@@ -2,10 +2,14 @@
 Creative Director: LLM-powered natural language video editing
 
 Translates natural language prompts into structured editing instructions
-using local LLMs (Llama 3.1, DeepSeek-R1) via Ollama.
+using local LLMs (Llama 3.1, DeepSeek-R1) via Ollama, or Google Gemini via cgpu.
 
 Architecture (2024/2025 industry standard):
   User Prompt → LLM → JSON Instructions → Validation → Editing Engine
+
+Backends:
+  - Ollama (local): OLLAMA_HOST environment variable
+  - cgpu/Gemini (cloud): CGPU_ENABLED=true, requires cgpu serve running
 
 Based on research:
 - Descript Underlord: Conversational editing interface
@@ -19,11 +23,27 @@ import requests
 from typing import Dict, Optional, Any
 from .style_templates import get_style_template, list_available_styles
 
-VERSION = "0.1.0"
+# Try importing OpenAI client for cgpu/Gemini support
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    OpenAI = None
+
+VERSION = "0.2.0"
+
+# Backend configuration
+CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
+CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
+CGPU_PORT = os.environ.get("CGPU_PORT", "8080")
+CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
+
+# Ollama (fallback/local)
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # or deepseek-r1:70b
 
-# System prompt for the Creative Director LLM
+# System prompt for the Creative Director LLM (style list is injected at runtime)
 DIRECTOR_SYSTEM_PROMPT = """You are the Creative Director for the Fluxibri video editing system.
 
 Your role: Translate natural language editing requests into structured JSON editing instructions.
@@ -34,7 +54,7 @@ Available cinematic styles:
 You MUST respond with ONLY valid JSON matching this structure:
 {{
   "style": {{
-    "name": "hitchcock" | "wes_anderson" | "mtv" | "documentary" | "minimalist" | "action" | "custom",
+    "name": {style_name_options},
     "mood": "suspenseful" | "playful" | "energetic" | "calm" | "dramatic" | "mysterious",
     "description": "Custom style description (only if name=custom)"
   }},
@@ -123,13 +143,15 @@ class CreativeDirector:
     LLM-powered Creative Director for video editing.
 
     Translates natural language prompts into structured editing instructions.
+    Supports multiple backends: Ollama (local) or cgpu/Gemini (cloud).
     """
 
     def __init__(
         self,
         ollama_host: str = OLLAMA_HOST,
         model: str = OLLAMA_MODEL,
-        timeout: int = 60
+        timeout: int = 60,
+        use_cgpu: bool = None
     ):
         """
         Initialize Creative Director.
@@ -138,17 +160,42 @@ class CreativeDirector:
             ollama_host: Ollama API endpoint
             model: LLM model to use (llama3.1:70b, deepseek-r1:70b, etc.)
             timeout: Request timeout in seconds
+            use_cgpu: Force cgpu backend (None = auto-detect from env)
         """
         self.ollama_host = ollama_host
-        self.model = model
+        self.ollama_model = model
         self.timeout = timeout
+        
+        # Determine backend
+        if use_cgpu is None:
+            self.use_cgpu = CGPU_ENABLED and OPENAI_AVAILABLE
+        else:
+            self.use_cgpu = use_cgpu and OPENAI_AVAILABLE
+        
+        # Initialize cgpu client if enabled
+        self.cgpu_client = None
+        if self.use_cgpu:
+            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}/v1"
+            try:
+                self.cgpu_client = OpenAI(
+                    base_url=cgpu_url,
+                    api_key="unused"  # cgpu ignores API key
+                )
+                print(f"   🌐 Creative Director using cgpu/Gemini at {cgpu_url}")
+            except Exception as e:
+                print(f"   ⚠️ Failed to initialize cgpu client: {e}")
+                self.use_cgpu = False
 
-        # Build system prompt with available styles
-        styles_list = "\n".join([
-            f"- {name}: {get_style_template(name)['description']}"
-            for name in list_available_styles()
-        ])
-        self.system_prompt = DIRECTOR_SYSTEM_PROMPT.format(styles_list=styles_list)
+        # Build system prompt with available styles from presets
+        available_styles = list_available_styles()
+        styles_list = "\n".join(
+            [f"- {name}: {get_style_template(name)['description']}" for name in available_styles]
+        )
+        style_name_options = " | ".join([f'\"{name}\"' for name in available_styles] + ['"custom"'])
+        self.system_prompt = DIRECTOR_SYSTEM_PROMPT.format(
+            styles_list=styles_list,
+            style_name_options=style_name_options,
+        )
 
     def interpret_prompt(self, user_prompt: str) -> Optional[Dict[str, Any]]:
         """
@@ -236,7 +283,7 @@ class CreativeDirector:
 
     def _query_llm(self, user_prompt: str) -> Optional[str]:
         """
-        Query Ollama LLM with user prompt.
+        Query LLM with user prompt (cgpu/Gemini or Ollama).
 
         Args:
             user_prompt: User's natural language request
@@ -244,9 +291,55 @@ class CreativeDirector:
         Returns:
             LLM response text (should be JSON)
         """
+        if self.use_cgpu and self.cgpu_client:
+            return self._query_cgpu(user_prompt)
+        else:
+            return self._query_ollama(user_prompt)
+
+    def _query_cgpu(self, user_prompt: str) -> Optional[str]:
+        """
+        Query cgpu/Gemini for creative direction.
+        
+        Uses OpenAI-compatible API provided by `cgpu serve`.
+        """
+        try:
+            response = self.cgpu_client.chat.completions.create(
+                model=CGPU_MODEL,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1024
+            )
+            
+            if response.choices and len(response.choices) > 0:
+                content = response.choices[0].message.content
+                # Clean up response - Gemini sometimes wraps JSON in markdown
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.startswith("```"):
+                    content = content[3:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                return content.strip()
+            else:
+                print("   ⚠️ cgpu/Gemini returned empty response")
+                return None
+                
+        except Exception as e:
+            print(f"   ⚠️ cgpu/Gemini error: {e}")
+            # Fallback to Ollama if cgpu fails
+            print("   🔄 Falling back to Ollama...")
+            return self._query_ollama(user_prompt)
+
+    def _query_ollama(self, user_prompt: str) -> Optional[str]:
+        """
+        Query Ollama LLM with user prompt (local fallback).
+        """
         try:
             payload = {
-                "model": self.model,
+                "model": self.ollama_model,
                 "prompt": user_prompt,
                 "system": self.system_prompt,
                 "stream": False,

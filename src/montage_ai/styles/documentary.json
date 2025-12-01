@@ -1,0 +1,13 @@
+{
+  "id": "documentary",
+  "name": "Documentary Realism",
+  "description": "Natural pacing, observational, minimal effects",
+  "params": {
+    "style": {"name": "documentary", "mood": "calm"},
+    "pacing": {"speed": "slow", "variation": "moderate", "intro_duration_beats": 16, "climax_intensity": 0.4},
+    "cinematography": {"prefer_wide_shots": true, "prefer_high_action": false, "match_cuts_enabled": true, "invisible_cuts_enabled": true, "shot_variation_priority": "medium"},
+    "transitions": {"type": "crossfade", "crossfade_duration_sec": 1.0},
+    "effects": {"color_grading": "neutral", "stabilization": true, "sharpness_boost": false},
+    "energy_mapping": {"sync_to_beats": false, "energy_amplification": 0.7}
+  }
+}

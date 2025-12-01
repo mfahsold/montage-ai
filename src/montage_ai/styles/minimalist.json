@@ -1,0 +1,14 @@
+{
+  "id": "minimalist",
+  "name": "Minimalist Art Film",
+  "description": "Very long takes, contemplative, sparse cuts",
+  "params": {
+    "style": {"name": "minimalist", "mood": "calm"},
+    "pacing": {"speed": "very_slow", "variation": "minimal", "intro_duration_beats": 32, "climax_intensity": 0.3},
+    "cinematography": {"prefer_wide_shots": true, "prefer_high_action": false, "match_cuts_enabled": true, "invisible_cuts_enabled": true, "shot_variation_priority": "low"},
+    "transitions": {"type": "crossfade", "crossfade_duration_sec": 2.0},
+    "effects": {"color_grading": "desaturated", "stabilization": true, "sharpness_boost": false},
+    "energy_mapping": {"sync_to_beats": false, "energy_amplification": 0.5},
+    "constraints": {"min_clip_duration_sec": 4.0, "max_clip_duration_sec": 60.0}
+  }
+}

@@ -1,101 +1,209 @@
 """
-Style Templates - Predefined editing styles
+Style template loader (config-first, no hardcoded presets).
 
-Usage:
-    from montage_ai.style_templates import get_style_template, list_available_styles
-    
-    styles = list_available_styles()  # ['hitchcock', 'mtv', 'action', ...]
-    template = get_style_template('hitchcock')
+Features
+- Ships with JSON presets in `montage_ai/styles/*.json`.
+- Overrides via env vars: `STYLE_PRESET_PATH` (file) or
+  `STYLE_PRESET_DIR` / `STYLE_TEMPLATES_DIR` (directory of *.json).
+- Later files override earlier ones (defaults < user overrides).
+- Lightweight validation to catch malformed presets.
 """
 
-STYLE_TEMPLATES = {
-    "hitchcock": {
-        "name": "Hitchcock Suspense",
-        "description": "Long takes building tension, rapid cuts at climax",
-        "params": {
-            "style": {"name": "hitchcock", "mood": "suspenseful"},
-            "pacing": {"speed": "dynamic", "variation": "high", "intro_duration_beats": 16, "climax_intensity": 0.9},
-            "cinematography": {"prefer_wide_shots": False, "prefer_high_action": True, "match_cuts_enabled": True, "invisible_cuts_enabled": True, "shot_variation_priority": "high"},
-            "transitions": {"type": "hard_cuts", "crossfade_duration_sec": 0.3},
-            "effects": {"color_grading": "high_contrast", "stabilization": False, "sharpness_boost": True}
-        }
+from __future__ import annotations
+
+import json
+import os
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, Iterable, List
+
+from jsonschema import ValidationError, validate
+
+# ---------------------------------------------------------------------------
+# Locations
+# ---------------------------------------------------------------------------
+
+DEFAULT_STYLE_DIR = Path(__file__).resolve().parent / "styles"
+ENV_STYLE_FILE = os.environ.get("STYLE_PRESET_PATH") or os.environ.get("STYLE_TEMPLATE_PATH")
+ENV_STYLE_DIR = os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")
+
+
+# ---------------------------------------------------------------------------
+# Validation schema (minimal on purpose)
+# ---------------------------------------------------------------------------
+
+STYLE_SCHEMA = {
+    "type": "object",
+    "required": ["id", "name", "description", "params"],
+    "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "params": {"type": "object"},
     },
-    "mtv": {
-        "name": "MTV Fast-Paced",
-        "description": "Rapid 1-2 beat cuts, high energy music video style",
-        "params": {
-            "style": {"name": "mtv", "mood": "energetic"},
-            "pacing": {"speed": "very_fast", "variation": "high", "intro_duration_beats": 2, "climax_intensity": 1.0},
-            "cinematography": {"prefer_wide_shots": False, "prefer_high_action": True, "match_cuts_enabled": False, "invisible_cuts_enabled": True, "shot_variation_priority": "high"},
-            "transitions": {"type": "hard_cuts", "crossfade_duration_sec": 0.0},
-            "effects": {"color_grading": "vibrant", "stabilization": False, "sharpness_boost": True},
-            "energy_mapping": {"sync_to_beats": True, "energy_amplification": 1.5}
-        }
-    },
-    "action": {
-        "name": "Action Blockbuster",
-        "description": "Michael Bay style - explosive energy, rapid cuts",
-        "params": {
-            "style": {"name": "action", "mood": "dramatic"},
-            "pacing": {"speed": "fast", "variation": "fibonacci", "intro_duration_beats": 4, "climax_intensity": 0.95},
-            "cinematography": {"prefer_wide_shots": False, "prefer_high_action": True, "match_cuts_enabled": True, "invisible_cuts_enabled": True, "shot_variation_priority": "high"},
-            "transitions": {"type": "hard_cuts", "crossfade_duration_sec": 0.0},
-            "effects": {"color_grading": "vibrant", "stabilization": False, "sharpness_boost": True},
-            "energy_mapping": {"sync_to_beats": True, "energy_amplification": 1.8}
-        }
-    },
-    "documentary": {
-        "name": "Documentary Realism",
-        "description": "Natural pacing, observational, minimal effects",
-        "params": {
-            "style": {"name": "documentary", "mood": "calm"},
-            "pacing": {"speed": "slow", "variation": "moderate", "intro_duration_beats": 16, "climax_intensity": 0.4},
-            "cinematography": {"prefer_wide_shots": True, "prefer_high_action": False, "match_cuts_enabled": True, "invisible_cuts_enabled": True, "shot_variation_priority": "medium"},
-            "transitions": {"type": "crossfade", "crossfade_duration_sec": 1.0},
-            "effects": {"color_grading": "neutral", "stabilization": True, "sharpness_boost": False},
-            "energy_mapping": {"sync_to_beats": False, "energy_amplification": 0.7}
-        }
-    },
-    "minimalist": {
-        "name": "Minimalist Art Film",
-        "description": "Very long takes, contemplative, sparse cuts",
-        "params": {
-            "style": {"name": "minimalist", "mood": "calm"},
-            "pacing": {"speed": "very_slow", "variation": "minimal", "intro_duration_beats": 32, "climax_intensity": 0.3},
-            "cinematography": {"prefer_wide_shots": True, "prefer_high_action": False, "match_cuts_enabled": True, "invisible_cuts_enabled": True, "shot_variation_priority": "low"},
-            "transitions": {"type": "crossfade", "crossfade_duration_sec": 2.0},
-            "effects": {"color_grading": "desaturated", "stabilization": True, "sharpness_boost": False},
-            "energy_mapping": {"sync_to_beats": False, "energy_amplification": 0.5},
-            "constraints": {"min_clip_duration_sec": 4.0, "max_clip_duration_sec": 60.0}
-        }
-    },
-    "wes_anderson": {
-        "name": "Wes Anderson",
-        "description": "Symmetrical, whimsical, measured pacing",
-        "params": {
-            "style": {"name": "wes_anderson", "mood": "playful"},
-            "pacing": {"speed": "slow", "variation": "minimal", "intro_duration_beats": 8, "climax_intensity": 0.5},
-            "cinematography": {"prefer_wide_shots": True, "prefer_high_action": False, "match_cuts_enabled": True, "invisible_cuts_enabled": False, "shot_variation_priority": "low"},
-            "transitions": {"type": "crossfade", "crossfade_duration_sec": 0.8},
-            "effects": {"color_grading": "warm", "stabilization": True, "sharpness_boost": False}
-        }
-    }
 }
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _style_files() -> List[Path]:
+    """Gather style preset files with precedence: defaults then overrides."""
+
+    candidates: List[Path] = []
+
+    if DEFAULT_STYLE_DIR.exists():
+        candidates.extend(sorted(DEFAULT_STYLE_DIR.glob("*.json")))
+
+    if ENV_STYLE_DIR:
+        env_dir = Path(ENV_STYLE_DIR)
+        if env_dir.is_dir():
+            candidates.extend(sorted(env_dir.glob("*.json")))
+        elif env_dir.is_file() and env_dir.suffix.lower() == ".json":
+            candidates.append(env_dir)
+
+    if ENV_STYLE_FILE:
+        env_file = Path(ENV_STYLE_FILE)
+        if env_file.is_file() and env_file.suffix.lower() == ".json":
+            candidates.append(env_file)
+
+    # Deduplicate while preserving order
+    seen: set[Path] = set()
+    unique: List[Path] = []
+    for path in candidates:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique.append(path)
+    return unique
+
+
+def _extract_templates(raw: object, source: Path) -> Iterable[dict]:
+    """Normalize raw JSON content into an iterable of template dicts."""
+
+    if isinstance(raw, dict) and "params" in raw:
+        yield raw
+        return
+
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict):
+                yield item
+        return
+
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            if isinstance(value, dict):
+                value.setdefault("id", key)
+                yield value
+        return
+
+    raise TypeError(f"Style file {source} must contain an object or array of objects")
+
+
+def _normalize_template(raw: dict, source: Path) -> dict:
+    """Ensure required keys exist and align identifiers."""
+
+    template_id = (
+        raw.get("id")
+        or raw.get("key")
+        or raw.get("slug")
+        or raw.get("style", {}).get("name")
+        or raw.get("params", {}).get("style", {}).get("name")
+        or source.stem
+    )
+
+    params = raw.get("params", {}) or {}
+    style_block = params.get("style", {}) or {}
+    style_block.setdefault("name", str(template_id))
+    params["style"] = style_block
+
+    normalized = {
+        "id": str(template_id).lower(),
+        "name": raw.get("name") or style_block.get("label") or str(template_id),
+        "description": raw.get("description", ""),
+        "params": params,
+    }
+
+    validate(instance=normalized, schema=STYLE_SCHEMA)
+    return normalized
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def load_style_templates() -> Dict[str, dict]:
+    """Load and cache style templates from JSON files."""
+
+    templates: Dict[str, dict] = {}
+    files = _style_files()
+
+    if not files:
+        raise RuntimeError(
+            "No style preset files found. Set STYLE_PRESET_DIR/STYLE_PRESET_PATH or keep defaults."
+        )
+
+    for path in files:
+        try:
+            raw_content = json.loads(path.read_text())
+        except Exception as exc:  # noqa: BLE001
+            print(f"⚠️  Skipping style file {path}: {exc}")
+            continue
+
+        try:
+            candidate_templates = list(_extract_templates(raw_content, path))
+        except Exception as exc:  # noqa: BLE001
+            print(f"⚠️  Skipping style file {path}: {exc}")
+            continue
+
+        for entry in candidate_templates:
+            try:
+                normalized = _normalize_template(entry, path)
+            except ValidationError as exc:
+                print(f"⚠️  Invalid style in {path}: {exc.message}")
+                continue
+            except Exception as exc:  # noqa: BLE001
+                print(f"⚠️  Skipping style in {path}: {exc}")
+                continue
+
+            templates[normalized["id"]] = normalized  # later files override earlier ones
+
+    if not templates:
+        raise RuntimeError("Failed to load any style templates; check preset files")
+
+    return templates
+
+
+def reload_style_templates() -> None:
+    """Clear cache so new/changed presets are picked up."""
+
+    load_style_templates.cache_clear()
+
+
 def get_style_template(style_name: str) -> dict:
-    """Get a style template by name."""
-    if style_name not in STYLE_TEMPLATES:
-        available = ", ".join(STYLE_TEMPLATES.keys())
+    """Get a style template by id (case-insensitive)."""
+
+    templates = load_style_templates()
+    key = style_name.lower()
+    if key not in templates:
+        available = ", ".join(sorted(templates.keys()))
         raise KeyError(f"Unknown style '{style_name}'. Available: {available}")
-    return STYLE_TEMPLATES[style_name]
+    return templates[key]
 
 
-def list_available_styles() -> list:
-    """List all available style names."""
-    return list(STYLE_TEMPLATES.keys())
+def list_available_styles() -> List[str]:
+    """List available style ids (sorted)."""
+
+    return sorted(load_style_templates().keys())
 
 
 def get_style_description(style_name: str) -> str:
-    """Get the description of a style."""
-    return STYLE_TEMPLATES[style_name]["description"]
+    """Get the human-friendly description for a style."""
+
+    return get_style_template(style_name)["description"]
+

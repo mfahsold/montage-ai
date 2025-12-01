@@ -1,0 +1,12 @@
+{
+  "id": "hitchcock",
+  "name": "Hitchcock Suspense",
+  "description": "Long takes building tension, rapid cuts at climax",
+  "params": {
+    "style": {"name": "hitchcock", "mood": "suspenseful"},
+    "pacing": {"speed": "dynamic", "variation": "high", "intro_duration_beats": 16, "climax_intensity": 0.9},
+    "cinematography": {"prefer_wide_shots": false, "prefer_high_action": true, "match_cuts_enabled": true, "invisible_cuts_enabled": true, "shot_variation_priority": "high"},
+    "transitions": {"type": "hard_cuts", "crossfade_duration_sec": 0.3},
+    "effects": {"color_grading": "high_contrast", "stabilization": false, "sharpness_boost": true}
+  }
+}

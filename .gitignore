@@ -31,5 +31,9 @@ data/output/
 *.log
 logs/
 
+# Local business documentation (not tracked)
+BACKLOG.md
+docs/internal/
+
 # macOS
 .DS_Store

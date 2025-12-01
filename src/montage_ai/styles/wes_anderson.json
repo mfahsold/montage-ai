@@ -1,0 +1,12 @@
+{
+  "id": "wes_anderson",
+  "name": "Wes Anderson",
+  "description": "Symmetrical, whimsical, measured pacing",
+  "params": {
+    "style": {"name": "wes_anderson", "mood": "playful"},
+    "pacing": {"speed": "slow", "variation": "minimal", "intro_duration_beats": 8, "climax_intensity": 0.5},
+    "cinematography": {"prefer_wide_shots": true, "prefer_high_action": false, "match_cuts_enabled": true, "invisible_cuts_enabled": false, "shot_variation_priority": "low"},
+    "transitions": {"type": "crossfade", "crossfade_duration_sec": 0.8},
+    "effects": {"color_grading": "warm", "stabilization": true, "sharpness_boost": false}
+  }
+}

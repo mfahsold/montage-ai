@@ -10,6 +10,9 @@ scenedetect[opencv]
 # HTTP / API
 requests
 
+# LLM API (cgpu/Gemini integration)
+openai>=1.0.0
+
 # System Monitoring
 psutil>=5.9.0
 

@@ -18,7 +18,11 @@ dependencies = [
     "scenedetect[opencv]>=0.6.0",
     "tqdm>=4.65.0",
     "requests>=2.31.0",
+    "jsonschema>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"montage_ai" = ["styles/*.json"]

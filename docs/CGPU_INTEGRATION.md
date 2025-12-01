@@ -1,175 +1,158 @@
 ---
-title: "cgpu Integration Plan"
-summary: "Integration von cgpu für LLM-basierte kreative Steuerung"
+title: "cgpu Integration"
+summary: "cgpu integration for free cloud GPU and Gemini LLM"
 updated: 2025-12-01
+status: implemented
 ---
 
-# cgpu Integration für Montage-AI
+# cgpu Integration for Montage-AI
 
-## Übersicht
+## Status: ✅ Implemented
 
-**cgpu** (github.com/RohanAdwankar/cgpu) bietet zwei Hauptfunktionen:
-1. **Free Cloud GPU** via Google Colab (für CUDA-Entwicklung)
-2. **`cgpu serve`** - OpenAI-kompatibler API-Server, der Google Gemini proxyt
+cgpu (github.com/RohanAdwankar/cgpu) is now integrated, providing:
+1. **Free LLM API** via `cgpu serve` (Google Gemini proxy)
+2. **Free Cloud GPU** via `cgpu run` (Google Colab GPUs for Real-ESRGAN)
 
-## Wichtig: Was cgpu kann und was nicht
-
-### ✅ Geeignet für Montage-AI:
-| Feature | Nutzen |
-|---------|--------|
-| `cgpu serve` (Gemini API) | Creative Director: NLP → Editing-Parameter |
-| Free LLM Inference | Intelligente Clip-Analyse, Story-Arc-Generierung |
-| OpenAI-kompatible API | Einfache Integration via `openai` Python-Client |
-
-### ❌ NICHT geeignet (bleibt lokal):
-| Feature | Grund |
-|---------|-------|
-| Real-ESRGAN Upscaling | Benötigt lokale GPU/CPU |
-| Video Stabilization | OpenCV/FFmpeg lokal |
-| FFmpeg Encoding | Lokaler Prozess |
-| Beat Detection | librosa (CPU) |
-
-## Architektur
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Montage-AI                                │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────┐    ┌─────────────────┐    ┌───────────────┐  │
-│  │   CLI/API    │───▶│ Creative        │───▶│ cgpu serve    │  │
-│  │              │    │ Director        │    │ (Gemini API)  │  │
-│  └──────────────┘    └─────────────────┘    └───────┬───────┘  │
-│         │                    │                       │          │
-│         │                    ▼                       ▼          │
-│         │           ┌─────────────────┐     ┌───────────────┐  │
-│         │           │ Footage         │     │ Google Gemini │  │
-│         │           │ Analyzer        │     │ (Free LLM)    │  │
-│         │           └─────────────────┘     └───────────────┘  │
-│         │                    │                                  │
-│         ▼                    ▼                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                     Editor (editor.py)                    │  │
-│  │  - Beat Sync          - Scene Detection                   │  │
-│  │  - Style Templates    - Composition                       │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │              Local Video Processing (FFmpeg/OpenCV)       │  │
-│  │  - Upscaling (Real-ESRGAN)  - Stabilization              │  │
-│  │  - Encoding (H.264/H.265)   - Color Grading              │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Geplante Änderungen
-
-### 1. Dependencies
+## Quick Start
 
 ```bash
-# Neue Abhängigkeit
-npm install -g cgpu  # Für cgpu serve
+# Install cgpu (one-time)
+npm i -g cgpu
 
-# Python-Client (bereits vorhanden)
-pip install openai
+# Install gemini-cli (required for cgpu serve)
+# See: https://github.com/google-gemini/gemini-cli
+
+# First-time setup (interactive wizard)
+cgpu connect
+
+# Option 1: Use Gemini for Creative Director
+./montage-ai.sh run hitchcock --cgpu
+
+# Option 2: Use cloud GPU for upscaling
+./montage-ai.sh run hitchcock --cgpu --cgpu-gpu --upscale
+
+# Option 3: Full cgpu mode (LLM + GPU)
+./montage-ai.sh hq hitchcock --cgpu --cgpu-gpu
 ```
 
-### 2. Neue Umgebungsvariablen
+## How It Works
+
+cgpu provides two main features:
+
+1. **LLM API** - `cgpu serve` proxies to Google Gemini (used by Creative Director)
+2. **Cloud GPU** - `cgpu run` executes code on Google Colab GPUs (used for AI upscaling)
+
+See [Architecture](architecture.md) for full system design.
+
+## Environment Variables
+
+| Variable           | Default                | Description                              |
+| ------------------ | ---------------------- | ---------------------------------------- |
+| `CGPU_ENABLED`     | `false`                | Enable cgpu/Gemini for Creative Director |
+| `CGPU_HOST`        | `host.docker.internal` | cgpu serve host                          |
+| `CGPU_PORT`        | `8080`                 | cgpu serve port                          |
+| `CGPU_MODEL`       | `gemini-2.0-flash`     | Gemini model to use                      |
+| `CGPU_GPU_ENABLED` | `false`                | Enable cloud GPU for upscaling           |
+| `CGPU_TIMEOUT`     | `600`                  | Cloud GPU operation timeout (seconds)    |
+
+## CLI Commands
 
 ```bash
-# .env
-CGPU_ENABLED=true
-CGPU_HOST=127.0.0.1
-CGPU_PORT=8080
-CGPU_MODEL=gemini-2.0-flash
+# cgpu management
+./montage-ai.sh cgpu-start    # Start cgpu serve (Gemini API)
+./montage-ai.sh cgpu-stop     # Stop cgpu serve
+./montage-ai.sh cgpu-status   # Check cgpu installation/status
+
+# Running with cgpu
+./montage-ai.sh run --cgpu              # Use Gemini LLM
+./montage-ai.sh run --cgpu-gpu          # Use cloud GPU for upscaling
+./montage-ai.sh run --cgpu --cgpu-gpu   # Both features
 ```
 
-### 3. Zu ändernde Dateien
+## Files Modified
 
-| Datei | Änderung |
-|-------|----------|
-| `requirements.txt` | `openai>=1.0.0` hinzufügen |
-| `src/montage_ai/creative_director.py` | cgpu/Gemini-Backend statt lokales LLM |
-| `src/montage_ai/footage_analyzer.py` | LLM-basierte Clip-Beschreibung |
-| `docker-compose.yml` | `cgpu serve` als Sidecar-Service |
-| `montage-ai.sh` | `cgpu serve` automatisch starten |
+| File                                  | Changes                              |
+| ------------------------------------- | ------------------------------------ |
+| `requirements.txt`                    | Added `openai>=1.0.0`                |
+| `src/montage_ai/creative_director.py` | Added cgpu/Gemini backend            |
+| `src/montage_ai/cgpu_upscaler.py`     | **NEW** - Cloud GPU upscaling module |
+| `src/montage_ai/editor.py`            | Integrated cgpu upscaler             |
+| `docker-compose.yml`                  | Added cgpu environment variables     |
+| `montage-ai.sh`                       | Added cgpu commands and flags        |
 
-### 4. Creative Director Integration
+## Implementation Details
+
+### Creative Director (Gemini LLM)
+
+When `CGPU_ENABLED=true`:
+
+1. `cgpu serve` runs locally, proxying to Google Gemini
+2. Creative Director uses OpenAI-compatible API at `http://localhost:8080/v1`
+3. Falls back to Ollama if cgpu is unavailable
 
 ```python
-from openai import OpenAI
-
-class CreativeDirector:
-    def __init__(self, cgpu_url="http://localhost:8080/v1"):
-        self.client = OpenAI(
-            base_url=cgpu_url,
-            api_key="unused"  # cgpu ignoriert API key
-        )
-    
-    def interpret_prompt(self, user_prompt: str) -> dict:
-        """Natural Language → Editing Parameters"""
-        response = self.client.responses.create(
-            model="gemini-2.0-flash",
-            instructions="""You are a video editing AI. Convert the user's 
-            creative direction into specific editing parameters.
-            Return JSON with: style, energy, cut_frequency, mood""",
-            input=user_prompt
-        )
-        return json.loads(response.output_text)
+# In creative_director.py
+if self.use_cgpu and self.cgpu_client:
+    return self._query_cgpu(user_prompt)  # Uses Gemini
+else:
+    return self._query_ollama(user_prompt)  # Local fallback
 ```
 
-### 5. Docker Compose Erweiterung
+### Cloud GPU Upscaling
 
-```yaml
-services:
-  cgpu:
-    image: node:20-slim
-    command: npx cgpu serve --port 8080 --host 0.0.0.0
+When `CGPU_GPU_ENABLED=true` and `UPSCALE=true`:
+
+1. Video frames extracted locally
+2. Frames uploaded to Google Colab via cgpu
+3. Real-ESRGAN runs on T4/A100 GPU
+4. Upscaled frames downloaded
+5. Video reassembled locally
+
+Priority order:
+
+1. cgpu Cloud GPU (if enabled)
+2. Local Vulkan GPU (if available)
+3. FFmpeg Lanczos (CPU fallback)
+
+## Limitations
+
+1. **Internet required** - Both features need connectivity
+2. **Rate limits** - Google Gemini has usage limits
+3. **Colab quotas** - Cloud GPU usage is limited
+4. **Latency** - Cloud operations add network overhead
+5. **gemini-cli required** - Must install separately for `cgpu serve`
+
+## Fallback Behavior
+
+The system gracefully falls back when cgpu is unavailable:
+
+- **LLM**: Falls back to Ollama (local)
+- **Upscaling**: Falls back to local Vulkan GPU or FFmpeg
+
+## Testing
+
+```bash
+# Check cgpu status
+./montage-ai.sh cgpu-status
+
+# Test Gemini integration
+CGPU_ENABLED=true python -c "
+from montage_ai.creative_director import CreativeDirector
+d = CreativeDirector()
+print(d.interpret_prompt('Edit like Hitchcock'))
+"
+
+# Test cloud GPU
+CGPU_GPU_ENABLED=true python -c "
+from montage_ai.cgpu_upscaler import is_cgpu_available, check_cgpu_gpu
+print(f'Available: {is_cgpu_available()}')
+print(f'GPU: {check_cgpu_gpu()}')
+"
+```
+
+## References
+
+- cgpu GitHub: <https://github.com/RohanAdwankar/cgpu>
+- Gemini CLI: <https://github.com/google-gemini/gemini-cli>
+- OpenAI Python Client: <https://github.com/openai/openai-python>
     ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  montage:
-    build: .
-    depends_on:
-      - cgpu
-    environment:
-      - CGPU_URL=http://cgpu:8080/v1
-```
-
-## Einschränkungen
-
-1. **cgpu serve benötigt `gemini` CLI** installiert (https://github.com/google-gemini/gemini-cli)
-2. **Keine GPU-Beschleunigung für Video** - nur für LLM
-3. **Rate Limits** von Google Gemini gelten
-4. **Keine Offline-Fähigkeit** - Internet erforderlich für LLM
-
-## Phasen-Plan
-
-### Phase 1 (Priorität):
-- [ ] `cgpu serve` für Creative Director (NLP → Parameter)
-- [ ] Footage Analyzer mit LLM-Beschreibungen
-- [ ] Fallback auf lokale Defaults wenn cgpu nicht verfügbar
-
-### Phase 2 (Später):
-- [ ] Story-Arc-Generator mit Gemini
-- [ ] Automatische Musik-Mood-Matching
-- [ ] Clip-Kategorisierung via Vision (wenn Gemini Vision unterstützt)
-
-## Nicht ändern
-
-- Video-Processing bleibt lokal (FFmpeg, OpenCV)
-- Upscaling bleibt Real-ESRGAN (lokal)
-- Beat Detection bleibt librosa (lokal)
-- Style Templates bleiben Python-Dictionaries
-
-## Referenzen
-
-- cgpu GitHub: https://github.com/RohanAdwankar/cgpu
-- Gemini CLI: https://github.com/google-gemini/gemini-cli
-- OpenAI Python Client: https://github.com/openai/openai-python

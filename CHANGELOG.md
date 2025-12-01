@@ -1,0 +1,73 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- cgpu integration for free cloud GPU and LLM access
+  - `src/montage_ai/cgpu_upscaler.py`: New module for cloud GPU upscaling via cgpu/Google Colab
+    - Offloads Real-ESRGAN to free T4/A100 GPUs
+    - Automatic fallback to local Vulkan/CPU when cgpu unavailable
+    - Frame extraction → cloud processing → reassembly pipeline
+  - `creative_director.py`: Dual backend support (Ollama + cgpu/Gemini)
+    - OpenAI-compatible client for cgpu serve endpoint
+    - Automatic fallback from Gemini → Ollama on failure
+  - `montage-ai.sh`: cgpu management commands
+    - `cgpu-start`: Launch cgpu serve in background
+    - `cgpu-stop`: Stop cgpu serve process
+    - `cgpu-status`: Check cgpu availability
+    - `--cgpu` flag: Enable Gemini LLM backend
+    - `--cgpu-gpu` flag: Enable cloud GPU for upscaling
+  - New environment variables in `docker-compose.yml`:
+    - `CGPU_ENABLED`: Enable cgpu/Gemini LLM backend
+    - `CGPU_HOST`: cgpu serve host (default: host.docker.internal)
+    - `CGPU_PORT`: cgpu serve port (default: 5021)
+    - `CGPU_MODEL`: Gemini model (default: gemini-2.0-flash)
+    - `CGPU_GPU_ENABLED`: Enable cloud GPU for upscaling
+    - `CGPU_TIMEOUT`: Cloud operation timeout (default: 300s)
+
+### Changed
+
+- `editor.py`: Updated upscale pipeline with cgpu priority
+  - Priority order: cgpu cloud GPU → local Vulkan GPU → FFmpeg CPU fallback
+  - Added cgpu_upscaler import and integration
+- `requirements.txt`: Added `openai>=1.0.0` for cgpu/Gemini API compatibility
+
+### Technical
+
+- `.github/copilot-instructions.md`: Created AI coding agent instructions
+  - Architecture overview and component documentation
+  - cgpu integration documented as priority task
+  - Code conventions and development workflow
+  - Change documentation requirements added
+- Documentation overhaul - created comprehensive SOTA documentation:
+  - `docs/README.md`: Documentation index with table of contents
+  - `docs/features.md`: Detailed feature documentation (beat sync, styles, Creative Director, story arc, enhancement pipeline, hardware acceleration)
+  - `docs/configuration.md`: Complete environment variable reference
+  - `docs/styles.md`: Style guide with all presets and customization instructions
+  - `docs/architecture.md`: System design with data flow diagrams
+  - `docs/CGPU_INTEGRATION.md`: Updated from planning doc to implementation status
+- `README.md`: Streamlined as project overview with feature list and doc links
+- `BACKLOG.md`: Created structured backlog for task tracking (local only, gitignored)
+- `.gitignore`: Added exclusions for local business documentation
+- Style preset system is now config-first (no hardcoded styles in code)
+  - JSON presets ship in `montage_ai/styles/*.json` and are packaged
+  - Override via env vars: `STYLE_PRESET_DIR` (folder) or `STYLE_PRESET_PATH` (single file)
+  - Loader validates presets with `jsonschema`, supports multi-style files, and allows override precedence
+  - Creative Director prompt pulls available styles dynamically from loaded presets
+
+## [0.3.0] - 2024-XX-XX
+
+### Features
+
+- Initial release with core montage editing capabilities
+- Beat-synchronized video editing via librosa
+- Creative Director LLM integration (Ollama)
+- Style templates: hitchcock, mtv, documentary, action, dynamic, minimalist
+- Footage Manager with story arc awareness
+- Real-time monitoring and decision logging

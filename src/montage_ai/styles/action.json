@@ -1,0 +1,13 @@
+{
+  "id": "action",
+  "name": "Action Blockbuster",
+  "description": "Explosive energy, rapid cuts, blockbuster pacing",
+  "params": {
+    "style": {"name": "action", "mood": "dramatic"},
+    "pacing": {"speed": "fast", "variation": "fibonacci", "intro_duration_beats": 4, "climax_intensity": 0.95},
+    "cinematography": {"prefer_wide_shots": false, "prefer_high_action": true, "match_cuts_enabled": true, "invisible_cuts_enabled": true, "shot_variation_priority": "high"},
+    "transitions": {"type": "hard_cuts", "crossfade_duration_sec": 0.0},
+    "effects": {"color_grading": "vibrant", "stabilization": false, "sharpness_boost": true},
+    "energy_mapping": {"sync_to_beats": true, "energy_amplification": 1.8}
+  }
+}

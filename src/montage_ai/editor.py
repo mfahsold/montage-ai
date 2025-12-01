@@ -61,7 +61,7 @@ ASSETS_DIR = "/data/assets"
 OUTPUT_DIR = "/data/output"
 TEMP_DIR = "/tmp"
 
-# Job Identification (für parallele Runs)
+# Job Identification (for parallel runs)
 JOB_ID = os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 # LLM / AI Configuration
@@ -105,6 +105,9 @@ MAX_PARALLEL_JOBS = int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, multiproc
 # GPU/Hardware Acceleration (auto-detected)
 USE_GPU = os.environ.get("USE_GPU", "auto").lower()  # auto, vulkan, v4l2, none
 
+# cgpu Cloud GPU Configuration
+CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
+
 # ============================================================================
 # GLOBAL EDITING INSTRUCTIONS (Set by Creative Director)
 # ============================================================================
@@ -112,6 +115,15 @@ EDITING_INSTRUCTIONS = None  # Will be populated by interpret_creative_prompt()
 
 # GPU/Hardware Capability Detection (set at runtime)
 GPU_CAPABILITY = None  # Will be set by detect_gpu_capabilities()
+
+# Import cgpu Cloud Upscaler if available
+try:
+    from .cgpu_upscaler import upscale_with_cgpu, is_cgpu_available
+    CGPU_UPSCALER_AVAILABLE = True
+except ImportError:
+    CGPU_UPSCALER_AVAILABLE = False
+    is_cgpu_available = lambda: False
+    upscale_with_cgpu = None
 
 # Import Timeline Exporter if available
 try:
@@ -1672,15 +1684,24 @@ def upscale_clip(input_path, output_path):
     Upscale video using the best available method.
     
     Priority:
-    1. Real-ESRGAN (if Vulkan GPU is available) - SOTA quality
-    2. FFmpeg Lanczos + Sharpening (CPU fallback) - Good quality, always works
+    1. cgpu Cloud GPU (if CGPU_GPU_ENABLED) - Free cloud GPU via Google Colab
+    2. Real-ESRGAN local (if Vulkan GPU is available) - SOTA quality
+    3. FFmpeg Lanczos + Sharpening (CPU fallback) - Good quality, always works
     
     NOTE: realesrgan-ncnn-vulkan does NOT support CPU mode (-g -1 is invalid).
     On systems without Vulkan compute (like Qualcomm Adreno), we use FFmpeg.
     """
     print(f"   ✨ Upscaling {os.path.basename(input_path)}...")
     
-    # Check if Real-ESRGAN can work (Vulkan GPU available)
+    # Priority 1: cgpu Cloud GPU
+    if CGPU_GPU_ENABLED and CGPU_UPSCALER_AVAILABLE and is_cgpu_available():
+        print(f"   ☁️ Attempting cgpu cloud GPU upscaling...")
+        result = upscale_with_cgpu(input_path, output_path, scale=2)
+        if result:
+            return result
+        print(f"   ⚠️ cgpu upscaling failed, falling back to local methods...")
+    
+    # Priority 2: Local Vulkan GPU
     real_esrgan_available = False
     
     try:
