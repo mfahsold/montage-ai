@@ -15,8 +15,13 @@ patches:
         template:
           spec:
             nodeSelector:
+              kubernetes.io/arch: arm64
               kubernetes.io/hostname: codeaijetson-desktop
-            runtimeClassName: nvidia
+            # runtimeClassName: nvidia  # uncomment if runtimeclass exists
+            tolerations:
+              - key: "node.kubernetes.io/disk-pressure"
+                operator: "Exists"
+                effect: "NoSchedule"
             containers:
               - name: montage-ai
                 env:
@@ -26,12 +31,12 @@ patches:
                     value: "/usr/lib/aarch64-linux-gnu/nvidia/nvidia_icd.json"
                 resources:
                   requests:
-                    cpu: "4"
-                    memory: "8Gi"
+                    cpu: "3"
+                    memory: "4Gi"
                     nvidia.com/gpu: "1"
                   limits:
                     cpu: "6"
-                    memory: "16Gi"
+                    memory: "7Gi"
                     nvidia.com/gpu: "1"
             volumes:
               - name: dev-dri

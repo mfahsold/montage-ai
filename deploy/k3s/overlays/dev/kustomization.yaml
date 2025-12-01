@@ -21,8 +21,8 @@ patches:
               - name: montage-ai
                 resources:
                   requests:
-                    cpu: "4"
-                    memory: "8Gi"
+                    cpu: "2"
+                    memory: "6Gi"
                   limits:
                     cpu: "6"
                     memory: "16Gi"

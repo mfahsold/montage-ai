@@ -17,6 +17,10 @@ spec:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: renderer
     spec:
+      securityContext:
+        # render group on fluxibriserver is gid 992, video is 44
+        fsGroup: 992
+        supplementalGroups: [44,992]
       restartPolicy: Never
       containers:
         - name: montage-ai
