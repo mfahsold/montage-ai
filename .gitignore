@@ -17,8 +17,15 @@ venv/
 .vscode/
 *.swp
 
-# Output only (keep input data)
+# Media files (user provides their own)
+data/input/
+data/music/
 data/output/
+*.mp4
+*.mp3
+*.wav
+*.mov
+*.avi
 
 # Logs
 *.log
