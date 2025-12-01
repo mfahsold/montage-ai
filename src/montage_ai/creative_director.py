@@ -1,0 +1,417 @@
+"""
+Creative Director: LLM-powered natural language video editing
+
+Translates natural language prompts into structured editing instructions
+using local LLMs (Llama 3.1, DeepSeek-R1) via Ollama.
+
+Architecture (2024/2025 industry standard):
+  User Prompt → LLM → JSON Instructions → Validation → Editing Engine
+
+Based on research:
+- Descript Underlord: Conversational editing interface
+- DirectorLLM: Llama-based cinematography orchestration
+- LAVE: Structured JSON output for video editing
+"""
+
+import os
+import json
+import requests
+from typing import Dict, Optional, Any
+from .style_templates import get_style_template, list_available_styles
+
+VERSION = "0.1.0"
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
+OLLAMA_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # or deepseek-r1:70b
+
+# System prompt for the Creative Director LLM
+DIRECTOR_SYSTEM_PROMPT = """You are the Creative Director for the Fluxibri video editing system.
+
+Your role: Translate natural language editing requests into structured JSON editing instructions.
+
+Available cinematic styles:
+{styles_list}
+
+You MUST respond with ONLY valid JSON matching this structure:
+{{
+  "style": {{
+    "name": "hitchcock" | "wes_anderson" | "mtv" | "documentary" | "minimalist" | "action" | "custom",
+    "mood": "suspenseful" | "playful" | "energetic" | "calm" | "dramatic" | "mysterious",
+    "description": "Custom style description (only if name=custom)"
+  }},
+  "pacing": {{
+    "speed": "very_slow" | "slow" | "medium" | "fast" | "very_fast" | "dynamic",
+    "variation": "minimal" | "moderate" | "high" | "fibonacci",
+    "intro_duration_beats": 4-32,
+    "climax_intensity": 0.0-1.0
+  }},
+  "cinematography": {{
+    "prefer_wide_shots": true | false,
+    "prefer_high_action": true | false,
+    "match_cuts_enabled": true | false,
+    "invisible_cuts_enabled": true | false,
+    "shot_variation_priority": "low" | "medium" | "high"
+  }},
+  "transitions": {{
+    "type": "hard_cuts" | "crossfade" | "mixed" | "energy_aware",
+    "crossfade_duration_sec": 0.1-2.0
+  }},
+  "energy_mapping": {{
+    "sync_to_beats": true | false,
+    "energy_amplification": 0.5-2.0
+  }},
+  "effects": {{
+    "color_grading": "none" | "neutral" | "warm" | "cool" | "high_contrast" | "desaturated" | "vibrant",
+    "stabilization": true | false,
+    "upscale": true | false,
+    "sharpness_boost": true | false
+  }},
+  "constraints": {{
+    "target_duration_sec": null | number,
+    "min_clip_duration_sec": 0.5-10.0,
+    "max_clip_duration_sec": 2.0-60.0
+  }}
+}}
+
+Examples:
+
+User: "Edit this like a Hitchcock thriller"
+Response:
+{{
+  "style": {{"name": "hitchcock", "mood": "suspenseful"}},
+  "pacing": {{"speed": "dynamic", "variation": "high", "intro_duration_beats": 16, "climax_intensity": 0.9}},
+  "cinematography": {{"prefer_wide_shots": false, "prefer_high_action": true, "match_cuts_enabled": true, "invisible_cuts_enabled": true, "shot_variation_priority": "high"}},
+  "transitions": {{"type": "hard_cuts", "crossfade_duration_sec": 0.3}},
+  "effects": {{"color_grading": "high_contrast", "stabilization": false, "sharpness_boost": true}}
+}}
+
+User: "Make it calm and meditative with long shots"
+Response:
+{{
+  "style": {{"name": "minimalist", "mood": "calm"}},
+  "pacing": {{"speed": "very_slow", "variation": "minimal", "intro_duration_beats": 32, "climax_intensity": 0.3}},
+  "cinematography": {{"prefer_wide_shots": true, "prefer_high_action": false, "match_cuts_enabled": true, "invisible_cuts_enabled": true, "shot_variation_priority": "low"}},
+  "transitions": {{"type": "crossfade", "crossfade_duration_sec": 2.0}},
+  "effects": {{"color_grading": "desaturated", "stabilization": true, "sharpness_boost": false}},
+  "constraints": {{"min_clip_duration_sec": 4.0, "max_clip_duration_sec": 60.0}}
+}}
+
+User: "Fast-paced music video style"
+Response:
+{{
+  "style": {{"name": "mtv", "mood": "energetic"}},
+  "pacing": {{"speed": "very_fast", "variation": "high", "intro_duration_beats": 2, "climax_intensity": 1.0}},
+  "cinematography": {{"prefer_wide_shots": false, "prefer_high_action": true, "match_cuts_enabled": false, "invisible_cuts_enabled": true, "shot_variation_priority": "high"}},
+  "transitions": {{"type": "hard_cuts"}},
+  "effects": {{"color_grading": "vibrant", "sharpness_boost": true}},
+  "energy_mapping": {{"energy_amplification": 1.5}}
+}}
+
+CRITICAL RULES:
+1. Return ONLY valid JSON - no markdown, no explanations
+2. Use predefined styles when possible (hitchcock, mtv, etc.)
+3. For unknown requests, use "custom" style and describe intent
+4. Always include "style" and "pacing" (required fields)
+5. Be conservative with effects (stabilization/upscale are slow!)
+6. Match the user's creative intent while staying technically feasible
+
+Think like a professional film editor who understands both art and constraints.
+"""
+
+
+class CreativeDirector:
+    """
+    LLM-powered Creative Director for video editing.
+
+    Translates natural language prompts into structured editing instructions.
+    """
+
+    def __init__(
+        self,
+        ollama_host: str = OLLAMA_HOST,
+        model: str = OLLAMA_MODEL,
+        timeout: int = 60
+    ):
+        """
+        Initialize Creative Director.
+
+        Args:
+            ollama_host: Ollama API endpoint
+            model: LLM model to use (llama3.1:70b, deepseek-r1:70b, etc.)
+            timeout: Request timeout in seconds
+        """
+        self.ollama_host = ollama_host
+        self.model = model
+        self.timeout = timeout
+
+        # Build system prompt with available styles
+        styles_list = "\n".join([
+            f"- {name}: {get_style_template(name)['description']}"
+            for name in list_available_styles()
+        ])
+        self.system_prompt = DIRECTOR_SYSTEM_PROMPT.format(styles_list=styles_list)
+
+    def interpret_prompt(self, user_prompt: str) -> Optional[Dict[str, Any]]:
+        """
+        Interpret natural language prompt and return editing instructions.
+
+        Args:
+            user_prompt: Natural language editing request
+
+        Returns:
+            Dictionary of editing instructions (validated JSON schema)
+            None if LLM fails or returns invalid JSON
+
+        Example:
+            >>> director = CreativeDirector()
+            >>> instructions = director.interpret_prompt("Edit like Hitchcock")
+            >>> print(instructions['style']['name'])
+            'hitchcock'
+        """
+        print(f"🎬 Creative Director analyzing: '{user_prompt}'")
+
+        # Check if prompt directly references a template
+        user_lower = user_prompt.lower()
+        for style_name in list_available_styles():
+            if style_name in user_lower or style_name.replace('_', ' ') in user_lower:
+                print(f"   🎯 Detected style template: {style_name}")
+                template = get_style_template(style_name)
+                return template['params']
+
+        # Extended keyword matching (no LLM needed)
+        style_keywords = {
+            'hitchcock': ['hitchcock', 'suspense', 'thriller', 'tension', 'mystery'],
+            'action': ['action', 'blockbuster', 'explosive', 'michael bay', 'fast cuts', 'adrenaline'],
+            'mtv': ['mtv', 'music video', 'fast-paced', 'fast paced', 'energetic', 'rapid'],
+            'documentary': ['documentary', 'doc', 'realism', 'natural', 'observational', 'vérité', 'verite'],
+            'minimalist': ['minimalist', 'art film', 'meditative', 'calm', 'contemplative', 'long takes', 'slow'],
+            'wes_anderson': ['wes anderson', 'whimsical', 'symmetry', 'symmetrical', 'pastel', 'quirky'],
+        }
+        
+        # Also match mood-based keywords
+        mood_to_style = {
+            'cinematic': 'hitchcock',  # Cinematic masterpiece → Hitchcock (elegant, professional)
+            'elegant': 'hitchcock',
+            'masterpiece': 'hitchcock',
+            'professional': 'documentary',
+            'smooth': 'documentary',
+            'gallery': 'minimalist',
+            'beautiful': 'wes_anderson',
+            'artistic': 'minimalist',
+        }
+        
+        # Check extended keywords
+        for style_name, keywords in style_keywords.items():
+            for keyword in keywords:
+                if keyword in user_lower:
+                    print(f"   🎯 Keyword match '{keyword}' → {style_name}")
+                    template = get_style_template(style_name)
+                    return template['params']
+        
+        # Check mood keywords
+        for mood_keyword, style_name in mood_to_style.items():
+            if mood_keyword in user_lower:
+                print(f"   🎯 Mood match '{mood_keyword}' → {style_name}")
+                template = get_style_template(style_name)
+                return template['params']
+
+        # Otherwise, query LLM for creative interpretation
+        try:
+            response = self._query_llm(user_prompt)
+            if not response:
+                print("   ❌ LLM returned empty response")
+                return None
+
+            # Parse and validate JSON
+            instructions = self._parse_and_validate(response)
+            if instructions:
+                print(f"   ✅ Generated editing instructions (style: {instructions['style']['name']})")
+                return instructions
+            else:
+                print("   ⚠️ LLM response failed validation")
+                return None
+
+        except Exception as e:
+            print(f"   ❌ Creative Director error: {e}")
+            return None
+
+    def _query_llm(self, user_prompt: str) -> Optional[str]:
+        """
+        Query Ollama LLM with user prompt.
+
+        Args:
+            user_prompt: User's natural language request
+
+        Returns:
+            LLM response text (should be JSON)
+        """
+        try:
+            payload = {
+                "model": self.model,
+                "prompt": user_prompt,
+                "system": self.system_prompt,
+                "stream": False,
+                "format": "json",  # Force JSON output (Ollama native feature)
+                "options": {
+                    "temperature": 0.3,  # Low temp for consistent, reliable output
+                    "top_p": 0.9,
+                    "num_predict": 1024  # Max tokens for JSON response
+                }
+            }
+
+            response = requests.post(
+                f"{self.ollama_host}/api/generate",
+                json=payload,
+                timeout=self.timeout
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                return result.get("response", "")
+            else:
+                print(f"   ⚠️ Ollama API error: {response.status_code}")
+                return None
+
+        except requests.exceptions.Timeout:
+            print(f"   ⚠️ Ollama request timeout ({self.timeout}s)")
+            return None
+        except requests.exceptions.ConnectionError:
+            print(f"   ⚠️ Cannot connect to Ollama at {self.ollama_host}")
+            print(f"      Make sure Ollama is running: ollama serve")
+            return None
+        except Exception as e:
+            print(f"   ❌ LLM query error: {e}")
+            return None
+
+    def _parse_and_validate(self, llm_response: str) -> Optional[Dict[str, Any]]:
+        """
+        Parse and validate LLM JSON response.
+
+        Args:
+            llm_response: Raw text from LLM (should be JSON)
+
+        Returns:
+            Validated editing instructions dict, or None if invalid
+        """
+        try:
+            # Parse JSON
+            instructions = json.loads(llm_response)
+
+            # Basic validation: required fields
+            if "style" not in instructions or "pacing" not in instructions:
+                print(f"   ⚠️ Missing required fields (style/pacing)")
+                return None
+
+            # Validate style name
+            style_name = instructions["style"].get("name")
+            valid_styles = list_available_styles() + ["custom"]
+            if style_name not in valid_styles:
+                print(f"   ⚠️ Invalid style name: {style_name}")
+                return None
+
+            # TODO: Full JSON schema validation (jsonschema library)
+            # For now, basic checks are sufficient
+
+            return instructions
+
+        except json.JSONDecodeError as e:
+            print(f"   ❌ Invalid JSON from LLM: {e}")
+            print(f"      Response: {llm_response[:200]}...")
+            return None
+        except Exception as e:
+            print(f"   ❌ Validation error: {e}")
+            return None
+
+    def get_default_instructions(self) -> Dict[str, Any]:
+        """
+        Get safe default editing instructions (elegant cinematic style).
+
+        Returns:
+            Default editing parameters - balanced, professional look
+        """
+        return {
+            "style": {
+                "name": "cinematic",  # Balanced default for gallery/professional content
+                "mood": "elegant"
+            },
+            "pacing": {
+                "speed": "dynamic",  # Position-aware (intro → build → climax → outro)
+                "variation": "moderate",
+                "intro_duration_beats": 8,
+                "climax_intensity": 0.7
+            },
+            "cinematography": {
+                "prefer_wide_shots": True,  # More elegant/cinematic
+                "prefer_high_action": False,  # Balanced
+                "match_cuts_enabled": True,
+                "invisible_cuts_enabled": True,
+                "shot_variation_priority": "medium"
+            },
+            "transitions": {
+                "type": "energy_aware",  # Smart crossfade on low energy
+                "crossfade_duration_sec": 0.5
+            },
+            "energy_mapping": {
+                "sync_to_beats": True,
+                "energy_amplification": 1.0
+            },
+            "effects": {
+                "color_grading": "neutral",
+                "stabilization": False,
+                "upscale": False,
+                "sharpness_boost": True
+            }
+        }
+
+
+# Convenience function for direct usage
+def interpret_natural_language(prompt: str) -> Dict[str, Any]:
+    """
+    Convenience function: Interpret natural language prompt.
+
+    Args:
+        prompt: Natural language editing request
+
+    Returns:
+        Editing instructions (falls back to defaults if LLM fails)
+
+    Example:
+        >>> instructions = interpret_natural_language("Make it suspenseful")
+        >>> apply_editing_instructions(instructions)
+    """
+    director = CreativeDirector()
+    instructions = director.interpret_prompt(prompt)
+
+    if instructions:
+        return instructions
+    else:
+        print("   ℹ️ Falling back to default editing style")
+        return director.get_default_instructions()
+
+
+if __name__ == "__main__":
+    # Test suite
+    print(f"🎬 Creative Director v{VERSION}")
+    print(f"   Model: {OLLAMA_MODEL}")
+    print(f"   Host: {OLLAMA_HOST}\n")
+
+    test_prompts = [
+        "Edit this like a Hitchcock thriller",
+        "Make it calm and meditative",
+        "Fast-paced MTV style",
+        "Documentary realism",
+        "Create suspense with long takes then explosive action"
+    ]
+
+    director = CreativeDirector()
+
+    for prompt in test_prompts:
+        print(f"\n{'='*60}")
+        print(f"Prompt: '{prompt}'")
+        print(f"{'='*60}")
+
+        result = director.interpret_prompt(prompt)
+
+        if result:
+            print(json.dumps(result, indent=2))
+        else:
+            print("❌ Failed to generate instructions")

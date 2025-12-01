@@ -1,0 +1,48 @@
+services:
+  montage-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: montage-ai:latest
+    container_name: montage-ai
+    cpus: 6
+    mem_limit: 24g
+    volumes:
+      - ./data/input:/data/input:ro
+      - ./data/music:/data/music:ro
+      - ./data/assets:/data/assets:ro
+      - ./data/output:/data/output
+    environment:
+      # Creative Direction
+      - CREATIVE_PROMPT=${CREATIVE_PROMPT:-}
+      - CUT_STYLE=${CUT_STYLE:-dynamic}
+      
+      # AI / LLM Configuration
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llava}
+      - DIRECTOR_MODEL=${DIRECTOR_MODEL:-llama3.1:70b}
+      - ENABLE_AI_FILTER=${ENABLE_AI_FILTER:-false}
+      
+      # Enhancement Settings
+      - STABILIZE=${STABILIZE:-false}
+      - UPSCALE=${UPSCALE:-false}
+      - ENHANCE=${ENHANCE:-true}
+      
+      # Output Configuration
+      - NUM_VARIANTS=${NUM_VARIANTS:-1}
+      - VERBOSE=${VERBOSE:-true}
+      - EXPORT_TIMELINE=${EXPORT_TIMELINE:-false}
+      - GENERATE_PROXIES=${GENERATE_PROXIES:-false}
+      
+      # Performance
+      - FFMPEG_THREADS=${FFMPEG_THREADS:-0}
+      - FFMPEG_PRESET=${FFMPEG_PRESET:-medium}
+      - PARALLEL_ENHANCE=${PARALLEL_ENHANCE:-true}
+      - MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS:-4}
+      - USE_GPU=${USE_GPU:-auto}
+      
+      # Deep Analysis
+      - DEEP_ANALYSIS=${DEEP_ANALYSIS:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: "no"

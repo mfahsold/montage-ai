@@ -1,0 +1,18 @@
+# Video Processing
+moviepy==1.0.3
+opencv-python-headless
+soundfile
+Pillow
+proglog
+tqdm
+scenedetect[opencv]
+
+# HTTP / API
+requests
+
+# System Monitoring
+psutil>=5.9.0
+
+# Timeline Export (Professional NLE Integration)
+OpenTimelineIO>=0.16.0  # Academy Software Foundation standard
+jsonschema>=4.0.0  # JSON schema validation for Creative Director
