@@ -15,21 +15,24 @@ patches:
         template:
           spec:
             nodeSelector:
-              kubernetes.io/arch: amd64
-              kubernetes.io/hostname: codeai-fluxibriserver
+              kubernetes.io/hostname: codeaijetson-desktop
+            runtimeClassName: nvidia
             containers:
               - name: montage-ai
+                env:
+                  - name: USE_GPU
+                    value: "prefer"
+                  - name: VK_ICD_FILENAMES
+                    value: "/usr/lib/aarch64-linux-gnu/nvidia/nvidia_icd.json"
                 resources:
                   requests:
                     cpu: "4"
                     memory: "8Gi"
+                    nvidia.com/gpu: "1"
                   limits:
                     cpu: "6"
                     memory: "16Gi"
-                volumeMounts:
-                  - name: dev-dri
-                    mountPath: /dev/dri
-                    readOnly: true
+                    nvidia.com/gpu: "1"
             volumes:
               - name: dev-dri
                 hostPath:

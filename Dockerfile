@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
     libgl1 \
+    mesa-vulkan-drivers \
+    vulkan-tools \
     imagemagick \
     build-essential \
     cmake \

@@ -23,6 +23,11 @@ spec:
           image: 192.168.1.16:30500/montage-ai:latest
           # Always re-pull to avoid stale arch-specific images on mixed clusters
           imagePullPolicy: Always
+          env:
+            - name: USE_GPU
+              value: "prefer"
+            - name: VK_ICD_FILENAMES
+              value: "/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
           resources:
             requests:
               cpu: "2"
@@ -48,6 +53,9 @@ spec:
               readOnly: true
             - name: output
               mountPath: /data/output
+            - name: dev-dri
+              mountPath: /dev/dri
+              readOnly: true
       volumes:
         - name: input
           persistentVolumeClaim:
@@ -61,6 +69,10 @@ spec:
         - name: output
           persistentVolumeClaim:
             claimName: montage-ai-output
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: DirectoryOrCreate
       # Generic - works on any amd64 node
       # Override in overlays for GPU targeting
       nodeSelector:

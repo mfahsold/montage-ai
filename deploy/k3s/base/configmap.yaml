@@ -11,10 +11,10 @@ data:
   CREATIVE_PROMPT: ""
   
   # AI / LLM Configuration
-  # Option 1: Ollama (self-hosted)
-  OLLAMA_HOST: "http://ollama.kubeai-system.svc.cluster.local:11434"
-  OLLAMA_MODEL: "llava"
-  DIRECTOR_MODEL: "llama3.1:70b"
+  # Option 1: KubeAI OpenAI-compatible endpoint
+  OLLAMA_HOST: "http://kubeai.kubeai-system.svc.cluster.local/openai/v1"
+  OLLAMA_MODEL: "qwen3-axera-1-7b"
+  DIRECTOR_MODEL: "qwen3-axera-1-7b"
   
   # Option 2: cgpu (cloud GPU + Gemini LLM)
   CGPU_ENABLED: "false"
@@ -25,10 +25,10 @@ data:
   CGPU_TIMEOUT: "600"
   
   # Enhancement Settings
-  STABILIZE: "false"
-  UPSCALE: "false"
+  STABILIZE: "true"
+  UPSCALE: "true"
   ENHANCE: "true"
-  ENABLE_AI_FILTER: "false"
+  ENABLE_AI_FILTER: "true"
   
   # Output Configuration
   NUM_VARIANTS: "1"
@@ -40,7 +40,7 @@ data:
   FFMPEG_THREADS: "0"
   FFMPEG_PRESET: "medium"
   PARALLEL_ENHANCE: "true"
-  MAX_PARALLEL_JOBS: "4"
+  MAX_PARALLEL_JOBS: "6"
   USE_GPU: "auto"
   
   # Deep Analysis

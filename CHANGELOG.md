@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- K3s dev overlay tuned for CPU-heavy renders: enable STABILIZE/UPSCALE/AI filter by default, raise parallel jobs to 6, and bump dev resources to 4c/8Gi requests with 6c/16Gi limits for montage-ai job.
 - **cgpu integration fixes** (tested 2025-12-01)
   - `creative_director.py`: Switch from chat.completions to responses API
     - cgpu serve uses `/v1/responses` endpoint, not `/v1/chat/completions`
