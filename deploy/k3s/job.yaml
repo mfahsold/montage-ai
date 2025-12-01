@@ -21,7 +21,8 @@ spec:
       containers:
         - name: montage-ai
           image: ghcr.io/mfahsold/montage-ai:latest
-          imagePullPolicy: IfNotPresent
+          # Always re-pull to avoid stale arch-specific images on mixed clusters
+          imagePullPolicy: Always
           resources:
             requests:
               cpu: "2"

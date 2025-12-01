@@ -20,8 +20,9 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai:latest
-          imagePullPolicy: IfNotPresent
+          image: 192.168.1.16:30500/montage-ai:latest
+          # Always re-pull to avoid stale arch-specific images on mixed clusters
+          imagePullPolicy: Always
           resources:
             requests:
               cpu: "2"
