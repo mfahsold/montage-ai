@@ -1,39 +1,13 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "montage-ai"
 version = "0.3.0"
-description = "AI-powered automatic video montage creation with natural language control"
+description = "AI-powered automatic video montage creation"
 readme = "README.md"
 license = {text = "MIT"}
-authors = [
-    {name = "Matthias Fahsold", email = "matthias@fahsold.de"}
-]
-keywords = [
-    "video-editing",
-    "ai",
-    "montage",
-    "beat-sync",
-    "natural-language",
-    "moviepy",
-    "automation"
-]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Multimedia :: Video",
-    "Topic :: Multimedia :: Video :: Non-Linear Editor",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
 requires-python = ">=3.10"
 
 dependencies = [
@@ -41,62 +15,10 @@ dependencies = [
     "opencv-python-headless>=4.8.0",
     "librosa>=0.10.0",
     "numpy>=1.24.0",
-    "scipy>=1.11.0",
-    "soundfile>=0.12.0",
-    "Pillow>=10.0.0",
-    "tqdm>=4.65.0",
     "scenedetect[opencv]>=0.6.0",
+    "tqdm>=4.65.0",
     "requests>=2.31.0",
-    "psutil>=5.9.0",
-    "jsonschema>=4.0.0",
 ]
-
-[project.optional-dependencies]
-timeline = [
-    "OpenTimelineIO>=0.16.0",
-]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.5.0",
-]
-all = [
-    "montage-ai[timeline,dev]",
-]
-
-[project.scripts]
-montage-ai = "montage_ai.cli:main"
-
-[project.urls]
-Homepage = "https://github.com/mfahsold/montage-ai"
-Documentation = "https://github.com/mfahsold/montage-ai#readme"
-Repository = "https://github.com/mfahsold/montage-ai.git"
-Issues = "https://github.com/mfahsold/montage-ai/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-montage_ai = ["*.json"]
-
-[tool.black]
-line-length = 100
-target-version = ["py310", "py311", "py312"]
-
-[tool.ruff]
-line-length = 100
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
-ignore = ["E501"]  # Line length handled by black
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-addopts = "-v --cov=montage_ai --cov-report=term-missing"
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-ignore_missing_imports = true

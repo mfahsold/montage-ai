@@ -9,7 +9,7 @@
 Footage Management System for Montage AI
 
 Implements professional editing workflows:
-- Footage wird einmal "verbraucht" (consumed once)
+- Footage consumed once
 - Story Arc-aware clip selection
 - Variety scoring and optimization
 - Continuity rules for smooth transitions
@@ -58,28 +58,28 @@ class FootageClip:
     "consumed" once and then removed from the available pool.
     """
     
-    # Identifikation
+    # Identification
     clip_id: str
     source_file: str
     
     # Timing
-    in_point: float              # Start-Timecode (Sekunden)
-    out_point: float             # End-Timecode (Sekunden)
-    duration: float              # Länge in Sekunden
+    in_point: float              # Start time in seconds
+    out_point: float             # End time in seconds
+    duration: float              # Duration in seconds
     
-    # Kategorisierung
+    # Classification
     scene_type: SceneType = SceneType.ACTION
     energy_level: float = 0.5   # 0.0 - 1.0
     
-    # Nutzungs-Tracking
+    # Usage tracking
     usage_status: UsageStatus = UsageStatus.UNUSED
     usage_count: int = 0
     
-    # Qualitäts-Scoring
+    # Quality scoring
     quality_score: float = 0.5  # 0.0 - 1.0
     visual_interest: float = 0.5
     
-    # Analyse-Metadaten (optional)
+    # Analysis metadata (optional)
     dominant_colors: List[Tuple] = field(default_factory=list)
     motion_intensity: float = 0.5
     brightness: float = 0.5
@@ -123,35 +123,35 @@ class StoryArcController:
             energy_range=(0.2, 0.5),
             cut_rate="slow",
             preferred_types=[SceneType.SCENIC, SceneType.ESTABLISHING, SceneType.PORTRAIT],
-            description="Einführung, Kontext etablieren"
+            description="Introduction, establish context"
         ),
         StoryPhase.BUILD: StoryArcPhaseConfig(
             position_range=(0.15, 0.40),
             energy_range=(0.4, 0.7),
             cut_rate="medium",
             preferred_types=[SceneType.ACTION, SceneType.DETAIL, SceneType.PORTRAIT],
-            description="Aufbau, Spannung steigern"
+            description="Build tension"
         ),
         StoryPhase.CLIMAX: StoryArcPhaseConfig(
             position_range=(0.40, 0.70),
             energy_range=(0.6, 1.0),
             cut_rate="fast",
             preferred_types=[SceneType.ACTION, SceneType.DETAIL],
-            description="Höhepunkt, maximale Intensität"
+            description="Climax, peak intensity"
         ),
         StoryPhase.SUSTAIN: StoryArcPhaseConfig(
             position_range=(0.70, 0.90),
             energy_range=(0.5, 0.8),
             cut_rate="medium",
             preferred_types=[SceneType.ACTION, SceneType.SCENIC, SceneType.PORTRAIT],
-            description="Spannung halten, Varianz"
+            description="Sustain tension, add variety"
         ),
         StoryPhase.OUTRO: StoryArcPhaseConfig(
             position_range=(0.90, 1.0),
             energy_range=(0.2, 0.5),
             cut_rate="slow",
             preferred_types=[SceneType.SCENIC, SceneType.PORTRAIT, SceneType.ESTABLISHING],
-            description="Abschluss, Resolution"
+            description="Outro, resolution"
         )
     }
     

@@ -115,8 +115,8 @@ GPU_CAPABILITY = None  # Will be set by detect_gpu_capabilities()
 
 # Import Timeline Exporter if available
 try:
-    from .timeline_exporter import export_timeline_from_montage
-    TIMELINE_EXPORT_AVAILABLE = True
+    
+    TIMELINE_EXPORT_AVAILABLE = False
 except ImportError:
     print("⚠️ Timeline Exporter not available (missing timeline_exporter.py)")
     TIMELINE_EXPORT_AVAILABLE = False
@@ -134,8 +134,8 @@ except ImportError:
 
 # Import Deep Footage Analyzer
 try:
-    from .footage_analyzer import DeepFootageAnalyzer, SceneAnalysis
-    DEEP_ANALYSIS_AVAILABLE = True
+    
+    DEEP_ANALYSIS_AVAILABLE = False
 except ImportError:
     print("⚠️ Deep Footage Analyzer not available (missing footage_analyzer.py)")
     DEEP_ANALYSIS_AVAILABLE = False
