@@ -2,31 +2,134 @@
 
 Deploy montage-ai as a Kubernetes Job for batch video processing.
 
-## Quick Start
+## Directory Structure
+
+```text
+deploy/k3s/
+├── base/                    # Base manifests
+│   ├── namespace.yaml       # montage-ai namespace
+│   ├── configmap.yaml       # Environment configuration
+│   ├── pvc.yaml             # Storage claims
+│   ├── job.yaml             # One-off render job
+│   ├── cronjob.yaml         # Scheduled renders
+│   └── kustomization.yaml   # Base kustomization
+├── overlays/
+│   ├── dev/                 # Fast preview settings
+│   │   └── kustomization.yaml
+│   └── production/          # HQ render + AMD GPU targeting
+│       └── kustomization.yaml
+└── README.md
+```
+
+## Prerequisites
+
+- Kubernetes cluster (K3s, K8s, EKS, GKE, etc.)
+- `kubectl` configured with cluster access
+- Container image available (see Build section)
+
+## Build the Image
+
+Build and push the container image before deploying:
+
+### Option A: Local Build + Push to Registry
 
 ```bash
-# 1. Create namespace and resources
-kubectl apply -k deploy/k3s/
+# Build for amd64 architecture
+docker buildx build --platform linux/amd64 \
+  -t ghcr.io/mfahsold/montage-ai:latest .
 
-# 2. Copy your footage to the input PVC
-kubectl cp ./my-footage/ montage-ai/montage-ai-input:/data/input/
+# Push to GitHub Container Registry
+docker push ghcr.io/mfahsold/montage-ai:latest
 
-# 3. Copy music files
-kubectl cp ./my-music/ montage-ai/montage-ai-music:/data/music/
+# Or push to local/private registry
+docker tag ghcr.io/mfahsold/montage-ai:latest your-registry/montage-ai:latest
+docker push your-registry/montage-ai:latest
+```
 
-# 4. Trigger a render job
-kubectl create -f deploy/k3s/job.yaml
+### Option B: In-Cluster Build (Kaniko)
 
-# 5. Watch progress
+For clusters with Kaniko or similar build systems, create a build job that:
+
+1. Clones this repository
+2. Builds the image using `Dockerfile`
+3. Pushes to your registry
+
+See your cluster's build documentation (e.g., fluxibri_core for Fluxibri clusters).
+
+### Option C: Manual Import
+
+```bash
+# Build locally
+docker build -t ghcr.io/mfahsold/montage-ai:latest .
+
+# Export and import to cluster node
+docker save ghcr.io/mfahsold/montage-ai:latest | \
+  ssh user@cluster-node "sudo ctr -n k8s.io images import -"
+```
+
+## Deploy to Cluster
+
+### Step 1: Create Namespace and Resources
+
+```bash
+# Deploy base resources (namespace, configmap, PVCs)
+kubectl apply -k deploy/k3s/base/
+```
+
+### Step 2: Load Media Data
+
+```bash
+# Option A: Use a data loader pod
+kubectl run -it --rm data-loader \
+  --image=busybox \
+  -n montage-ai \
+  -- sh
+# Then mount PVCs and copy files inside the pod
+
+# Option B: Copy via kubectl (requires running pod)
+kubectl cp ./my-videos/ montage-ai/<pod-name>:/data/input/
+kubectl cp ./my-music.mp3 montage-ai/<pod-name>:/data/music/
+
+# Option C: Use existing shared storage
+# Configure PVCs to use your NFS/SMB storage class
+```
+
+### Step 3: Run Render Job
+
+```bash
+# Start render job
+kubectl apply -f deploy/k3s/base/job.yaml
+
+# Watch progress
 kubectl logs -n montage-ai -f job/montage-ai-render
 
-# 6. Copy output
-kubectl cp montage-ai/montage-ai-output:/data/output/ ./rendered/
+# Check status
+kubectl get jobs -n montage-ai
+```
+
+### Step 4: Retrieve Output
+
+```bash
+# Copy rendered video from output PVC
+kubectl cp montage-ai/<pod-name>:/data/output/ ./rendered/
+```
+
+## Deployment Variants
+
+```bash
+# Base (any amd64 node)
+kubectl apply -k deploy/k3s/base/
+
+# Development (fast preview, low resources)
+kubectl apply -k deploy/k3s/overlays/dev/
+
+# Production (AMD GPU node, high quality)
+kubectl apply -k deploy/k3s/overlays/production/
 ```
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    Kubernetes Cluster                       │
 ├─────────────────────────────────────────────────────────────┤

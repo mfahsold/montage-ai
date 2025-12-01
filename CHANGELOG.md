@@ -9,13 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Professional development workflow
+  - `Makefile` with build, deploy, test commands
+  - `CONTRIBUTING.md` for external contributors
+  - `docs/INSTALL.md` comprehensive installation guide
 - Kubernetes deployment support (`deploy/k3s/`)
   - Kustomize-based manifests for any K8s/K3s cluster
-  - Job template for batch video processing
+  - `base/` - generic manifests (namespace, configmap, pvc, job)
+  - `overlays/dev/` - fast preview, low resources
+  - `overlays/production/` - AMD GPU targeting, HQ settings
   - CronJob template for scheduled rendering
-  - ConfigMap with all environment variables
-  - PVCs for input/music/assets/output storage
-  - Overlays for dev (fast preview) and production (HQ render)
   - Full README with deployment guide
 - cgpu integration for free cloud GPU and LLM access
   - `src/montage_ai/cgpu_upscaler.py`: New module for cloud GPU upscaling via cgpu/Google Colab

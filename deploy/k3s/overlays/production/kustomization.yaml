@@ -1,38 +1,37 @@
 # Production overlay for montage-ai
-# High-quality settings with stabilization and upscaling
+# High-quality settings with AMD GPU support
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - ../../
+  - ../../base
 
 namespace: montage-ai
 
 # Use a specific image tag for production
 images:
   - name: ghcr.io/mfahsold/montage-ai
-    newTag: v1.0.0
+    newTag: latest
 
-# Override ConfigMap values
 patches:
+  # High-quality production settings
   - patch: |-
       apiVersion: v1
       kind: ConfigMap
       metadata:
         name: montage-ai-config
       data:
-        # High-quality production settings
         CUT_STYLE: "dynamic"
         STABILIZE: "true"
         UPSCALE: "true"
         ENHANCE: "true"
         FFMPEG_PRESET: "slow"
-        VERBOSE: "false"
+        VERBOSE: "true"
     target:
       kind: ConfigMap
       name: montage-ai-config
 
-  # Increase resources for production
+  # Target AMD GPU node with increased resources
   - patch: |-
       apiVersion: batch/v1
       kind: Job
@@ -41,6 +40,8 @@ patches:
       spec:
         template:
           spec:
+            nodeSelector:
+              amd.com/gpu: present
             containers:
               - name: montage-ai
                 resources:
@@ -50,6 +51,7 @@ patches:
                   limits:
                     cpu: "8"
                     memory: "32Gi"
+                    # amd.com/gpu: "1"  # Uncomment when ROCm support added to container
     target:
       kind: Job
       name: montage-ai-render

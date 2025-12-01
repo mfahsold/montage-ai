@@ -127,10 +127,10 @@ except ImportError:
 
 # Import Timeline Exporter if available
 try:
-    
-    TIMELINE_EXPORT_AVAILABLE = False
-except ImportError:
-    print("⚠️ Timeline Exporter not available (missing timeline_exporter.py)")
+    from .timeline_exporter import export_timeline_from_montage
+    TIMELINE_EXPORT_AVAILABLE = True
+except ImportError as exc:
+    print(f"⚠️ Timeline Exporter not available (missing timeline_exporter.py): {exc}")
     TIMELINE_EXPORT_AVAILABLE = False
 
 # Import Live Monitoring System
@@ -146,10 +146,10 @@ except ImportError:
 
 # Import Deep Footage Analyzer
 try:
-    
-    DEEP_ANALYSIS_AVAILABLE = False
-except ImportError:
-    print("⚠️ Deep Footage Analyzer not available (missing footage_analyzer.py)")
+    from .footage_analyzer import DeepFootageAnalyzer, SceneAnalysis
+    DEEP_ANALYSIS_AVAILABLE = True
+except ImportError as exc:
+    print(f"⚠️ Deep Footage Analyzer not available (missing footage_analyzer.py): {exc}")
     DEEP_ANALYSIS_AVAILABLE = False
     DeepFootageAnalyzer = None
 

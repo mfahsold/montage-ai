@@ -1,5 +1,7 @@
 # Montage AI
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 AI-powered video montage with beat-synchronized editing.
 
 ## Features
@@ -11,114 +13,103 @@ AI-powered video montage with beat-synchronized editing.
 - **🎨 Enhancement** - Stabilization, AI upscaling, color grading
 - **☁️ Cloud GPU** - Free upscaling via [cgpu](https://github.com/RohanAdwankar/cgpu)
 
-**[📚 Full Documentation](docs/README.md)** | **[🔧 Configuration](docs/configuration.md)** | **[🎭 Style Guide](docs/styles.md)**
-
 ---
 
 ## Quick Start
 
 ```bash
-# Build once
+# Clone and build
+git clone https://github.com/mfahsold/montage-ai.git
+cd montage-ai
 ./montage-ai.sh build
 
-# Run with default style
-./montage-ai.sh run
+# Add your media
+cp /path/to/videos/* data/input/
+cp /path/to/music.mp3 data/music/
 
-# Or pick a style
-./montage-ai.sh run hitchcock
-./montage-ai.sh run mtv
-./montage-ai.sh run documentary
+# Create montage
+./montage-ai.sh run
 ```
 
-## Commands
+→ **[Full Installation Guide](docs/INSTALL.md)**
 
-| Command           | Description           |
-| ----------------- | --------------------- |
-| `run [STYLE]`     | Create montage        |
-| `preview [STYLE]` | Fast preview          |
-| `hq [STYLE]`      | High quality render   |
-| `list`            | Show available styles |
-| `build`           | Build Docker image    |
+## Usage
+
+```bash
+# Basic commands
+./montage-ai.sh run [STYLE]      # Create montage
+./montage-ai.sh preview [STYLE]  # Fast preview
+./montage-ai.sh hq [STYLE]       # High quality
+./montage-ai.sh list             # Show styles
+
+# With options
+./montage-ai.sh run --stabilize  # Add stabilization
+./montage-ai.sh run --upscale    # AI upscaling
+./montage-ai.sh run --cgpu       # Use cloud LLM
+```
 
 ## Styles
 
-| Style          | Description                                 |
-| -------------- | ------------------------------------------- |
-| `hitchcock`    | Slow build, explosive climax, high contrast |
-| `mtv`          | Rapid 1-2 beat cuts, maximum energy         |
-| `action`       | Michael Bay fast cuts, motion preference    |
-| `documentary`  | Natural pacing, longer takes                |
-| `minimalist`   | Contemplative long takes                    |
-| `wes_anderson` | Symmetric framing, warm colors              |
+| Style          | Description                        |
+| -------------- | ---------------------------------- |
+| `dynamic`      | Position-aware pacing (default)    |
+| `hitchcock`    | Suspense - slow build, fast climax |
+| `mtv`          | Rapid 1-2 beat cuts                |
+| `action`       | Michael Bay fast cuts              |
+| `documentary`  | Natural, observational             |
+| `minimalist`   | Contemplative long takes           |
+| `wes_anderson` | Symmetric, stylized                |
 
-→ [Full style documentation](docs/styles.md)
+→ [Style documentation](docs/styles.md)
 
-## Options
+## Deployment
 
-```bash
-./montage-ai.sh run --stabilize              # Stabilization
-./montage-ai.sh run --upscale                # AI upscaling
-./montage-ai.sh run --variants 3             # Multiple versions
-./montage-ai.sh hq hitchcock --stabilize     # HQ + stabilize
-```
-
-### Cloud Features (cgpu)
-
-```bash
-./montage-ai.sh run --cgpu                      # Gemini LLM
-./montage-ai.sh run --cgpu-gpu --upscale        # Cloud GPU upscaling
-./montage-ai.sh hq hitchcock --cgpu --cgpu-gpu  # Full cloud mode
-```
-
-→ [cgpu setup guide](docs/CGPU_INTEGRATION.md)
-
-## Data Structure
-
-```text
-data/
-├── input/   # Source clips (any format)
-├── music/   # Soundtrack files
-├── assets/  # Overlays, logos
-└── output/  # Generated videos
-```
-
-## Deployment Options
-
-### Local (Docker Compose)
+### Docker (Local)
 
 ```bash
 ./montage-ai.sh build && ./montage-ai.sh run
 ```
 
-### Kubernetes / K3s
+### Kubernetes
 
 ```bash
-# Deploy to any Kubernetes cluster
-kubectl apply -k deploy/k3s/
-
-# Or use overlays
-kubectl apply -k deploy/k3s/overlays/production/
-kubectl apply -k deploy/k3s/overlays/dev/
+kubectl apply -k deploy/k3s/base/
 ```
 
-→ [Kubernetes deployment guide](deploy/k3s/README.md)
+→ [Kubernetes guide](deploy/k3s/README.md)
 
-## Requirements
+### Development
 
-- Docker & Docker Compose (local)
-- Or: Kubernetes 1.28+ (cluster deployment)
-- [Ollama](https://ollama.ai) (local LLM) or [cgpu](https://github.com/RohanAdwankar/cgpu) (cloud)
+```bash
+make help      # Show all commands
+make build     # Build image
+make test      # Run tests
+make deploy    # Deploy to K8s
+```
 
 ## Documentation
 
-| Document                                     | Description                       |
-| -------------------------------------------- | --------------------------------- |
-| [Features](docs/features.md)                 | Detailed feature documentation    |
-| [Configuration](docs/configuration.md)       | All environment variables         |
-| [Styles](docs/styles.md)                     | Style templates and customization |
-| [Architecture](docs/architecture.md)         | System design                     |
-| [cgpu Integration](docs/CGPU_INTEGRATION.md) | Cloud GPU setup                   |
+| Document                                     | Description                     |
+| -------------------------------------------- | ------------------------------- |
+| **[Installation](docs/INSTALL.md)**          | Setup guide (Docker, K8s, cgpu) |
+| [Features](docs/features.md)                 | Detailed feature documentation  |
+| [Configuration](docs/configuration.md)       | Environment variables           |
+| [Styles](docs/styles.md)                     | Style templates                 |
+| [Architecture](docs/architecture.md)         | System design                   |
+| [cgpu Integration](docs/CGPU_INTEGRATION.md) | Cloud GPU setup                 |
+
+## Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+```bash
+# Development workflow
+git checkout -b feature/your-feature
+make test
+# ... make changes ...
+git commit -m "feat: your feature"
+```
 
 ## License
 
-MIT
+MIT - see [LICENSE](LICENSE)
