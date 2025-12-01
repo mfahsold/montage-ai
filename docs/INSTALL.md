@@ -1,331 +1,336 @@
 # Installation Guide
 
-Complete installation instructions for Montage AI.
+Get Montage-AI running on your system.
 
-## Table of Contents
+## Requirements
 
-- [Quick Start (Docker)](#quick-start-docker)
-- [Local Development](#local-development)
-- [Kubernetes Deployment](#kubernetes-deployment)
-- [Cloud GPU (cgpu)](#cloud-gpu-cgpu)
-- [Troubleshooting](#troubleshooting)
+| Component | Required | Notes |
+|-----------|----------|-------|
+| Docker | ✅ | Recommended method |
+| Docker Compose | ✅ | v2.0+ |
+| 8GB RAM | ✅ | 16GB for HQ mode |
+| 10GB disk | ✅ | Plus space for media |
+
+**Optional:**
+
+| Component | For | Installation |
+|-----------|-----|--------------|
+| Ollama | Local AI Director | [ollama.ai](https://ollama.ai/) |
+| cgpu | Cloud LLM/GPU | `npm install -g cgpu` |
+| kubectl | K8s deployment | [kubernetes.io](https://kubernetes.io/docs/tasks/tools/) |
 
 ---
 
 ## Quick Start (Docker)
 
-The fastest way to get started. Works on any system with Docker.
+**Works on:** Linux, macOS, Windows (WSL2)
 
-### Prerequisites
+### 1. Install Docker
 
-- [Docker](https://docs.docker.com/get-docker/) (20.10+)
-- [Docker Compose](https://docs.docker.com/compose/install/) (v2+)
-
-### Installation
+<details>
+<summary><strong>Linux (Ubuntu/Debian)</strong></summary>
 
 ```bash
-# Clone the repository
-git clone https://github.com/mfahsold/montage-ai.git
-cd montage-ai
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
 
-# Build the image
-./montage-ai.sh build
-
-# Add your media files
-cp /path/to/your/videos/* data/input/
-cp /path/to/your/music.mp3 data/music/
-
-# Create your first montage
-./montage-ai.sh run
+# Verify
+docker --version
 ```
 
-### Verify Installation
+</details>
+
+<details>
+<summary><strong>macOS</strong></summary>
 
 ```bash
-# Check Docker is working
+# Install Docker Desktop
+brew install --cask docker
+
+# Or download from: https://www.docker.com/products/docker-desktop
+
+# Start Docker Desktop, then verify
 docker --version
-docker compose version
+```
 
-# Test the build
+</details>
+
+<details>
+<summary><strong>Windows</strong></summary>
+
+1. Install [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop)
+2. Enable WSL2 backend in Docker Desktop settings
+3. Open PowerShell or WSL2 terminal
+
+```powershell
+docker --version
+```
+
+</details>
+
+### 2. Clone & Build
+
+```bash
+git clone https://github.com/mfahsold/montage-ai.git
+cd montage-ai
 ./montage-ai.sh build
+```
 
-# List available styles
+### 3. Add Media
+
+```bash
+# Add your video clips
+cp /path/to/your/videos/*.mp4 data/input/
+
+# Add background music
+cp /path/to/your/music.mp3 data/music/
+```
+
+**Supported formats:**
+
+- Video: `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`
+- Audio: `.mp3`, `.wav`, `.flac`, `.m4a`
+
+### 4. Create Montage
+
+```bash
+# Basic run (uses 'dynamic' style)
+./montage-ai.sh run
+
+# Choose a style
+./montage-ai.sh run hitchcock
+
+# Fast preview
+./montage-ai.sh preview
+
+# High quality + effects
+./montage-ai.sh hq
+```
+
+**Output:** `data/output/montage.mp4`
+
+### 5. Verify It Works
+
+```bash
+# List available commands
+./montage-ai.sh help
+
+# List styles
 ./montage-ai.sh list
+
+# Check logs if something fails
+./montage-ai.sh logs
 ```
 
 ---
 
-## Local Development
+## Optional: AI Director (Ollama)
 
-For developers who want to modify the code or run without Docker.
+The AI Director uses an LLM to interpret creative prompts. Without it, Montage-AI uses preset styles only.
 
-### Prerequisites
+### Install Ollama
 
-- Python 3.10+
-- FFmpeg
-- [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (recommended)
+```bash
+# Linux/macOS
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Windows: Download from https://ollama.ai/download
+
+# Pull the model
+ollama pull llama3.1:8b
+```
+
+### Use AI Director
+
+```bash
+# Set a creative prompt
+export CREATIVE_PROMPT="Fast-paced travel montage with dramatic builds"
+./montage-ai.sh run
+```
+
+**Note:** Ollama runs on your machine. For cloud LLM (faster, no local resources), see [cgpu section](#cloud-gpu-cgpu).
+
+---
+
+## Optional: Cloud GPU (cgpu)
+
+Use free cloud resources via [cgpu](https://github.com/RohanAdwankar/cgpu):
+
+- **Gemini LLM** — Faster than local Ollama
+- **Cloud GPU** — For AI upscaling without local GPU
 
 ### Setup
 
 ```bash
-# Clone repository
-git clone https://github.com/mfahsold/montage-ai.git
-cd montage-ai
+# 1. Install cgpu
+npm install -g cgpu
 
-# Create conda environment
-conda create -n montage-ai python=3.10 -y
-conda activate montage-ai
+# 2. Install gemini-cli
+# Follow: https://github.com/google-gemini/gemini-cli
 
-# Install dependencies
-conda install -c conda-forge librosa numba numpy scipy ffmpeg -y
-pip install -r requirements.txt
-pip install -e .
-
-# Install FFmpeg (if not via conda)
-# Ubuntu/Debian: sudo apt install ffmpeg
-# macOS: brew install ffmpeg
-# Windows: choco install ffmpeg
-
-# Verify installation
-python -c "from montage_ai import editor; print('OK')"
+# 3. Authenticate
+gemini auth login
 ```
 
-### Running Locally (without Docker)
+### Usage
 
 ```bash
-# Set environment variables
-export CUT_STYLE=dynamic
-export VERBOSE=true
+# Start cgpu server
+./montage-ai.sh cgpu-start
 
-# Run the editor
-python -m montage_ai.editor
-```
+# Run with cloud LLM
+./montage-ai.sh run --cgpu
 
-### Development Workflow
+# Run with cloud GPU for upscaling
+./montage-ai.sh run --upscale --cgpu-gpu
 
-```bash
-# Use Make for common tasks
-make help           # Show all commands
-make build          # Build Docker image
-make run            # Run montage
-make shell          # Interactive container shell
-make test           # Run tests
-make validate       # Validate K8s manifests
+# Stop when done
+./montage-ai.sh cgpu-stop
 ```
 
 ---
 
 ## Kubernetes Deployment
 
-Deploy Montage AI as batch jobs on any Kubernetes cluster.
+For production or batch processing on a cluster.
 
 ### Prerequisites
 
-- Kubernetes 1.28+ (K3s, K8s, EKS, GKE, etc.)
-- kubectl configured
-- Container registry access
+- Kubernetes cluster (K3s, K8s, EKS, GKE)
+- `kubectl` configured
+- Container image available
 
-### Option A: Using Pre-built Images
+### Deploy
 
 ```bash
-# Deploy directly from GitHub Container Registry
+# 1. Apply base manifests
 kubectl apply -k deploy/k3s/base/
 
-# Start a render job
+# 2. Check resources
+kubectl get all -n montage-ai
+
+# 3. Load your media (see deploy/k3s/README.md for methods)
+
+# 4. Start render job
 kubectl apply -f deploy/k3s/base/job.yaml
 
-# Watch logs
+# 5. Watch progress
 kubectl logs -n montage-ai -f job/montage-ai-render
 ```
 
-### Option B: Building Your Own Image
+### Variants
 
 ```bash
-# Build for amd64 (most clusters)
-make build-amd64
-
-# Push to your registry
-docker tag ghcr.io/mfahsold/montage-ai:latest your-registry/montage-ai:latest
-docker push your-registry/montage-ai:latest
-
-# Update image reference in kustomization.yaml
-# Then deploy
-kubectl apply -k deploy/k3s/base/
-```
-
-### Deployment Variants
-
-```bash
-# Base - generic amd64 deployment
-kubectl apply -k deploy/k3s/base/
-
-# Development - fast preview, low resources
+# Development (fast preview)
 kubectl apply -k deploy/k3s/overlays/dev/
 
-# Production - AMD GPU targeting, high quality
+# Production (HQ + AMD GPU)
 kubectl apply -k deploy/k3s/overlays/production/
 ```
 
-### Loading Media Data
-
-```bash
-# Option 1: Use a data loader pod
-kubectl run -it --rm data-loader \
-  --image=busybox \
-  --namespace=montage-ai \
-  --overrides='{"spec":{"containers":[{"name":"data-loader","image":"busybox","volumeMounts":[{"name":"input","mountPath":"/data/input"}]}],"volumes":[{"name":"input","persistentVolumeClaim":{"claimName":"montage-ai-input"}}]}}' \
-  -- sh
-
-# Option 2: Copy from local machine (requires running pod)
-kubectl cp ./my-videos/ montage-ai/<pod-name>:/data/input/
-kubectl cp ./my-music.mp3 montage-ai/<pod-name>:/data/music/
-```
-
-### Cluster Requirements
-
-| Resource | Minimum  | Recommended              |
-| -------- | -------- | ------------------------ |
-| CPU      | 2 cores  | 4+ cores                 |
-| Memory   | 8 GB     | 16+ GB                   |
-| Storage  | 50 GB    | 200+ GB                  |
-| GPU      | Optional | AMD/NVIDIA for upscaling |
+→ **[Full K8s Guide](../deploy/k3s/README.md)**
 
 ---
 
-## Cloud GPU (cgpu)
+## Local Development (No Docker)
 
-Use free cloud GPUs via [cgpu](https://github.com/RohanAdwankar/cgpu) for:
-- **LLM Access**: Free Gemini API for Creative Director
-- **GPU Compute**: Free Google Colab GPUs for upscaling
+For contributors or advanced users.
 
 ### Prerequisites
 
-1. **Install cgpu**
-   ```bash
-   npm install -g cgpu
-   ```
+- Python 3.10+
+- FFmpeg
+- Git
 
-2. **Install gemini-cli** (for LLM features)
-   ```bash
-   # Follow instructions at:
-   # https://github.com/google-gemini/gemini-cli
-   ```
-
-3. **Authenticate with Google**
-   ```bash
-   gemini auth login
-   ```
-
-### Using cgpu for LLM (Creative Director)
+### Setup
 
 ```bash
-# Start the cgpu server
-./montage-ai.sh cgpu-start
+# Clone
+git clone https://github.com/mfahsold/montage-ai.git
+cd montage-ai
 
-# Run with Gemini LLM
-./montage-ai.sh run --cgpu
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# .venv\Scripts\activate   # Windows
 
-# Check status
-./montage-ai.sh cgpu-status
+# Install dependencies
+pip install -r requirements.txt
+pip install -e .
 
-# Stop when done
-./montage-ai.sh cgpu-stop
+# Install FFmpeg
+# Linux: sudo apt install ffmpeg
+# macOS: brew install ffmpeg
+# Windows: choco install ffmpeg
+
+# Verify
+python -c "from montage_ai import editor; print('OK')"
 ```
 
-### Using cgpu for GPU Upscaling
+### Run
 
 ```bash
-# Enable cloud GPU for upscaling
-./montage-ai.sh run --cgpu-gpu --upscale
+# Set paths
+export INPUT_DIR=./data/input
+export MUSIC_DIR=./data/music
+export OUTPUT_DIR=./data/output
 
-# Full cloud mode (LLM + GPU)
-./montage-ai.sh hq hitchcock --cgpu --cgpu-gpu
+# Run editor
+python -m montage_ai.editor
 ```
 
-### cgpu Configuration
+### Development Commands
 
-| Variable           | Default          | Description                 |
-| ------------------ | ---------------- | --------------------------- |
-| `CGPU_ENABLED`     | false            | Enable Gemini LLM           |
-| `CGPU_HOST`        | localhost        | cgpu server host            |
-| `CGPU_PORT`        | 8080             | cgpu server port            |
-| `CGPU_MODEL`       | gemini-2.0-flash | Gemini model                |
-| `CGPU_GPU_ENABLED` | false            | Enable cloud GPU            |
-| `CGPU_TIMEOUT`     | 600              | Operation timeout (seconds) |
-
-### Fallback Behavior
-
-cgpu features gracefully fall back when unavailable:
-
-| Feature           | Primary          | Fallback           |
-| ----------------- | ---------------- | ------------------ |
-| Creative Director | Gemini (cgpu)    | Ollama (local)     |
-| Upscaling         | Cloud GPU (cgpu) | Local Vulkan → CPU |
+```bash
+make help      # Show all commands
+make test      # Run tests
+make lint      # Check code style
+make shell     # Container shell
+```
 
 ---
 
 ## Troubleshooting
 
-### Docker Issues
+### Docker
 
-```bash
-# Permission denied
-sudo usermod -aG docker $USER
-newgrp docker
+| Problem | Solution |
+|---------|----------|
+| Permission denied | `sudo usermod -aG docker $USER && newgrp docker` |
+| Build fails | `docker system prune -af && ./montage-ai.sh build` |
+| Out of disk | `docker image prune -af` |
 
-# Build fails
-docker system prune -af
-./montage-ai.sh build
+### Media
 
-# Out of disk space
-docker system df
-docker image prune -af
-```
+| Problem | Solution |
+|---------|----------|
+| "No input videos found" | Add `.mp4`/`.mov` files to `data/input/` |
+| "No music files found" | Add `.mp3`/`.wav` to `data/music/` |
+| Corrupt output | Try different input codec, re-encode with FFmpeg |
 
-### Kubernetes Issues
+### AI Director
 
-```bash
-# Pod stuck in Pending
-kubectl describe pod -n montage-ai -l app.kubernetes.io/name=montage-ai
+| Problem | Solution |
+|---------|----------|
+| "Ollama connection refused" | Start Ollama: `ollama serve` |
+| Slow generation | Use `--cgpu` for cloud LLM |
+| JSON parse error | Update Ollama model: `ollama pull llama3.1:8b` |
 
-# Image pull errors
-kubectl get events -n montage-ai --sort-by='.lastTimestamp'
+### Kubernetes
 
-# Check PVC binding
-kubectl get pvc -n montage-ai
-
-# View logs
-kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai --tail=100
-```
-
-### cgpu Issues
-
-```bash
-# cgpu not found
-npm install -g cgpu
-
-# Gemini auth failed
-gemini auth login
-
-# Server won't start
-./montage-ai.sh cgpu-stop
-./montage-ai.sh cgpu-start
-```
-
-### Common Errors
-
-| Error                       | Solution                       |
-| --------------------------- | ------------------------------ |
-| "No input videos found"     | Add videos to `data/input/`    |
-| "No music files found"      | Add audio to `data/music/`     |
-| "CUDA not available"        | Use `--cgpu-gpu` for cloud GPU |
-| "Ollama connection refused" | Start Ollama or use `--cgpu`   |
+| Problem | Solution |
+|---------|----------|
+| Pod pending | Check PVC: `kubectl get pvc -n montage-ai` |
+| Image pull error | Check registry access, image exists |
+| Job failed | `kubectl logs -n montage-ai job/montage-ai-render` |
 
 ---
 
 ## Next Steps
 
-- [Configuration Guide](configuration.md) - All environment variables
-- [Style Guide](styles.md) - Style templates and customization
-- [Architecture](architecture.md) - System design
-- [Contributing](../CONTRIBUTING.md) - How to contribute
+- **[Configuration](configuration.md)** — Environment variables
+- **[Styles](styles.md)** — Style templates
+- **[Architecture](architecture.md)** — System design
+- **[Contributing](../CONTRIBUTING.md)** — How to contribute

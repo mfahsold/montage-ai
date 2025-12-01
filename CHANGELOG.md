@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Documentation overhaul for public release**
+  - `README.md`: Complete rewrite with "Why Montage-AI?" section, comparison table, architecture diagram
+  - `docs/models.md`: AI models documentation (librosa, Real-ESRGAN, Llama/Gemini) with rationale and sources
+  - `docs/decisions.md`: Architecture Decision Records (ADR) for all major technical choices
+  - Comparison with Adobe Premiere, DaVinci Resolve, Descript
+  - Links to academic papers and official documentation
 - Professional development workflow
   - `Makefile` with build, deploy, test commands
   - `CONTRIBUTING.md` for external contributors
