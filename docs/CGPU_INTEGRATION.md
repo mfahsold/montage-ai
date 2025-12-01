@@ -46,14 +46,14 @@ See [Architecture](architecture.md) for full system design.
 
 ## Environment Variables
 
-| Variable           | Default                | Description                              |
-| ------------------ | ---------------------- | ---------------------------------------- |
-| `CGPU_ENABLED`     | `false`                | Enable cgpu/Gemini for Creative Director |
-| `CGPU_HOST`        | `127.0.0.1`            | cgpu serve host (localhost for local)    |
-| `CGPU_PORT`        | `5021`                 | cgpu serve port                          |
-| `CGPU_MODEL`       | `gemini-2.5-flash`     | Gemini model (2.5+ required for thinking)|
-| `CGPU_GPU_ENABLED` | `false`                | Enable cloud GPU for upscaling           |
-| `CGPU_TIMEOUT`     | `600`                  | Cloud GPU operation timeout (seconds)    |
+| Variable           | Default            | Description                               |
+| ------------------ | ------------------ | ----------------------------------------- |
+| `CGPU_ENABLED`     | `false`            | Enable cgpu/Gemini for Creative Director  |
+| `CGPU_HOST`        | `127.0.0.1`        | cgpu serve host (localhost for local)     |
+| `CGPU_PORT`        | `5021`             | cgpu serve port                           |
+| `CGPU_MODEL`       | `gemini-2.5-flash` | Gemini model (2.5+ required for thinking) |
+| `CGPU_GPU_ENABLED` | `false`            | Enable cloud GPU for upscaling            |
+| `CGPU_TIMEOUT`     | `600`              | Cloud GPU operation timeout (seconds)     |
 
 ## CLI Commands
 

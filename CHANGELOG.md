@@ -60,8 +60,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Default port changed from 8080 to 5021 for consistency
   - `docs/CGPU_INTEGRATION.md`: Updated with correct settings and troubleshooting
 
-### Changed
-
+- **cgpu GPU upscaling v2.0** (tested 2025-12-01)
+  - `cgpu_upscaler.py`: Complete rewrite with working cloud GPU workflow
+    - Uses `cgpu copy` for file upload (upload only, no download via copy)
+    - Uses `cgpu run` for Real-ESRGAN on Tesla T4
+    - Uses base64 stdout for result download
+    - Added torchvision compatibility patch for Colab's newer torchvision
+    - Added `upscale_image_with_cgpu()` for single image upscaling
+    - Fixed model weight selection (always use x4plus, outscale controls factor)
+  - Verified end-to-end: 320x240 → 1280x960 (4x) on Tesla T4 GPU
 - `editor.py`: Updated upscale pipeline with cgpu priority
   - Priority order: cgpu cloud GPU → local Vulkan GPU → FFmpeg CPU fallback
   - Added cgpu_upscaler import and integration
