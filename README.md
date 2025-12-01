@@ -32,24 +32,24 @@ AI-powered video montage with beat-synchronized editing.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `run [STYLE]` | Create montage |
-| `preview [STYLE]` | Fast preview |
-| `hq [STYLE]` | High quality render |
-| `list` | Show available styles |
-| `build` | Build Docker image |
+| Command           | Description           |
+| ----------------- | --------------------- |
+| `run [STYLE]`     | Create montage        |
+| `preview [STYLE]` | Fast preview          |
+| `hq [STYLE]`      | High quality render   |
+| `list`            | Show available styles |
+| `build`           | Build Docker image    |
 
 ## Styles
 
-| Style | Description |
-|-------|-------------|
-| `hitchcock` | Slow build, explosive climax, high contrast |
-| `mtv` | Rapid 1-2 beat cuts, maximum energy |
-| `action` | Michael Bay fast cuts, motion preference |
-| `documentary` | Natural pacing, longer takes |
-| `minimalist` | Contemplative long takes |
-| `wes_anderson` | Symmetric framing, warm colors |
+| Style          | Description                                 |
+| -------------- | ------------------------------------------- |
+| `hitchcock`    | Slow build, explosive climax, high contrast |
+| `mtv`          | Rapid 1-2 beat cuts, maximum energy         |
+| `action`       | Michael Bay fast cuts, motion preference    |
+| `documentary`  | Natural pacing, longer takes                |
+| `minimalist`   | Contemplative long takes                    |
+| `wes_anderson` | Symmetric framing, warm colors              |
 
 → [Full style documentation](docs/styles.md)
 
@@ -82,20 +82,42 @@ data/
 └── output/  # Generated videos
 ```
 
+## Deployment Options
+
+### Local (Docker Compose)
+
+```bash
+./montage-ai.sh build && ./montage-ai.sh run
+```
+
+### Kubernetes / K3s
+
+```bash
+# Deploy to any Kubernetes cluster
+kubectl apply -k deploy/k3s/
+
+# Or use overlays
+kubectl apply -k deploy/k3s/overlays/production/
+kubectl apply -k deploy/k3s/overlays/dev/
+```
+
+→ [Kubernetes deployment guide](deploy/k3s/README.md)
+
 ## Requirements
 
-- Docker & Docker Compose
+- Docker & Docker Compose (local)
+- Or: Kubernetes 1.28+ (cluster deployment)
 - [Ollama](https://ollama.ai) (local LLM) or [cgpu](https://github.com/RohanAdwankar/cgpu) (cloud)
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Features](docs/features.md) | Detailed feature documentation |
-| [Configuration](docs/configuration.md) | All environment variables |
-| [Styles](docs/styles.md) | Style templates and customization |
-| [Architecture](docs/architecture.md) | System design |
-| [cgpu Integration](docs/CGPU_INTEGRATION.md) | Cloud GPU setup |
+| Document                                     | Description                       |
+| -------------------------------------------- | --------------------------------- |
+| [Features](docs/features.md)                 | Detailed feature documentation    |
+| [Configuration](docs/configuration.md)       | All environment variables         |
+| [Styles](docs/styles.md)                     | Style templates and customization |
+| [Architecture](docs/architecture.md)         | System design                     |
+| [cgpu Integration](docs/CGPU_INTEGRATION.md) | Cloud GPU setup                   |
 
 ## License
 

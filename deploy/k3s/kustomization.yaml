@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: montage-ai
+
+namespace: montage-ai
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - job.yaml
+
+commonLabels:
+  app.kubernetes.io/name: montage-ai
+  app.kubernetes.io/version: "1.0.0"
+  app.kubernetes.io/managed-by: kustomize
+
+# Image configuration - override in overlays
+images:
+  - name: ghcr.io/mfahsold/montage-ai
+    newTag: latest

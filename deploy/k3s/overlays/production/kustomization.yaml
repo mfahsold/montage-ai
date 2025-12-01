@@ -1,0 +1,55 @@
+# Production overlay for montage-ai
+# High-quality settings with stabilization and upscaling
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../
+
+namespace: montage-ai
+
+# Use a specific image tag for production
+images:
+  - name: ghcr.io/mfahsold/montage-ai
+    newTag: v1.0.0
+
+# Override ConfigMap values
+patches:
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: montage-ai-config
+      data:
+        # High-quality production settings
+        CUT_STYLE: "dynamic"
+        STABILIZE: "true"
+        UPSCALE: "true"
+        ENHANCE: "true"
+        FFMPEG_PRESET: "slow"
+        VERBOSE: "false"
+    target:
+      kind: ConfigMap
+      name: montage-ai-config
+
+  # Increase resources for production
+  - patch: |-
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: montage-ai-render
+      spec:
+        template:
+          spec:
+            containers:
+              - name: montage-ai
+                resources:
+                  requests:
+                    cpu: "4"
+                    memory: "16Gi"
+                  limits:
+                    cpu: "8"
+                    memory: "32Gi"
+    target:
+      kind: Job
+      name: montage-ai-render

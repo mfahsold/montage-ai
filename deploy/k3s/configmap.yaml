@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: montage-ai-config
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+data:
+  # Creative Direction
+  CUT_STYLE: "dynamic"
+  CREATIVE_PROMPT: ""
+  
+  # AI / LLM Configuration
+  # Option 1: Ollama (self-hosted)
+  OLLAMA_HOST: "http://ollama.kubeai-system.svc.cluster.local:11434"
+  OLLAMA_MODEL: "llava"
+  DIRECTOR_MODEL: "llama3.1:70b"
+  
+  # Option 2: cgpu (cloud GPU + Gemini LLM)
+  CGPU_ENABLED: "false"
+  CGPU_HOST: "cgpu-server.montage-ai.svc.cluster.local"
+  CGPU_PORT: "8080"
+  CGPU_MODEL: "gemini-2.0-flash"
+  CGPU_GPU_ENABLED: "false"
+  CGPU_TIMEOUT: "600"
+  
+  # Enhancement Settings
+  STABILIZE: "false"
+  UPSCALE: "false"
+  ENHANCE: "true"
+  ENABLE_AI_FILTER: "false"
+  
+  # Output Configuration
+  NUM_VARIANTS: "1"
+  VERBOSE: "true"
+  EXPORT_TIMELINE: "false"
+  GENERATE_PROXIES: "false"
+  
+  # Performance
+  FFMPEG_THREADS: "0"
+  FFMPEG_PRESET: "medium"
+  PARALLEL_ENHANCE: "true"
+  MAX_PARALLEL_JOBS: "4"
+  USE_GPU: "auto"
+  
+  # Deep Analysis
+  DEEP_ANALYSIS: "false"

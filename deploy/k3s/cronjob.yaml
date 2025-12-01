@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: montage-ai-scheduled
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: scheduler
+spec:
+  # Run daily at 2 AM
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 86400  # 24 hours
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: montage-ai
+            app.kubernetes.io/component: renderer
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: montage-ai
+              image: ghcr.io/mfahsold/montage-ai:latest
+              imagePullPolicy: Always
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: "8Gi"
+                limits:
+                  cpu: "6"
+                  memory: "24Gi"
+              envFrom:
+                - configMapRef:
+                    name: montage-ai-config
+              volumeMounts:
+                - name: input
+                  mountPath: /data/input
+                  readOnly: true
+                - name: music
+                  mountPath: /data/music
+                  readOnly: true
+                - name: assets
+                  mountPath: /data/assets
+                  readOnly: true
+                - name: output
+                  mountPath: /data/output
+          volumes:
+            - name: input
+              persistentVolumeClaim:
+                claimName: montage-ai-input
+            - name: music
+              persistentVolumeClaim:
+                claimName: montage-ai-music
+            - name: assets
+              persistentVolumeClaim:
+                claimName: montage-ai-assets
+            - name: output
+              persistentVolumeClaim:
+                claimName: montage-ai-output

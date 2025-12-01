@@ -373,7 +373,7 @@ class FootagePoolManager:
         
         if self.verbose:
             remaining = len(self.clips) - len(self.used_clips)
-            print(f"   📼 Consumed clip {clip_id[:20]}... ({remaining} remaining)")
+            print(f"   📼 Consumed clip {clip_id} ({remaining} remaining)")
         
         return True
     

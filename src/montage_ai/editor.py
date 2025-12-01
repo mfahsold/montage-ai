@@ -1292,8 +1292,8 @@ def create_montage(variant_id=1):
         footage_pool.consume_clip(
             clip_id=id(selected_scene),
             timeline_position=current_time,
-            in_point=clip_start,
-            out_point=clip_end
+            used_in_point=clip_start,
+            used_out_point=clip_end
         )
         
         # Track enhancements applied for monitoring

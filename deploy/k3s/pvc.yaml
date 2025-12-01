@@ -1,0 +1,68 @@
+---
+# Input storage for source video clips
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-input
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce  # local-path only supports RWO
+  resources:
+    requests:
+      storage: 50Gi
+  # storageClassName: local-path  # Uncomment and adjust for your cluster
+---
+# Music storage for audio tracks
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-music
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # storageClassName: local-path
+---
+# Assets storage for overlays, logos
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-assets
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # storageClassName: local-path
+---
+# Output storage for generated videos
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-output
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  # storageClassName: local-path

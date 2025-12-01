@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Kubernetes deployment support (`deploy/k3s/`)
+  - Kustomize-based manifests for any K8s/K3s cluster
+  - Job template for batch video processing
+  - CronJob template for scheduled rendering
+  - ConfigMap with all environment variables
+  - PVCs for input/music/assets/output storage
+  - Overlays for dev (fast preview) and production (HQ render)
+  - Full README with deployment guide
 - cgpu integration for free cloud GPU and LLM access
   - `src/montage_ai/cgpu_upscaler.py`: New module for cloud GPU upscaling via cgpu/Google Colab
     - Offloads Real-ESRGAN to free T4/A100 GPUs

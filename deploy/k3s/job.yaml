@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-render
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: renderer
+spec:
+  # Don't retry failed jobs automatically
+  backoffLimit: 0
+  # Clean up completed jobs after 1 hour
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: renderer
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: montage-ai
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "6"
+              memory: "24Gi"
+              # Uncomment for GPU support:
+              # amd.com/gpu: "1"     # AMD GPU (ROCm)
+              # nvidia.com/gpu: "1"  # NVIDIA GPU (CUDA)
+          envFrom:
+            - configMapRef:
+                name: montage-ai-config
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+            - name: assets
+              mountPath: /data/assets
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music
+        - name: assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-ai-output
+      # Target AMD GPU node
+      nodeSelector:
+        amd.com/gpu: present
