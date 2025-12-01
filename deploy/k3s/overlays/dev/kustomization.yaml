@@ -19,6 +19,9 @@ patches:
               kubernetes.io/hostname: codeai-fluxibriserver
             containers:
               - name: montage-ai
+                securityContext:
+                  privileged: true
+                  allowPrivilegeEscalation: true
                 resources:
                   requests:
                     cpu: "2"

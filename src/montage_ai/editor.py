@@ -1776,7 +1776,8 @@ def _upscale_with_realesrgan(input_path, output_path):
         else:
             fps_arg = fps_str
 
-        subprocess.run(["ffmpeg", "-y", "-framerate", fps_arg, "-i", f"{out_frame_dir}/frame_%08d.jpg", 
+        # Real-ESRGAN writes PNG frames by default; re-encode from PNGs
+        subprocess.run(["ffmpeg", "-y", "-framerate", fps_arg, "-i", f"{out_frame_dir}/frame_%08d.png", 
                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", output_path],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                        
