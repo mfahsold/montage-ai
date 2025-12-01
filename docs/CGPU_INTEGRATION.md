@@ -49,9 +49,9 @@ See [Architecture](architecture.md) for full system design.
 | Variable           | Default                | Description                              |
 | ------------------ | ---------------------- | ---------------------------------------- |
 | `CGPU_ENABLED`     | `false`                | Enable cgpu/Gemini for Creative Director |
-| `CGPU_HOST`        | `host.docker.internal` | cgpu serve host                          |
-| `CGPU_PORT`        | `8080`                 | cgpu serve port                          |
-| `CGPU_MODEL`       | `gemini-2.0-flash`     | Gemini model to use                      |
+| `CGPU_HOST`        | `127.0.0.1`            | cgpu serve host (localhost for local)    |
+| `CGPU_PORT`        | `5021`                 | cgpu serve port                          |
+| `CGPU_MODEL`       | `gemini-2.5-flash`     | Gemini model (2.5+ required for thinking)|
 | `CGPU_GPU_ENABLED` | `false`                | Enable cloud GPU for upscaling           |
 | `CGPU_TIMEOUT`     | `600`                  | Cloud GPU operation timeout (seconds)    |
 
@@ -121,6 +121,19 @@ Priority order:
 3. **Colab quotas** - Cloud GPU usage is limited
 4. **Latency** - Cloud operations add network overhead
 5. **gemini-cli required** - Must install separately for `cgpu serve`
+6. **Model requirement** - Use `gemini-2.5-flash` or higher (2.0 doesn't support thinking)
+
+### gemini-cli Configuration
+
+If you get "IDE directory mismatch" errors, disable IDE integration:
+
+```bash
+# Edit ~/.gemini/settings.json
+{
+  "ide": { "enabled": false },
+  "security": { "auth": { "selectedType": "oauth-personal" } }
+}
+```
 
 ## Fallback Behavior
 

@@ -31,13 +31,13 @@ except ImportError:
     OPENAI_AVAILABLE = False
     OpenAI = None
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 # Backend configuration
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
-CGPU_PORT = os.environ.get("CGPU_PORT", "8080")
-CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
+CGPU_PORT = os.environ.get("CGPU_PORT", "5021")
+CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.5-flash")  # 2.5 required for thinking
 
 # Ollama (fallback/local)
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
@@ -300,21 +300,20 @@ class CreativeDirector:
         """
         Query cgpu/Gemini for creative direction.
         
-        Uses OpenAI-compatible API provided by `cgpu serve`.
+        Uses OpenAI Responses API provided by `cgpu serve`.
+        Note: cgpu uses /v1/responses endpoint, not /v1/chat/completions.
         """
         try:
-            response = self.cgpu_client.chat.completions.create(
+            # cgpu uses the OpenAI Responses API format
+            # Combine system prompt with user prompt as instructions
+            response = self.cgpu_client.responses.create(
                 model=CGPU_MODEL,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.3,
-                max_tokens=1024
+                instructions=self.system_prompt,
+                input=user_prompt,
             )
             
-            if response.choices and len(response.choices) > 0:
-                content = response.choices[0].message.content
+            if hasattr(response, 'output_text') and response.output_text:
+                content = response.output_text
                 # Clean up response - Gemini sometimes wraps JSON in markdown
                 if content.startswith("```json"):
                     content = content[7:]

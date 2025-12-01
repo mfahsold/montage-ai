@@ -42,11 +42,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `--cgpu-gpu` flag: Enable cloud GPU for upscaling
   - New environment variables in `docker-compose.yml`:
     - `CGPU_ENABLED`: Enable cgpu/Gemini LLM backend
-    - `CGPU_HOST`: cgpu serve host (default: host.docker.internal)
+    - `CGPU_HOST`: cgpu serve host (default: 127.0.0.1)
     - `CGPU_PORT`: cgpu serve port (default: 5021)
-    - `CGPU_MODEL`: Gemini model (default: gemini-2.0-flash)
+    - `CGPU_MODEL`: Gemini model (default: gemini-2.5-flash)
     - `CGPU_GPU_ENABLED`: Enable cloud GPU for upscaling
     - `CGPU_TIMEOUT`: Cloud operation timeout (default: 300s)
+
+### Changed
+
+- **cgpu integration fixes** (tested 2025-12-01)
+  - `creative_director.py`: Switch from chat.completions to responses API
+    - cgpu serve uses `/v1/responses` endpoint, not `/v1/chat/completions`
+    - Use `instructions` + `input` parameters instead of `messages` array
+  - Default model changed from `gemini-2.0-flash` to `gemini-2.5-flash`
+    - Gemini 2.0 doesn't support "thinking" feature required by gemini-cli
+    - Gemini 2.5+ includes thinking support
+  - Default port changed from 8080 to 5021 for consistency
+  - `docs/CGPU_INTEGRATION.md`: Updated with correct settings and troubleshooting
 
 ### Changed
 
