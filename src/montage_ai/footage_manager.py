@@ -266,7 +266,7 @@ class FootagePoolManager:
                 scene_type = SceneType.ACTION
             
             clip = FootageClip(
-                clip_id=f"scene_{i}_{scene.get('start', 0):.2f}",
+                clip_id=id(scene),  # Use Python object ID for matching
                 source_file=scene['path'],
                 in_point=scene['start'],
                 out_point=scene['end'],

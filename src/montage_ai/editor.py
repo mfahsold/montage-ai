@@ -1072,7 +1072,17 @@ def create_montage(variant_id=1):
             
         # Find a scene that fits using Footage Pool Manager
         # Get available clips that haven't been overused
-        available_footage = footage_pool.get_available_clips(min_duration=cut_duration)
+        # Relax min_duration to 50% of cut_duration to handle fast tempos
+        min_dur = cut_duration * 0.5
+        available_footage = footage_pool.get_available_clips(min_duration=min_dur)
+
+        # DEBUG: Show what's happening
+        if VERBOSE and not available_footage:
+            all_durations = [c.duration for c in footage_pool.clips.values()]
+            print(f"   🐛 DEBUG: cut_duration={cut_duration:.2f}s, min_duration={min_dur:.2f}s")
+            print(f"   🐛 DEBUG: beats_per_cut={beats_per_cut}, tempo={tempo:.1f} BPM")
+            print(f"   🐛 DEBUG: Available footage durations: min={min(all_durations):.2f}s, max={max(all_durations):.2f}s, median={sorted(all_durations)[len(all_durations)//2]:.2f}s")
+            print(f"   🐛 DEBUG: Total clips in pool: {len(footage_pool.clips)}, Used clips: {len(footage_pool.used_clips)}")
 
         if not available_footage:
             print("   ⚠️ No more footage available. Stopping.")
@@ -1083,6 +1093,10 @@ def create_montage(variant_id=1):
         valid_scenes = [s for s in all_scenes if id(s) in [c.clip_id for c in available_footage]]
 
         if not valid_scenes:
+            print(f"   🐛 DEBUG: available_footage has {len(available_footage)} clips but valid_scenes is empty!")
+            print(f"   🐛 DEBUG: First available clip_id: {available_footage[0].clip_id if available_footage else 'N/A'}")
+            print(f"   🐛 DEBUG: First all_scenes id: {id(all_scenes[0]) if all_scenes else 'N/A'}")
+            print(f"   🐛 DEBUG: Do they match? {id(all_scenes[0]) in [c.clip_id for c in available_footage] if all_scenes and available_footage else 'N/A'}")
             print("   ⚠️ No more footage long enough for this cut. Stopping.")
             break
 

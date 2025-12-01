@@ -57,13 +57,11 @@ COPY requirements.txt .
 # Install other dependencies via pip, but exclude librosa/numpy since we have them
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all Python modules (v0.2.0: Natural Language Control + Timeline Export + Monitoring + Deep Analysis)
-COPY smart_worker.py .
-COPY creative_director.py .
-COPY style_templates.py .
-COPY timeline_exporter.py .
-COPY monitoring.py .
-COPY footage_analyzer.py .
-COPY editing_schema.json .
+# Copy package structure
+COPY src/ /app/src/
+COPY pyproject.toml .
 
-ENTRYPOINT ["python", "-u", "smart_worker.py"]
+# Install package
+RUN pip install --no-cache-dir -e .
+
+ENTRYPOINT ["python", "-u", "-m", "montage_ai.editor"]
