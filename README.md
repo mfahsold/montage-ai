@@ -1,67 +1,64 @@
 # Montage AI
 
-AI-powered automatic video montage creation with beat-synchronized editing.
+AI-powered video montage with beat-synchronized editing.
 
 ## Quick Start
 
 ```bash
-# Build
-docker build -t montage-ai .
+# Build once
+./montage-ai.sh build
 
-# Run
-./montage-ai.sh
+# Run with default style
+./montage-ai.sh run
 
-# With style
-CREATIVE_PROMPT="Edit like Hitchcock" ./montage-ai.sh
+# Or pick a style
+./montage-ai.sh run hitchcock
+./montage-ai.sh run mtv
+./montage-ai.sh run documentary
 ```
 
-## Data Structure
+## Commands
 
-```
-data/
-├── input/   # Your video files
-├── music/   # Your audio track
-└── output/  # Generated videos
-```
+| Command | Description |
+|---------|-------------|
+| `run [STYLE]` | Create montage |
+| `preview [STYLE]` | Fast preview |
+| `hq [STYLE]` | High quality render |
+| `list` | Show available styles |
+| `build` | Build Docker image |
 
 ## Styles
 
+| Style | Description |
+|-------|-------------|
+| `dynamic` | Position-aware pacing (default) |
+| `hitchcock` | Slow build, explosive climax |
+| `mtv` | Fast 1-2 beat cuts |
+| `action` | Michael Bay rapid cuts |
+| `documentary` | Natural pacing |
+| `minimalist` | Long contemplative takes |
+
+## Options
+
 ```bash
-./montage-ai.sh                           # Default dynamic
-CREATIVE_PROMPT="hitchcock" ./montage-ai.sh    # Suspense
-CREATIVE_PROMPT="mtv" ./montage-ai.sh          # Fast cuts
-CREATIVE_PROMPT="documentary" ./montage-ai.sh  # Natural pacing
-CREATIVE_PROMPT="minimalist" ./montage-ai.sh   # Long takes
+./montage-ai.sh run --stabilize           # Enable stabilization
+./montage-ai.sh run --variants 3          # Generate 3 variants
+./montage-ai.sh hq hitchcock --stabilize  # HQ + stabilize
 ```
 
-## Configuration
+## Data
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CREATIVE_PROMPT` | - | Style: hitchcock, mtv, documentary, minimalist |
-| `STABILIZE` | false | Video stabilization |
-| `ENHANCE` | true | Color/sharpness boost |
-| `NUM_VARIANTS` | 1 | Generate multiple versions |
+```
+data/
+├── input/   # 51 video clips (gallery footage)
+├── music/   # aggressive-techno-409194.mp3
+└── output/  # Generated videos
+```
 
 ## Modules
 
-### Core (Stable)
-- **editor.py** - Main editing engine with beat-sync
-- **style_templates.py** - Predefined editing styles
-- **footage_manager.py** - Clip tracking and story arc
-- **monitoring.py** - Progress tracking
-
-### Experimental
-- **timeline_exporter.py** - Export to DaVinci/Premiere (OTIO/EDL) [WIP]
-- **footage_analyzer.py** - Deep visual analysis for AI storytelling [WIP]
-
-## Roadmap
-
-- [x] Beat-synchronized editing
-- [x] Style templates
-- [x] Footage consumption tracking
-- [ ] Timeline export (OTIO/EDL)
-- [ ] AI-powered story generation from footage analysis
+**Core:** editor, style_templates, footage_manager, monitoring  
+**Experimental:** timeline_exporter (OTIO/EDL), footage_analyzer
 
 ## License
 

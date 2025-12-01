@@ -1,143 +1,129 @@
 #!/bin/bash
-# Montage AI - Quick Edit Script
-# Usage: ./montage-ai.sh [options]
-
+# Montage AI - Simple CLI
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-
-# Default settings
-CREATIVE_PROMPT="${CREATIVE_PROMPT:-}"
-CUT_STYLE="${CUT_STYLE:-dynamic}"
-STABILIZE="${STABILIZE:-false}"
-UPSCALE="${UPSCALE:-false}"
-ENHANCE="${ENHANCE:-true}"
-NUM_VARIANTS="${NUM_VARIANTS:-1}"
-VERBOSE="${VERBOSE:-true}"
-EXPORT_TIMELINE="${EXPORT_TIMELINE:-false}"
-DEEP_ANALYSIS="${DEEP_ANALYSIS:-false}"
-
-# Performance settings
-CPUS="${CPUS:-6}"
-MEMORY="${MEMORY:-24g}"
-FFMPEG_PRESET="${FFMPEG_PRESET:-medium}"
-
-# Help message
 show_help() {
-    echo "Montage AI - AI-Powered Video Montage Creation"
-    echo ""
-    echo "Usage: $0 [command] [options]"
-    echo ""
-    echo "Commands:"
-    echo "  edit      Run the video editor (default)"
-    echo "  build     Build the Docker image"
-    echo "  shell     Open a shell in the container"
-    echo "  logs      Show container logs"
-    echo "  help      Show this help message"
-    echo ""
-    echo "Environment Variables:"
-    echo "  CREATIVE_PROMPT   Natural language editing prompt"
-    echo "  CUT_STYLE         Legacy style: fast, hyper, slow, dynamic"
-    echo "  STABILIZE         Enable stabilization (true/false)"
-    echo "  UPSCALE           Enable AI upscaling (true/false)"
-    echo "  ENHANCE           Enable color enhancement (true/false)"
-    echo "  NUM_VARIANTS      Number of output variants"
-    echo "  DEEP_ANALYSIS     Enable deep footage analysis"
-    echo ""
-    echo "Examples:"
-    echo "  # Quick edit with default settings"
-    echo "  ./montage-ai.sh"
-    echo ""
-    echo "  # Hitchcock style with stabilization"
-    echo "  CREATIVE_PROMPT='Edit like Hitchcock' STABILIZE=true ./montage-ai.sh"
-    echo ""
-    echo "  # MTV fast-paced style"
-    echo "  CREATIVE_PROMPT='MTV music video style' ./montage-ai.sh"
-    echo ""
-    echo "  # Full quality render"
-    echo "  STABILIZE=true UPSCALE=true FFMPEG_PRESET=slow ./montage-ai.sh"
+    cat << EOF
+Montage AI - Video Montage Creator
+
+Usage: ./montage-ai.sh [COMMAND] [OPTIONS]
+
+Commands:
+  run [STYLE]     Create montage (default: dynamic)
+  preview         Quick preview (fast preset)
+  hq              High quality render
+  list            List available styles
+  build           Build Docker image
+
+Styles:
+  dynamic         Position-aware pacing (default)
+  hitchcock       Suspense - slow build, fast climax
+  mtv             Fast 1-2 beat cuts
+  action          Michael Bay rapid cuts
+  documentary     Natural, observational
+  minimalist      Long contemplative takes
+
+Options:
+  --stabilize     Enable video stabilization
+  --no-enhance    Disable color enhancement
+  --variants N    Generate N variants
+
+Examples:
+  ./montage-ai.sh run                    # Default dynamic style
+  ./montage-ai.sh run hitchcock          # Hitchcock suspense
+  ./montage-ai.sh preview mtv            # Quick MTV preview
+  ./montage-ai.sh hq documentary         # High quality documentary
+  ./montage-ai.sh run --stabilize        # With stabilization
+EOF
 }
 
-# Build Docker image
+list_styles() {
+    echo "Available Styles:"
+    echo "  dynamic      - Position-aware pacing (intro→build→climax→outro)"
+    echo "  hitchcock    - Slow build-up, explosive climax"
+    echo "  mtv          - Fast 1-2 beat cuts, high energy"
+    echo "  action       - Michael Bay rapid cuts"
+    echo "  documentary  - Natural pacing, observational"
+    echo "  minimalist   - Long takes, contemplative"
+    echo "  wes_anderson - Symmetrical, whimsical"
+}
+
 build_image() {
-    echo "🔨 Building Montage AI Docker image..."
+    echo "Building Montage AI..."
     docker build -t montage-ai:latest .
-    echo "✅ Build complete"
+    echo "Done."
 }
 
-# Run the editor
-run_editor() {
-    echo "🎬 Starting Montage AI..."
-    echo "   Creative Prompt: ${CREATIVE_PROMPT:-'(using default)'}"
+run_montage() {
+    local STYLE="${1:-dynamic}"
+    local PRESET="${2:-medium}"
+    local STABILIZE="${3:-false}"
+    local ENHANCE="${4:-true}"
+    local VARIANTS="${5:-1}"
+
+    echo "🎬 Montage AI"
+    echo "   Style: $STYLE"
+    echo "   Preset: $PRESET"
     echo "   Stabilize: $STABILIZE"
-    echo "   Upscale: $UPSCALE"
-    echo "   Enhance: $ENHANCE"
-    echo "   Variants: $NUM_VARIANTS"
     echo ""
-    
-    # Check if data directories exist
-    if [ ! -d "./data/input" ]; then
-        echo "❌ Error: ./data/input directory not found"
-        echo "   Please create it and add your video files"
-        exit 1
-    fi
-    
-    if [ ! -d "./data/music" ]; then
-        echo "❌ Error: ./data/music directory not found"
-        echo "   Please create it and add your music file"
-        exit 1
-    fi
-    
-    # Create output directory
-    mkdir -p ./data/output
-    
-    # Run container
+
     docker compose run --rm \
-        -e CREATIVE_PROMPT="$CREATIVE_PROMPT" \
-        -e CUT_STYLE="$CUT_STYLE" \
+        -e CREATIVE_PROMPT="$STYLE" \
+        -e FFMPEG_PRESET="$PRESET" \
         -e STABILIZE="$STABILIZE" \
-        -e UPSCALE="$UPSCALE" \
         -e ENHANCE="$ENHANCE" \
-        -e NUM_VARIANTS="$NUM_VARIANTS" \
-        -e VERBOSE="$VERBOSE" \
-        -e EXPORT_TIMELINE="$EXPORT_TIMELINE" \
-        -e DEEP_ANALYSIS="$DEEP_ANALYSIS" \
-        -e FFMPEG_PRESET="$FFMPEG_PRESET" \
+        -e NUM_VARIANTS="$VARIANTS" \
         montage-ai
 }
 
-# Open shell in container
-run_shell() {
-    echo "🐚 Opening shell in Montage AI container..."
-    docker compose run --rm --entrypoint /bin/bash montage-ai
-}
+# Parse arguments
+STYLE="dynamic"
+PRESET="medium"
+STABILIZE="false"
+ENHANCE="true"
+VARIANTS="1"
 
-# Show logs
-show_logs() {
-    docker compose logs -f montage-ai
-}
-
-# Main
-case "${1:-edit}" in
-    edit)
-        run_editor
+case "${1:-run}" in
+    run)
+        shift
+        [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
+        ;;
+    preview)
+        PRESET="fast"
+        shift
+        [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
+        ;;
+    hq)
+        PRESET="slow"
+        STABILIZE="true"
+        shift
+        [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
+        ;;
+    list)
+        list_styles
+        exit 0
         ;;
     build)
         build_image
-        ;;
-    shell)
-        run_shell
-        ;;
-    logs)
-        show_logs
+        exit 0
         ;;
     help|--help|-h)
         show_help
+        exit 0
         ;;
     *)
-        echo "Unknown command: $1"
-        show_help
-        exit 1
+        [[ "$1" != --* ]] && { STYLE="$1"; shift; }
         ;;
 esac
+
+# Parse options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --stabilize) STABILIZE="true"; shift ;;
+        --no-enhance) ENHANCE="false"; shift ;;
+        --variants) VARIANTS="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+
+run_montage "$STYLE" "$PRESET" "$STABILIZE" "$ENHANCE" "$VARIANTS"
