@@ -1,47 +1,21 @@
-# Development overlay for montage-ai
-# Fast preview settings with minimal resources
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
   - ../../base
 
-namespace: montage-ai
-
-# Use latest image for development
-images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newTag: latest
-
-# Override ConfigMap values
 patches:
-  - patch: |-
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: montage-ai-config
-      data:
-        # Fast preview settings
-        CUT_STYLE: "dynamic"
-        STABILIZE: "false"
-        UPSCALE: "false"
-        ENHANCE: "false"
-        FFMPEG_PRESET: "ultrafast"
-        VERBOSE: "true"
-        GENERATE_PROXIES: "true"
-    target:
-      kind: ConfigMap
-      name: montage-ai-config
-
-  # Reduce resources for development
   - patch: |-
       apiVersion: batch/v1
       kind: Job
       metadata:
         name: montage-ai-render
+        namespace: montage-ai
       spec:
         template:
           spec:
+            nodeSelector:
+              kubernetes.io/arch: amd64
             containers:
               - name: montage-ai
                 resources:
@@ -51,33 +25,3 @@ patches:
                   limits:
                     cpu: "2"
                     memory: "8Gi"
-    target:
-      kind: Job
-      name: montage-ai-render
-
-  # Reduce PVC sizes for development
-  - patch: |-
-      apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
-        name: montage-ai-input
-      spec:
-        resources:
-          requests:
-            storage: 10Gi
-    target:
-      kind: PersistentVolumeClaim
-      name: montage-ai-input
-
-  - patch: |-
-      apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
-        name: montage-ai-output
-      spec:
-        resources:
-          requests:
-            storage: 20Gi
-    target:
-      kind: PersistentVolumeClaim
-      name: montage-ai-output
