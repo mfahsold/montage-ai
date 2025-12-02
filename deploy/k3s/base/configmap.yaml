@@ -26,7 +26,7 @@ data:
   
   # Enhancement Settings
   STABILIZE: "true"
-  UPSCALE: "true"
+  UPSCALE: "false"
   ENHANCE: "true"
   ENABLE_AI_FILTER: "true"
   
@@ -40,7 +40,7 @@ data:
   FFMPEG_THREADS: "0"
   FFMPEG_PRESET: "medium"
   PARALLEL_ENHANCE: "true"
-  MAX_PARALLEL_JOBS: "6"
+  MAX_PARALLEL_JOBS: "4"
   USE_GPU: "auto"
   
   # Deep Analysis

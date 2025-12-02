@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Output file download via `/api/download/{filename}`
   - Health check endpoint for K8s probes
 - Renderer observability: stdout/stderr are now tee'd to `/data/output/render.log` (pod PVC), so full render logs persist after Job cleanup.
+- K3s dev defaults tuned for stability: UPSCALE off by default, MAX_PARALLEL_JOBS=4, dev job memory limit raised to 20Gi (was 16Gi).
 
 - **Documentation overhaul for public release**
   - `README.md`: Complete rewrite with "Why Montage-AI?" section, comparison table, architecture diagram

@@ -28,7 +28,7 @@ patches:
                     memory: "6Gi"
                   limits:
                     cpu: "6"
-                    memory: "16Gi"
+                    memory: "20Gi"
                 volumeMounts:
                   - name: dev-dri
                     mountPath: /dev/dri
