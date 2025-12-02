@@ -23,6 +23,7 @@ import time
 import psutil
 import io
 import atexit
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
@@ -70,6 +71,8 @@ class Monitor:
         self.processed_count = 0
         self._log_file = None
         self._tee_enabled = False
+        self._mem_thread = None
+        self._mem_interval = float(os.environ.get("MONITOR_MEM_INTERVAL", "5.0"))
         
         # Performance tracking
         self.phase_times: Dict[str, float] = {}
@@ -77,6 +80,30 @@ class Monitor:
         
         self._setup_tee()
         self._print_header()
+        self._start_mem_probe()
+
+    def _start_mem_probe(self):
+        """Periodically log process and system memory to stdout (and tee)."""
+        if self._mem_interval <= 0:
+            return
+
+        def _loop():
+            proc = psutil.Process()
+            while True:
+                try:
+                    rss = proc.memory_info().rss / (1024 * 1024)
+                    vms = proc.memory_info().vms / (1024 * 1024)
+                    virt = psutil.virtual_memory()
+                    print(f"[monitor] mem: rss={rss:.1f}Mi vms={vms:.1f}Mi "
+                          f"sys_used={virt.used/1024/1024:.1f}Mi "
+                          f"sys_free={virt.available/1024/1024:.1f}Mi "
+                          f"sys_pct={virt.percent:.1f}%")
+                except Exception:
+                    pass
+                time.sleep(self._mem_interval)
+
+        self._mem_thread = threading.Thread(target=_loop, daemon=True)
+        self._mem_thread.start()
 
     def _setup_tee(self):
         """

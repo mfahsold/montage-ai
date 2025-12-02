@@ -42,6 +42,7 @@ data:
   PARALLEL_ENHANCE: "true"
   MAX_PARALLEL_JOBS: "4"
   USE_GPU: "auto"
+  MONITOR_MEM_INTERVAL: "5"
   
   # Deep Analysis
   DEEP_ANALYSIS: "false"
