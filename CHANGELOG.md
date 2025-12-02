@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Health check endpoint for K8s probes
 - Renderer observability: stdout/stderr are now tee'd to `/data/output/render.log` (pod PVC), so full render logs persist after Job cleanup.
 - K3s dev defaults tuned for stability: UPSCALE off by default, MAX_PARALLEL_JOBS=4, dev job memory limit raised to 48Gi (was 16Gi).
-- Clip variety: Footage pool runs in strict mode (each detected scene höchstens einmal); falls Material ausgeht, bricht der Job mit Warnung ab.
+- Clip variety: Pool bleibt flexibel, aber mit Reuse-Cap (`MAX_SCENE_REUSE`, default 3). AI darf Clips wiederverwenden, aber nicht exzessiv.
 
 - **Documentation overhaul for public release**
   - `README.md`: Complete rewrite with "Why Montage-AI?" section, comparison table, architecture diagram
