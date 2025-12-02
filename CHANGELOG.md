@@ -8,6 +8,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- **Open-Source AI Integration** (Sprint 1-2)
+  - `docs/INTEGRATION_PLAN.md`: Comprehensive integration plan for VideoAgent, Wan2.1-VACE, Open-Sora
+  - Architecture diagrams and sprint breakdown for implementation
+  
+- **FFmpeg Tools** (`src/montage_ai/ffmpeg_tools.py`)
+  - LLM-callable FFmpeg wrapper replacing external FFmpeg-MCP dependency
+  - 10 tools: extract_frames, create_segment, apply_transition, color_grade, mix_audio, resize, concatenate, get_video_info, thumbnail_grid, speed_change
+  - OpenAI function calling schema for LLM integration
+  - Built-in color grading presets (cinematic, vintage, cold, warm, noir, vivid)
+  
+- **VideoAgent Integration** (`src/montage_ai/video_agent.py`)
+  - Memory-augmented clip analysis inspired by ECCV 2024 VideoAgent paper
+  - Temporal Memory: Scene captions with embeddings for semantic search
+  - Object Memory: SQL-backed object tracking across video
+  - 4 Core Tools: caption_retrieval, segment_localization, visual_question_answering, object_memory_querying
+  - Integration with footage_manager.py for story-arc aware clip selection
+  
+- **Wan2.1-VACE Service** (`src/montage_ai/wan_vace.py`)
+  - Video generation and editing via Alibaba Wan2.1 model
+  - Text-to-Video (T2V) B-Roll generation
+  - cgpu cloud GPU execution for free T4 access
+  - WanBRollGenerator with templates: transition, filler, establishing, detail, action
+  - Supports 480p output with 1.3B model (8GB VRAM)
+  
+- **Open-Sora Generator** (`src/montage_ai/open_sora.py`)
+  - Text-to-Video generation via HPC-AI Tech Open-Sora (Apache-2.0)
+  - 256p generation on single T4 GPU
+  - Automatic 4x upscaling with Real-ESRGAN to 1024p output
+  - OpenSoraPromptEnhancer for better generation results
+  - Diffusers fallback to ModelScope T2V if Open-Sora unavailable
+
+### Changed
+
+- **Package version** bumped to 0.4.0
+- **`__init__.py`** updated with all new modules and feature flags
+  - FFMPEG_TOOLS_AVAILABLE, VIDEO_AGENT_AVAILABLE, WAN_VACE_AVAILABLE, OPEN_SORA_AVAILABLE
+  - Comprehensive docstrings with usage examples
+
+### Technical
+
+- All new modules use consistent error handling with feature flags
+- cgpu integration follows established patterns from cgpu_upscaler.py
+- SQLite-backed storage for VideoAgent memory (persistent across sessions)
+
+---
+
+## Previous Releases
+
+### Added
 - **Professional Timeline Export**: Fully integrated OTIO/EDL/CSV export for importing montages into professional NLE software
   - `src/montage_ai/timeline_exporter.py`: Complete export implementation with clip metadata collection
   - OpenTimelineIO (.otio) export - Academy Software Foundation standard for DaVinci Resolve, Premiere Pro, Final Cut Pro
