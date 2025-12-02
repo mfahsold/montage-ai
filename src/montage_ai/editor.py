@@ -1339,6 +1339,11 @@ def create_montage(variant_id=1):
         # Track enhancements applied for monitoring
         enhancements_applied = []
         enhancement_start_time = time.time()
+        
+        # Track which enhancements were actually applied (for metadata)
+        stabilize_applied = False
+        upscale_applied = False
+        enhance_applied = False
             
         # Create Clip
         # If stabilization is requested, we need to process the subclip first
@@ -1346,6 +1351,7 @@ def create_montage(variant_id=1):
         
         if STABILIZE:
             enhancements_applied.append("stabilize")
+            stabilize_applied = True
             # Extract subclip to temp file first
             temp_clip_name = f"temp_clip_{beat_idx}_{random.randint(0,9999)}.mp4"
             temp_clip_path = os.path.join(TEMP_DIR, temp_clip_name)
@@ -1363,12 +1369,16 @@ def create_montage(variant_id=1):
             
             # AI Upscale (Optional - Slow!)
             if UPSCALE:
+                enhancements_applied.append("upscale")
+                upscale_applied = True
                 temp_upscale_path = os.path.join(TEMP_DIR, f"upscale_{temp_clip_name}")
                 final_clip_path = upscale_clip(temp_clip_path, temp_upscale_path)
                 temp_clip_path = final_clip_path
 
             # Enhance (Color/Sharpness) - Do this LAST for best quality on upscaled result
             if ENHANCE:
+                enhancements_applied.append("enhance")
+                enhance_applied = True
                 temp_enhance_path = os.path.join(TEMP_DIR, f"enhance_{temp_clip_name}")
                 final_clip_path = enhance_clip(temp_clip_path, temp_enhance_path)
                 temp_clip_path = final_clip_path
@@ -1387,10 +1397,14 @@ def create_montage(variant_id=1):
                 extract_subclip_ffmpeg(selected_scene['path'], clip_start, cut_duration, temp_clip_path)
                 
                 if UPSCALE:
+                    enhancements_applied.append("upscale")
+                    upscale_applied = True
                     temp_upscale_path = os.path.join(TEMP_DIR, f"upscale_{temp_clip_name}")
                     temp_clip_path = upscale_clip(temp_clip_path, temp_upscale_path)
 
                 if ENHANCE:
+                    enhancements_applied.append("enhance")
+                    enhance_applied = True
                     temp_enhance_path = os.path.join(TEMP_DIR, f"enhance_{temp_clip_name}")
                     temp_clip_path = enhance_clip(temp_clip_path, temp_enhance_path)
                     
