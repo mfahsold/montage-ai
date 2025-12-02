@@ -46,6 +46,7 @@ from .cgpu_utils import (
     is_cgpu_available,
     run_cgpu_command,
     cgpu_copy_to_remote,
+    parse_base64_output,
 )
 
 
@@ -395,18 +396,12 @@ print("===VIDEO_BASE64_END===")
             os.unlink(script_path)
     
     def _parse_base64_output(self, output: str) -> Optional[bytes]:
-        """Extract base64 video data from output."""
-        start_marker = "===VIDEO_BASE64_START==="
-        end_marker = "===VIDEO_BASE64_END==="
-        
-        if start_marker not in output or end_marker not in output:
-            return None
-        
-        start_idx = output.index(start_marker) + len(start_marker)
-        end_idx = output.index(end_marker)
-        
-        b64_data = output[start_idx:end_idx].strip()
-        return base64.b64decode(b64_data)
+        """Extract base64 video data from output using shared utility."""
+        return parse_base64_output(
+            output,
+            "===VIDEO_BASE64_START===",
+            "===VIDEO_BASE64_END==="
+        )
     
     def _upscale_video(self, video_path: str, output_path: str) -> str:
         """Upscale video using Real-ESRGAN via cgpu."""
