@@ -24,7 +24,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: 192.168.1.16:30500/montage-ai:latest
+          image: 192.168.1.16:5000/montage-ai:latest
           # Always re-pull to avoid stale arch-specific images on mixed clusters
           imagePullPolicy: Always
           env:

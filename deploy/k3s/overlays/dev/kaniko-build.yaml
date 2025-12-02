@@ -10,21 +10,15 @@ spec:
       restartPolicy: Never
       nodeSelector:
         kubernetes.io/hostname: codeai-fluxibriserver
-      volumes:
-        - name: certs
-          configMap:
-            name: local-registry-ca
       containers:
         - name: kaniko
           image: gcr.io/kaniko-project/executor:latest
           args:
             - --context=git://github.com/mfahsold/montage-ai.git#main
             - --dockerfile=Dockerfile
-            - --destination=192.168.1.16:30500/montage-ai:latest
+            - --destination=192.168.1.16:5000/montage-ai:latest
             - --snapshot-mode=time
             - --verbosity=info
             - --custom-platform=linux/amd64
-            - --registry-certificate=192.168.1.16:30500=/kaniko/certs/registry.crt
-          volumeMounts:
-            - name: certs
-              mountPath: /kaniko/certs
+            - --insecure
+            - --skip-tls-verify-registry=192.168.1.16:5000
