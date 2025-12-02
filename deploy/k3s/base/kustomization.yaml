@@ -8,6 +8,7 @@ resources:
   - configmap.yaml
   - pvc.yaml
   - job.yaml
+  - network-policies/networkpolicy-default-deny.yaml
 
 labels:
   - pairs:

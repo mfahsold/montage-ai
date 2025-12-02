@@ -16,7 +16,6 @@ patches:
           spec:
             nodeSelector:
               kubernetes.io/arch: amd64
-              kubernetes.io/hostname: codeai-fluxibriserver
             containers:
               - name: montage-ai
                 securityContext:
@@ -25,10 +24,10 @@ patches:
                 resources:
                   requests:
                     cpu: "2"
-                    memory: "6Gi"
+                    memory: "8Gi"
                   limits:
                     cpu: "6"
-                    memory: "20Gi"
+                    memory: "48Gi"
                 volumeMounts:
                   - name: dev-dri
                     mountPath: /dev/dri
