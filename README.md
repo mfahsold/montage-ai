@@ -47,6 +47,18 @@ Montage-AI automates this with proven algorithms:
 
 ## Quick Start
 
+### Option 1: Web UI (Easiest)
+
+```bash
+git clone https://github.com/mfahsold/montage-ai.git
+cd montage-ai
+make web
+```
+
+Open **http://localhost:5000** → Upload → Create → Download
+
+### Option 2: Command Line
+
 \`\`\`bash
 # 1. Clone and build
 git clone https://github.com/mfahsold/montage-ai.git
@@ -63,7 +75,7 @@ cp /path/to/music.mp3 data/music/
 
 Output: \`data/output/montage.mp4\`
 
-→ **[Full Installation Guide](docs/INSTALL.md)** | **[Kubernetes Deployment](deploy/k3s/README.md)**
+→ **[Quick Start Guide](docs/QUICKSTART.md)** | **[Web UI Guide](docs/web_ui.md)** | **[Installation](docs/INSTALL.md)** | **[Kubernetes](deploy/k3s/README.md)**
 
 ---
 
@@ -71,11 +83,13 @@ Output: \`data/output/montage.mp4\`
 
 | Feature | Description |
 |---------|-------------|
+| 🌐 **Web UI** | Self-hosted web interface (no cloud uploads) |
 | 🎵 **Beat Sync** | Cuts align to music rhythm via [librosa](https://librosa.org/) beat detection |
 | 🎬 **Style Templates** | Hitchcock, MTV, documentary, action, minimalist presets |
 | 🤖 **AI Director** | Natural language → editing parameters via LLM |
 | 📖 **Story Arc** | Automatic intro/build/climax/outro structure |
 | ⬆️ **AI Upscaling** | 4x resolution via [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) |
+| 📽️ **Timeline Export** | OTIO/EDL for DaVinci Resolve, Premiere Pro, Final Cut |
 | ☁️ **Cloud GPU** | Free cloud processing via [cgpu](https://github.com/RohanAdwankar/cgpu) |
 | 🐳 **Deploy Anywhere** | Docker, Kubernetes, local |
 

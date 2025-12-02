@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montage AI - Self-Hosted Video Editing</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🎬 Montage AI</h1>
+            <p class="subtitle">AI-powered video montage with beat-synchronized editing</p>
+            <span class="version">v{{ version }}</span>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="card">
+            <h2>1. Upload Media</h2>
+            <div class="upload-area">
+                <div class="upload-box">
+                    <h3>📹 Videos</h3>
+                    <input type="file" id="videoUpload" accept="video/*" multiple>
+                    <label for="videoUpload" class="upload-label">
+                        Choose video files (MP4, MOV)
+                    </label>
+                    <div id="videoList" class="file-list"></div>
+                </div>
+                <div class="upload-box">
+                    <h3>🎵 Music</h3>
+                    <input type="file" id="musicUpload" accept="audio/*">
+                    <label for="musicUpload" class="upload-label">
+                        Choose audio file (MP3, WAV)
+                    </label>
+                    <div id="musicList" class="file-list"></div>
+                </div>
+            </div>
+            <button onclick="refreshFiles()" class="btn-secondary">🔄 Refresh Files</button>
+        </section>
+
+        <!-- Configuration Section -->
+        <section class="card">
+            <h2>2. Configure Montage</h2>
+
+            <div class="form-group">
+                <label for="style">Style</label>
+                <select id="style">
+                    <option value="dynamic">Dynamic (Default)</option>
+                    <option value="hitchcock">Hitchcock (Suspense)</option>
+                    <option value="mtv">MTV (Fast Cuts)</option>
+                    <option value="action">Action (Michael Bay)</option>
+                    <option value="documentary">Documentary</option>
+                    <option value="minimalist">Minimalist</option>
+                    <option value="wes_anderson">Wes Anderson</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="prompt">Creative Prompt (Optional)</label>
+                <input type="text" id="prompt" placeholder="e.g., 'Edit like a thriller with slow builds'">
+                <small>Natural language instructions for AI Director</small>
+            </div>
+
+            <div class="options-grid">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="enhance" checked>
+                    <span>✨ Enhance (Color & Sharpness)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="stabilize">
+                    <span>⚖️ Stabilize</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="upscale">
+                    <span>🔍 AI Upscale (Slow!)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="cgpu">
+                    <span>☁️ Use Cloud GPU (cgpu)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="exportTimeline">
+                    <span>📽️ Export Timeline (OTIO/EDL)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="generateProxies">
+                    <span>🎞️ Generate Proxies</span>
+                </label>
+            </div>
+
+            <button onclick="createJob()" class="btn-primary">🚀 Create Montage</button>
+        </section>
+
+        <!-- Jobs Section -->
+        <section class="card">
+            <h2>3. Jobs & Output</h2>
+            <button onclick="refreshJobs()" class="btn-secondary">🔄 Refresh</button>
+            <div id="jobsList"></div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <p>Open Source | <a href="https://github.com/mfahsold/montage-ai" target="_blank">GitHub</a> | <a href="/api/status">API Status</a></p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

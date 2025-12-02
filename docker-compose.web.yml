@@ -1,0 +1,30 @@
+# Docker Compose for Montage AI Web UI
+#
+# Usage:
+#   docker-compose -f docker-compose.web.yml up
+
+version: '3.8'
+
+services:
+  web-ui:
+    build: .
+    command: python -m montage_ai.web_ui.app
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/data
+    environment:
+      - FLASK_ENV=production
+      - INPUT_DIR=/data/input
+      - MUSIC_DIR=/data/music
+      - OUTPUT_DIR=/data/output
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - CGPU_ENABLED=false
+      - VERBOSE=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

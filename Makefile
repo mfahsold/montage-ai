@@ -19,6 +19,10 @@ RESET := \033[0m
 help: ## Show this help
 	@echo "$(CYAN)Montage AI - Development Commands$(RESET)"
 	@echo ""
+	@echo "$(GREEN)Web UI (Self-Hosted):$(RESET)"
+	@echo "  make web            Start web UI (http://localhost:5000)"
+	@echo "  make web-deploy     Deploy web UI to K8s cluster"
+	@echo ""
 	@echo "$(GREEN)Local Development:$(RESET)"
 	@echo "  make build          Build Docker image (local arch)"
 	@echo "  make run            Run montage locally"
@@ -46,6 +50,28 @@ help: ## Show this help
 	@echo "  make clean          Clean up local resources"
 	@echo "  make clean-k8s      Clean up Kubernetes resources"
 	@echo "  make validate       Validate all manifests"
+
+# ============================================================================
+# WEB UI (SELF-HOSTED)
+# ============================================================================
+
+web: build ## Start web UI (http://localhost:5000)
+	@echo "$(CYAN)Starting Montage AI Web UI...$(RESET)"
+	@echo "$(GREEN)Web interface: http://localhost:5000$(RESET)"
+	docker-compose -f docker-compose.web.yml up
+
+web-bg: build ## Start web UI in background
+	@echo "$(CYAN)Starting Montage AI Web UI (background)...$(RESET)"
+	docker-compose -f docker-compose.web.yml up -d
+	@echo "$(GREEN)Web interface: http://localhost:5000$(RESET)"
+
+web-stop: ## Stop web UI
+	docker-compose -f docker-compose.web.yml down
+
+web-deploy: ## Deploy web UI to Kubernetes
+	@echo "$(CYAN)Deploying Web UI to Kubernetes...$(RESET)"
+	kubectl apply -f deploy/k3s/base/web-service.yaml
+	@echo "$(GREEN)Web UI deployed. Check service: kubectl get svc -n $(NAMESPACE) montage-ai-web$(RESET)"
 
 # ============================================================================
 # LOCAL DEVELOPMENT
@@ -117,8 +143,13 @@ status: ## Show cluster deployment status
 # TESTING
 # ============================================================================
 
-test: validate test-local ## Run all tests
+test: validate test-local test-unit ## Run all tests
 	@echo "$(GREEN)All tests passed!$(RESET)"
+
+test-unit: ## Run unit tests with pytest
+	@echo "$(CYAN)Running unit tests...$(RESET)"
+	pytest tests/ -v
+	@echo "$(GREEN)✓ Unit tests passed$(RESET)"
 
 test-local: ## Test local Docker workflow
 	@echo "$(CYAN)Testing local Docker workflow...$(RESET)"
