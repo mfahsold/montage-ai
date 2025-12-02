@@ -7,9 +7,7 @@ metadata:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: renderer
 spec:
-  # Don't retry failed jobs automatically
   backoffLimit: 0
-  # Clean up completed jobs after 1 hour
   ttlSecondsAfterFinished: 3600
   template:
     metadata:
@@ -18,22 +16,18 @@ spec:
         app.kubernetes.io/component: renderer
     spec:
       securityContext:
-        # render group on fluxibriserver is gid 992, video is 44
         fsGroup: 992
         supplementalGroups: [44,992]
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: montage-ai-registry.montage-ai.svc.cluster.local:5000/montage-ai:latest
-          # Always re-pull to avoid stale arch-specific images on mixed clusters
+          image: 192.168.1.16:5001/montage-ai:latest
           imagePullPolicy: Always
           env:
             - name: USE_GPU
               value: "prefer"
             - name: VK_ICD_FILENAMES
               value: "/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
-            # Headless Vulkan needs an explicit runtime dir; /tmp is fine in jobs
-            # See https://community.khronos.org/t/enabling-vulkan-in-ubuntu-24-04-for-headless-browser/111067
             - name: XDG_RUNTIME_DIR
               value: "/tmp"
           resources:
@@ -43,9 +37,6 @@ spec:
             limits:
               cpu: "6"
               memory: "24Gi"
-              # Uncomment for GPU support:
-              # amd.com/gpu: "1"     # AMD GPU (ROCm)
-              # nvidia.com/gpu: "1"  # NVIDIA GPU (CUDA)
           envFrom:
             - configMapRef:
                 name: montage-ai-config
@@ -81,7 +72,5 @@ spec:
           hostPath:
             path: /dev/dri
             type: DirectoryOrCreate
-      # Generic - works on any amd64 node
-      # Override in overlays for GPU targeting
       nodeSelector:
-        kubernetes.io/arch: amd64
+        kubernetes.io/hostname: codeai-fluxibriserver

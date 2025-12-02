@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Direct Google AI Integration** (`creative_director.py` v0.3.0)
+  - New `GOOGLE_API_KEY` environment variable for direct Gemini API access
+  - `_query_google_ai()` method bypasses cgpu serve / gemini-cli entirely
+  - Uses `generativelanguage.googleapis.com` REST API with JSON output mode
+  - Backend priority: Google AI (API Key) > cgpu serve > Ollama (local)
+  - New env vars: `GOOGLE_API_KEY`, `GOOGLE_AI_MODEL=gemini-2.0-flash`
+  - Automatic fallback to Ollama if Google AI fails
+
 - **cgpu Utilities Module** (`src/montage_ai/cgpu_utils.py`)
   - Centralized cgpu cloud GPU utilities to eliminate code duplication
   - `CGPUConfig` dataclass for unified configuration (host, port, model, timeout)

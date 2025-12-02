@@ -31,13 +31,18 @@ except ImportError:
     OPENAI_AVAILABLE = False
     OpenAI = None
 
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 
 # Backend configuration
+# Priority: GOOGLE_API_KEY (direct Gemini) > CGPU_ENABLED (cgpu serve) > Ollama (local)
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
+GOOGLE_AI_MODEL = os.environ.get("GOOGLE_AI_MODEL", "gemini-2.0-flash")
+GOOGLE_AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
+
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
-CGPU_PORT = os.environ.get("CGPU_PORT", "5021")
-CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.5-flash")  # 2.5 required for thinking
+CGPU_PORT = os.environ.get("CGPU_PORT", "8080")  # Updated default port
+CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
 
 # Ollama (fallback/local)
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
@@ -143,7 +148,10 @@ class CreativeDirector:
     LLM-powered Creative Director for video editing.
 
     Translates natural language prompts into structured editing instructions.
-    Supports multiple backends: Ollama (local) or cgpu/Gemini (cloud).
+    Supports multiple backends:
+      - Google AI (direct API with GOOGLE_API_KEY) - preferred
+      - cgpu serve (OpenAI-compatible proxy)
+      - Ollama (local LLM fallback)
     """
 
     def __init__(
@@ -151,7 +159,8 @@ class CreativeDirector:
         ollama_host: str = OLLAMA_HOST,
         model: str = OLLAMA_MODEL,
         timeout: int = 60,
-        use_cgpu: bool = None
+        use_cgpu: bool = None,
+        use_google_ai: bool = None
     ):
         """
         Initialize Creative Director.
@@ -161,16 +170,31 @@ class CreativeDirector:
             model: LLM model to use (llama3.1:70b, deepseek-r1:70b, etc.)
             timeout: Request timeout in seconds
             use_cgpu: Force cgpu backend (None = auto-detect from env)
+            use_google_ai: Force Google AI backend (None = auto-detect from env)
         """
         self.ollama_host = ollama_host
         self.ollama_model = model
         self.timeout = timeout
         
-        # Determine backend
-        if use_cgpu is None:
-            self.use_cgpu = CGPU_ENABLED and OPENAI_AVAILABLE
+        # Determine backend priority: Google AI > cgpu > Ollama
+        if use_google_ai is None:
+            self.use_google_ai = bool(GOOGLE_API_KEY)
         else:
-            self.use_cgpu = use_cgpu and OPENAI_AVAILABLE
+            self.use_google_ai = use_google_ai
+            
+        if use_cgpu is None:
+            self.use_cgpu = CGPU_ENABLED and OPENAI_AVAILABLE and not self.use_google_ai
+        else:
+            self.use_cgpu = use_cgpu and OPENAI_AVAILABLE and not self.use_google_ai
+        
+        # Log backend selection
+        if self.use_google_ai:
+            print(f"   🌐 Creative Director using Google AI ({GOOGLE_AI_MODEL})")
+        elif self.use_cgpu:
+            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}/v1"
+            print(f"   🌐 Creative Director using cgpu/Gemini at {cgpu_url}")
+        else:
+            print(f"   🏠 Creative Director using Ollama ({self.ollama_model})")
         
         # Initialize cgpu client if enabled
         self.cgpu_client = None
@@ -181,7 +205,6 @@ class CreativeDirector:
                     base_url=cgpu_url,
                     api_key="unused"  # cgpu ignores API key
                 )
-                print(f"   🌐 Creative Director using cgpu/Gemini at {cgpu_url}")
             except Exception as e:
                 print(f"   ⚠️ Failed to initialize cgpu client: {e}")
                 self.use_cgpu = False
@@ -283,7 +306,7 @@ class CreativeDirector:
 
     def _query_llm(self, user_prompt: str) -> Optional[str]:
         """
-        Query LLM with user prompt (cgpu/Gemini or Ollama).
+        Query LLM with user prompt (Google AI, cgpu, or Ollama).
 
         Args:
             user_prompt: User's natural language request
@@ -291,9 +314,86 @@ class CreativeDirector:
         Returns:
             LLM response text (should be JSON)
         """
-        if self.use_cgpu and self.cgpu_client:
+        # Try backends in priority order: Google AI > cgpu > Ollama
+        if self.use_google_ai:
+            return self._query_google_ai(user_prompt)
+        elif self.use_cgpu and self.cgpu_client:
             return self._query_cgpu(user_prompt)
         else:
+            return self._query_ollama(user_prompt)
+
+    def _query_google_ai(self, user_prompt: str) -> Optional[str]:
+        """
+        Query Google AI directly using API Key (no cgpu/gemini-cli).
+        
+        Uses the generativelanguage.googleapis.com REST API.
+        This bypasses cgpu serve and gemini-cli entirely.
+        """
+        try:
+            url = f"{GOOGLE_AI_ENDPOINT}/{GOOGLE_AI_MODEL}:generateContent"
+            
+            # Build request payload
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": f"{self.system_prompt}\n\nUser request: {user_prompt}"}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "topP": 0.9,
+                    "maxOutputTokens": 1024,
+                    "responseMimeType": "application/json"  # Force JSON output
+                }
+            }
+            
+            headers = {
+                "Content-Type": "application/json",
+                "X-goog-api-key": GOOGLE_API_KEY
+            }
+            
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                # Extract text from Gemini response structure
+                candidates = result.get("candidates", [])
+                if candidates:
+                    content = candidates[0].get("content", {})
+                    parts = content.get("parts", [])
+                    if parts:
+                        text = parts[0].get("text", "")
+                        # Clean up response - Gemini sometimes wraps JSON in markdown
+                        if text.startswith("```json"):
+                            text = text[7:]
+                        if text.startswith("```"):
+                            text = text[3:]
+                        if text.endswith("```"):
+                            text = text[:-3]
+                        return text.strip()
+                print("   ⚠️ Google AI returned empty response")
+                return None
+            else:
+                error_msg = response.json().get("error", {}).get("message", response.text)
+                print(f"   ⚠️ Google AI error ({response.status_code}): {error_msg}")
+                # Fallback to Ollama
+                print("   🔄 Falling back to Ollama...")
+                return self._query_ollama(user_prompt)
+                
+        except requests.exceptions.Timeout:
+            print(f"   ⚠️ Google AI request timeout ({self.timeout}s)")
+            return self._query_ollama(user_prompt)
+        except Exception as e:
+            print(f"   ⚠️ Google AI error: {e}")
+            # Fallback to Ollama if Google AI fails
+            print("   🔄 Falling back to Ollama...")
             return self._query_ollama(user_prompt)
 
     def _query_cgpu(self, user_prompt: str) -> Optional[str]:
