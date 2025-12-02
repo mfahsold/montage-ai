@@ -62,6 +62,26 @@ Complete reference for all environment variables and settings.
 
 ---
 
+## Memory Management
+
+**NEW:** Stability improvements for large projects and constrained hardware.
+
+| Variable           | Default | Description                                                    |
+| ------------------ | ------- | -------------------------------------------------------------- |
+| `MEMORY_LIMIT_GB`  | `16`    | Docker container memory limit (GB) - match docker-compose.yml  |
+| `MAX_CLIPS_IN_RAM` | `50`    | Maximum clips to keep in RAM simultaneously                    |
+| `AUTO_CLEANUP`     | `true`  | Automatically delete temp files after rendering                |
+
+**Hardware-specific recommendations:**
+
+- **8-16GB RAM:** `MEMORY_LIMIT_GB=12`, `MAX_CLIPS_IN_RAM=30`, `CGPU_GPU_ENABLED=true`
+- **16-32GB RAM:** Default settings are optimal
+- **32GB+ RAM:** `MEMORY_LIMIT_GB=48`, `MAX_CLIPS_IN_RAM=100`
+
+See [STABILITY_IMPROVEMENTS.md](../STABILITY_IMPROVEMENTS.md) for details.
+
+---
+
 ## Output / Export
 
 | Variable           | Default | Description                                 |

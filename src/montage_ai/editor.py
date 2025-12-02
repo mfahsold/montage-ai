@@ -1385,8 +1385,18 @@ def create_montage(variant_id=1):
             
             # Load into MoviePy
             v_clip = VideoFileClip(temp_clip_path)
-            
-            # Cleanup later? For now let /tmp fill up, it's a container.
+
+            # === MEMORY MANAGEMENT: Track temp files for cleanup ===
+            # Store temp file path for later cleanup
+            if not hasattr(v_clip, '_temp_files'):
+                v_clip._temp_files = []
+            v_clip._temp_files.append(temp_clip_path)
+            if 'temp_stab_path' in locals() and os.path.exists(temp_stab_path):
+                v_clip._temp_files.append(temp_stab_path)
+            if 'temp_upscale_path' in locals() and os.path.exists(temp_upscale_path):
+                v_clip._temp_files.append(temp_upscale_path)
+            if 'temp_enhance_path' in locals() and os.path.exists(temp_enhance_path):
+                v_clip._temp_files.append(temp_enhance_path)
         else:
             # Even if not stabilizing, we might want to enhance/upscale
             if ENHANCE or UPSCALE:
@@ -1409,6 +1419,14 @@ def create_montage(variant_id=1):
                     temp_clip_path = enhance_clip(temp_clip_path, temp_enhance_path)
                     
                 v_clip = VideoFileClip(temp_clip_path)
+                # Track temp files for cleanup
+                if not hasattr(v_clip, '_temp_files'):
+                    v_clip._temp_files = []
+                v_clip._temp_files.append(temp_clip_path)
+                if 'temp_upscale_path' in locals() and os.path.exists(temp_upscale_path):
+                    v_clip._temp_files.append(temp_upscale_path)
+                if 'temp_enhance_path' in locals() and os.path.exists(temp_enhance_path):
+                    v_clip._temp_files.append(temp_enhance_path)
             else:
                 v_clip = VideoFileClip(selected_scene['path']).subclip(clip_start, clip_start + cut_duration)
         
@@ -1599,6 +1617,49 @@ def create_montage(variant_id=1):
         monitor.log_render_complete(output_filename, file_size_mb, render_duration_ms)
     else:
         print(f"✅ Variant #{variant_id} Done!")
+
+    # === CLEANUP: Free memory and delete temp files ===
+    print(f"\n🧹 Cleaning up resources...")
+    cleanup_count = 0
+    cleanup_size_mb = 0
+
+    for clip in clips:
+        # Delete temp files associated with this clip
+        if hasattr(clip, '_temp_files'):
+            for temp_file in clip._temp_files:
+                try:
+                    if os.path.exists(temp_file):
+                        size = os.path.getsize(temp_file) / (1024 * 1024)
+                        os.remove(temp_file)
+                        cleanup_count += 1
+                        cleanup_size_mb += size
+                except Exception as e:
+                    if monitor:
+                        monitor.log_warning("cleanup", f"Failed to delete {temp_file}: {e}")
+
+        # Close clip to free memory
+        try:
+            clip.close()
+        except Exception as e:
+            if monitor:
+                monitor.log_warning("cleanup", f"Failed to close clip: {e}")
+
+    # Close audio clip
+    try:
+        audio_clip.close()
+    except:
+        pass
+
+    # Close final video
+    try:
+        final_video.close()
+    except:
+        pass
+
+    print(f"   ✅ Deleted {cleanup_count} temp files ({cleanup_size_mb:.1f} MB freed)")
+    if monitor:
+        monitor.log_success("cleanup", f"Resources freed: {cleanup_count} files, {cleanup_size_mb:.1f}MB")
+        monitor.log_resources()  # Log final memory state
 
     # 7. Timeline Export (if enabled)
     if EXPORT_TIMELINE and TIMELINE_EXPORT_AVAILABLE:

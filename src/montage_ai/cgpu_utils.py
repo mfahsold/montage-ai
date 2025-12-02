@@ -128,31 +128,61 @@ def is_cgpu_serve_available() -> bool:
 # ============================================================================
 
 def run_cgpu_command(
-    cmd: str, 
-    timeout: int = CGPU_TIMEOUT
+    cmd: str,
+    timeout: int = CGPU_TIMEOUT,
+    retries: int = 2,
+    retry_delay: int = 5
 ) -> Tuple[bool, str, str]:
     """
-    Run a shell command on Colab via cgpu.
-    
+    Run a shell command on Colab via cgpu with retry logic.
+
     Args:
         cmd: Shell command to execute
         timeout: Timeout in seconds
-        
+        retries: Number of retry attempts on failure
+        retry_delay: Seconds to wait between retries
+
     Returns:
         (success, stdout, stderr) tuple
     """
-    try:
-        result = subprocess.run(
-            ["cgpu", "run", cmd],
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-        return result.returncode == 0, result.stdout, result.stderr
-    except subprocess.TimeoutExpired:
-        return False, "", f"Timeout after {timeout}s"
-    except Exception as e:
-        return False, "", str(e)
+    import time
+
+    last_error = ""
+
+    for attempt in range(retries + 1):
+        try:
+            result = subprocess.run(
+                ["cgpu", "run", cmd],
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+
+            # Check for session invalidation errors
+            if "session expired" in result.stderr.lower() or "not authenticated" in result.stderr.lower():
+                print(f"   ⚠️ cgpu session expired, attempting reconnection...")
+                # Try to reconnect (cgpu status triggers re-auth)
+                subprocess.run(["cgpu", "status"], capture_output=True, timeout=30)
+                if attempt < retries:
+                    time.sleep(retry_delay)
+                    continue  # Retry
+
+            return result.returncode == 0, result.stdout, result.stderr
+
+        except subprocess.TimeoutExpired:
+            last_error = f"Timeout after {timeout}s"
+            if attempt < retries:
+                print(f"   ⚠️ Timeout on attempt {attempt+1}/{retries+1}, retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+                continue
+        except Exception as e:
+            last_error = str(e)
+            if attempt < retries:
+                print(f"   ⚠️ Error on attempt {attempt+1}/{retries+1}: {e}, retrying...")
+                time.sleep(retry_delay)
+                continue
+
+    return False, "", last_error
 
 
 def run_cgpu_python(

@@ -5,9 +5,18 @@ services:
       dockerfile: Dockerfile
     image: montage-ai:latest
     container_name: montage-ai
-    # Resource limits - adjust based on your system
-    # cpus: 6
-    # mem_limit: 24g
+    # === RESOURCE LIMITS (IMPORTANT for stability) ===
+    # Uncomment and adjust based on your system:
+    # - For 32GB RAM system: mem_limit: 24g (leaves 8GB for OS)
+    # - For 16GB RAM system: mem_limit: 12g (leaves 4GB for OS)
+    # - For  8GB RAM system: mem_limit:  6g (leaves 2GB for OS)
+    deploy:
+      resources:
+        limits:
+          cpus: '6'
+          memory: 16g  # Default: 16GB limit (safe for most systems)
+        reservations:
+          memory: 4g   # Reserve at least 4GB
     volumes:
       - ./data/input:/data/input:ro
       - ./data/music:/data/music:ro
@@ -55,6 +64,11 @@ services:
       - PARALLEL_ENHANCE=${PARALLEL_ENHANCE:-true}
       - MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS:-4}
       - USE_GPU=${USE_GPU:-auto}
+
+      # Memory Management (NEW!)
+      - MEMORY_LIMIT_GB=${MEMORY_LIMIT_GB:-16}  # Match docker mem_limit
+      - MAX_CLIPS_IN_RAM=${MAX_CLIPS_IN_RAM:-50}  # Limit simultaneous clips
+      - AUTO_CLEANUP=${AUTO_CLEANUP:-true}  # Enable temp file cleanup
       
       # Deep Analysis
       - DEEP_ANALYSIS=${DEEP_ANALYSIS:-false}

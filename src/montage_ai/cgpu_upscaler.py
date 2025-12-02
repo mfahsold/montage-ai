@@ -171,7 +171,7 @@ echo "ENV_READY"
         
         # 3. Run full pipeline on Colab (extract → upscale → reassemble)
         print(f"   🚀 Processing on Tesla T4 (scale={scale}x)...")
-        
+
         # Build Python script for Colab
         if "animevideov3" in model or "anime" in model:
             model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth"
@@ -181,7 +181,9 @@ echo "ENV_READY"
             model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
             num_block = 23
             model_scale = 4
-        
+
+        # === IMPROVED: Upload script as file instead of inline string ===
+        # This avoids quote-escaping hell and makes debugging easier
         # Full pipeline script - runs entirely on Colab GPU with detailed CUDA logging
         pipeline_script = f'''
 import sys
@@ -335,13 +337,35 @@ print(f"Performance: {{len(frames)/elapsed:.1f}} fps")
 print("=" * 60)
 print("PIPELINE_SUCCESS")
 '''
-        
-        start_time = time.time()
-        success, stdout, stderr = _run_cgpu_command(
-            f"python3 -c '{pipeline_script}'",
-            timeout=CGPU_TIMEOUT
-        )
-        elapsed = time.time() - start_time
+
+        # === IMPROVED: Upload script as file for better reliability ===
+        remote_script_path = f"{REMOTE_WORK_DIR}/upscale_pipeline.py"
+
+        # Write script to local temp file
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(pipeline_script)
+            local_script_path = f.name
+
+        try:
+            # Upload script to Colab
+            if not _cgpu_copy_to_remote(local_script_path, remote_script_path):
+                print(f"   ❌ Failed to upload processing script")
+                return None
+
+            # Execute uploaded script (no quote-escaping issues!)
+            start_time = time.time()
+            success, stdout, stderr = _run_cgpu_command(
+                f"python3 {remote_script_path}",
+                timeout=CGPU_TIMEOUT
+            )
+            elapsed = time.time() - start_time
+        finally:
+            # Cleanup local temp file
+            try:
+                os.unlink(local_script_path)
+            except:
+                pass
         
         # Always show GPU diagnostics from stdout (even on success)
         if stdout:
@@ -360,10 +384,51 @@ print("PIPELINE_SUCCESS")
         
         if not success or "PIPELINE_SUCCESS" not in stdout:
             print(f"   ❌ Pipeline failed after {elapsed:.0f}s")
+
+            # === IMPROVED: Detailed CUDA error analysis ===
+            cuda_errors = []
+
+            # Check for common CUDA errors in stdout/stderr
+            combined_output = (stdout or "") + (stderr or "")
+
+            if "CUDA out of memory" in combined_output or "OutOfMemoryError" in combined_output:
+                cuda_errors.append("⚠️ CUDA OUT OF MEMORY - Video too large for T4 GPU")
+                cuda_errors.append("   → Try reducing video resolution or using smaller clips")
+                cuda_errors.append("   → Consider chunking into multiple smaller jobs")
+
+            if "No CUDA" in combined_output or "CUDA not available" in combined_output:
+                cuda_errors.append("⚠️ CUDA NOT AVAILABLE - No GPU detected on Colab")
+                cuda_errors.append("   → Colab session may have lost GPU allocation")
+                cuda_errors.append("   → Try restarting cgpu connection")
+
+            if "ModuleNotFoundError" in combined_output:
+                cuda_errors.append("⚠️ MISSING PYTHON MODULE - Dependencies not installed")
+                cuda_errors.append("   → Colab environment may need reinstallation")
+
+            if "RuntimeError" in combined_output and "torch" in combined_output.lower():
+                cuda_errors.append("⚠️ PYTORCH RUNTIME ERROR - Model loading or execution failed")
+
+            if cuda_errors:
+                print(f"\n   🔍 CUDA Error Diagnosis:")
+                for err in cuda_errors:
+                    print(f"      {err}")
+
+            # Show relevant output sections
             if stdout:
-                print(f"   stdout (last 800 chars): {stdout[-800:]}")
+                # Extract error-relevant sections
+                lines = stdout.split('\n')
+                error_lines = [l for l in lines if any(kw in l.lower() for kw in ['error', 'failed', 'exception', 'traceback'])]
+
+                if error_lines:
+                    print(f"\n   📋 Error Messages:")
+                    for line in error_lines[-10:]:  # Last 10 error lines
+                        print(f"      {line}")
+                else:
+                    print(f"\n   📋 Last output: {stdout[-600:]}")
+
             if stderr:
-                print(f"   stderr: {stderr[-300:]}")
+                print(f"\n   📋 stderr: {stderr[-400:]}")
+
             return None
         
         print(f"   ✅ GPU processing done ({elapsed:.0f}s)")
