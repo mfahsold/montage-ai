@@ -102,8 +102,15 @@ FFMPEG_PRESET = os.environ.get("FFMPEG_PRESET", "medium")  # ultrafast/fast/medi
 PARALLEL_ENHANCE = os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true"  # Parallel clip enhancement
 MAX_PARALLEL_JOBS = int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, multiprocessing.cpu_count() - 2))))  # Leave 2 cores free
 
+# Clip reuse control
+MAX_SCENE_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
+
 # GPU/Hardware Acceleration (auto-detected)
 USE_GPU = os.environ.get("USE_GPU", "auto").lower()  # auto, vulkan, v4l2, none
+
+# Optional FFmpeg MCP offload
+USE_FFMPEG_MCP = os.environ.get("USE_FFMPEG_MCP", "false").lower() == "true"
+FFMPEG_MCP_ENDPOINT = os.environ.get("FFMPEG_MCP_ENDPOINT", "http://ffmpeg-mcp.montage-ai.svc.cluster.local:8080")
 
 # cgpu Cloud GPU Configuration
 CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
@@ -629,6 +636,38 @@ def find_best_start_point(video_path, scene_start, scene_end, target_duration):
         return scene_start
     return random.uniform(scene_start, max_start)
 
+
+def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, output_path: str):
+    """
+    Extract a subclip via FFmpeg MCP (if enabled) with fallback to local ffmpeg.
+    """
+    if USE_FFMPEG_MCP:
+        try:
+            resp = requests.post(
+                f"{FFMPEG_MCP_ENDPOINT}/clip",
+                json={
+                    "input": input_path,
+                    "start": start,
+                    "duration": duration,
+                    "output": output_path,
+                    "video_codec": "libx264",
+                    "preset": "ultrafast",
+                    "copy_audio": True
+                },
+                timeout=120
+            )
+            resp.raise_for_status()
+            return
+        except Exception as exc:
+            print(f"   ⚠️ MCP clip failed, falling back to local ffmpeg: {exc}")
+
+    cmd_extract = [
+        "ffmpeg", "-y", "-ss", str(start), "-i", input_path,
+        "-t", str(duration), "-c:v", "libx264", "-preset", "ultrafast",
+        "-c:a", "copy", output_path
+    ]
+    subprocess.run(cmd_extract, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 def analyze_music_energy(audio_path):
     """Get RMS energy curve."""
     print(f"🎵 Analyzing energy levels of {os.path.basename(audio_path)}...")
@@ -946,7 +985,7 @@ def create_montage(variant_id=1):
     print("📚 Initializing Footage Pool Manager...")
     footage_pool = integrate_footage_manager(
         all_scenes,
-        strict_once=True  # Use each detected scene at most once for maximal variety
+        strict_once=False  # Allow AI to reuse when it improves flow; capped by MAX_SCENE_REUSE
     )
     if VERBOSE:
         print(f"   ✓ Footage Pool: {len(all_scenes)} clips ready")
@@ -1314,12 +1353,7 @@ def create_montage(variant_id=1):
             
             # Use ffmpeg to extract exactly the part we need (faster than loading full video)
             # ffmpeg -ss START -i INPUT -t DURATION -c copy TEMP
-            cmd_extract = [
-                "ffmpeg", "-y", "-ss", str(clip_start), "-i", selected_scene['path'],
-                "-t", str(cut_duration), "-c:v", "libx264", "-preset", "ultrafast", 
-                "-c:a", "copy", temp_clip_path
-            ]
-            subprocess.run(cmd_extract, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            extract_subclip_ffmpeg(selected_scene['path'], clip_start, cut_duration, temp_clip_path)
             
             # Stabilize
             if STABILIZE:
@@ -1350,12 +1384,7 @@ def create_montage(variant_id=1):
                 temp_clip_name = f"temp_clip_{beat_idx}_{random.randint(0,9999)}.mp4"
                 temp_clip_path = os.path.join(TEMP_DIR, temp_clip_name)
                 
-                cmd_extract = [
-                    "ffmpeg", "-y", "-ss", str(clip_start), "-i", selected_scene['path'],
-                    "-t", str(cut_duration), "-c:v", "libx264", "-preset", "ultrafast", 
-                    "-c:a", "copy", temp_clip_path
-                ]
-                subprocess.run(cmd_extract, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                extract_subclip_ffmpeg(selected_scene['path'], clip_start, cut_duration, temp_clip_path)
                 
                 if UPSCALE:
                     temp_upscale_path = os.path.join(TEMP_DIR, f"upscale_{temp_clip_name}")

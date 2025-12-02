@@ -17,6 +17,7 @@ Implements professional editing workflows:
 Integration: Import in smart_worker.py and replace scene selection logic.
 """
 
+import os
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Set
 from enum import Enum
@@ -208,6 +209,9 @@ class FootagePoolManager:
     4. Track variety and utilization metrics
     """
     
+    # Max times a single detected scene may be reused (soft cap when strict_once=False)
+    MAX_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
+
     def __init__(self, 
                  clips: List[FootageClip],
                  strict_once: bool = True,
@@ -305,6 +309,10 @@ class FootagePoolManager:
         for clip in self.clips.values():
             # Skip used clips in strict mode
             if self.strict_once and clip.clip_id in self.used_clips:
+                continue
+
+            # Reuse cap in flexible mode
+            if not self.strict_once and clip.usage_count >= self.MAX_REUSE:
                 continue
             
             # Duration filter

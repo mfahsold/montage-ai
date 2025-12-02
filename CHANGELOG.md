@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renderer observability: stdout/stderr are now tee'd to `/data/output/render.log` (pod PVC), so full render logs persist after Job cleanup.
 - K3s dev defaults tuned for stability: UPSCALE off by default, MAX_PARALLEL_JOBS=4, dev job memory limit raised to 48Gi (was 16Gi).
 - Clip variety: Pool bleibt flexibel, aber mit Reuse-Cap (`MAX_SCENE_REUSE`, default 3). AI darf Clips wiederverwenden, aber nicht exzessiv.
+- FFmpeg MCP optional: `USE_FFMPEG_MCP` + `FFMPEG_MCP_ENDPOINT` schalten Subclip-Extraction auf einen MCP-Service um (Fallback: lokales ffmpeg).
 
 - **Documentation overhaul for public release**
   - `README.md`: Complete rewrite with "Why Montage-AI?" section, comparison table, architecture diagram

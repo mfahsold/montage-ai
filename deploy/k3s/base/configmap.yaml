@@ -43,6 +43,9 @@ data:
   MAX_PARALLEL_JOBS: "4"
   USE_GPU: "auto"
   MONITOR_MEM_INTERVAL: "5"
+  MAX_SCENE_REUSE: "3"
+  USE_FFMPEG_MCP: "false"
+  FFMPEG_MCP_ENDPOINT: "http://ffmpeg-mcp.montage-ai.svc.cluster.local:8080"
   
   # Deep Analysis
   DEEP_ANALYSIS: "false"

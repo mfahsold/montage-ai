@@ -6,6 +6,7 @@ Pillow
 proglog
 tqdm
 scenedetect[opencv]
+requests>=2.31.0
 
 # HTTP / API
 requests
