@@ -123,14 +123,19 @@ EDITING_INSTRUCTIONS = None  # Will be populated by interpret_creative_prompt()
 # GPU/Hardware Capability Detection (set at runtime)
 GPU_CAPABILITY = None  # Will be set by detect_gpu_capabilities()
 
-# Import cgpu Cloud Upscaler if available
+# Import cgpu Cloud Upscaler if available (v3 with polling)
 try:
-    from .cgpu_upscaler import upscale_with_cgpu, is_cgpu_available
+    from .cgpu_upscaler_v3 import upscale_with_cgpu, is_cgpu_available
     CGPU_UPSCALER_AVAILABLE = True
 except ImportError:
-    CGPU_UPSCALER_AVAILABLE = False
-    is_cgpu_available = lambda: False
-    upscale_with_cgpu = None
+    # Fallback to original upscaler
+    try:
+        from .cgpu_upscaler import upscale_with_cgpu, is_cgpu_available
+        CGPU_UPSCALER_AVAILABLE = True
+    except ImportError:
+        CGPU_UPSCALER_AVAILABLE = False
+        is_cgpu_available = lambda: False
+        upscale_with_cgpu = None
 
 # Import Timeline Exporter if available
 try:

@@ -140,11 +140,50 @@ def upscale_with_cgpu(
     
     try:
         # 1. Setup remote environment (once per session)
-        if not _colab_env_ready:
+        # Check if environment is ready by testing if work directory exists
+        need_setup = not _colab_env_ready
+        if _colab_env_ready:
+            # Verify directory still exists (session may have restarted)
+            check_success, check_out, _ = _run_cgpu_command(
+                f"test -d {REMOTE_WORK_DIR} && echo EXISTS || echo MISSING",
+                timeout=30
+            )
+            if "MISSING" in check_out or not check_success:
+                print(f"   ⚠️ Colab session restarted, re-initializing environment...")
+                need_setup = True
+                
+        if need_setup:
             print(f"   🔧 Setting up Colab environment (first clip)...")
+            # Install basicsr with torchvision compatibility patch
+            # The patch creates a fake module that redirects the deprecated import
             setup_cmd = f"""
 mkdir -p {REMOTE_WORK_DIR} && \
-pip install -q realesrgan basicsr opencv-python-headless 2>/dev/null && \
+pip install -q opencv-python-headless 2>/dev/null && \
+pip install -q realesrgan basicsr 2>/dev/null || true && \
+python3 << 'PATCH_SCRIPT'
+# Create torchvision compatibility patch
+import os
+patch_code = '''
+# Compatibility shim for torchvision.transforms.functional_tensor
+# This module was removed in torchvision 0.18+
+from torchvision.transforms import functional as F
+
+def rgb_to_grayscale(img, num_output_channels=1):
+    return F.rgb_to_grayscale(img, num_output_channels)
+'''
+# Find site-packages and create the patch
+import site
+for sp in site.getsitepackages():
+    tv_path = os.path.join(sp, "torchvision", "transforms")
+    if os.path.exists(tv_path):
+        patch_file = os.path.join(tv_path, "functional_tensor.py")
+        with open(patch_file, "w") as f:
+            f.write(patch_code)
+        print(f"PATCHED: {{patch_file}}")
+        break
+else:
+    print("WARN: Could not find torchvision to patch")
+PATCH_SCRIPT
 python -c "import torch; print(f'CUDA: {{torch.cuda.is_available()}}, GPU: {{torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}}')" && \
 echo "ENV_READY"
 """
@@ -184,33 +223,32 @@ echo "ENV_READY"
         # 3. Run full pipeline on Colab (extract → upscale → reassemble)
         print(f"   🚀 Processing on Tesla T4 (scale={scale}x)...")
 
-        # Build Python script for Colab
+        # Build Python script for Colab - model architecture depends on model type
+        # animevideov3 uses SRVGGNetCompact, others use RRDBNet
         if "animevideov3" in model or "anime" in model:
             model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth"
-            num_block = 6
+            model_arch = "SRVGGNetCompact"
+            model_init = "SRVGGNetCompact(num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=16, upscale=4, act_type='prelu')"
             model_scale = 4
         else:
             model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
-            num_block = 23
+            model_arch = "RRDBNet"
+            model_init = "RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)"
             model_scale = 4
 
         # === IMPROVED: Upload script as file instead of inline string ===
         # This avoids quote-escaping hell and makes debugging easier
         # Full pipeline script - runs entirely on Colab GPU with detailed CUDA logging
+        # Note: torchvision.transforms.functional_tensor is patched during env setup
         pipeline_script = f'''
-import sys
-# Torchvision compatibility patch
-class _FT:
-    @staticmethod
-    def rgb_to_grayscale(img, n=1):
-        import torchvision.transforms.functional as F
-        return F.rgb_to_grayscale(img, n)
-sys.modules["torchvision.transforms.functional_tensor"] = _FT()
-
 import os, glob, subprocess, urllib.request, time
 import torch, cv2
-from basicsr.archs.rrdbnet_arch import RRDBNet  
 from realesrgan import RealESRGANer
+# Import the correct architecture
+if "{model_arch}" == "SRVGGNetCompact":
+    from realesrgan.archs.srvgg_arch import SRVGGNetCompact
+else:
+    from basicsr.archs.rrdbnet_arch import RRDBNet
 
 # ============ CUDA DIAGNOSTICS ============
 print("=" * 60)
@@ -288,9 +326,9 @@ else:
     print("Model already cached")
 
 # Init Real-ESRGAN with tiling for faster processing
-print("Initializing Real-ESRGAN...")
+print("Initializing Real-ESRGAN ({model_arch})...")
 init_start = time.time()
-model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block={num_block}, num_grow_ch=32, scale={model_scale})
+model = {model_init}
 upsampler = RealESRGANer(scale={model_scale}, model_path=model_path, model=model, tile=512, tile_pad=10, pre_pad=0, half=True, device="cuda")
 print(f"Model initialized in {{time.time()-init_start:.1f}}s")
 
@@ -394,7 +432,11 @@ print("PIPELINE_SUCCESS")
                 if line.startswith('=' * 10) and in_diag and 'DIAGNOSTICS' not in line and 'FRAMES' not in line:
                     in_diag = False
         
-        if not success or "PIPELINE_SUCCESS" not in stdout:
+        # IMPORTANT: cgpu may return exit code 1 even on success (known issue).
+        # We use PIPELINE_SUCCESS marker as the primary success indicator.
+        pipeline_success = "PIPELINE_SUCCESS" in stdout if stdout else False
+        
+        if not pipeline_success:
             print(f"   ❌ Pipeline failed after {elapsed:.0f}s")
 
             # === IMPROVED: Detailed CUDA error analysis ===

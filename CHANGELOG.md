@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **cgpu Status Parsing Bug** - Fixed polling not detecting SUCCESS status
+  - cgpu output contains "Authenticated as..." line at the start and `__COLAB_CLI_EXIT__` garbage at the end
+  - Parser was reading "Authenticated..." as the status instead of actual status
+  - Now filters out cgpu noise before parsing status lines
+  - This was causing successful jobs to timeout instead of downloading
+
+- **cgpu Session Lost Detection** - Fixed infinite polling when Colab session recycles
+  - Added consecutive failure counter (5 failures = abort)
+  - Detects "No such file or directory" errors and aborts gracefully
+  - Prevents hanging jobs when cloud GPU session expires
+
+- **cgpu Encoding Status** - Added `ENCODING` phase to recognized status markers
+  - Pipeline now correctly waits during ffmpeg video encoding phase
+
+### Changed
+
+- **cgpu Upscaler v3 - Polling-based Architecture** (`cgpu_upscaler_v3.py`)
+  - Replaced blocking `cgpu run` with background execution + polling
+  - Each job gets unique work directory (`/content/upscale_{uuid}`) for parallel safety
+  - Status tracking via marker file instead of stdout parsing
+  - Simplified code: 350 lines vs 750 lines (-53%)
+  - Known limitation: Download of large files (>30MB) can still timeout
+
+### Fixed
+
+- **API Options Parsing** - Fixed `app.py` not reading options from nested `options` object
+  - Now correctly extracts `upscale`, `cgpu` from `{"options": {...}}` request body
+
+- **cgpu Exit Code Bug** - Fixed false-negative failures when cgpu returns exit code 1 despite successful execution
+  - cgpu sometimes reports "Command finished without reporting an exit code; assuming failure"
+  - Now uses `PIPELINE_SUCCESS` marker in stdout as primary success indicator instead of exit code
+  - This was causing successful upscales to fall back to local methods unnecessarily
+
+- **cgpu Session Restart Detection** - Fixed environment reuse failing after Colab session restart
+  - Previously cached `_colab_env_ready=True` but session might have been recycled
+  - Now verifies work directory exists before reusing, re-initializes if session restarted
+
 ### Added
 
 - **🎉 Stability Improvements (2025-12-02)**

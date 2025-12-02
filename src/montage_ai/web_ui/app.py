@@ -113,7 +113,9 @@ def run_montage(job_id: str, style: str, options: dict):
         env["ENHANCE"] = "true" if options.get("enhance", True) else "false"
         env["EXPORT_TIMELINE"] = "true" if options.get("export_timeline", False) else "false"
         env["GENERATE_PROXIES"] = "true" if options.get("generate_proxies", False) else "false"
+        # cgpu checkbox enables BOTH LLM and GPU upscaling
         env["CGPU_ENABLED"] = "true" if options.get("cgpu", False) else "false"
+        env["CGPU_GPU_ENABLED"] = "true" if options.get("cgpu", False) else "false"
         env["VERBOSE"] = "true"
 
         # Run montage
@@ -269,18 +271,21 @@ def api_create_job():
     # Generate job ID
     job_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # Extract options from nested object or top-level (backwards compatible)
+    options_data = data.get('options', {})
+    
     # Create job
     job = {
         "id": job_id,
         "style": data['style'],
         "options": {
-            "prompt": data.get('prompt', ''),
-            "stabilize": data.get('stabilize', False),
-            "upscale": data.get('upscale', False),
-            "enhance": data.get('enhance', True),
-            "export_timeline": data.get('export_timeline', False),
-            "generate_proxies": data.get('generate_proxies', False),
-            "cgpu": data.get('cgpu', False)
+            "prompt": options_data.get('prompt', data.get('prompt', '')),
+            "stabilize": options_data.get('stabilize', data.get('stabilize', False)),
+            "upscale": options_data.get('upscale', data.get('upscale', False)),
+            "enhance": options_data.get('enhance', data.get('enhance', True)),
+            "export_timeline": options_data.get('export_timeline', data.get('export_timeline', False)),
+            "generate_proxies": options_data.get('generate_proxies', data.get('generate_proxies', False)),
+            "cgpu": options_data.get('cgpu', data.get('cgpu', False))
         },
         "status": "queued",
         "created_at": datetime.now().isoformat()
