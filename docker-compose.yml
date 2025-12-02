@@ -5,8 +5,9 @@ services:
       dockerfile: Dockerfile
     image: montage-ai:latest
     container_name: montage-ai
-    cpus: 6
-    mem_limit: 24g
+    # Resource limits - adjust based on your system
+    # cpus: 6
+    # mem_limit: 24g
     volumes:
       - ./data/input:/data/input:ro
       - ./data/music:/data/music:ro

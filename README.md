@@ -6,48 +6,13 @@
 
 > Turn hours of raw footage into beat-synchronized montages in minutes.
 
-**Montage-AI** is an open-source video editor that automatically creates cinematic montages from your clips. It analyzes music beats, detects scenes, and assembles footage using AI-driven creative decisions.
-
-<!-- TODO: Add demo video link when available -->
-<!-- [![Demo](https://img.youtube.com/vi/XXXXX/0.jpg)](https://youtube.com/watch?v=XXXXX) -->
-
----
-
-## Why Montage-AI?
-
-Creating engaging video montages manually requires:
-
-- **Hours of beat-syncing** — aligning cuts to music rhythm
-- **Clip selection expertise** — knowing which shots work together
-- **Story arc planning** — structuring intro, build, climax, outro
-
-Montage-AI automates this with proven algorithms:
-
-| Task | Manual | Montage-AI |
-|------|--------|------------|
-| Beat synchronization | 2-3 hours | Automatic ([librosa](https://librosa.org/)) |
-| Scene detection | Manual review | Automatic ([PySceneDetect](https://scenedetect.com/)) |
-| Clip selection | Requires experience | AI-driven (LLM) |
-| Upscaling | Expensive software | Free ([Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)) |
-
-### vs. Other Tools
-
-| | Adobe Premiere | DaVinci Resolve | Descript | **Montage-AI** |
-|-|----------------|-----------------|----------|----------------|
-| Beat sync | Manual | Manual | ❌ | ✅ Auto |
-| AI editing | ❌ | ❌ | ✅ Transcript | ✅ Creative |
-| Cinematic styles | Manual | Manual | ❌ | ✅ Presets |
-| Story arc | Manual | Manual | ❌ | ✅ Auto |
-| Open source | ❌ | ❌ | ❌ | ✅ MIT |
-| Cost | $23/mo | Free | $15/mo | **Free** |
-
-**Best for:** Travel videos, event highlights, music videos, social media content.
+AI-powered video editor that automatically creates cinematic montages from your clips. Analyzes music beats, detects scenes, and assembles footage using AI-driven creative decisions.
 
 ---
 
 ## Quick Start
 
-### Option 1: Web UI (Easiest)
+### Web UI (Recommended)
 
 ```bash
 git clone https://github.com/mfahsold/montage-ai.git
@@ -55,27 +20,26 @@ cd montage-ai
 make web
 ```
 
-Open **http://localhost:5000** → Upload → Create → Download
+Open **http://localhost:5001** → Select files → Create Montage → Download
 
-### Option 2: Command Line
+### Command Line
 
-\`\`\`bash
-# 1. Clone and build
-git clone https://github.com/mfahsold/montage-ai.git
-cd montage-ai
+```bash
+# Build
 ./montage-ai.sh build
 
-# 2. Add your media
+# Add media
 cp /path/to/videos/* data/input/
 cp /path/to/music.mp3 data/music/
 
-# 3. Create montage
-./montage-ai.sh run
-\`\`\`
+# Create montage
+./montage-ai.sh run              # Default style
+./montage-ai.sh run hitchcock    # Suspense style
+./montage-ai.sh run mtv          # Fast cuts
+./montage-ai.sh hq               # High quality + stabilization
+```
 
-Output: \`data/output/montage.mp4\`
-
-→ **[Quick Start Guide](docs/QUICKSTART.md)** | **[Web UI Guide](docs/web_ui.md)** | **[Installation](docs/INSTALL.md)** | **[Kubernetes](deploy/k3s/README.md)**
+Output: `data/output/montage.mp4`
 
 ---
 
@@ -83,71 +47,87 @@ Output: \`data/output/montage.mp4\`
 
 | Feature | Description |
 |---------|-------------|
-| 🌐 **Web UI** | Self-hosted web interface (no cloud uploads) |
-| 🎵 **Beat Sync** | Cuts align to music rhythm via [librosa](https://librosa.org/) beat detection |
-| 🎬 **Style Templates** | Hitchcock, MTV, documentary, action, minimalist presets |
-| 🤖 **AI Director** | Natural language → editing parameters via LLM |
-| 📖 **Story Arc** | Automatic intro/build/climax/outro structure |
-| ⬆️ **AI Upscaling** | 4x resolution via [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) |
-| 📽️ **Timeline Export** | OTIO/EDL for DaVinci Resolve, Premiere Pro, Final Cut |
-| ☁️ **Cloud GPU** | Free cloud processing via [cgpu](https://github.com/RohanAdwankar/cgpu) |
-| 🐳 **Deploy Anywhere** | Docker, Kubernetes, local |
+| 🎵 **Beat Sync** | Cuts align to music rhythm (librosa) |
+| 🎬 **Style Templates** | hitchcock, mtv, action, documentary, minimalist, wes_anderson |
+| 🤖 **AI Director** | Natural language → editing parameters |
+| ⬆️ **AI Upscaling** | 4x resolution via Real-ESRGAN |
+| ☁️ **Cloud GPU** | Free GPU via [cgpu](https://github.com/RohanAdwankar/cgpu) |
+| 📽️ **Timeline Export** | OTIO/EDL for DaVinci Resolve, Premiere |
 
 ---
 
-## Usage
+## Configuration
 
-\`\`\`bash
-./montage-ai.sh run [STYLE]      # Create montage
-./montage-ai.sh preview [STYLE]  # Fast preview (lower quality)
-./montage-ai.sh hq [STYLE]       # High quality + stabilization
-./montage-ai.sh list             # Show available styles
-\`\`\`
+All settings via environment variables. Key options:
 
-### Styles
+```bash
+# Style
+CUT_STYLE=hitchcock              # Style preset
+CREATIVE_PROMPT="tense thriller" # Natural language (overrides style)
+
+# Enhancements
+STABILIZE=true                   # Video stabilization
+UPSCALE=true                     # AI 4x upscaling
+ENHANCE=true                     # Color/sharpness (default)
+
+# AI Backend (choose one)
+GOOGLE_API_KEY=xxx               # Google AI (preferred)
+OLLAMA_HOST=http://localhost:11434  # Local Ollama
+
+# Cloud GPU (for upscaling)
+CGPU_GPU_ENABLED=true            # Use Google Colab T4
+```
+
+→ Full reference: [docs/configuration.md](docs/configuration.md)
+
+---
+
+## Styles
 
 | Style | Description |
 |-------|-------------|
-| \`dynamic\` | Position-aware pacing (default) |
-| \`hitchcock\` | Suspense — slow build, fast climax |
-| \`mtv\` | Rapid 1-2 beat cuts |
-| \`action\` | Michael Bay intensity |
-| \`documentary\` | Natural, observational |
-| \`minimalist\` | Contemplative long takes |
+| `dynamic` | Adapts to music energy (default) |
+| `hitchcock` | Slow tension build, explosive climax |
+| `mtv` | Rapid 1-2 beat cuts |
+| `action` | Michael Bay intensity |
+| `documentary` | Natural, observational |
+| `minimalist` | Contemplative long takes |
+| `wes_anderson` | Symmetric, warm, playful |
 
-### Options
+Custom styles: Create JSON in `src/montage_ai/styles/` or set `STYLE_PRESET_DIR`
 
-\`\`\`bash
-./montage-ai.sh run --stabilize  # Video stabilization
-./montage-ai.sh run --upscale    # AI 4x upscaling
-./montage-ai.sh run --cgpu       # Use cloud LLM (faster)
-\`\`\`
+→ Style guide: [docs/styles.md](docs/styles.md)
 
 ---
 
-## How It Works
+## Architecture
 
-\`\`\`text
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Input     │────▶│   Analyze   │────▶│   Arrange   │────▶│   Render    │
-│  Clips +    │     │  • Beats    │     │  • Select   │     │  • FFmpeg   │
-│  Music      │     │  • Scenes   │     │  • Order    │     │  • Effects  │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-                          │                   │
-                    ┌─────▼─────┐       ┌─────▼─────┐
-                    │  librosa  │       │    LLM    │
-                    │PySceneDetect      │ (Ollama/  │
-                    └───────────┘       │  Gemini)  │
-                                        └───────────┘
-\`\`\`
+```
+Input Clips + Music
+        ↓
+┌───────────────────┐
+│  Beat Detection   │  ← librosa
+│  Scene Detection  │  ← PySceneDetect
+└─────────┬─────────┘
+          ↓
+┌───────────────────┐
+│  Creative Director│  ← LLM (Gemini/Ollama)
+│  (Style → Params) │
+└─────────┬─────────┘
+          ↓
+┌───────────────────┐
+│  Footage Manager  │  ← Story arc selection
+│  Editor Assembly  │  ← Beat-aligned cuts
+└─────────┬─────────┘
+          ↓
+┌───────────────────┐
+│  FFmpeg Render    │  ← Stabilization, upscaling
+└───────────────────┘
+          ↓
+    Final Video
+```
 
-1. **Beat Detection** — [librosa](https://librosa.org/) analyzes music tempo and beat positions
-2. **Scene Detection** — [PySceneDetect](https://scenedetect.com/) identifies cut points in clips
-3. **Clip Selection** — LLM (Llama 3.1 or Gemini) matches clips to story arc positions
-4. **Assembly** — Clips arranged to align cuts with beats
-5. **Rendering** — FFmpeg encodes final video with optional enhancements
-
-→ **[Architecture Details](docs/architecture.md)** | **[AI Models Documentation](docs/models.md)**
+→ Details: [docs/architecture.md](docs/architecture.md)
 
 ---
 
@@ -155,40 +135,31 @@ Output: \`data/output/montage.mp4\`
 
 | Document | Description |
 |----------|-------------|
-| [Installation](docs/INSTALL.md) | Docker, Kubernetes, local setup |
-| [Features](docs/features.md) | Detailed feature documentation |
-| [Styles](docs/styles.md) | Style templates and customization |
+| [Quick Start](docs/QUICKSTART.md) | First-time setup |
+| [Installation](docs/INSTALL.md) | Docker, K8s, local |
+| [Configuration](docs/configuration.md) | All environment variables |
+| [Styles](docs/styles.md) | Style customization |
+| [cgpu Setup](docs/CGPU_INTEGRATION.md) | Cloud GPU / Gemini |
+| [Web UI](docs/web_ui.md) | Web interface guide |
 | [Architecture](docs/architecture.md) | System design |
-| [AI Models](docs/models.md) | Model choices and rationale |
-| [cgpu Integration](docs/CGPU_INTEGRATION.md) | Cloud GPU setup |
-| [Configuration](docs/configuration.md) | Environment variables |
+| [Models](docs/models.md) | AI model choices |
 
 ---
 
-## Contributing
+## Development
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-\`\`\`bash
-git checkout -b feature/your-feature
+```bash
+# Run tests
 make test
-git commit -m "feat: description"
-\`\`\`
 
-**Good first issues:** Check [issues labeled "good first issue"](https://github.com/mfahsold/montage-ai/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+# Local development
+make dev
 
----
+# Validate K8s manifests
+make validate
+```
 
-## Built With
-
-- [librosa](https://librosa.org/) — Audio analysis (beat detection)
-- [PySceneDetect](https://scenedetect.com/) — Scene cut detection
-- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) — AI upscaling
-- [MoviePy](https://zulko.github.io/moviepy/) — Video composition
-- [Ollama](https://ollama.ai/) / [cgpu](https://github.com/RohanAdwankar/cgpu) — LLM backends
-- [FFmpeg](https://ffmpeg.org/) — Video encoding
-
-→ **[Why these libraries?](docs/models.md)**
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ---
 

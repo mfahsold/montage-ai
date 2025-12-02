@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Documentation Cleanup**
+  - Streamlined `README.md` - focused on essentials, removed redundancy
+  - Moved internal analysis docs to `docs/archive/` (ROBUSTNESS_*, OVER_ENGINEERING_REVIEW, INTEGRATION_PLAN)
+  - Archived development planning files (BACKLOG.md, TODO.md, IMPLEMENTATION_SUMMARY.md)
+  - Updated `docs/README.md` as clean documentation index
+
+- **Generalized Configuration Files**
+  - `docker-compose.yml`: Removed hardcoded cpus/mem_limit (now optional comments)
+  - `docker-compose.web.yml`: All values from ENV with defaults, removed dev source mount
+  - Updated default `CGPU_TIMEOUT` from 600 to 1200 seconds (20 minutes for T4 processing)
+
 ### Added
 
 - **cgpu Cloud GPU in Docker** (`Dockerfile`, `docker-compose.web.yml`, `docker-compose.yml`)

@@ -35,7 +35,7 @@ Complete reference for all environment variables and settings.
 | `CGPU_PORT`        | `8080`                 | cgpu serve port                                  |
 | `CGPU_MODEL`       | `gemini-2.0-flash`     | Gemini model to use                              |
 | `CGPU_GPU_ENABLED` | `false`                | Enable cloud GPU for upscaling                   |
-| `CGPU_TIMEOUT`     | `600`                  | Cloud operation timeout (seconds)                |
+| `CGPU_TIMEOUT`     | `1200`                 | Cloud operation timeout (seconds)                |
 
 ---
 

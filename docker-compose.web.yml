@@ -1,33 +1,39 @@
 # Docker Compose for Montage AI Web UI
 #
 # Usage:
-#   docker-compose -f docker-compose.web.yml up
+#   docker compose -f docker-compose.web.yml up
+#
+# Environment variables (optional):
+#   CGPU_GPU_ENABLED=true  - Enable cloud GPU for upscaling
+#   CGPU_ENABLED=true      - Enable cgpu LLM serve
+#   GOOGLE_API_KEY=xxx     - Google AI API key
 
 services:
   web-ui:
     build: .
     entrypoint: ["python", "-u", "-m", "montage_ai.web_ui.app"]
     ports:
-      - "5001:5000"  # Using 5001 as 5000 is used by registry
+      - "${WEB_PORT:-5001}:5000"
     volumes:
       - ./data:/data
-      # Development: Mount source for live updates (remove in production)
-      - ./src:/app/src:ro
-      # cgpu Cloud GPU credentials (cgpu binary is installed in Docker image)
+      # cgpu Cloud GPU credentials (optional)
       - ${HOME}/.config/cgpu:/root/.config/cgpu:ro
     environment:
       - FLASK_ENV=production
       - INPUT_DIR=/data/input
       - MUSIC_DIR=/data/music
       - OUTPUT_DIR=/data/output
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      # cgpu Cloud GPU for upscaling (uses Google Colab T4)
-      - CGPU_GPU_ENABLED=true
-      - CGPU_TIMEOUT=600
-      # cgpu LLM serve (separate feature, disabled for now)
-      - CGPU_ENABLED=false
-      - VERBOSE=true
-      - MAX_CONCURRENT_JOBS=2
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      # Google AI (preferred LLM backend)
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GOOGLE_AI_MODEL=${GOOGLE_AI_MODEL:-gemini-2.0-flash}
+      # cgpu Cloud GPU for upscaling
+      - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-false}
+      - CGPU_TIMEOUT=${CGPU_TIMEOUT:-1200}
+      # cgpu LLM serve (alternative to Google AI)
+      - CGPU_ENABLED=${CGPU_ENABLED:-false}
+      - VERBOSE=${VERBOSE:-true}
+      - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-2}
     restart: unless-stopped
     # Resource limits to prevent OOM
     deploy:

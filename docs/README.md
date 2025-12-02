@@ -1,18 +1,33 @@
-# Montage AI Documentation
+# Documentation
 
-Comprehensive documentation for the AI-powered video montage system.
+Technical documentation for Montage AI.
 
-## Table of Contents
+## User Guides
 
-1. [Features](features.md) - Detailed feature documentation
-2. [Architecture](architecture.md) - System design and components
-3. [Configuration](configuration.md) - Environment variables and settings
-4. [cgpu Integration](CGPU_INTEGRATION.md) - Cloud GPU and Gemini LLM setup
-5. [Style Guide](styles.md) - Creating and customizing editing styles
+| Document | Description |
+|----------|-------------|
+| [Quick Start](QUICKSTART.md) | Get running in 5 minutes |
+| [Installation](INSTALL.md) | Docker, Kubernetes, local setup |
+| [Web UI Guide](web_ui.md) | Using the web interface |
+| [Configuration](configuration.md) | All environment variables |
 
-## Quick Links
+## Features & Customization
 
-- **What can it do?** → [Features](features.md)
-- **Free cloud GPU?** → [cgpu Integration](CGPU_INTEGRATION.md)
-- **Custom styles?** → [Style Guide](styles.md)
-- **All settings?** → [Configuration](configuration.md)
+| Document | Description |
+|----------|-------------|
+| [Features](features.md) | Detailed feature documentation |
+| [Styles](styles.md) | Style templates and customization |
+| [Timeline Export](timeline_export.md) | OTIO/EDL export for NLEs |
+| [cgpu Integration](CGPU_INTEGRATION.md) | Cloud GPU and Gemini setup |
+
+## Technical Reference
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](architecture.md) | System design and data flow |
+| [Models](models.md) | AI model choices and rationale |
+| [Decisions](decisions.md) | Architecture decision records |
+
+## Archive
+
+Internal development notes and analysis documents are in [archive/](archive/).
