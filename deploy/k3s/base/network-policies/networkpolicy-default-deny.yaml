@@ -1,4 +1,4 @@
-# Default Deny - Blockiert allen eingehenden Traffic
+# Default deny - block all inbound traffic
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -9,7 +9,7 @@ spec:
   policyTypes:
   - Ingress
 ---
-# Erlaubt internen Traffic innerhalb des Namespace
+# Allow internal traffic inside the namespace
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -25,7 +25,7 @@ spec:
         matchLabels:
           kubernetes.io/metadata.name: montage-ai
 ---
-# Erlaubt DNS-Auflösung
+# Allow DNS resolution
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -46,7 +46,7 @@ spec:
     - protocol: TCP
       port: 53
 ---
-# Erlaubt Egress zu Registry (192.168.1.16:30500)
+# Allow egress to private registry (192.168.1.16:30500)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -64,7 +64,7 @@ spec:
     - protocol: TCP
       port: 30500
 ---
-# Erlaubt Egress zu GitHub für Kaniko-Builds
+# Allow egress to GitHub for Kaniko builds
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

@@ -162,7 +162,7 @@ make logs
 ./montage-ai.sh run your_style
 ```
 
-3. Add to documentation in `docs/styles.md`
+3. Add to documentation in `docs/features.md`
 
 ## Release Process
 

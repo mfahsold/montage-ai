@@ -1,18 +1,18 @@
 # Open-Source Integration Plan
 
-> Montage AI - Erweiterung durch externe Open-Source Projekte
+> Montage AI – extending the platform with external open-source projects
 
-## Status Übersicht
+## Status Overview
 
-| Projekt       | Status           | Lizenz          | Priorität     | GPU Anforderung           |
-| ------------- | ---------------- | --------------- | ------------- | ------------------------- |
-| VideoAgent    | ✅ Verfügbar      | MIT (ECCV 2024) | 🔴 Hoch        | ~8GB VRAM (Video-LLaVA)   |
-| Open-Sora 2.0 | ✅ Verfügbar      | Apache-2.0      | 🟡 Mittel      | 256p: 1 GPU, 768p: 8 GPUs |
-| Wan2.1-VACE   | ✅ Verfügbar      | Apache-2.0      | 🟡 Mittel      | 1.3B: 8GB, 14B: 24GB+     |
-| FFmpeg-MCP    | ❌ Nicht gefunden | -               | → Alternative | -                         |
-| Frame AI      | ❌ Nicht gefunden | -               | → Alternative | -                         |
+| Project        | Status        | License         | Priority | GPU Requirement             |
+| -------------- | ------------- | --------------- | -------- | --------------------------- |
+| VideoAgent     | ✅ Available  | MIT (ECCV 2024) | 🔴 High  | ~8GB VRAM (Video-LLaVA)     |
+| Open-Sora 2.0  | ✅ Available  | Apache-2.0      | 🟡 Medium| 256p: 1 GPU, 768p: 8 GPUs   |
+| Wan2.1-VACE    | ✅ Available  | Apache-2.0      | 🟡 Medium| 1.3B: 8GB, 14B: 24GB+       |
+| FFmpeg-MCP     | ❌ Not found  | -               | → Alt    | -                           |
+| Frame AI       | ❌ Not found  | -               | → Alt    | -                           |
 
-## Architektur nach Integration
+## Target Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -22,7 +22,7 @@
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐  │
 │  │ Creative        │      │ VideoAgent      │      │ Footage         │  │
 │  │ Director (LLM)  │─────▶│ Memory Agent    │─────▶│ Manager         │  │
-│  │ cgpu/Gemini     │      │ (Clip-Analyse)  │      │ (Selection)     │  │
+│  │ cgpu/Gemini     │      │ (Clip Analysis) │      │ (Selection)     │  │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘  │
 │           │                       │                        │            │
 │           │                       ▼                        │            │
@@ -60,10 +60,10 @@
 
 ---
 
-## Sprint 1: Foundation (Woche 1-2)
+## Sprint 1: Foundation (Weeks 1–2)
 
-### 1.1 MAX_SCENE_REUSE ENV Variable
-**Status:** ✅ Bereits implementiert
+### 1.1 MAX_SCENE_REUSE environment variable
+**Status:** ✅ already implemented
 
 ```python
 # src/montage_ai/footage_manager.py:213
@@ -73,18 +73,18 @@ MAX_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
 MAX_SCENE_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
 ```
 
-### 1.2 FFmpeg Tool Wrapper (Alternative zu FFmpeg-MCP)
+### 1.2 FFmpeg tool wrapper (FFmpeg-MCP alternative)
 
-Da FFmpeg-MCP nicht gefunden wurde, implementieren wir einen eigenen LLM-callable Wrapper.
+Because FFmpeg-MCP is unavailable, add an in-house LLM-callable wrapper.
 
-**Neue Datei:** `src/montage_ai/ffmpeg_tools.py`
+**New file:** `src/montage_ai/ffmpeg_tools.py`
 
 ```python
 """
-FFmpeg Tool Wrapper - LLM-Callable Interface
+FFmpeg Tool Wrapper - LLM-callable interface
 
-Ersetzt FFmpeg-MCP mit direkten Tool-Funktionen die vom 
-Creative Director aufgerufen werden können.
+Replaces FFmpeg-MCP with direct tool functions that the Creative Director
+can invoke.
 """
 
 from dataclasses import dataclass
@@ -141,43 +141,41 @@ TOOLS = [
 ]
 ```
 
-### 1.3 Clip-Pool Scoring mit PerfectFrameAI-Alternative
+### 1.3 Clip-pool scoring (PerfectFrameAI fallback)
 
-Da PerfectFrameAI nicht gefunden wurde, erweitern wir den bestehenden `footage_analyzer.py`:
+Extend the existing `footage_analyzer.py` with:
 
-**Erweiterung:** `src/montage_ai/footage_analyzer.py`
-
-- Frame-Quality-Scoring (Schärfe, Belichtung, Komposition)
-- Motion-Blur-Detection
-- Aesthetic Score via CLIP/BLIP
+- Frame quality scoring (sharpness, exposure, composition)
+- Motion blur detection
+- Aesthetic score via CLIP/BLIP
 
 ---
 
-## Sprint 2: AI Integration (Woche 3-4)
+## Sprint 2: AI Integration (Weeks 3–4)
 
-### 2.1 VideoAgent Integration
+### 2.1 VideoAgent integration
 
 **Repository:** https://github.com/YueFan1014/VideoAgent
 
-**Komponenten:**
-1. **ReActAgent** - LangChain-basierter Agent mit 4 Tools
-2. **Temporal Memory** - Caption-basierte Szenen-Suche
-3. **Object Memory** - SQL-Datenbank für erkannte Objekte
-4. **Video-LLaVA** - Visual Question Answering
+**Components:**
+1. **ReActAgent** – LangChain agent with four tools
+2. **Temporal Memory** – caption-based scene search
+3. **Object Memory** – SQL database for detected objects
+4. **Video-LLaVA** – visual question answering
 
-**Neue Datei:** `src/montage_ai/video_agent.py`
+**New file:** `src/montage_ai/video_agent.py`
 
 ```python
 """
-VideoAgent Integration - Memory-Augmented Clip Analysis
+VideoAgent Integration - memory-augmented clip analysis
 
-Basiert auf: ECCV 2024 Paper "VideoAgent"
+Based on ECCV 2024 paper "VideoAgent"
 Repo: github.com/YueFan1014/VideoAgent
 
 Features:
-- Temporal Memory für Szenen-Retrieval
-- Object Memory für Objekt-Tracking
-- 4 Tools: caption_retrieval, segment_localization, VQA, object_memory
+- Temporal memory for scene retrieval
+- Object memory for object tracking
+- Four tools: caption_retrieval, segment_localization, vqa, object_memory
 """
 
 from dataclasses import dataclass
@@ -186,16 +184,16 @@ import sqlite3
 
 @dataclass
 class TemporalMemoryEntry:
-    """Ein Eintrag in der Temporal Memory."""
+    """Entry stored in temporal memory."""
     segment_id: str
     start_time: float
     end_time: float
     caption: str
     embedding: List[float]  # ViCLIP embedding
 
-@dataclass  
+@dataclass
 class ObjectMemoryEntry:
-    """Ein Eintrag in der Object Memory."""
+    """Entry stored in object memory."""
     object_id: str
     object_class: str
     first_seen: float
@@ -204,13 +202,13 @@ class ObjectMemoryEntry:
 
 class VideoAgentAdapter:
     """
-    Adapter für VideoAgent Integration.
+    Adapter for VideoAgent integration.
     
-    Nutzt die 4 Tools des VideoAgent:
-    1. caption_retrieval - Finde Szenen basierend auf Beschreibung
-    2. segment_localization - Lokalisiere spezifische Segmente
-    3. visual_question_answering - Beantworte Fragen über Video
-    4. object_memory_querying - Finde Objekte über Zeit
+    Uses the four VideoAgent tools:
+    1. caption_retrieval – find scenes by description
+    2. segment_localization – localize a specific segment
+    3. visual_question_answering – answer questions about frames/segments
+    4. object_memory_querying – find objects over time
     """
     
     def __init__(self, db_path: str = "/tmp/video_agent.db"):
@@ -245,55 +243,55 @@ class VideoAgentAdapter:
     
     def analyze_footage(self, video_path: str) -> Dict:
         """
-        Analysiere Video und baue Memory auf.
+        Analyze video and build memory.
         
-        Führt aus:
-        1. Szenen-Erkennung
-        2. Caption-Generierung pro Segment
-        3. Objekt-Erkennung und Tracking
-        4. ViCLIP Embedding-Berechnung
+        Executes:
+        1. Scene detection
+        2. Caption generation per segment
+        3. Object detection and tracking
+        4. ViCLIP embedding computation
         """
-        pass  # Implementation folgt
+        pass  # Implementation to follow
     
     def caption_retrieval(self, query: str, top_k: int = 5) -> List[TemporalMemoryEntry]:
-        """Tool 1: Finde Szenen basierend auf natürlicher Sprache."""
+        """Tool 1: find scenes based on natural language."""
         pass
     
     def segment_localization(self, description: str) -> Optional[TemporalMemoryEntry]:
-        """Tool 2: Lokalisiere ein spezifisches Segment."""
+        """Tool 2: localize a specific segment."""
         pass
     
     def visual_question_answering(self, question: str, timestamp: float) -> str:
-        """Tool 3: Beantworte Frage über Frame/Segment."""
+        """Tool 3: answer a question about a frame/segment."""
         pass
     
     def object_memory_querying(self, object_class: str) -> List[ObjectMemoryEntry]:
-        """Tool 4: Finde alle Vorkommen eines Objekttyps."""
+        """Tool 4: find all occurrences of an object class."""
         pass
 ```
 
-### 2.2 Wan2.1-VACE Service
+### 2.2 Wan2.1-VACE service
 
 **Repository:** https://github.com/Wan-Video/Wan2.1
 
-**Modelle:**
-- `Wan2.1-T2V-1.3B` - 8GB VRAM, 480p Generation
-- `Wan2.1-T2V-14B` - 24GB+ VRAM, 720p Generation
-- `Wan2.1-VACE-1.3B` - Video Editing/Inpainting
+**Models:**
+- `Wan2.1-T2V-1.3B` – 8GB VRAM, 480p generation
+- `Wan2.1-T2V-14B` – 24GB+ VRAM, 720p generation
+- `Wan2.1-VACE-1.3B` – video editing/inpainting
 
-**Neue Datei:** `src/montage_ai/wan_vace.py`
+**New file:** `src/montage_ai/wan_vace.py`
 
 ```python
 """
-Wan2.1-VACE Integration - Video Editing & Generation
+Wan2.1-VACE Integration - video editing & generation
 
-Basiert auf: Alibaba Wan2.1
+Based on Alibaba Wan2.1
 Repo: github.com/Wan-Video/Wan2.1
 
 Features:
-- Text-to-Video Generation
-- Video Inpainting/Editing
-- Reference-based Generation
+- Text-to-video generation
+- Video inpainting/editing
+- Reference-based generation
 """
 
 import os
@@ -302,20 +300,20 @@ from typing import Optional
 
 @dataclass
 class WanVACEConfig:
-    """Konfiguration für Wan2.1-VACE."""
-    model_size: str = "1.3B"  # "1.3B" oder "14B"
-    resolution: str = "480p"   # "480p" oder "720p"
-    use_cgpu: bool = True      # Nutze cgpu für Cloud GPU
+    """Configuration for Wan2.1-VACE."""
+    model_size: str = "1.3B"  # "1.3B" or "14B"
+    resolution: str = "480p"   # "480p" or "720p"
+    use_cgpu: bool = True      # Use cgpu for cloud GPU
     
 class WanVACEService:
     """
-    Wan2.1-VACE Service für Video-Editing.
+    Wan2.1-VACE service for video editing.
     
-    Anwendungsfälle:
-    1. B-Roll Generation aus Text
-    2. Video Inpainting (Objekte entfernen)
-    3. Style Transfer
-    4. Video Extension
+    Use cases:
+    1. B-roll generation from text
+    2. Video inpainting (remove objects)
+    3. Style transfer
+    4. Video extension
     """
     
     def __init__(self, config: WanVACEConfig):
@@ -323,7 +321,7 @@ class WanVACEService:
         self.cgpu_available = self._check_cgpu()
     
     def _check_cgpu(self) -> bool:
-        """Prüfe ob cgpu verfügbar ist."""
+        """Check whether cgpu is available."""
         return os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
     
     def generate_broll(
@@ -333,15 +331,15 @@ class WanVACEService:
         reference_frame: Optional[str] = None
     ) -> str:
         """
-        Generiere B-Roll Video aus Text-Prompt.
+        Generate a B-roll clip from a text prompt.
         
         Args:
-            prompt: Beschreibung des gewünschten Videos
-            duration: Länge in Sekunden (max 5s für 1.3B)
-            reference_frame: Optional - Referenzbild für Stil
+            prompt: Description of the desired video
+            duration: Length in seconds (max 5s for 1.3B)
+            reference_frame: Optional reference image for style
             
         Returns:
-            Pfad zum generierten Video
+            Path to the generated video
         """
         pass
     
@@ -352,71 +350,72 @@ class WanVACEService:
         prompt: str
     ) -> str:
         """
-        Video Inpainting - Ersetze maskierte Bereiche.
+        Video inpainting – replace masked areas.
         
         Args:
-            video_path: Eingabe-Video
-            mask_path: Maske (weiß = zu ersetzen)
-            prompt: Was soll eingefügt werden
+            video_path: Input video
+            mask_path: Mask (white = replace)
+            prompt: What should be inserted
             
         Returns:
-            Pfad zum bearbeiteten Video
+            Path to the edited video
         """
         pass
 ```
 
-### 2.3 Open-Sora 2.0 Generator
+### 2.3 Open-Sora 2.0 generator
 
 **Repository:** https://github.com/hpcaitech/Open-Sora
 
-**HuggingFace:** `hpcai-tech/Open-Sora-v2`
+**Hugging Face:** `hpcai-tech/Open-Sora-v2`
 
-**Spezifikationen:**
-- 11B Parameter
-- Text-to-Video (T2V)
-- Image-to-Video (I2V)
+**Specs:**
+- 11B parameters
+- Text-to-video (T2V)
+- Image-to-video (I2V)
 - 256p: 1 GPU
-- 768p: 8 GPUs (via cgpu nicht realistisch)
+- 768p: 8 GPUs (not realistic via cgpu)
 
-**Neue Datei:** `src/montage_ai/open_sora.py`
+**New file:** `src/montage_ai/open_sora.py`
 
 ```python
 """
-Open-Sora 2.0 Integration - Text-to-Video Generation
+Open-Sora 2.0 Integration - text-to-video generation
 
-Basiert auf: HPC-AI Tech Open-Sora
+Based on HPC-AI Tech Open-Sora
 Repo: github.com/hpcaitech/Open-Sora
 Model: hpcai-tech/Open-Sora-v2
 
 Features:
-- Text-to-Video Generation
-- Image-to-Video Erweiterung
-- Apache-2.0 Lizenz
+- Text-to-video generation
+- Image-to-video extension
+- Apache-2.0 license
 """
 
 import os
 from dataclasses import dataclass
 from typing import Optional, List
 
+
 @dataclass
 class OpenSoraConfig:
-    """Konfiguration für Open-Sora."""
-    resolution: str = "256p"  # Realistisch für 1 GPU
-    num_frames: int = 51      # ~2 Sekunden
+    """Configuration for Open-Sora."""
+    resolution: str = "256p"  # realistic for one GPU
+    num_frames: int = 51      # ~2 seconds
     use_cgpu: bool = True
     model_id: str = "hpcai-tech/Open-Sora-v2"
 
+
 class OpenSoraGenerator:
     """
-    Open-Sora Video Generator.
+    Open-Sora video generator.
     
-    Hinweis: 768p benötigt 8 GPUs und ist via cgpu
-    nicht praktikabel. Nutze 256p für Generierung,
-    dann cgpu Real-ESRGAN für Upscaling.
+    Note: 768p requires eight GPUs and is not practical via cgpu.
+    Use 256p for generation, then upscale with Real-ESRGAN.
     
     Pipeline:
-    1. Open-Sora generiert 256p Video
-    2. Real-ESRGAN upscaled auf 1024p
+    1. Open-Sora generates 256p video
+    2. Real-ESRGAN upscales to 1024p
     """
     
     def __init__(self, config: OpenSoraConfig):
@@ -430,18 +429,18 @@ class OpenSoraGenerator:
         reference_image: Optional[str] = None
     ) -> str:
         """
-        Generiere Video aus Text-Prompt.
+        Generate a video from a text prompt.
         
         Args:
-            prompt: Beschreibung des Videos
-            negative_prompt: Was vermieden werden soll
-            duration: Länge in Sekunden
-            reference_image: Für I2V - Startbild
+            prompt: Description of the video
+            negative_prompt: What to avoid
+            duration: Length in seconds
+            reference_image: For I2V – starting image
             
         Returns:
-            Pfad zum generierten Video
+            Path to the generated video
         """
-        # cgpu run für Colab-Ausführung
+        # cgpu run for Colab execution
         pass
     
     def extend_video(
@@ -451,61 +450,61 @@ class OpenSoraGenerator:
         extend_seconds: float = 2.0
     ) -> str:
         """
-        Verlängere bestehendes Video.
+        Extend an existing video.
         
         Args:
-            video_path: Eingabe-Video
-            prompt: Beschreibung der Fortsetzung
-            extend_seconds: Wie viel hinzufügen
+            video_path: Input video
+            prompt: Description of the extension
+            extend_seconds: How many seconds to add
             
         Returns:
-            Pfad zum verlängerten Video
+            Path to the extended video
         """
         pass
 ```
 
 ---
 
-## Sprint 3: Integration & Testing (Woche 5-6)
+## Sprint 3: Integration & Testing (Weeks 5–6)
 
-### 3.1 Editor Integration
+### 3.1 Editor integration
 
-Erweitere `editor.py` um die neuen Services:
+Extend `editor.py` with the new services:
 
 ```python
 # In editor.py
 
-# Import neue Services
+# Import new services
 from .video_agent import VideoAgentAdapter
 from .wan_vace import WanVACEService, WanVACEConfig
 from .open_sora import OpenSoraGenerator, OpenSoraConfig
 from .ffmpeg_tools import TOOLS as FFMPEG_TOOLS
 
-# Feature Flags
+# Feature flags
 ENABLE_VIDEO_AGENT = os.environ.get("ENABLE_VIDEO_AGENT", "false").lower() == "true"
 ENABLE_WAN_VACE = os.environ.get("ENABLE_WAN_VACE", "false").lower() == "true"
 ENABLE_OPEN_SORA = os.environ.get("ENABLE_OPEN_SORA", "false").lower() == "true"
 ```
 
-### 3.2 Docker Compose Updates
+### 3.2 Docker Compose updates
 
 ```yaml
-# docker-compose.yml - Neue Services
+# docker-compose.yml - new services
 
 services:
   montage-ai:
     # ... existing config
     environment:
-      # Neue Feature Flags
+      # Feature flags
       - ENABLE_VIDEO_AGENT=${ENABLE_VIDEO_AGENT:-false}
       - ENABLE_WAN_VACE=${ENABLE_WAN_VACE:-false}
       - ENABLE_OPEN_SORA=${ENABLE_OPEN_SORA:-false}
-      # cgpu Config
+      # cgpu config
       - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-false}
       - CGPU_HOST=${CGPU_HOST:-localhost}
       - CGPU_PORT=${CGPU_PORT:-5021}
 
-  # cgpu serve als Sidecar (bereits geplant)
+  # cgpu serve as sidecar (already planned)
   cgpu-serve:
     image: alpine
     command: ["cgpu", "serve", "--port", "5021"]
@@ -515,87 +514,87 @@ services:
 
 ---
 
-## Abhängigkeiten
+## Dependencies
 
 ```
-requirements.txt (Ergänzungen)
+requirements.txt (additions)
 ================================
-# VideoAgent Dependencies
+# VideoAgent dependencies
 langchain>=0.1.0
 langchain-community>=0.0.20
 transformers>=4.36.0
 sentence-transformers>=2.2.0
 
-# Video Processing
-decord>=0.6.0          # Für schnelles Video-Loading
-viclip                 # Video-CLIP Embeddings (optional)
+# Video processing
+decord>=0.6.0          # fast video loading
+viclip                 # Video-CLIP embeddings (optional)
 
 # Database
-sqlalchemy>=2.0.0      # Für Object Memory
+sqlalchemy>=2.0.0      # for object memory
 ```
 
 ---
 
-## Implementierungs-Reihenfolge
+## Implementation order
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Phase 1: Foundation (Diese Woche)                             │
+│  Phase 1: Foundation (this week)                               │
 │  ──────────────────────────────────────────────────────────────│
-│  [x] MAX_SCENE_REUSE bereits implementiert                     │
-│  [ ] ffmpeg_tools.py - LLM-callable Wrapper                    │
-│  [ ] footage_analyzer.py - Frame Quality Scoring erweitern     │
+│  [x] MAX_SCENE_REUSE already implemented                       │
+│  [ ] ffmpeg_tools.py - LLM-callable wrapper                     │
+│  [ ] footage_analyzer.py - extend frame quality scoring         │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Phase 2: VideoAgent (Woche 2-3)                               │
+│  Phase 2: VideoAgent (weeks 2–3)                               │
 │  ──────────────────────────────────────────────────────────────│
-│  [ ] video_agent.py - Adapter implementieren                   │
-│  [ ] Temporal Memory mit ViCLIP Embeddings                     │
-│  [ ] Object Memory mit SQLite                                  │
-│  [ ] Integration in footage_manager.py                         │
+│  [ ] video_agent.py - implement adapter                         │
+│  [ ] Temporal Memory with ViCLIP embeddings                     │
+│  [ ] Object Memory with SQLite                                  │
+│  [ ] Integration in footage_manager.py                          │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Phase 3: Generative AI (Woche 4-5)                            │
+│  Phase 3: Generative AI (weeks 4–5)                            │
 │  ──────────────────────────────────────────────────────────────│
-│  [ ] wan_vace.py - B-Roll Generation                           │
-│  [ ] open_sora.py - Text-to-Video                              │
-│  [ ] cgpu GPU Pipeline für beide                               │
+│  [ ] wan_vace.py - B-roll generation                            │
+│  [ ] open_sora.py - text-to-video                               │
+│  [ ] cgpu GPU pipeline for both                                 │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Phase 4: Polish (Woche 6)                                     │
+│  Phase 4: Polish (week 6)                                      │
 │  ──────────────────────────────────────────────────────────────│
-│  [ ] End-to-End Tests                                          │
-│  [ ] Documentation                                             │
-│  [ ] Performance Optimization                                  │
+│  [ ] End-to-end tests                                           │
+│  [ ] Documentation                                              │
+│  [ ] Performance optimization                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Nächste Schritte
+## Next steps
 
-1. **Sofort:** `ffmpeg_tools.py` implementieren (Ersatz für FFmpeg-MCP)
-2. **Diese Woche:** `video_agent.py` Grundstruktur
-3. **Review:** Entscheiden ob Wan2.1 oder Open-Sora Priorität hat
-
----
-
-## Risiken & Mitigationen
-
-| Risiko                             | Mitigation                          |
-| ---------------------------------- | ----------------------------------- |
-| VideoAgent Models zu groß für cgpu | Nutze kleinere Video-LLaVA Variante |
-| Open-Sora 768p braucht 8 GPUs      | 256p + Real-ESRGAN Upscaling        |
-| Wan2.1 14B zu langsam              | Bleibe bei 1.3B für 480p            |
-| cgpu Rate Limits                   | Caching, Batch Processing           |
+1. **Immediate:** implement `ffmpeg_tools.py` (replacement for FFmpeg-MCP)
+2. **This week:** scaffold `video_agent.py`
+3. **Review:** pick priority between Wan2.1 and Open-Sora
 
 ---
 
-*Erstellt: $(date)*
-*Letzte Aktualisierung: -* 
+## Risks & mitigations
+
+| Risk                              | Mitigation                            |
+| --------------------------------- | ------------------------------------- |
+| VideoAgent models too large for cgpu | Use smaller Video-LLaVA variant     |
+| Open-Sora 768p needs eight GPUs   | Use 256p + Real-ESRGAN upscaling      |
+| Wan2.1 14B too slow               | Stay on 1.3B for 480p                 |
+| cgpu rate limits                  | Caching, batch processing             |
+
+---
+
+*Created: 2025-12-02*
+*Last updated: 2025-12-02*

@@ -1,6 +1,14 @@
 # Quick Start Guide
 
-Get Montage AI running in 5 minutes.
+Get Montage AI running in minutes with the simplest paths.
+
+---
+
+## Requirements (minimal)
+
+- Docker + Docker Compose v2
+- 8GB RAM (16GB recommended for HQ mode)
+- Optional: `npm i -g cgpu` (cloud LLM/GPU) or Ollama for local LLM
 
 ---
 
@@ -14,7 +22,7 @@ cd montage-ai
 make web
 ```
 
-Open **http://localhost:5000**
+Open **http://localhost:5001**
 
 ### Use It
 
@@ -135,10 +143,9 @@ export CGPU_ENABLED=true
 
 ## Next Steps
 
-- [Features Documentation](features.md)
+- [Features & Workflows](features.md)
 - [Configuration Guide](configuration.md)
-- [Web UI Guide](web_ui.md)
-- [Timeline Export](timeline_export.md)
+- [Architecture](architecture.md)
 
 ---
 

@@ -96,7 +96,7 @@ CGPU_GPU_ENABLED=true            # Use Google Colab T4
 
 Custom styles: Create JSON in `src/montage_ai/styles/` or set `STYLE_PRESET_DIR`
 
-→ Style guide: [docs/styles.md](docs/styles.md)
+→ Style guide: [docs/features.md](docs/features.md#style-templates-built-in)
 
 ---
 
@@ -133,16 +133,13 @@ Input Clips + Music
 
 ## Documentation
 
-| Document                               | Description               |
-| -------------------------------------- | ------------------------- |
-| [Quick Start](docs/QUICKSTART.md)      | First-time setup          |
-| [Installation](docs/INSTALL.md)        | Docker, K8s, local        |
-| [Configuration](docs/configuration.md) | All environment variables |
-| [Styles](docs/styles.md)               | Style customization       |
-| [cgpu Setup](docs/CGPU_INTEGRATION.md) | Cloud GPU / Gemini        |
-| [Web UI](docs/web_ui.md)               | Web interface guide       |
-| [Architecture](docs/architecture.md)   | System design             |
-| [Models](docs/models.md)               | AI model choices          |
+| Document                                   | Description                    |
+| ------------------------------------------ | ------------------------------ |
+| [Quick Start](docs/QUICKSTART.md)          | Fast setup paths               |
+| [Configuration](docs/configuration.md)     | Environment variables          |
+| [Features & Workflows](docs/features.md)   | Features, styles, Web UI, export|
+| [Architecture](docs/architecture.md)       | System design                  |
+| [Models](docs/models.md)                   | AI model choices               |
 
 ---
 

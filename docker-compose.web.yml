@@ -19,10 +19,10 @@ services:
       # cgpu Cloud GPU credentials (optional)
       - ${HOME}/.config/cgpu:/root/.config/cgpu:ro
     environment:
-      - FLASK_ENV=production
-      - INPUT_DIR=/data/input
-      - MUSIC_DIR=/data/music
-      - OUTPUT_DIR=/data/output
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - INPUT_DIR=${INPUT_DIR:-/data/input}
+      - MUSIC_DIR=${MUSIC_DIR:-/data/music}
+      - OUTPUT_DIR=${OUTPUT_DIR:-/data/output}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       # Google AI (preferred LLM backend)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
@@ -35,15 +35,15 @@ services:
       - VERBOSE=${VERBOSE:-true}
       - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-2}
     restart: unless-stopped
-    # Resource limits to prevent OOM
+    # Resource limits (override via env values)
     deploy:
       resources:
         limits:
-          memory: 8G      # Prevent container from consuming all system RAM
-          cpus: '4.0'     # Limit CPU usage to 4 cores
+          memory: ${WEB_MEMORY_LIMIT:-8G}
+          cpus: '${WEB_CPU_LIMIT:-4.0}'
         reservations:
-          memory: 2G      # Guarantee minimum 2GB
-          cpus: '1.0'     # Guarantee minimum 1 core
+          memory: ${WEB_MEMORY_RESERVATION:-2G}
+          cpus: '${WEB_CPU_RESERVATION:-1.0}'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
       interval: 30s
