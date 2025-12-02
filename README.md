@@ -45,14 +45,14 @@ Output: `data/output/montage.mp4`
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| 🎵 **Beat Sync** | Cuts align to music rhythm (librosa) |
+| Feature               | Description                                                   |
+| --------------------- | ------------------------------------------------------------- |
+| 🎵 **Beat Sync**       | Cuts align to music rhythm (librosa)                          |
 | 🎬 **Style Templates** | hitchcock, mtv, action, documentary, minimalist, wes_anderson |
-| 🤖 **AI Director** | Natural language → editing parameters |
-| ⬆️ **AI Upscaling** | 4x resolution via Real-ESRGAN |
-| ☁️ **Cloud GPU** | Free GPU via [cgpu](https://github.com/RohanAdwankar/cgpu) |
-| 📽️ **Timeline Export** | OTIO/EDL for DaVinci Resolve, Premiere |
+| 🤖 **AI Director**     | Natural language → editing parameters                         |
+| ⬆️ **AI Upscaling**    | 4x resolution via Real-ESRGAN                                 |
+| ☁️ **Cloud GPU**       | Free GPU via [cgpu](https://github.com/RohanAdwankar/cgpu)    |
+| 📽️ **Timeline Export** | OTIO/EDL for DaVinci Resolve, Premiere                        |
 
 ---
 
@@ -84,15 +84,15 @@ CGPU_GPU_ENABLED=true            # Use Google Colab T4
 
 ## Styles
 
-| Style | Description |
-|-------|-------------|
-| `dynamic` | Adapts to music energy (default) |
-| `hitchcock` | Slow tension build, explosive climax |
-| `mtv` | Rapid 1-2 beat cuts |
-| `action` | Michael Bay intensity |
-| `documentary` | Natural, observational |
-| `minimalist` | Contemplative long takes |
-| `wes_anderson` | Symmetric, warm, playful |
+| Style          | Description                          |
+| -------------- | ------------------------------------ |
+| `dynamic`      | Adapts to music energy (default)     |
+| `hitchcock`    | Slow tension build, explosive climax |
+| `mtv`          | Rapid 1-2 beat cuts                  |
+| `action`       | Michael Bay intensity                |
+| `documentary`  | Natural, observational               |
+| `minimalist`   | Contemplative long takes             |
+| `wes_anderson` | Symmetric, warm, playful             |
 
 Custom styles: Create JSON in `src/montage_ai/styles/` or set `STYLE_PRESET_DIR`
 
@@ -133,16 +133,16 @@ Input Clips + Music
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Quick Start](docs/QUICKSTART.md) | First-time setup |
-| [Installation](docs/INSTALL.md) | Docker, K8s, local |
+| Document                               | Description               |
+| -------------------------------------- | ------------------------- |
+| [Quick Start](docs/QUICKSTART.md)      | First-time setup          |
+| [Installation](docs/INSTALL.md)        | Docker, K8s, local        |
 | [Configuration](docs/configuration.md) | All environment variables |
-| [Styles](docs/styles.md) | Style customization |
-| [cgpu Setup](docs/CGPU_INTEGRATION.md) | Cloud GPU / Gemini |
-| [Web UI](docs/web_ui.md) | Web interface guide |
-| [Architecture](docs/architecture.md) | System design |
-| [Models](docs/models.md) | AI model choices |
+| [Styles](docs/styles.md)               | Style customization       |
+| [cgpu Setup](docs/CGPU_INTEGRATION.md) | Cloud GPU / Gemini        |
+| [Web UI](docs/web_ui.md)               | Web interface guide       |
+| [Architecture](docs/architecture.md)   | System design             |
+| [Models](docs/models.md)               | AI model choices          |
 
 ---
 
