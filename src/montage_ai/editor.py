@@ -946,7 +946,7 @@ def create_montage(variant_id=1):
     print("📚 Initializing Footage Pool Manager...")
     footage_pool = integrate_footage_manager(
         all_scenes,
-        strict_once=False  # Flexible: allow reuse with penalty
+        strict_once=True  # Use each detected scene at most once for maximal variety
     )
     if VERBOSE:
         print(f"   ✓ Footage Pool: {len(all_scenes)} clips ready")
