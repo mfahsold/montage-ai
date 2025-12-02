@@ -10,6 +10,7 @@ resources:
   - job.yaml
   - registry.yaml
   - network-policies/networkpolicy-default-deny.yaml
+  - network-policies/allow-registry-ingress.yaml
 
 labels:
   - pairs:
