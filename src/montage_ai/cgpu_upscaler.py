@@ -4,12 +4,16 @@ cgpu Cloud GPU Upscaler - Real-ESRGAN via Google Colab T4/A100
 Uses cgpu (github.com/RohanAdwankar/cgpu) to run Real-ESRGAN on free cloud GPUs.
 This offloads computationally expensive AI upscaling to Google Colab's CUDA GPUs.
 
-Architecture:
-  1. Extract frames locally (FFmpeg)
-  2. Upload frames to Colab (cgpu copy)  
-  3. Run Real-ESRGAN on T4/A100 GPU (cgpu run)
-  4. Download upscaled frames (base64 over stdout)
-  5. Reassemble video locally (FFmpeg)
+Architecture (optimized v2.2):
+  1. Upload video directly to Colab (cgpu copy) - skip frame extraction locally
+  2. Extract + upscale + reassemble ALL on Colab GPU
+  3. Download result video via base64 chunks
+  
+This approach:
+  - Reduces upload size (video is ~10x smaller than PNG frames)
+  - Leverages T4 GPU for frame extraction too
+  - Single upload/download per video
+  - Reuses Colab environment across clips (session caching)
 
 Requirements:
   - cgpu installed: npm i -g cgpu
@@ -22,7 +26,7 @@ Usage:
     if is_cgpu_available():
         output_path = upscale_with_cgpu("input.mp4", "output.mp4", scale=2)
 
-Version: 2.1.0 - Uses shared cgpu_utils module
+Version: 2.2.0 - Direct video upload, Colab-side processing
 """
 
 import os
@@ -44,7 +48,7 @@ from .cgpu_utils import (
     cgpu_download_base64,
 )
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 # Configuration from shared utils
 _cgpu_config = CGPUConfig()
@@ -53,6 +57,9 @@ CGPU_TIMEOUT = _cgpu_config.timeout
 
 # Remote working directory on Colab
 REMOTE_WORK_DIR = "/content/upscale_work"
+
+# Session state - track if Colab environment is already set up
+_colab_env_ready = False
 
 
 # Internal wrappers for backward compatibility
@@ -106,12 +113,10 @@ def upscale_with_cgpu(
     """
     Upscale video using Real-ESRGAN on cgpu cloud GPU (Tesla T4/A100).
     
-    Workflow:
-    1. Extract frames from input video locally
-    2. Upload frames tarball to Colab via cgpu copy
-    3. Install and run Real-ESRGAN on cloud GPU
-    4. Download upscaled frames via base64 stdout
-    5. Reassemble video with original audio
+    Optimized workflow (v2.2):
+    1. Upload video directly to Colab (much smaller than frames)
+    2. Run entire pipeline on Colab: extract → upscale → reassemble
+    3. Download result video via chunked base64
     
     Args:
         input_path: Path to input video
@@ -122,246 +127,319 @@ def upscale_with_cgpu(
     Returns:
         output_path on success, None on failure
     """
+    global _colab_env_ready
+    
     print(f"   ☁️ Upscaling via cgpu cloud GPU (CUDA)...")
     
     if not is_cgpu_available():
         print(f"   ❌ cgpu not available (set CGPU_GPU_ENABLED=true)")
         return None
     
-    # Create local temp directory
-    work_dir = tempfile.mkdtemp(prefix="cgpu_upscale_")
-    frames_dir = os.path.join(work_dir, "frames")
-    upscaled_dir = os.path.join(work_dir, "upscaled")
-    os.makedirs(frames_dir)
-    os.makedirs(upscaled_dir)
+    input_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+    print(f"   📹 Input: {os.path.basename(input_path)} ({input_size_mb:.1f} MB)")
     
     try:
-        # 1. Get video info
-        fps = _get_video_fps(input_path)
-        print(f"   📹 Input: {os.path.basename(input_path)} @ {fps:.2f} FPS")
-        
-        # 2. Extract audio (to preserve it)
-        audio_path = os.path.join(work_dir, "audio.aac")
-        has_audio = _get_video_audio(input_path, audio_path)
-        
-        # 3. Extract frames locally
-        print(f"   📸 Extracting frames...")
-        extract_cmd = [
-            "ffmpeg", "-y", "-i", input_path,
-            "-q:v", "2",
-            os.path.join(frames_dir, "frame_%06d.png")
-        ]
-        subprocess.run(extract_cmd, check=True, capture_output=True)
-        
-        frame_files = sorted([f for f in os.listdir(frames_dir) if f.endswith('.png')])
-        frame_count = len(frame_files)
-        print(f"   📸 Extracted {frame_count} frames")
-        
-        if frame_count == 0:
-            print(f"   ❌ No frames extracted")
-            return None
-        
-        # 4. Create tarball of frames
-        print(f"   📦 Compressing frames...")
-        tar_path = os.path.join(work_dir, "frames.tar.gz")
-        subprocess.run(
-            ["tar", "-czf", tar_path, "-C", frames_dir, "."],
-            check=True, capture_output=True
-        )
-        tar_size_mb = os.path.getsize(tar_path) / (1024 * 1024)
-        print(f"   📦 Tarball: {tar_size_mb:.1f} MB")
-        
-        # 5. Setup remote environment
-        print(f"   🔧 Setting up Colab environment...")
-        # Note: torch/torchvision are pre-installed on Colab with CUDA support
-        setup_cmd = f"""
-mkdir -p {REMOTE_WORK_DIR}/frames {REMOTE_WORK_DIR}/upscaled && \
+        # 1. Setup remote environment (once per session)
+        if not _colab_env_ready:
+            print(f"   🔧 Setting up Colab environment (first clip)...")
+            setup_cmd = f"""
+mkdir -p {REMOTE_WORK_DIR} && \
 pip install -q realesrgan basicsr opencv-python-headless 2>/dev/null && \
-python -c "import torch; print(f'PyTorch CUDA: {{torch.cuda.is_available()}}')"
+python -c "import torch; print(f'CUDA: {{torch.cuda.is_available()}}, GPU: {{torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}}')" && \
+echo "ENV_READY"
 """
-        setup_success, stdout, stderr = _run_cgpu_command(setup_cmd, timeout=180)
+            success, stdout, stderr = _run_cgpu_command(setup_cmd, timeout=180)
+            if not success or "ENV_READY" not in stdout:
+                print(f"   ❌ Environment setup failed")
+                return None
+            _colab_env_ready = True
+            print(f"   ✅ Environment ready (will be reused)")
+        else:
+            print(f"   ♻️ Reusing Colab environment")
         
-        if not setup_success:
-            print(f"   ❌ Remote setup failed: {stderr}")
+        # 2. Upload video directly (much smaller than PNG frames!)
+        remote_video = f"{REMOTE_WORK_DIR}/input.mp4"
+        print(f"   ⬆️ Uploading video ({input_size_mb:.1f} MB)...")
+        
+        if not _cgpu_copy_to_remote(input_path, remote_video):
+            print(f"   ❌ Upload failed - trying fallback method...")
+            # Fallback: Base64 upload for smaller files
+            if input_size_mb < 20:
+                return _upscale_via_base64_upload(input_path, output_path, scale, model)
             return None
-        print(f"   ✅ Environment ready")
+        print(f"   ✅ Upload complete")
         
-        # 6. Upload frames
-        print(f"   ⬆️ Uploading {frame_count} frames to Colab...")
+        # 3. Run full pipeline on Colab (extract → upscale → reassemble)
+        print(f"   🚀 Processing on Tesla T4 (scale={scale}x)...")
         
-        if not _cgpu_copy_to_remote(tar_path, f"{REMOTE_WORK_DIR}/frames.tar.gz"):
-            print(f"   ❌ Failed to upload frames")
-            return None
-        
-        # Extract on remote
-        extract_success, _, stderr = _run_cgpu_command(
-            f"cd {REMOTE_WORK_DIR}/frames && tar -xzf ../frames.tar.gz && ls | wc -l",
-            timeout=60
-        )
-        if not extract_success:
-            print(f"   ❌ Remote extraction failed: {stderr}")
-            return None
-        
-        print(f"   ✅ Frames uploaded")
-        
-        # 7. Run Real-ESRGAN on cloud GPU
-        print(f"   🚀 Running Real-ESRGAN on Tesla T4 (scale={scale}x)...")
-        
-        # Determine model weights URL and architecture
-        # Real-ESRGAN has x4plus model - we always use 4x model and adjust final scale
+        # Build Python script for Colab
         if "animevideov3" in model or "anime" in model:
             model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth"
             num_block = 6
             model_scale = 4
         else:
-            # x4plus is the standard model, works for both 2x and 4x output
             model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
             num_block = 23
-            model_scale = 4  # Model is always 4x, outscale parameter handles 2x
+            model_scale = 4
         
-        # Python script with torchvision compatibility patch
-        # (Colab's torchvision removed functional_tensor module)
-        esrgan_script = f'''
+        # Full pipeline script - runs entirely on Colab GPU with detailed CUDA logging
+        pipeline_script = f'''
 import sys
-
-# Monkey-patch for torchvision compatibility (functional_tensor removed in newer versions)
-class _FakeFunctionalTensor:
+# Torchvision compatibility patch
+class _FT:
     @staticmethod
-    def rgb_to_grayscale(img, num_output_channels=1):
+    def rgb_to_grayscale(img, n=1):
         import torchvision.transforms.functional as F
-        return F.rgb_to_grayscale(img, num_output_channels)
-sys.modules["torchvision.transforms.functional_tensor"] = _FakeFunctionalTensor()
+        return F.rgb_to_grayscale(img, n)
+sys.modules["torchvision.transforms.functional_tensor"] = _FT()
 
-import os, glob, cv2, torch, urllib.request
-from basicsr.archs.rrdbnet_arch import RRDBNet
+import os, glob, subprocess, urllib.request, time
+import torch, cv2
+from basicsr.archs.rrdbnet_arch import RRDBNet  
 from realesrgan import RealESRGANer
 
-print(f"CUDA: {{torch.cuda.is_available()}}, GPU: {{torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}}")
+# ============ CUDA DIAGNOSTICS ============
+print("=" * 60)
+print("CUDA DIAGNOSTICS")
+print("=" * 60)
+print(f"PyTorch version: {{torch.__version__}}")
+print(f"CUDA available: {{torch.cuda.is_available()}}")
+print(f"CUDA version: {{torch.version.cuda}}")
+print(f"cuDNN version: {{torch.backends.cudnn.version()}}")
+print(f"cuDNN enabled: {{torch.backends.cudnn.enabled}}")
+print(f"GPU count: {{torch.cuda.device_count()}}")
 
-# Download model weights if needed
-model_path = "/content/esrgan_model.pth"
+if torch.cuda.is_available():
+    gpu_id = 0
+    print(f"GPU {{gpu_id}}: {{torch.cuda.get_device_name(gpu_id)}}")
+    props = torch.cuda.get_device_properties(gpu_id)
+    print(f"  Compute capability: {{props.major}}.{{props.minor}}")
+    print(f"  Total memory: {{props.total_memory / 1024**3:.1f}} GB")
+    print(f"  Multi-processor count: {{props.multi_processor_count}}")
+    
+    # Current memory state
+    print(f"  Memory allocated: {{torch.cuda.memory_allocated(gpu_id) / 1024**2:.1f}} MB")
+    print(f"  Memory reserved: {{torch.cuda.memory_reserved(gpu_id) / 1024**2:.1f}} MB")
+    
+    # Get nvidia-smi output for detailed GPU state
+    try:
+        smi = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu,utilization.memory,memory.used,memory.free,temperature.gpu,power.draw", 
+                              "--format=csv,noheader,nounits"], capture_output=True, text=True)
+        if smi.returncode == 0:
+            vals = smi.stdout.strip().split(", ")
+            print(f"  GPU Utilization: {{vals[0]}}%")
+            print(f"  Memory Utilization: {{vals[1]}}%")
+            print(f"  Memory Used: {{vals[2]}} MB")
+            print(f"  Memory Free: {{vals[3]}} MB")
+            print(f"  Temperature: {{vals[4]}}°C")
+            print(f"  Power Draw: {{vals[5]}} W")
+    except: pass
+print("=" * 60)
+
+start = time.time()
+
+# Create work dirs
+os.makedirs("{REMOTE_WORK_DIR}/frames", exist_ok=True)
+os.makedirs("{REMOTE_WORK_DIR}/upscaled", exist_ok=True)
+
+# Get FPS
+fps_cmd = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", 
+    "-show_entries", "stream=r_frame_rate", "-of", "default=noprint_wrappers=1:nokey=1",
+    "{remote_video}"], capture_output=True, text=True)
+fps_str = fps_cmd.stdout.strip()
+fps = eval(fps_str) if "/" in fps_str else float(fps_str)
+print(f"FPS: {{fps}}")
+
+# Extract frames (JPEG to save space)
+print("Extracting frames...")
+extract_start = time.time()
+subprocess.run(["ffmpeg", "-y", "-i", "{remote_video}", "-q:v", "2", 
+    "{REMOTE_WORK_DIR}/frames/f%06d.jpg"], check=True, capture_output=True)
+frames = sorted(glob.glob("{REMOTE_WORK_DIR}/frames/*.jpg"))
+print(f"Frames: {{len(frames)}} (extracted in {{time.time()-extract_start:.1f}}s)")
+
+# Check frame resolution
+if frames:
+    test_img = cv2.imread(frames[0])
+    print(f"Frame resolution: {{test_img.shape[1]}}x{{test_img.shape[0]}}")
+
+# Download model
+model_path = "/content/esrgan.pth"
 if not os.path.exists(model_path):
-    print("Downloading model weights...")
+    print("Downloading model...")
+    dl_start = time.time()
     urllib.request.urlretrieve("{model_url}", model_path)
+    print(f"Model downloaded in {{time.time()-dl_start:.1f}}s")
+else:
+    print("Model already cached")
 
+# Init Real-ESRGAN with tiling for faster processing
+print("Initializing Real-ESRGAN...")
+init_start = time.time()
 model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block={num_block}, num_grow_ch=32, scale={model_scale})
-upsampler = RealESRGANer(scale={model_scale}, model_path=model_path, model=model, tile=0, tile_pad=10, pre_pad=0, half=True, device="cuda")
+upsampler = RealESRGANer(scale={model_scale}, model_path=model_path, model=model, tile=512, tile_pad=10, pre_pad=0, half=True, device="cuda")
+print(f"Model initialized in {{time.time()-init_start:.1f}}s")
 
-frames = sorted(glob.glob("{REMOTE_WORK_DIR}/frames/*.png"))
-print(f"Processing {{len(frames)}} frames...")
+# Memory after model load
+print(f"GPU Memory after model load: {{torch.cuda.memory_allocated(0) / 1024**2:.1f}} MB")
 
+# Upscale all frames with detailed timing
+print("=" * 60)
+print("UPSCALING FRAMES")
+print("=" * 60)
+upscale_start = time.time()
+frame_times = []
 for i, f in enumerate(frames):
-    img = cv2.imread(f, cv2.IMREAD_UNCHANGED)
+    frame_start = time.time()
+    img = cv2.imread(f)
     out, _ = upsampler.enhance(img, outscale={scale})
-    cv2.imwrite(f.replace("/frames/", "/upscaled/"), out)
-    if (i+1) % 20 == 0 or i == 0:
-        print(f"  {{i+1}}/{{len(frames)}}")
+    out_path = f.replace("/frames/", "/upscaled/")
+    cv2.imwrite(out_path, out)
+    frame_time = time.time() - frame_start
+    frame_times.append(frame_time)
+    
+    if (i+1) % 10 == 0 or i == 0:
+        avg_time = sum(frame_times[-10:]) / len(frame_times[-10:])
+        remaining = (len(frames) - i - 1) * avg_time
+        gpu_mem = torch.cuda.memory_allocated(0) / 1024**2
+        print(f"  Frame {{i+1}}/{{len(frames)}} | {{frame_time:.2f}}s | avg={{avg_time:.2f}}s | ETA={{remaining:.0f}}s | GPU={{gpu_mem:.0f}}MB")
 
-print("UPSCALE_DONE")
+total_upscale_time = time.time() - upscale_start
+avg_frame_time = sum(frame_times) / len(frame_times)
+print(f"Upscaling complete: {{len(frames)}} frames in {{total_upscale_time:.1f}}s (avg {{avg_frame_time:.2f}}s/frame)")
+
+# Reassemble video
+print("Encoding output...")
+encode_start = time.time()
+subprocess.run(["ffmpeg", "-y", "-framerate", str(fps), 
+    "-i", "{REMOTE_WORK_DIR}/upscaled/f%06d.jpg",
+    "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+    "{REMOTE_WORK_DIR}/output.mp4"], check=True, capture_output=True)
+print(f"Encoding done in {{time.time()-encode_start:.1f}}s")
+
+# Add audio back if exists
+subprocess.run(["ffmpeg", "-y", "-i", "{REMOTE_WORK_DIR}/output.mp4", "-i", "{remote_video}",
+    "-c:v", "copy", "-c:a", "aac", "-map", "0:v", "-map", "1:a?", "-shortest",
+    "{REMOTE_WORK_DIR}/final.mp4"], capture_output=True)
+
+# Check which output exists
+if os.path.exists("{REMOTE_WORK_DIR}/final.mp4"):
+    os.rename("{REMOTE_WORK_DIR}/final.mp4", "{REMOTE_WORK_DIR}/output.mp4")
+
+elapsed = time.time() - start
+size = os.path.getsize("{REMOTE_WORK_DIR}/output.mp4") / 1024 / 1024
+print("=" * 60)
+print(f"COMPLETE: {{len(frames)}} frames upscaled in {{elapsed:.1f}}s")
+print(f"Output: {{size:.1f}}MB")
+print(f"Performance: {{len(frames)/elapsed:.1f}} fps")
+print("=" * 60)
+print("PIPELINE_SUCCESS")
 '''
         
         start_time = time.time()
-        run_success, stdout, stderr = _run_cgpu_command(
-            f"python -c '{esrgan_script}'",
+        success, stdout, stderr = _run_cgpu_command(
+            f"python3 -c '{pipeline_script}'",
             timeout=CGPU_TIMEOUT
         )
-        
         elapsed = time.time() - start_time
         
-        if not run_success or "UPSCALE_DONE" not in stdout:
-            print(f"   ❌ Upscaling failed after {elapsed:.0f}s")
-            print(f"   stderr: {stderr[:500]}")
-            print(f"   stdout: {stdout[:500]}")
+        # Always show GPU diagnostics from stdout (even on success)
+        if stdout:
+            # Extract and display CUDA diagnostics section
+            lines = stdout.split('\n')
+            in_diag = False
+            for line in lines:
+                if 'CUDA DIAGNOSTICS' in line or 'UPSCALING FRAMES' in line or 'COMPLETE:' in line:
+                    in_diag = True
+                if in_diag:
+                    # Filter out authentication messages
+                    if not line.startswith('Authenticated'):
+                        print(f"   [T4] {line}")
+                if line.startswith('=' * 10) and in_diag and 'DIAGNOSTICS' not in line and 'FRAMES' not in line:
+                    in_diag = False
+        
+        if not success or "PIPELINE_SUCCESS" not in stdout:
+            print(f"   ❌ Pipeline failed after {elapsed:.0f}s")
+            if stdout:
+                print(f"   stdout (last 800 chars): {stdout[-800:]}")
+            if stderr:
+                print(f"   stderr: {stderr[-300:]}")
             return None
         
-        print(f"   ✅ Upscaling complete ({elapsed:.0f}s)")
+        print(f"   ✅ GPU processing done ({elapsed:.0f}s)")
         
-        # 8. Download upscaled frames via base64
-        print(f"   ⬇️ Downloading upscaled frames...")
+        # 4. Download result (chunked to avoid timeout)
+        print(f"   ⬇️ Downloading upscaled video...")
         
-        # Create tarball on remote
-        tar_success, _, _ = _run_cgpu_command(
-            f"cd {REMOTE_WORK_DIR}/upscaled && tar -czf ../upscaled.tar.gz . && ls -la ../upscaled.tar.gz",
-            timeout=120
+        # Get output size first
+        size_success, size_out, _ = _run_cgpu_command(
+            f"stat -c%s {REMOTE_WORK_DIR}/output.mp4",
+            timeout=30
         )
+        if size_success:
+            out_size_mb = int(size_out.strip().split()[-1]) / 1024 / 1024
+            print(f"   📦 Output size: {out_size_mb:.1f} MB")
         
-        # Download via base64 (cgpu copy is upload-only)
+        # Download via base64
         dl_success, b64_data, stderr = _run_cgpu_command(
-            f"base64 {REMOTE_WORK_DIR}/upscaled.tar.gz",
-            timeout=300
+            f"base64 {REMOTE_WORK_DIR}/output.mp4",
+            timeout=600  # 10 min for large files
         )
         
         if not dl_success:
-            print(f"   ❌ Download failed: {stderr}")
+            print(f"   ❌ Download failed: {stderr[:200]}")
             return None
         
-        # Filter out non-base64 lines (cgpu adds auth messages)
-        b64_lines = [l for l in b64_data.split('\n') if l and not l.startswith('Authenticated')]
+        # Clean up base64 data
+        b64_lines = [l for l in b64_data.split('\\n') if l and not l.startswith('Authenticated')]
         b64_clean = ''.join(b64_lines)
         
-        # Decode and extract
-        try:
-            tar_data = base64.b64decode(b64_clean)
-            dl_tar_path = os.path.join(work_dir, "upscaled.tar.gz")
-            with open(dl_tar_path, 'wb') as f:
-                f.write(tar_data)
-            
-            subprocess.run(
-                ["tar", "-xzf", dl_tar_path, "-C", upscaled_dir],
-                check=True, capture_output=True
-            )
-        except Exception as e:
-            print(f"   ❌ Failed to decode/extract: {e}")
-            return None
-        
-        upscaled_count = len([f for f in os.listdir(upscaled_dir) if f.endswith('.png')])
-        print(f"   ✅ Downloaded {upscaled_count} upscaled frames")
-        
-        if upscaled_count == 0:
-            print(f"   ❌ No upscaled frames received")
-            return None
-        
-        # 9. Reassemble video
-        print(f"   🎬 Reassembling video...")
-        
-        encode_cmd = [
-            "ffmpeg", "-y",
-            "-framerate", str(fps),
-            "-i", os.path.join(upscaled_dir, "frame_%06d.png"),
-            "-c:v", "libx264",
-            "-preset", "medium",
-            "-crf", "18",
-            "-pix_fmt", "yuv420p",
-        ]
-        
-        # Add audio if present
-        if has_audio and os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
-            encode_cmd.extend(["-i", audio_path, "-c:a", "aac", "-shortest"])
-        
-        encode_cmd.append(output_path)
-        
-        subprocess.run(encode_cmd, check=True, capture_output=True)
+        # Decode and save
+        video_data = base64.b64decode(b64_clean)
+        os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+        with open(output_path, 'wb') as f:
+            f.write(video_data)
         
         final_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-        print(f"   ✅ Cloud GPU upscaling complete: {output_path} ({final_size_mb:.1f} MB)")
+        print(f"   ✅ cgpu upscaling complete: {final_size_mb:.1f} MB")
         return output_path
         
-    except subprocess.TimeoutExpired:
-        print(f"   ⏱️ cgpu operation timed out after {CGPU_TIMEOUT}s")
-        return None
     except Exception as e:
-        print(f"   ❌ cgpu upscaling error: {e}")
+        print(f"   ❌ cgpu error: {e}")
         import traceback
         traceback.print_exc()
         return None
-    finally:
-        # Cleanup local
-        shutil.rmtree(work_dir, ignore_errors=True)
-        # Cleanup remote (best effort)
-        try:
-            _run_cgpu_command(f"rm -rf {REMOTE_WORK_DIR}", timeout=30)
-        except:
-            pass
+
+
+def _upscale_via_base64_upload(
+    input_path: str,
+    output_path: str, 
+    scale: int,
+    model: str
+) -> Optional[str]:
+    """
+    Fallback: Upload video via base64 encoding for smaller files.
+    Used when cgpu copy fails.
+    """
+    print(f"   🔄 Using base64 upload fallback...")
+    
+    # Read and encode video
+    with open(input_path, 'rb') as f:
+        video_b64 = base64.b64encode(f.read()).decode()
+    
+    # Upload via echo (works for <20MB)
+    remote_video = f"{REMOTE_WORK_DIR}/input.mp4"
+    upload_cmd = f"echo '{video_b64}' | base64 -d > {remote_video}"
+    
+    success, _, stderr = _run_cgpu_command(upload_cmd, timeout=120)
+    if not success:
+        print(f"   ❌ Base64 upload failed")
+        return None
+    
+    # Continue with same pipeline...
+    # (simplified - just return None for now, full implementation would call main pipeline)
+    print(f"   ⚠️ Base64 fallback not fully implemented yet")
+    return None
 
 
 def upscale_image_with_cgpu(

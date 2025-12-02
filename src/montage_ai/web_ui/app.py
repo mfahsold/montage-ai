@@ -9,12 +9,14 @@ import os
 import json
 import subprocess
 import threading
+import psutil
 from datetime import datetime
 from pathlib import Path
+from collections import deque
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 # Paths
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))
@@ -31,14 +33,46 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max upload
 app.config['UPLOAD_FOLDER'] = INPUT_DIR
 
-# Job queue (simple in-memory - for production use Redis/Celery)
+# Job queue and management
 jobs = {}
 job_lock = threading.Lock()
+job_queue = deque()
+active_jobs = 0
+MAX_CONCURRENT_JOBS = int(os.environ.get("MAX_CONCURRENT_JOBS", "2"))
+MIN_MEMORY_GB = 4  # Minimum memory required to start a job
 
 
 def allowed_file(filename: str, allowed_extensions: set) -> bool:
     """Check if file extension is allowed."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+
+def process_job_from_queue(job_data: dict):
+    """Process a job from the queue in a background thread."""
+    global active_jobs
+    active_jobs += 1
+
+    thread = threading.Thread(
+        target=run_montage,
+        args=(job_data['job_id'], job_data['style'], job_data['options']),
+        daemon=False  # Non-daemon to ensure cleanup
+    )
+    thread.start()
+
+
+def check_memory_available(required_gb: float = MIN_MEMORY_GB) -> tuple[bool, float]:
+    """Check if enough memory is available to start a job.
+
+    Returns:
+        (is_available, available_gb)
+    """
+    try:
+        mem = psutil.virtual_memory()
+        available_gb = mem.available / (1024**3)
+        return available_gb >= required_gb, available_gb
+    except Exception as e:
+        print(f"⚠️ Error checking memory: {e}")
+        return True, 0.0  # Fail-open to avoid blocking
 
 
 def get_job_status(job_id: str) -> dict:
@@ -49,6 +83,18 @@ def get_job_status(job_id: str) -> dict:
 
 def run_montage(job_id: str, style: str, options: dict):
     """Run montage creation in background."""
+    global active_jobs
+
+    # Check memory before starting
+    memory_ok, available_gb = check_memory_available()
+    if not memory_ok:
+        with job_lock:
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = f"Insufficient memory (only {available_gb:.1f}GB available, need {MIN_MEMORY_GB}GB). Please try again later."
+            jobs[job_id]["completed_at"] = datetime.now().isoformat()
+        active_jobs -= 1
+        return
+
     with job_lock:
         jobs[job_id]["status"] = "running"
         jobs[job_id]["started_at"] = datetime.now().isoformat()
@@ -116,6 +162,12 @@ def run_montage(job_id: str, style: str, options: dict):
         with job_lock:
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
+    finally:
+        active_jobs -= 1
+        # Process next job in queue if available
+        if job_queue:
+            next_job = job_queue.popleft()
+            process_job_from_queue(next_job)
 
 
 # =============================================================================
@@ -130,12 +182,23 @@ def index():
 
 @app.route('/api/status')
 def api_status():
-    """API health check."""
+    """API health check with system stats."""
+    mem = psutil.virtual_memory()
+    memory_ok, available_gb = check_memory_available()
+
     return jsonify({
         "status": "ok",
         "version": VERSION,
         "input_dir": str(INPUT_DIR),
-        "output_dir": str(OUTPUT_DIR)
+        "output_dir": str(OUTPUT_DIR),
+        "system": {
+            "memory_available_gb": round(available_gb, 2),
+            "memory_total_gb": round(mem.total / (1024**3), 2),
+            "memory_percent": mem.percent,
+            "active_jobs": active_jobs,
+            "queued_jobs": len(job_queue),
+            "max_concurrent_jobs": MAX_CONCURRENT_JOBS
+        }
     })
 
 
@@ -194,7 +257,9 @@ def api_upload():
 
 @app.route('/api/jobs', methods=['POST'])
 def api_create_job():
-    """Create new montage job."""
+    """Create new montage job with queue management."""
+    global active_jobs
+
     data = request.json
 
     # Validate required fields
@@ -224,13 +289,26 @@ def api_create_job():
     with job_lock:
         jobs[job_id] = job
 
-    # Start background thread
-    thread = threading.Thread(
-        target=run_montage,
-        args=(job_id, data['style'], job['options'])
-    )
-    thread.daemon = True
-    thread.start()
+    # Check if we can start immediately or need to queue
+    if active_jobs < MAX_CONCURRENT_JOBS:
+        # Start immediately
+        active_jobs += 1
+        thread = threading.Thread(
+            target=run_montage,
+            args=(job_id, data['style'], job['options']),
+            daemon=False  # Non-daemon for proper cleanup
+        )
+        thread.start()
+    else:
+        # Add to queue
+        job_queue.append({
+            'job_id': job_id,
+            'style': data['style'],
+            'options': job['options']
+        })
+        with job_lock:
+            jobs[job_id]["status"] = "queued"
+            jobs[job_id]["queue_position"] = len(job_queue)
 
     return jsonify(job)
 

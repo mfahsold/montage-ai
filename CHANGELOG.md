@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **cgpu Cloud GPU in Docker** (`Dockerfile`, `docker-compose.web.yml`, `docker-compose.yml`)
+  - Install Node.js 20 LTS and cgpu in Docker image for cloud GPU access
+  - Mount cgpu credentials (`~/.config/cgpu`) into container
+  - New environment variables: `CGPU_GPU_ENABLED=true`, `CGPU_TIMEOUT=600`
+  - AI upscaling now uses Google Colab T4 GPU via cgpu instead of local Vulkan
+  - Fallback chain: cgpu Cloud GPU → Local Vulkan GPU → FFmpeg Lanczos
+
 - **Direct Google AI Integration** (`creative_director.py` v0.3.0)
   - New `GOOGLE_API_KEY` environment variable for direct Gemini API access
   - `_query_google_ai()` method bypasses cgpu serve / gemini-cli entirely

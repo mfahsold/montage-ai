@@ -23,6 +23,7 @@ import base64
 import tempfile
 from typing import Tuple, Optional
 from pathlib import Path
+from dataclasses import dataclass
 
 
 # ============================================================================
@@ -31,13 +32,24 @@ from pathlib import Path
 
 # GPU-related cgpu settings
 CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
-CGPU_TIMEOUT = int(os.environ.get("CGPU_TIMEOUT", "600"))  # 10 minutes default
+CGPU_TIMEOUT = int(os.environ.get("CGPU_TIMEOUT", "1200"))  # 20 minutes default for video upscaling
 
 # LLM-related cgpu settings (for cgpu serve)
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
 CGPU_PORT = os.environ.get("CGPU_PORT", "8080")  # Updated default port
 CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
+
+
+@dataclass
+class CGPUConfig:
+    """Configuration container for cgpu settings."""
+    gpu_enabled: bool = CGPU_GPU_ENABLED
+    timeout: int = CGPU_TIMEOUT
+    llm_enabled: bool = CGPU_ENABLED
+    host: str = CGPU_HOST
+    port: str = CGPU_PORT
+    model: str = CGPU_MODEL
 
 
 # ============================================================================
@@ -346,6 +358,15 @@ def cleanup_remote(paths: list) -> None:
             run_cgpu_command(f"rm -rf {path}", timeout=30)
         except Exception:
             pass
+
+
+# ============================================================================
+# Aliases for backward compatibility
+# ============================================================================
+
+# cgpu_upscaler.py uses these names
+cgpu_copy_to_remote = copy_to_remote
+cgpu_download_base64 = download_via_base64
 
 
 # ============================================================================

@@ -2,6 +2,7 @@ FROM continuumio/miniconda3
 
 # Install system dependencies
 # Add build tools for Real-ESRGAN-ncnn-vulkan
+# Add Node.js for cgpu (cloud GPU via Google Colab)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
@@ -18,7 +19,16 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     unzip \
     wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20 LTS for cgpu
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install cgpu globally
+RUN npm install -g cgpu
 
 WORKDIR /app
 

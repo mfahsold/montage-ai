@@ -50,6 +50,10 @@ spec:
           value: "/data/music"
         - name: OUTPUT_DIR
           value: "/data/output"
+        - name: MAX_CONCURRENT_JOBS
+          value: "2"
+        - name: VERBOSE
+          value: "true"
         envFrom:
         - configMapRef:
             name: montage-ai-config
@@ -62,23 +66,27 @@ spec:
           mountPath: /data/output
         resources:
           requests:
-            cpu: 100m
-            memory: 256Mi
+            cpu: 1000m      # Guarantee 1 core minimum
+            memory: 2Gi     # Guarantee 2GB minimum
           limits:
-            cpu: 1000m
-            memory: 1Gi
+            cpu: 4000m      # Maximum 4 cores
+            memory: 8Gi     # Maximum 8GB to prevent OOM
         livenessProbe:
           httpGet:
             path: /api/status
             port: 5000
-          initialDelaySeconds: 10
-          periodSeconds: 30
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /api/status
             port: 5000
-          initialDelaySeconds: 5
-          periodSeconds: 10
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
       volumes:
       - name: input
         persistentVolumeClaim:
