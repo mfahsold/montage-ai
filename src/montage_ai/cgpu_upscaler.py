@@ -160,14 +160,26 @@ echo "ENV_READY"
         # 2. Upload video directly (much smaller than PNG frames!)
         remote_video = f"{REMOTE_WORK_DIR}/input.mp4"
         print(f"   ⬆️ Uploading video ({input_size_mb:.1f} MB)...")
-        
-        if not _cgpu_copy_to_remote(input_path, remote_video):
-            print(f"   ❌ Upload failed - trying fallback method...")
-            # Fallback: Base64 upload for smaller files
-            if input_size_mb < 20:
+
+        # Dynamic timeout: 1 min per 10MB, minimum 10 min
+        upload_timeout = max(600, int(input_size_mb / 10 * 60))
+
+        if not cgpu_copy_to_remote(input_path, remote_video, timeout=upload_timeout):
+            print(f"   ❌ Upload failed")
+            print(f"   💡 Troubleshooting:")
+            print(f"      1. Check cgpu connection: cgpu status")
+            print(f"      2. File size: {input_size_mb:.1f}MB (may need longer timeout)")
+            print(f"      3. Try manual upload: cgpu copy {input_path} {remote_video}")
+
+            # Fallback: Base64 upload for smaller files only
+            if input_size_mb < 10:
+                print(f"   → Trying base64 fallback for small file...")
                 return _upscale_via_base64_upload(input_path, output_path, scale, model)
-            return None
-        print(f"   ✅ Upload complete")
+            else:
+                print(f"   → File too large ({input_size_mb:.1f}MB) for base64 fallback")
+                return None
+
+        print(f"   ✅ Upload complete ({upload_timeout}s timeout used)")
         
         # 3. Run full pipeline on Colab (extract → upscale → reassemble)
         print(f"   🚀 Processing on Tesla T4 (scale={scale}x)...")

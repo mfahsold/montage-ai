@@ -45,7 +45,7 @@ services:
       - CGPU_PORT=${CGPU_PORT:-8080}
       - CGPU_MODEL=${CGPU_MODEL:-gemini-2.0-flash}
       - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-false}
-      - CGPU_TIMEOUT=${CGPU_TIMEOUT:-600}
+      - CGPU_TIMEOUT=${CGPU_TIMEOUT:-1800}  # 30 min for large videos (was 600)
       
       # Enhancement Settings
       - STABILIZE=${STABILIZE:-false}

@@ -130,7 +130,7 @@ def is_cgpu_serve_available() -> bool:
 def run_cgpu_command(
     cmd: str,
     timeout: int = CGPU_TIMEOUT,
-    retries: int = 2,
+    retries: int = 1,  # Reduced from 2 to avoid excessive retries
     retry_delay: int = 5
 ) -> Tuple[bool, str, str]:
     """
@@ -138,8 +138,8 @@ def run_cgpu_command(
 
     Args:
         cmd: Shell command to execute
-        timeout: Timeout in seconds
-        retries: Number of retry attempts on failure
+        timeout: Timeout in seconds PER ATTEMPT
+        retries: Number of retry attempts on failure (default: 1)
         retry_delay: Seconds to wait between retries
 
     Returns:
@@ -155,7 +155,7 @@ def run_cgpu_command(
                 ["cgpu", "run", cmd],
                 capture_output=True,
                 text=True,
-                timeout=timeout
+                timeout=timeout  # Timeout per attempt, not total
             )
 
             # Check for session invalidation errors
@@ -171,10 +171,9 @@ def run_cgpu_command(
 
         except subprocess.TimeoutExpired:
             last_error = f"Timeout after {timeout}s"
-            if attempt < retries:
-                print(f"   ⚠️ Timeout on attempt {attempt+1}/{retries+1}, retrying in {retry_delay}s...")
-                time.sleep(retry_delay)
-                continue
+            # For timeout, don't retry - it's likely the command will timeout again
+            print(f"   ⚠️ cgpu command timed out after {timeout}s")
+            break  # Don't retry on timeout
         except Exception as e:
             last_error = str(e)
             if attempt < retries:
@@ -225,27 +224,45 @@ def run_cgpu_python(
 # File Transfer
 # ============================================================================
 
-def copy_to_remote(local_path: str, remote_path: str) -> bool:
+def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> bool:
     """
     Copy file from local to Colab using cgpu copy.
-    
+
     Note: cgpu copy is upload-only. For downloads, use download_via_base64.
-    
+
     Args:
         local_path: Path to local file
         remote_path: Destination path on Colab
-        
+        timeout: Upload timeout in seconds (default: 600 = 10 min)
+
     Returns:
         True if successful
     """
     try:
+        # Get file size for logging
+        file_size_mb = os.path.getsize(local_path) / (1024 * 1024)
+
         result = subprocess.run(
             ["cgpu", "copy", local_path, remote_path],
             capture_output=True,
             text=True,
-            timeout=300  # 5 min for uploads
+            timeout=timeout
         )
-        return result.returncode == 0
+
+        if result.returncode != 0:
+            print(f"   ❌ cgpu copy failed (file: {os.path.basename(local_path)}, size: {file_size_mb:.1f}MB)")
+            if result.stderr:
+                # Show first line of error
+                error_line = result.stderr.strip().split('\n')[0]
+                print(f"      Error: {error_line}")
+            return False
+
+        return True
+
+    except subprocess.TimeoutExpired:
+        print(f"   ❌ Upload timeout after {timeout}s (file: {os.path.basename(local_path)})")
+        print(f"      → File may be too large ({file_size_mb:.1f}MB), consider increasing timeout")
+        return False
     except Exception as e:
         print(f"   ❌ Copy to remote failed: {e}")
         return False
