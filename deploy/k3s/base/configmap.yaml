@@ -33,7 +33,7 @@ data:
   # Output Configuration
   NUM_VARIANTS: "1"
   VERBOSE: "true"
-  EXPORT_TIMELINE: "false"
+  EXPORT_TIMELINE: "true"  # Export OTIO/EDL/CSV for professional NLE software
   GENERATE_PROXIES: "false"
   
   # Performance

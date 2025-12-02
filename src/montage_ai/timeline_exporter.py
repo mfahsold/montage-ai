@@ -80,7 +80,8 @@ class TimelineExporter:
         timeline: Timeline,
         generate_proxies: bool = False,
         export_otio: bool = True,
-        export_edl: bool = True
+        export_edl: bool = True,
+        export_csv: bool = True
     ) -> Dict[str, str]:
         """
         Export timeline to NLE-compatible formats.
@@ -90,6 +91,7 @@ class TimelineExporter:
             generate_proxies: Create H.264 proxies for editing
             export_otio: Export OpenTimelineIO file
             export_edl: Export CMX 3600 EDL file
+            export_csv: Export CSV spreadsheet
 
         Returns:
             Dictionary of exported file paths
@@ -123,6 +125,13 @@ class TimelineExporter:
             if edl_path:
                 exported_files['edl'] = edl_path
                 print(f"✅ EDL exported: {edl_path}")
+
+        # Export CSV
+        if export_csv:
+            csv_path = self._export_csv(timeline)
+            if csv_path:
+                exported_files['csv'] = csv_path
+                print(f"✅ CSV exported: {csv_path}")
 
         # Export metadata JSON
         metadata_path = self._export_metadata(timeline)
@@ -315,6 +324,83 @@ class TimelineExporter:
 
         return edl_path
 
+    def _export_csv(self, timeline: Timeline) -> str:
+        """
+        Export timeline as CSV spreadsheet.
+
+        CSV format is universal and can be opened in Excel, Google Sheets,
+        or imported into custom tools. Useful for manual review and logging.
+
+        Args:
+            timeline: Timeline object
+
+        Returns:
+            Path to .csv file
+        """
+        import csv
+
+        csv_path = os.path.join(
+            self.output_dir,
+            f"{timeline.project_name}.csv"
+        )
+
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+
+            # CSV Header
+            writer.writerow([
+                "Clip #",
+                "Source File",
+                "Source In (sec)",
+                "Source Out (sec)",
+                "Timeline In (sec)",
+                "Timeline Out (sec)",
+                "Duration (sec)",
+                "Source In (TC)",
+                "Source Out (TC)",
+                "Timeline In (TC)",
+                "Timeline Out (TC)",
+                "Energy",
+                "Action",
+                "Shot Type",
+                "Notes"
+            ])
+
+            # CSV Rows (one per clip)
+            for i, clip in enumerate(timeline.clips, start=1):
+                # Get metadata
+                meta = clip.metadata or {}
+                energy = meta.get('energy', 0.5)
+                action = meta.get('action', 'medium')
+                shot = meta.get('shot', 'medium')
+                notes = meta.get('notes', '')
+
+                # Timecodes
+                src_in_tc = self._seconds_to_timecode(clip.start_time, timeline.fps)
+                src_out_tc = self._seconds_to_timecode(clip.start_time + clip.duration, timeline.fps)
+                tl_in_tc = self._seconds_to_timecode(clip.timeline_start, timeline.fps)
+                tl_out_tc = self._seconds_to_timecode(clip.timeline_start + clip.duration, timeline.fps)
+
+                writer.writerow([
+                    i,  # Clip #
+                    clip.source_path,
+                    f"{clip.start_time:.2f}",
+                    f"{clip.start_time + clip.duration:.2f}",
+                    f"{clip.timeline_start:.2f}",
+                    f"{clip.timeline_start + clip.duration:.2f}",
+                    f"{clip.duration:.2f}",
+                    src_in_tc,
+                    src_out_tc,
+                    tl_in_tc,
+                    tl_out_tc,
+                    f"{energy:.2f}",
+                    action,
+                    shot,
+                    notes
+                ])
+
+        return csv_path
+
     def _export_metadata(self, timeline: Timeline) -> str:
         """
         Export timeline metadata as JSON.
@@ -435,7 +521,7 @@ def export_timeline_from_montage(
     audio_path: str,
     total_duration: float,
     output_dir: str = "/data/output",
-    project_name: str = "fluxibri_montage",
+    project_name: str = "montage_ai",
     generate_proxies: bool = False
 ) -> Dict[str, str]:
     """

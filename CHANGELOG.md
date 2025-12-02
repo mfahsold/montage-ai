@@ -8,7 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Renderer observability: stdout/stderr are now tee’d to `/data/output/render.log` (pod PVC), so full render logs persist after Job cleanup.
+- **Professional Timeline Export**: Fully integrated OTIO/EDL/CSV export for importing montages into professional NLE software
+  - `src/montage_ai/timeline_exporter.py`: Complete export implementation with clip metadata collection
+  - OpenTimelineIO (.otio) export - Academy Software Foundation standard for DaVinci Resolve, Premiere Pro, Final Cut Pro
+  - CMX 3600 EDL (.edl) export - Universal format compatible with all professional NLEs
+  - CSV spreadsheet (.csv) export - Human-readable timeline with timecodes, energy levels, shot types
+  - Clip metadata collection during assembly: tracks source files, in/out points, timeline positions, energy, action levels, enhancements applied
+  - Persistent export to PVC (`/data/output/*.{otio,edl,csv}`) alongside rendered video and logs
+  - Enabled by default in K8s ConfigMap (`EXPORT_TIMELINE: "true"`)
+- **Web Upload API** (initial implementation): User-friendly file upload interface for non-technical users
+  - `src/montage_ai/api.py`: FastAPI server with multi-part file upload endpoints
+  - Upload endpoints: `/api/upload/video`, `/api/upload/music`, `/api/upload/logo`
+  - File management: list, delete, clear operations via REST API
+  - Simple web interface at `/` for drag-and-drop uploads
+  - Output file download via `/api/download/{filename}`
+  - Health check endpoint for K8s probes
+- Renderer observability: stdout/stderr are now tee'd to `/data/output/render.log` (pod PVC), so full render logs persist after Job cleanup.
 
 - **Documentation overhaul for public release**
   - `README.md`: Complete rewrite with "Why Montage-AI?" section, comparison table, architecture diagram

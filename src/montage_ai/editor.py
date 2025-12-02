@@ -953,6 +953,7 @@ def create_montage(variant_id=1):
 
     # 3. Assemble Timeline
     clips = []
+    clips_metadata = []  # Track metadata for timeline export (OTIO/EDL/CSV)
     current_time = 0
     beat_idx = 0
     cut_number = 0  # For monitoring
@@ -1445,9 +1446,33 @@ def create_montage(variant_id=1):
                 clips[-1] = clips[-1].crossfadeout(fade_duration)
 
         clips.append(v_clip)
+
+        # === COLLECT METADATA FOR TIMELINE EXPORT ===
+        # Store clip metadata for OTIO/EDL/CSV export
+        clip_metadata = {
+            'source_path': selected_scene['path'],
+            'start_time': clip_start,
+            'duration': cut_duration,
+            'timeline_start': current_time,
+            'metadata': {
+                'energy': current_energy,
+                'action': selected_scene.get('meta', {}).get('action', 'medium'),
+                'shot': selected_scene.get('meta', {}).get('shot', 'medium'),
+                'beat_idx': beat_idx,
+                'beats_per_cut': beats_per_cut,
+                'selection_score': best_score if 'best_score' in dir() else 0,
+                'enhancements': {
+                    'stabilized': stabilize_applied,
+                    'upscaled': upscale_applied,
+                    'enhanced': enhance_applied
+                }
+            }
+        }
+        clips_metadata.append(clip_metadata)
+
         current_time += cut_duration
         beat_idx += beats_per_cut
-        
+
         # === MONITORING: Log progress every 5 cuts ===
         if monitor and cut_number % 5 == 0:
             monitor.log_cut_summary(cut_number, estimated_total_cuts, current_time)
@@ -1536,21 +1561,35 @@ def create_montage(variant_id=1):
     if EXPORT_TIMELINE and TIMELINE_EXPORT_AVAILABLE:
         print(f"\n📽️ Exporting Timeline for NLE import...")
 
-        # TODO: Collect clips_metadata during montage creation for accurate timeline
-        # For now, we indicate timeline export is configured but needs metadata collection
-        print(f"   ℹ️ Timeline export configured but requires metadata collection implementation")
-        print(f"   ℹ️ Next version will export .otio + .edl + proxies")
+        try:
+            # Determine style name for project naming
+            style_name = "dynamic"
+            if EDITING_INSTRUCTIONS is not None:
+                style_name = EDITING_INSTRUCTIONS.get('style_name', 'custom')
 
-        # Placeholder for future implementation:
-        # clips_metadata = [...]  # Collected during clip assembly
-        # export_timeline_from_montage(
-        #     clips_metadata,
-        #     music_path,
-        #     final_video.duration,
-        #     output_dir=OUTPUT_DIR,
-        #     project_name=f"gallery_montage_v{variant_id}",
-        #     generate_proxies=GENERATE_PROXIES
-        # )
+            # Export to OTIO/EDL/CSV for professional NLE software
+            exported_files = export_timeline_from_montage(
+                clips_metadata,
+                music_path,
+                final_video.duration,
+                output_dir=OUTPUT_DIR,
+                project_name=f"montage_{JOB_ID}_v{variant_id}_{style_name}",
+                generate_proxies=GENERATE_PROXIES
+            )
+
+            print(f"   ✅ Timeline exported successfully!")
+            print(f"   📁 Files: {', '.join(exported_files.keys())}")
+
+            if monitor:
+                monitor.log_info("timeline_export", "Timeline exported", {
+                    "formats": list(exported_files.keys()),
+                    "project_name": f"montage_{JOB_ID}_v{variant_id}_{style_name}"
+                })
+
+        except Exception as exc:
+            print(f"   ⚠️ Timeline export failed: {exc}")
+            if monitor:
+                monitor.log_warning("timeline_export", f"Export failed: {exc}")
 
 def stabilize_clip(input_path, output_path):
     """
