@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **cgpu Utilities Module** (`src/montage_ai/cgpu_utils.py`)
+  - Centralized cgpu cloud GPU utilities to eliminate code duplication
+  - `CGPUConfig` dataclass for unified configuration (host, port, model, timeout)
+  - `is_cgpu_available()`: Check if cgpu is installed and authenticated
+  - `check_cgpu_gpu()`: Verify GPU access on Colab
+  - `run_cgpu_command()`: Execute commands on cloud GPU
+  - `cgpu_copy_to_remote()`: Upload files to Colab
+  - `cgpu_download_base64()`: Download files via stdout
+  - `setup_cgpu_environment()`: Install dependencies on Colab
+  - `get_cgpu_llm_client()`: Get OpenAI-compatible client for cgpu serve
+
 - **Open-Source AI Integration** (Sprint 1-2)
   - `docs/INTEGRATION_PLAN.md`: Comprehensive integration plan for VideoAgent, Wan2.1-VACE, Open-Sora
   - Architecture diagrams and sprint breakdown for implementation
@@ -45,13 +56,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Package version** bumped to 0.4.0
 - **`__init__.py`** updated with all new modules and feature flags
   - FFMPEG_TOOLS_AVAILABLE, VIDEO_AGENT_AVAILABLE, WAN_VACE_AVAILABLE, OPEN_SORA_AVAILABLE
+  - CGPU_UTILS_AVAILABLE flag for shared utilities
   - Comprehensive docstrings with usage examples
+
+### Refactored
+
+- **cgpu code consolidation**: Eliminated duplicate `_run_cgpu` functions across modules
+  - `cgpu_upscaler.py` v2.1.0: Now imports from `cgpu_utils`
+  - `wan_vace.py` v1.1.0: Uses shared `run_cgpu_command()` and `cgpu_copy_to_remote()`
+  - `open_sora.py` v1.1.0: Uses shared cgpu utilities
+  - Reduced code duplication by ~150 lines
 
 ### Technical
 
 - All new modules use consistent error handling with feature flags
 - cgpu integration follows established patterns from cgpu_upscaler.py
 - SQLite-backed storage for VideoAgent memory (persistent across sessions)
+- Centralized cgpu configuration via `CGPUConfig` dataclass
 
 ---
 

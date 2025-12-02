@@ -81,6 +81,20 @@ try:
 except ImportError:
     OPEN_SORA_AVAILABLE = False
 
+# cgpu Utilities (shared module)
+try:
+    from .cgpu_utils import (
+        CGPUConfig,
+        is_cgpu_available,
+        check_cgpu_gpu,
+        run_cgpu_command,
+        cgpu_copy_to_remote,
+        get_cgpu_llm_client,
+    )
+    CGPU_UTILS_AVAILABLE = True
+except ImportError:
+    CGPU_UTILS_AVAILABLE = False
+
 # cgpu Upscaler
 try:
     from .cgpu_upscaler import upscale_with_cgpu, upscale_image_with_cgpu
@@ -108,6 +122,13 @@ __all__ = [
     "WanBRollGenerator",
     "OpenSoraGenerator",
     "create_open_sora",
+    # cgpu Utilities
+    "CGPUConfig",
+    "is_cgpu_available",
+    "check_cgpu_gpu",
+    "run_cgpu_command",
+    "cgpu_copy_to_remote",
+    "get_cgpu_llm_client",
     # Upscaling
     "upscale_with_cgpu",
     "upscale_image_with_cgpu",
@@ -116,5 +137,6 @@ __all__ = [
     "VIDEO_AGENT_AVAILABLE",
     "WAN_VACE_AVAILABLE",
     "OPEN_SORA_AVAILABLE",
+    "CGPU_UTILS_AVAILABLE",
     "CGPU_UPSCALER_AVAILABLE",
 ]

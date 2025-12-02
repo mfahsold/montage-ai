@@ -22,7 +22,7 @@ Usage:
     if is_cgpu_available():
         output_path = upscale_with_cgpu("input.mp4", "output.mp4", scale=2)
 
-Version: 2.0.0
+Version: 2.1.0 - Uses shared cgpu_utils module
 """
 
 import os
@@ -34,97 +34,38 @@ import base64
 from typing import Optional, Tuple
 from pathlib import Path
 
-VERSION = "2.0.0"
+# Import shared cgpu utilities
+from .cgpu_utils import (
+    CGPUConfig,
+    is_cgpu_available,
+    check_cgpu_gpu,
+    run_cgpu_command,
+    cgpu_copy_to_remote,
+    cgpu_download_base64,
+)
 
-# Configuration
-CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
-CGPU_TIMEOUT = int(os.environ.get("CGPU_TIMEOUT", "600"))  # 10 minutes default
+VERSION = "2.1.0"
+
+# Configuration from shared utils
+_cgpu_config = CGPUConfig()
+CGPU_GPU_ENABLED = _cgpu_config.gpu_enabled
+CGPU_TIMEOUT = _cgpu_config.timeout
 
 # Remote working directory on Colab
 REMOTE_WORK_DIR = "/content/upscale_work"
 
 
-def is_cgpu_available() -> bool:
-    """
-    Check if cgpu is installed and configured.
-    
-    Returns:
-        True if cgpu is available for cloud GPU tasks
-    """
-    if not CGPU_GPU_ENABLED:
-        return False
-    
-    try:
-        result = subprocess.run(
-            ["cgpu", "status"],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        return result.returncode == 0 and "Authenticated" in result.stdout
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-
-
-def check_cgpu_gpu() -> Tuple[bool, str]:
-    """
-    Check if cgpu can access a GPU.
-    
-    Returns:
-        (success, gpu_info) tuple
-    """
-    try:
-        result = subprocess.run(
-            ["cgpu", "run", "nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            # Extract just the GPU info line
-            lines = [l for l in result.stdout.strip().split('\n') if 'Tesla' in l or 'T4' in l or 'A100' in l or 'MiB' in l]
-            return True, lines[0] if lines else result.stdout.strip()
-        return False, result.stderr
-    except Exception as e:
-        return False, str(e)
-
-
-def _run_cgpu_command(cmd: str, timeout: int = CGPU_TIMEOUT) -> Tuple[bool, str, str]:
-    """
-    Run a command on Colab via cgpu.
-    
-    Returns:
-        (success, stdout, stderr)
-    """
-    try:
-        result = subprocess.run(
-            ["cgpu", "run", cmd],
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-        return result.returncode == 0, result.stdout, result.stderr
-    except subprocess.TimeoutExpired:
-        return False, "", f"Timeout after {timeout}s"
-    except Exception as e:
-        return False, "", str(e)
+# Internal wrappers for backward compatibility
+def _run_cgpu_command(cmd: str, timeout: int = None) -> Tuple[bool, str, str]:
+    """Wrapper for shared run_cgpu_command."""
+    if timeout is None:
+        timeout = CGPU_TIMEOUT
+    return run_cgpu_command(cmd, timeout)
 
 
 def _cgpu_copy_to_remote(local_path: str, remote_path: str) -> bool:
-    """
-    Copy file from local to Colab using cgpu copy.
-    """
-    try:
-        result = subprocess.run(
-            ["cgpu", "copy", local_path, remote_path],
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 min for uploads
-        )
-        return result.returncode == 0
-    except Exception as e:
-        print(f"   ❌ Copy to remote failed: {e}")
-        return False
+    """Wrapper for shared cgpu_copy_to_remote."""
+    return cgpu_copy_to_remote(local_path, remote_path)
 
 
 def _get_video_fps(video_path: str) -> float:

@@ -24,6 +24,8 @@ Integration with Montage AI:
 - Missing footage creation
 - Style-matched video generation
 - Video extension/continuation
+
+Version: 1.1.0 - Uses shared cgpu_utils module
 """
 
 import os
@@ -36,6 +38,14 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from enum import Enum
+
+# Import shared cgpu utilities
+from .cgpu_utils import (
+    CGPUConfig,
+    is_cgpu_available,
+    run_cgpu_command,
+    cgpu_copy_to_remote,
+)
 
 
 class WanModelSize(Enum):
@@ -190,20 +200,11 @@ print("===VIDEO_BASE64_END===")
         self._check_environment()
     
     def _check_environment(self):
-        """Check if cgpu is available and configured."""
-        self.cgpu_available = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
-        
-        if not self.cgpu_available:
-            # Check if cgpu command exists
-            try:
-                result = subprocess.run(["which", "cgpu"], capture_output=True)
-                if result.returncode == 0:
-                    self.cgpu_available = True
-            except Exception:
-                pass
+        """Check if cgpu is available and configured using shared utils."""
+        self.cgpu_available = is_cgpu_available()
     
     def _run_cgpu(self, script: str, timeout: Optional[int] = None) -> str:
-        """Execute Python script on cgpu cloud GPU."""
+        """Execute Python script on cgpu cloud GPU using shared utils."""
         timeout = timeout or self.config.cgpu_timeout
         
         # Create temp script file
@@ -212,22 +213,20 @@ print("===VIDEO_BASE64_END===")
             script_path = f.name
         
         try:
-            # Copy script to Colab
-            subprocess.run(
-                ["cgpu", "copy", script_path, "/tmp/wan_script.py"],
-                check=True,
-                capture_output=True
-            )
+            # Copy script to Colab using shared utils
+            if not cgpu_copy_to_remote(script_path, "/tmp/wan_script.py"):
+                raise RuntimeError("Failed to copy script to Colab")
             
-            # Run script
-            result = subprocess.run(
-                ["cgpu", "run", f"python /tmp/wan_script.py"],
-                capture_output=True,
-                text=True,
+            # Run script using shared utils
+            success, stdout, stderr = run_cgpu_command(
+                "python /tmp/wan_script.py",
                 timeout=timeout
             )
             
-            return result.stdout
+            if not success:
+                raise RuntimeError(f"Script execution failed: {stderr}")
+            
+            return stdout
             
         finally:
             os.unlink(script_path)
