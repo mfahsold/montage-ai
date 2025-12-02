@@ -4,13 +4,13 @@
 
 ## Status Übersicht
 
-| Projekt | Status | Lizenz | Priorität | GPU Anforderung |
-|---------|--------|--------|-----------|-----------------|
-| VideoAgent | ✅ Verfügbar | MIT (ECCV 2024) | 🔴 Hoch | ~8GB VRAM (Video-LLaVA) |
-| Open-Sora 2.0 | ✅ Verfügbar | Apache-2.0 | 🟡 Mittel | 256p: 1 GPU, 768p: 8 GPUs |
-| Wan2.1-VACE | ✅ Verfügbar | Apache-2.0 | 🟡 Mittel | 1.3B: 8GB, 14B: 24GB+ |
-| FFmpeg-MCP | ❌ Nicht gefunden | - | → Alternative | - |
-| Frame AI | ❌ Nicht gefunden | - | → Alternative | - |
+| Projekt       | Status           | Lizenz          | Priorität     | GPU Anforderung           |
+| ------------- | ---------------- | --------------- | ------------- | ------------------------- |
+| VideoAgent    | ✅ Verfügbar      | MIT (ECCV 2024) | 🔴 Hoch        | ~8GB VRAM (Video-LLaVA)   |
+| Open-Sora 2.0 | ✅ Verfügbar      | Apache-2.0      | 🟡 Mittel      | 256p: 1 GPU, 768p: 8 GPUs |
+| Wan2.1-VACE   | ✅ Verfügbar      | Apache-2.0      | 🟡 Mittel      | 1.3B: 8GB, 14B: 24GB+     |
+| FFmpeg-MCP    | ❌ Nicht gefunden | -               | → Alternative | -                         |
+| Frame AI      | ❌ Nicht gefunden | -               | → Alternative | -                         |
 
 ## Architektur nach Integration
 
@@ -588,12 +588,12 @@ sqlalchemy>=2.0.0      # Für Object Memory
 
 ## Risiken & Mitigationen
 
-| Risiko | Mitigation |
-|--------|------------|
+| Risiko                             | Mitigation                          |
+| ---------------------------------- | ----------------------------------- |
 | VideoAgent Models zu groß für cgpu | Nutze kleinere Video-LLaVA Variante |
-| Open-Sora 768p braucht 8 GPUs | 256p + Real-ESRGAN Upscaling |
-| Wan2.1 14B zu langsam | Bleibe bei 1.3B für 480p |
-| cgpu Rate Limits | Caching, Batch Processing |
+| Open-Sora 768p braucht 8 GPUs      | 256p + Real-ESRGAN Upscaling        |
+| Wan2.1 14B zu langsam              | Bleibe bei 1.3B für 480p            |
+| cgpu Rate Limits                   | Caching, Batch Processing           |
 
 ---
 
