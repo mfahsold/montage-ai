@@ -32,6 +32,10 @@ spec:
               value: "prefer"
             - name: VK_ICD_FILENAMES
               value: "/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
+            # Headless Vulkan needs an explicit runtime dir; /tmp is fine in jobs
+            # See https://community.khronos.org/t/enabling-vulkan-in-ubuntu-24-04-for-headless-browser/111067
+            - name: XDG_RUNTIME_DIR
+              value: "/tmp"
           resources:
             requests:
               cpu: "2"
