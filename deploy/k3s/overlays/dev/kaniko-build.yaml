@@ -16,9 +16,9 @@ spec:
           args:
             - --context=git://github.com/mfahsold/montage-ai.git#main
             - --dockerfile=Dockerfile
-            - --destination=192.168.1.16:5000/montage-ai:latest
+            - --destination=montage-ai-registry.montage-ai.svc.cluster.local:5000/montage-ai:latest
             - --snapshot-mode=time
             - --verbosity=info
             - --custom-platform=linux/amd64
             - --insecure
-            - --skip-tls-verify-registry=192.168.1.16:5000
+            - --skip-tls-verify-registry=montage-ai-registry.montage-ai.svc.cluster.local:5000
