@@ -21,6 +21,8 @@ import sys
 import json
 import time
 import psutil
+import io
+import atexit
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
@@ -66,12 +68,57 @@ class Monitor:
         self.phase = "init"
         self.clip_count = 0
         self.processed_count = 0
+        self._log_file = None
+        self._tee_enabled = False
         
         # Performance tracking
         self.phase_times: Dict[str, float] = {}
         self.phase_start: Optional[float] = None
         
+        self._setup_tee()
         self._print_header()
+
+    def _setup_tee(self):
+        """
+        Mirror stdout/stderr to a log file when LOG_FILE is set.
+
+        Keeps full pod logs on the output PVC so they are retrievable
+        even after the Job has finished.
+        """
+        log_path = os.environ.get("LOG_FILE", "/data/output/render.log")
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            self._log_file = open(log_path, "a", buffering=1, encoding="utf-8")
+
+            class _Tee(io.TextIOBase):
+                def __init__(self, *streams):
+                    self.streams = streams
+
+                def write(self, data):
+                    for s in self.streams:
+                        s.write(data)
+                    return len(data)
+
+                def flush(self):
+                    for s in self.streams:
+                        s.flush()
+
+            sys.stdout = _Tee(sys.stdout, self._log_file)
+            sys.stderr = _Tee(sys.stderr, self._log_file)
+            self._tee_enabled = True
+            print(f"[monitor] tee logging enabled → {log_path}")
+
+            def _cleanup():
+                try:
+                    if self._log_file:
+                        self._log_file.flush()
+                        self._log_file.close()
+                except Exception:
+                    pass
+
+            atexit.register(_cleanup)
+        except Exception as exc:
+            print(f"[monitor] ⚠️ Could not enable tee logging: {exc}")
     
     def _print_header(self):
         """Print startup banner with job info"""

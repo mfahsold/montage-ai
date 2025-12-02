@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Renderer observability: stdout/stderr are now tee’d to `/data/output/render.log` (pod PVC), so full render logs persist after Job cleanup.
 
 - **Documentation overhaul for public release**
   - `README.md`: Complete rewrite with "Why Montage-AI?" section, comparison table, architecture diagram
