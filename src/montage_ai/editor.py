@@ -1896,8 +1896,9 @@ def _upscale_with_realesrgan(input_path, output_path):
     os.makedirs(out_frame_dir, exist_ok=True)
     
     try:
-        # 1. Extract frames
-        subprocess.run(["ffmpeg", "-i", input_path, "-q:v", "2", f"{frame_dir}/frame_%08d.jpg"], 
+        # 1. Extract frames - Use -vf null to trigger auto-rotation from metadata
+        # Without a filter, ffmpeg does NOT apply rotation for portrait videos
+        subprocess.run(["ffmpeg", "-i", input_path, "-vf", "null", "-q:v", "2", f"{frame_dir}/frame_%08d.jpg"], 
                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # 2. Upscale frames with Real-ESRGAN (GPU 0)
@@ -1952,14 +1953,32 @@ def _upscale_with_ffmpeg(input_path, output_path):
     3. CAS (Contrast Adaptive Sharpening) for extra clarity
     """
     try:
-        # Get original dimensions
+        # Get original dimensions AFTER rotation is applied
+        # We need to check rotation metadata and swap w/h if rotated 90/270
         probe_cmd = [
             "ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=width,height",
-            "-of", "csv=p=0:s=x", input_path
+            "-show_entries", "stream=width,height:stream_side_data=rotation",
+            "-of", "json", input_path
         ]
-        dimensions = subprocess.check_output(probe_cmd).decode().strip()
-        orig_w, orig_h = map(int, dimensions.split('x'))
+        import json
+        probe_output = subprocess.check_output(probe_cmd).decode().strip()
+        probe_data = json.loads(probe_output)
+        stream = probe_data.get('streams', [{}])[0]
+        orig_w = int(stream.get('width', 0))
+        orig_h = int(stream.get('height', 0))
+        
+        # Check for rotation in side_data
+        rotation = 0
+        for side_data in stream.get('side_data_list', []):
+            if 'rotation' in side_data:
+                rotation = abs(int(side_data['rotation']))
+                break
+        
+        # Swap dimensions if rotated 90 or 270 degrees
+        if rotation in (90, 270):
+            orig_w, orig_h = orig_h, orig_w
+            print(f"   🔄 Detected {rotation}° rotation, adjusted dimensions")
+        
         new_w, new_h = orig_w * 2, orig_h * 2
         
         print(f"   📐 Upscaling {orig_w}x{orig_h} → {new_w}x{new_h}")

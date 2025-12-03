@@ -221,7 +221,13 @@ try:
     fps_str = fps_cmd.stdout.strip()
     fps = eval(fps_str) if "/" in fps_str else float(fps_str or "30")
     
-    subprocess.run(["ffmpeg", "-y", "-i", f"{{WORK_DIR}}/input.mp4", "-q:v", "2",
+    # Extract frames - IMPORTANT: Use -vf to trigger auto-rotation from metadata
+    # Without a filter, ffmpeg does NOT apply rotation metadata, causing portrait videos
+    # (shot on phones with rotation=90/270) to be extracted in wrong orientation
+    # The "null" filter forces filter graph processing which applies auto-rotation
+    subprocess.run(["ffmpeg", "-y", "-i", f"{{WORK_DIR}}/input.mp4", 
+        "-vf", "null",
+        "-q:v", "2",
         f"{{WORK_DIR}}/frames/f%06d.jpg"], capture_output=True, check=True)
     
     frames = sorted(glob.glob(f"{{WORK_DIR}}/frames/*.jpg"))
@@ -415,33 +421,45 @@ def _download_chunked(remote_path: str, local_path: str, file_size: int) -> bool
     
     os.makedirs(os.path.dirname(local_path) or '.', exist_ok=True)
     
-    with open(local_path, 'wb') as out_file:
-        for i in range(num_chunks):
-            start = i * CHUNK_SIZE
-            end = min(start + CHUNK_SIZE, file_size)
-            chunk_num = i + 1
-            
-            # Use dd to extract chunk, then base64
-            # dd skip=X count=Y reads Y blocks starting at block X
-            cmd = f"dd if={remote_path} bs=1 skip={start} count={end-start} 2>/dev/null | base64"
-            
-            success, b64_data, stderr = _run_cgpu(cmd, timeout=180)
-            
-            if not success:
-                _log(f"   ❌ Chunk {chunk_num}/{num_chunks} failed")
-                return False
-            
-            try:
-                b64_clean = ''.join(
-                    line for line in b64_data.split('\n')
-                    if line and not line.startswith('Authenticated')
-                )
-                chunk_data = base64.b64decode(b64_clean)
-                out_file.write(chunk_data)
-                _log(f"   📥 Chunk {chunk_num}/{num_chunks} ({len(chunk_data)//1024}KB)")
-            except Exception as e:
-                _log(f"   ❌ Chunk decode failed: {e}")
-                return False
+    try:
+        with open(local_path, 'wb') as out_file:
+            for i in range(num_chunks):
+                start = i * CHUNK_SIZE
+                end = min(start + CHUNK_SIZE, file_size)
+                chunk_num = i + 1
+                
+                # Use dd to extract chunk, then base64
+                # dd skip=X count=Y reads Y blocks starting at block X
+                cmd = f"dd if={remote_path} bs=1 skip={start} count={end-start} 2>/dev/null | base64"
+                
+                # Retry up to 2 times per chunk
+                for attempt in range(2):
+                    success, b64_data, stderr = _run_cgpu(cmd, timeout=300)  # Increased timeout
+                    
+                    if success and b64_data.strip():
+                        break
+                    if attempt == 0:
+                        _log(f"   ⚠️ Chunk {chunk_num} retry...")
+                        time.sleep(5)
+                
+                if not success:
+                    _log(f"   ❌ Chunk {chunk_num}/{num_chunks} failed: {stderr[:100]}")
+                    return False
+                
+                try:
+                    b64_clean = ''.join(
+                        line for line in b64_data.split('\n')
+                        if line and not line.startswith('Authenticated') and '__COLAB_CLI' not in line
+                    )
+                    chunk_data = base64.b64decode(b64_clean)
+                    out_file.write(chunk_data)
+                    _log(f"   📥 Chunk {chunk_num}/{num_chunks} ({len(chunk_data)//1024}KB)")
+                except Exception as e:
+                    _log(f"   ❌ Chunk decode failed: {e}")
+                    return False
+    except Exception as e:
+        _log(f"   ❌ Download write error: {e}")
+        return False
     
     # Verify file size
     actual_size = os.path.getsize(local_path)

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Portrait Video Distortion** - Fixed upscaled portrait videos being stretched/distorted
+  - FFmpeg frame extraction was ignoring rotation metadata from phone videos
+  - Added `-vf null` filter to trigger auto-rotation during frame extraction
+  - FFmpeg upscaler now correctly detects and handles 90°/270° rotation metadata
+  - Affects: cgpu cloud upscaler, local Real-ESRGAN, FFmpeg fallback upscaler
+
+- **cgpu Download Reliability** - Improved chunked download with retry logic
+  - Increased chunk timeout from 180s to 300s
+  - Added automatic retry (up to 2 attempts) per chunk
+  - Better error messages showing failure reason
+
 - **cgpu Status Parsing Bug** - Fixed polling not detecting SUCCESS status
   - cgpu output contains "Authenticated as..." line at the start and `__COLAB_CLI_EXIT__` garbage at the end
   - Parser was reading "Authenticated..." as the status instead of actual status
