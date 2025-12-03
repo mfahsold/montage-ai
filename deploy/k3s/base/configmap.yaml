@@ -46,6 +46,10 @@ data:
   MAX_SCENE_REUSE: "3"
   USE_FFMPEG_MCP: "false"
   FFMPEG_MCP_ENDPOINT: "http://ffmpeg-mcp.montage-ai.svc.cluster.local:8080"
+  FINAL_CRF: "18"               # Quality: 18=master, 23=fast preview
+  NORMALIZE_CLIPS: "true"       # Normalize fps/pix_fmt before concat
+  ENABLE_XFADE: ""              # "", true, false ("" = follow style)
+  XFADE_DURATION: "0.3"         # Seconds, only if ENABLE_XFADE=true
   
   # Deep Analysis
   DEEP_ANALYSIS: "false"

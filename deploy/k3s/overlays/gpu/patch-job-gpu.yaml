@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-render
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      nodeSelector:
+        # Adjust to your GPU node label / pool
+        # Example: "kubernetes.io/hostname": "gpu-node-1"
+        kubernetes.io/arch: amd64
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      runtimeClassName: nvidia  # assumes NVIDIA device plugin + runtimeclass
+      containers:
+        - name: montage-ai
+          env:
+            - name: USE_GPU
+              value: "prefer"
+            - name: VK_ICD_FILENAMES
+              value: "/usr/share/vulkan/icd.d/nvidia_icd.json"
+            - name: ENABLE_XFADE
+              value: ""      # follow style; set "true" to force xfade transitions
+          resources:
+            requests:
+              cpu: "4"
+              memory: "12Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "24Gi"
+              nvidia.com/gpu: "1"
+      volumes:
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: DirectoryOrCreate

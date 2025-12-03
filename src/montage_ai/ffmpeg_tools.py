@@ -840,3 +840,51 @@ def get_ffmpeg_tools_schema() -> List[Dict[str, Any]]:
     """Get OpenAI-compatible function schema for all FFmpeg tools."""
     toolkit = FFmpegToolkit()
     return toolkit.get_tools_schema()
+
+
+# ---------------------------------------------------------------------------
+# Compatibility helpers for legacy tests
+# ---------------------------------------------------------------------------
+def _color_grade(preset: str):
+    """
+    Lightweight helper for tests: return the filter chain for a preset.
+
+    The production pipeline uses FFmpegToolkit._color_grade with real files.
+    This shim avoids filesystem/FFmpeg calls during unit tests by exposing the
+    preset mapping only.
+    """
+    # Mirror preset keys used inside FFmpegToolkit._color_grade
+    presets = {
+        # === CLASSIC FILM LOOKS ===
+        "cinematic": "colorbalance=rs=0.1:gs=-0.05:bs=0.1:rm=0.1:bm=0.05,curves=preset=cross_process",
+        "teal_orange": "colorbalance=rs=-0.15:gs=-0.05:bs=0.2:rm=0.1:bm=-0.1:rh=0.15:bh=-0.15,eq=saturation=1.1:contrast=1.05",
+        "blockbuster": "colorbalance=rs=-0.1:bs=0.15:rh=0.12:bh=-0.1,curves=m='0/0 0.25/0.22 0.5/0.5 0.75/0.78 1/1',eq=contrast=1.08",
+
+        # === VINTAGE / RETRO ===
+        "vintage": "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131,curves=preset=vintage",
+        "film_fade": "curves=m='0/0.05 0.5/0.5 1/0.95',colorbalance=rs=0.1:gs=0.05:bs=-0.05,eq=saturation=0.85",
+        "70s": "colortemperature=temperature=5500,colorbalance=rs=0.15:gs=0.1:rh=0.1,eq=saturation=1.2:contrast=0.95",
+        "polaroid": "curves=r='0/0.1 0.5/0.55 1/0.9':g='0/0.05 0.5/0.5 1/0.95':b='0/0 0.5/0.45 1/0.85',eq=saturation=0.9",
+
+        # === TEMPERATURE ===
+        "cold": "colortemperature=temperature=7500,colorbalance=bs=0.1:bm=0.05,eq=saturation=0.9",
+        "warm": "colortemperature=temperature=4000,colorbalance=rs=0.08:rh=0.05,eq=saturation=1.1",
+        "golden_hour": "colortemperature=temperature=3500,colorbalance=rs=0.12:gs=0.05:rh=0.1:gh=0.05,eq=saturation=1.15:brightness=0.03",
+        "blue_hour": "colortemperature=temperature=8000,colorbalance=bs=0.15:bm=0.08,eq=saturation=0.95:contrast=1.05",
+
+        # === MOOD / GENRE ===
+        "noir": "hue=s=0,curves=preset=darker,eq=contrast=1.2",
+        "horror": "colorbalance=gs=-0.1:bs=0.05:bm=0.1,curves=m='0/0 0.4/0.35 0.6/0.65 1/1',eq=saturation=0.7:contrast=1.15",
+        "sci_fi": "colorbalance=bs=0.2:bm=0.1:gs=-0.05,eq=saturation=0.85:contrast=1.1,curves=m='0/0 0.3/0.25 1/1'",
+        "dreamy": "gblur=sigma=0.5,colorbalance=rs=0.05:bs=0.05,eq=saturation=0.9:brightness=0.05,curves=m='0/0.05 0.5/0.55 1/1'",
+
+        # === PROFESSIONAL ===
+        "vivid": "eq=saturation=1.4:contrast=1.1,unsharp=5:5:1.0",
+        "muted": "eq=saturation=0.7:contrast=0.95,curves=m='0/0.05 0.5/0.5 1/0.95'",
+        "high_contrast": "curves=m='0/0 0.25/0.15 0.5/0.5 0.75/0.85 1/1',eq=contrast=1.15",
+        "low_contrast": "curves=m='0/0.1 0.5/0.5 1/0.9',eq=contrast=0.9",
+        "desaturated": "eq=saturation=0.5",
+        "punch": "eq=saturation=1.25:contrast=1.1,unsharp=3:3:0.8,curves=m='0/0 0.2/0.15 0.8/0.85 1/1'"
+    }
+
+    return presets.get(preset)

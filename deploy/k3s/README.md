@@ -125,6 +125,9 @@ kubectl apply -k deploy/k3s/overlays/dev/
 
 # Production (AMD GPU node, high quality)
 kubectl apply -k deploy/k3s/overlays/production/
+
+# NVIDIA GPU node (device plugin + runtimeclass "nvidia" required)
+kubectl apply -k deploy/k3s/overlays/gpu/
 ```
 
 ## Architecture

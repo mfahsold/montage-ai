@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+patches:
+  # GPU-enabled render Job
+  - path: patch-job-gpu.yaml
+  # Optional: GPU for web UI (usually not required, kept minimal)
+  - path: patch-web-gpu.yaml
+
+images:
+  # Override to your registry if needed
+  - name: ghcr.io/mfahsold/montage-ai
+    newTag: latest
