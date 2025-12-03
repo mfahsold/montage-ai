@@ -1864,17 +1864,33 @@ def upscale_clip(input_path, output_path):
         print(f"   ⚠️ cgpu upscaling failed, falling back to local methods...")
     
     # Priority 2: Local Vulkan GPU
+    # NOTE: realesrgan-ncnn-vulkan requires a proper Vulkan GPU with compute support.
+    # Software renderers (llvmpipe) and GPUs without compute (Adreno) will crash.
     real_esrgan_available = False
     
     try:
-        # Quick test: Try to initialize Vulkan with realesrgan
+        # Test: Try to run realesrgan with a tiny test to verify Vulkan works
+        # The -i /dev/null test only checks if the binary starts, not Vulkan compute
         test_result = subprocess.run(
             ["realesrgan-ncnn-vulkan", "-i", "/dev/null", "-o", "/dev/null"],
             capture_output=True, timeout=5
         )
         # If it doesn't crash immediately with "invalid gpu", Vulkan might work
         if b"invalid gpu" not in test_result.stderr:
-            real_esrgan_available = True
+            # Additional check: Verify we have a real GPU, not software rendering
+            vulkan_info = subprocess.run(["vulkaninfo", "--summary"], capture_output=True, text=True, timeout=5)
+            if vulkan_info.returncode == 0:
+                output = vulkan_info.stdout.lower()
+                # Skip software renderers (llvmpipe, lavapipe, swiftshader)
+                if any(sw in output for sw in ["llvmpipe", "lavapipe", "swiftshader", "cpu"]):
+                    print(f"   ⚠️ Detected software Vulkan renderer - skipping Real-ESRGAN")
+                    real_esrgan_available = False
+                # Skip GPUs without compute shader support (Adreno, Mali on some devices)
+                elif "adreno" in output:
+                    print(f"   ⚠️ Detected Qualcomm Adreno GPU - no compute shader support")
+                    real_esrgan_available = False
+                else:
+                    real_esrgan_available = True
     except Exception:
         pass
     
@@ -1896,10 +1912,46 @@ def _upscale_with_realesrgan(input_path, output_path):
     os.makedirs(out_frame_dir, exist_ok=True)
     
     try:
-        # 1. Extract frames - Use -vf null to trigger auto-rotation from metadata
-        # Without a filter, ffmpeg does NOT apply rotation for portrait videos
-        subprocess.run(["ffmpeg", "-i", input_path, "-vf", "null", "-q:v", "2", f"{frame_dir}/frame_%08d.jpg"], 
-                      check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # 1. Check for rotation metadata and build appropriate filter
+        # FFmpeg does NOT auto-apply rotation when extracting to images without a filter
+        import json
+        probe_cmd = [
+            "ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=width,height:stream_side_data=rotation",
+            "-of", "json", input_path
+        ]
+        probe_output = subprocess.check_output(probe_cmd).decode().strip()
+        probe_data = json.loads(probe_output)
+        stream = probe_data.get('streams', [{}])[0]
+        
+        # Check for rotation in side_data
+        rotation = 0
+        for side_data in stream.get('side_data_list', []):
+            if 'rotation' in side_data:
+                rotation = int(side_data['rotation'])
+                break
+        
+        # Build filter based on rotation
+        # transpose=1: 90° CW, transpose=2: 90° CCW, vflip+hflip: 180°
+        if rotation == -90 or rotation == 270:
+            vf_filter = "transpose=1"  # 90° CW to correct -90° (270°) rotation
+            print(f"   🔄 Detected {rotation}° rotation, applying transpose=1")
+        elif rotation == 90 or rotation == -270:
+            vf_filter = "transpose=2"  # 90° CCW to correct 90° rotation  
+            print(f"   🔄 Detected {rotation}° rotation, applying transpose=2")
+        elif rotation == 180 or rotation == -180:
+            vf_filter = "vflip,hflip"  # 180° flip
+            print(f"   🔄 Detected {rotation}° rotation, applying vflip,hflip")
+        else:
+            vf_filter = None  # No rotation needed
+        
+        # 2. Extract frames with rotation correction if needed
+        extract_cmd = ["ffmpeg", "-i", input_path]
+        if vf_filter:
+            extract_cmd += ["-vf", vf_filter]
+        extract_cmd += ["-q:v", "2", f"{frame_dir}/frame_%08d.jpg"]
+        
+        subprocess.run(extract_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # 2. Upscale frames with Real-ESRGAN (GPU 0)
         upscale_cmd = [

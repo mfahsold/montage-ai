@@ -11,9 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Portrait Video Distortion** - Fixed upscaled portrait videos being stretched/distorted
   - FFmpeg frame extraction was ignoring rotation metadata from phone videos
-  - Added `-vf null` filter to trigger auto-rotation during frame extraction
-  - FFmpeg upscaler now correctly detects and handles 90°/270° rotation metadata
+  - Added explicit transpose filter based on rotation metadata (not `-vf null` which does nothing)
+  - Now correctly reads rotation from ffprobe and applies transpose=1/2 or vflip,hflip
   - Affects: cgpu cloud upscaler, local Real-ESRGAN, FFmpeg fallback upscaler
+
+- **Real-ESRGAN SIGSEGV Crash** - Fixed crash when no real GPU available
+  - realesrgan-ncnn-vulkan crashes with SIGSEGV on software renderers (llvmpipe)
+  - Now checks for llvmpipe/lavapipe/swiftshader and skips Real-ESRGAN
+  - Also detects Qualcomm Adreno (no compute shader support)
+  - Falls back gracefully to FFmpeg Lanczos upscaling
 
 - **cgpu Download Reliability** - Improved chunked download with retry logic
   - Increased chunk timeout from 180s to 300s

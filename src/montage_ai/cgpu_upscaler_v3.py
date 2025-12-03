@@ -221,14 +221,33 @@ try:
     fps_str = fps_cmd.stdout.strip()
     fps = eval(fps_str) if "/" in fps_str else float(fps_str or "30")
     
-    # Extract frames - IMPORTANT: Use -vf to trigger auto-rotation from metadata
-    # Without a filter, ffmpeg does NOT apply rotation metadata, causing portrait videos
-    # (shot on phones with rotation=90/270) to be extracted in wrong orientation
-    # The "null" filter forces filter graph processing which applies auto-rotation
-    subprocess.run(["ffmpeg", "-y", "-i", f"{{WORK_DIR}}/input.mp4", 
-        "-vf", "null",
-        "-q:v", "2",
-        f"{{WORK_DIR}}/frames/f%06d.jpg"], capture_output=True, check=True)
+    # Check for rotation metadata in input video
+    # Portrait videos (phones) have rotation=90/270 that must be applied during extraction
+    rot_cmd = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream_side_data=rotation", "-of", "default=nw=1:nk=1",
+        f"{{WORK_DIR}}/input.mp4"], capture_output=True, text=True)
+    rotation = int(rot_cmd.stdout.strip() or "0")
+    
+    # Build filter for rotation correction (must apply BEFORE upscaling!)
+    # transpose=1: 90° CW, transpose=2: 90° CCW, vflip+hflip: 180°
+    if rotation == -90 or rotation == 270:
+        vf_filter = "transpose=1"  # 90° CW to correct -90° (270°) rotation
+        print(f"🔄 Detected {{rotation}}° rotation, applying transpose=1")
+    elif rotation == 90 or rotation == -270:
+        vf_filter = "transpose=2"  # 90° CCW to correct 90° rotation
+        print(f"🔄 Detected {{rotation}}° rotation, applying transpose=2")
+    elif rotation == 180 or rotation == -180:
+        vf_filter = "vflip,hflip"  # 180° flip
+        print(f"🔄 Detected {{rotation}}° rotation, applying vflip,hflip")
+    else:
+        vf_filter = None  # No rotation needed
+    
+    # Extract frames with rotation correction
+    extract_cmd = ["ffmpeg", "-y", "-i", f"{{WORK_DIR}}/input.mp4"]
+    if vf_filter:
+        extract_cmd += ["-vf", vf_filter]
+    extract_cmd += ["-q:v", "2", f"{{WORK_DIR}}/frames/f%06d.jpg"]
+    subprocess.run(extract_cmd, capture_output=True, check=True)
     
     frames = sorted(glob.glob(f"{{WORK_DIR}}/frames/*.jpg"))
     mark("FRAMES_EXTRACTED", f"{{len(frames)}} frames @ {{fps}} fps")
