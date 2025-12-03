@@ -277,16 +277,75 @@ Beat Timeline + Clip Database + Style Parameters
 ```text
 Clip Sequence
       │
-      ├──▶ Optional: Stabilize
+      ├──▶ Crop/Scale to STANDARD_WIDTH x STANDARD_HEIGHT (1080x1920)
       │
-      ├──▶ Optional: Upscale
+      ├──▶ Optional: Stabilize (vidstab 2-pass)
       │
-      ├──▶ Color Grade
+      ├──▶ Optional: Upscale (Real-ESRGAN)
       │
-      ├──▶ Concatenate
+      ├──▶ Color Grade (20+ presets)
       │
-      └──▶ FFmpeg Encode ──▶ /data/output/montage.mp4
+      └──▶ Progressive Renderer
+            │
+            ├──▶ Batch clips (default 25)
+            ├──▶ Write segments to disk
+            ├──▶ FFmpeg concat (-c copy)
+            ├──▶ Optional: xfade transitions
+            └──▶ Audio mix + Logo overlay
+                    │
+                    ▼
+            /data/output/montage.mp4
 ```
+
+---
+
+## Memory-Efficient Progressive Rendering
+
+The system uses `ProgressiveRenderer` (in `segment_writer.py`) to prevent OOM crashes.
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    Progressive Renderer                      │
+│                                                              │
+│  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐     │
+│  │ Clip 1  │   │ Clip 2  │   │ ...     │   │ Clip 25 │     │
+│  └────┬────┘   └────┬────┘   └────┬────┘   └────┬────┘     │
+│       │             │             │             │            │
+│       └─────────────┴─────────────┴─────────────┘            │
+│                         │                                    │
+│                         ▼                                    │
+│              ┌──────────────────┐                           │
+│              │ flush_batch()    │                           │
+│              │ - Normalize      │                           │
+│              │ - Write segment  │                           │
+│              │ - GC + cleanup   │                           │
+│              └────────┬─────────┘                           │
+│                       │                                      │
+│                       ▼                                      │
+│              segment_0001.mp4 (disk)                        │
+│                                                              │
+│  ... repeat for all batches ...                             │
+│                                                              │
+│              ┌──────────────────┐                           │
+│              │ finalize()       │                           │
+│              │ - FFmpeg concat  │                           │
+│              │ - Audio mix      │                           │
+│              │ - Logo overlay   │                           │
+│              └────────┬─────────┘                           │
+│                       │                                      │
+│                       ▼                                      │
+│              output.mp4                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Constants (DRY):**
+| Constant           | Value   | Purpose                      |
+| ------------------ | ------- | ---------------------------- |
+| `STANDARD_WIDTH`   | 1080    | Target width (9:16 vertical) |
+| `STANDARD_HEIGHT`  | 1920    | Target height                |
+| `STANDARD_FPS`     | 30      | Frame rate                   |
+| `STANDARD_PIX_FMT` | yuv420p | Pixel format                 |
+| `STANDARD_PROFILE` | high    | H.264 profile                |
 
 ---
 

@@ -84,10 +84,17 @@ except ImportError:
 
 # Import Segment Writer for progressive rendering
 try:
-    from .segment_writer import SegmentWriter, ProgressiveRenderer
+    from .segment_writer import (
+        SegmentWriter, ProgressiveRenderer,
+        STANDARD_WIDTH, STANDARD_HEIGHT, STANDARD_FPS
+    )
     SEGMENT_WRITER_AVAILABLE = True
 except ImportError:
     SEGMENT_WRITER_AVAILABLE = False
+    # Fallback constants if segment_writer not available
+    STANDARD_WIDTH = 1080
+    STANDARD_HEIGHT = 1920
+    STANDARD_FPS = 30
     print("⚠️ Segment writer not available")
 
 VERSION = "0.2.0"
@@ -1650,29 +1657,36 @@ def create_montage(variant_id=1):
         print(f"  📏 Video dimensions: {w}x{h}")
         
         # Resize/Crop logic for 9:16 vertical video (preserving aspect ratio)
-        target_ratio = 9/16  # 0.5625
-        current_ratio = w/h
-        
+        # Uses STANDARD_WIDTH/HEIGHT from segment_writer for consistency
+        target_w, target_h = STANDARD_WIDTH, STANDARD_HEIGHT
+        target_ratio = target_w / target_h  # 0.5625
+        current_ratio = w / h
+
         print(f"  📏 Current ratio: {current_ratio:.3f}, target: {target_ratio:.3f}")
-        
+
         if current_ratio > target_ratio + 0.01:  # Add tolerance for floating point
             # Video is wider than 9:16 - crop width to fit
-            new_w = int(h * target_ratio)
+            # Use round() instead of int() to avoid accumulating rounding errors
+            new_w = round(h * target_ratio)
             crop_x = (w - new_w) // 2
             print(f"  ✂️ Cropping width: {w} -> {new_w} (crop_x={crop_x})")
             v_clip = v_clip.crop(x1=crop_x, x2=crop_x + new_w)
         elif current_ratio < target_ratio - 0.01:
             # Video is taller than 9:16 - crop height to fit
-            new_h = int(w / target_ratio)
+            new_h = round(w / target_ratio)
             crop_y = (h - new_h) // 2
             print(f"  ✂️ Cropping height: {h} -> {new_h} (crop_y={crop_y})")
             v_clip = v_clip.crop(y1=crop_y, y2=crop_y + new_h)
         # else: already ~9:16, no crop needed
-            
-        # Scale to 1080x1920 (standard vertical HD)
-        # This preserves aspect ratio since we already cropped to 9:16
-        v_clip = v_clip.resize(height=1920)
-        print(f"  📐 Final size: {v_clip.size}")
+
+        # Scale to exact target dimensions (1080x1920 for vertical HD)
+        # Only resize if dimensions don't match to avoid unnecessary quality loss
+        current_size = v_clip.size
+        if current_size != (target_w, target_h):
+            v_clip = v_clip.resize(newsize=(target_w, target_h))
+            print(f"  📐 Resized: {current_size} → {v_clip.size}")
+        else:
+            print(f"  📐 Final size: {v_clip.size} (no resize needed)")
         
         # Ensure dimensions are even (required by h264 encoder)
         clip_w, clip_h = v_clip.size

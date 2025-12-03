@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Centralized Standard Constants (DRY)** - Single source of truth for video parameters
+  - `STANDARD_WIDTH=1080`, `STANDARD_HEIGHT=1920` defined in `segment_writer.py`
+  - Imported into `editor.py` - no more hardcoded values scattered across codebase
+  - All scale/crop operations use shared constants for consistency
+
+- **Audio Duration Trimming** - Control audio length in final output
+  - `audio_duration` parameter in `concatenate_segments()` and `finalize()`
+  - Uses FFmpeg `atrim` filter to trim audio to desired length
+  - Useful for matching video length or extracting specific music sections
+
+- **Enhanced Temp File Cleanup** - Prevents /tmp disk space exhaustion
+  - `cleanup_all()` now removes `clip_*_*.mp4` and `*_norm.mp4` temp files
+  - Automatically cleans up after progressive render completes
+  - Logs each cleaned file for transparency
+
 - **ENV Control for Crossfades** - CLI/ENV override for xfade behavior
   - `ENABLE_XFADE=""` (default) = auto from style, `"true"` = force on, `"false"` = force off
   - `XFADE_DURATION=0.3` configurable crossfade duration in seconds

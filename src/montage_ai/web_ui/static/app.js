@@ -161,6 +161,11 @@ async function createJob() {
     const exportTimeline = document.getElementById('exportTimeline').checked;
     const generateProxies = document.getElementById('generateProxies').checked;
 
+    // NEW: Video length and music controls
+    const targetDuration = parseFloat(document.getElementById('targetDuration').value) || null;
+    const musicStart = parseFloat(document.getElementById('musicStart').value) || 0;
+    const musicEnd = parseFloat(document.getElementById('musicEnd').value) || null;
+
     const jobData = {
         style,
         prompt,
@@ -169,7 +174,10 @@ async function createJob() {
         enhance,
         cgpu,
         export_timeline: exportTimeline,
-        generate_proxies: generateProxies
+        generate_proxies: generateProxies,
+        target_duration: targetDuration,
+        music_start: musicStart,
+        music_end: musicEnd
     };
 
     try {

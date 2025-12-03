@@ -16,7 +16,7 @@ from collections import deque
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
-VERSION = "0.1.1"
+VERSION = "0.3.0"
 
 # Paths
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))

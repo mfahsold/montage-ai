@@ -29,6 +29,8 @@ STANDARD_FPS = 30
 STANDARD_PIX_FMT = "yuv420p"
 STANDARD_PROFILE = "high"
 STANDARD_LEVEL = "4.1"
+STANDARD_WIDTH = 1080   # Target width for vertical HD (9:16)
+STANDARD_HEIGHT = 1920  # Target height for vertical HD (9:16)
 
 # Default crossfade duration in seconds
 DEFAULT_XFADE_DURATION = 0.3
@@ -115,9 +117,9 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
                           preset: str = "fast") -> bool:
     """
     Normalize a clip to standard parameters for concat compatibility.
-    
+
     Only re-encodes if necessary (params don't match).
-    
+
     Args:
         input_path: Source video
         output_path: Normalized output
@@ -125,15 +127,25 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
         target_pix_fmt: Target pixel format
         crf: Quality setting
         preset: Encoding speed preset
-        
+
     Returns:
         True if successful
     """
     try:
+        # Build filter chain: scale to standard resolution, normalize fps and pixel format
+        # scale with force_original_aspect_ratio=decrease ensures no cropping
+        # pad centers the video if aspect ratio doesn't match
+        vf_chain = (
+            f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,"
+            f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
+            f"fps={target_fps},"
+            f"format={target_pix_fmt}"
+        )
+
         cmd = [
             "ffmpeg", "-y",
             "-i", input_path,
-            "-vf", f"fps={target_fps},format={target_pix_fmt}",
+            "-vf", vf_chain,
             "-c:v", "libx264",
             "-profile:v", STANDARD_PROFILE,
             "-level", STANDARD_LEVEL,
@@ -144,10 +156,10 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
             "-movflags", "+faststart",
             output_path
         ]
-        
+
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         return result.returncode == 0
-        
+
     except Exception as e:
         print(f"   ❌ Normalization failed: {e}")
         return False
@@ -495,12 +507,16 @@ class SegmentWriter:
                         f.write(f"file '{escaped_path}'\n")
             
             # Re-encode with normalized parameters
+            # CRITICAL: Also scale to standard resolution to handle dimension mismatches
+            # This ensures all clips have identical dimensions before concat
+            vf_chain = f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,fps={STANDARD_FPS},format={STANDARD_PIX_FMT}"
+
             cmd = [
                 "ffmpeg", "-y",
                 "-f", "concat",
                 "-safe", "0",
                 "-i", concat_list_path,
-                "-vf", f"fps={STANDARD_FPS},format={STANDARD_PIX_FMT}",
+                "-vf", vf_chain,
                 "-c:v", "libx264",
                 "-profile:v", STANDARD_PROFILE,
                 "-level", STANDARD_LEVEL,
@@ -641,25 +657,27 @@ class SegmentWriter:
             # Fall back to regular concat
             return self.write_segment_ffmpeg(clip_paths, segment_index)
     
-    def concatenate_segments(self, 
+    def concatenate_segments(self,
                               output_path: str,
                               audio_path: Optional[str] = None,
                               audio_volume: float = 1.0,
+                              audio_duration: Optional[float] = None,
                               logo_path: Optional[str] = None,
                               logo_position: str = "top-right") -> bool:
         """
         Concatenate all segments into final output file using -c copy.
-        
+
         Uses stream copy for video (no re-encoding) and only encodes audio.
         Optional logo overlay as second pass.
-        
+
         Args:
             output_path: Final output video path
             audio_path: Optional audio track to mix
             audio_volume: Volume multiplier for audio
+            audio_duration: Optional duration to trim audio to (in seconds)
             logo_path: Optional logo image to overlay
             logo_position: Logo position (top-right, top-left, bottom-right, bottom-left)
-            
+
         Returns:
             True if successful
         """
@@ -689,6 +707,15 @@ class SegmentWriter:
         try:
             if audio_path and os.path.exists(audio_path):
                 # Concatenate video (copy) + encode audio only
+                # Build audio filter chain
+                af_filters = [f"volume={audio_volume}"]
+
+                # Add trim filter if audio_duration is specified
+                if audio_duration is not None and audio_duration > 0:
+                    af_filters.insert(0, f"atrim=0:{audio_duration}")
+
+                af_chain = ",".join(af_filters)
+
                 cmd = [
                     "ffmpeg", "-y",
                     "-f", "concat",
@@ -700,7 +727,7 @@ class SegmentWriter:
                     "-c:v", "copy",  # Stream copy - no re-encode!
                     "-c:a", "aac",
                     "-b:a", "192k",
-                    "-af", f"volume={audio_volume}",
+                    "-af", af_chain,
                     "-shortest",
                     "-movflags", "+faststart",
                     actual_output
@@ -828,9 +855,9 @@ class SegmentWriter:
         return removed
     
     def cleanup_all(self) -> None:
-        """Remove all temp files including output directory."""
+        """Remove all temp files including output directory and temporary clip files."""
         self.cleanup_segments()
-        
+
         # Remove any remaining files in output dir
         try:
             for f in self.output_dir.iterdir():
@@ -838,6 +865,30 @@ class SegmentWriter:
                     f.unlink()
         except Exception:
             pass
+
+        # CRITICAL: Also cleanup temporary clip files (clip_*.mp4 and *_norm.mp4)
+        # These are created in TEMP_DIR and can accumulate during long runs
+        try:
+            from pathlib import Path
+            temp_dir = Path(os.environ.get("TEMP_DIR", "/tmp"))
+
+            # Find and remove clip files matching pattern clip_*_####.mp4
+            for clip_file in temp_dir.glob("clip_*_*.mp4"):
+                try:
+                    clip_file.unlink()
+                    print(f"   🧹 Cleaned up temp clip: {clip_file.name}")
+                except Exception:
+                    pass
+
+            # Find and remove normalized files (*_norm.mp4)
+            for norm_file in temp_dir.glob("*_norm.mp4"):
+                try:
+                    norm_file.unlink()
+                    print(f"   🧹 Cleaned up normalized clip: {norm_file.name}")
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"   ⚠️ Temp file cleanup warning: {e}")
     
     def _get_video_duration(self, video_path: str) -> float:
         """Get video duration using ffprobe."""
@@ -1044,32 +1095,34 @@ class ProgressiveRenderer:
     def _normalize_batch_clips(self) -> None:
         """
         Normalize all clips in current batch to ensure stream compatibility.
-        
+
         Only called when NORMALIZE_CLIPS is enabled. Converts clips to
-        standard fps/pix_fmt/profile for concat demuxer compatibility.
+        standard fps/pix_fmt/profile/dimensions for concat demuxer compatibility.
         """
         print(f"   🔄 Normalizing {len(self.current_batch_paths)} clips for compatibility...")
-        
+
         normalized_paths = []
-        for i, clip_path in enumerate(self.current_batch_paths):
+        for clip_path in self.current_batch_paths:
             # Check if clip needs normalization
             params = ffprobe_stream_params(clip_path)
-            
+
             needs_normalize = (
                 params is None or
                 abs(params.fps - STANDARD_FPS) >= 0.1 or
-                params.pix_fmt != STANDARD_PIX_FMT
+                params.pix_fmt != STANDARD_PIX_FMT or
+                params.width != STANDARD_WIDTH or
+                params.height != STANDARD_HEIGHT
             )
-            
+
             if needs_normalize:
                 # Create normalized version
                 normalized_path = clip_path.replace('.mp4', '_norm.mp4')
                 success = normalize_clip_ffmpeg(
-                    clip_path, 
+                    clip_path,
                     normalized_path,
                     crf=self.segment_writer.ffmpeg_crf
                 )
-                
+
                 if success:
                     # Remove original, use normalized
                     try:
@@ -1082,7 +1135,7 @@ class ProgressiveRenderer:
                     normalized_paths.append(clip_path)
             else:
                 normalized_paths.append(clip_path)
-        
+
         self.current_batch_paths = normalized_paths
         print(f"   ✅ Normalization complete")
     
@@ -1112,11 +1165,12 @@ class ProgressiveRenderer:
         # Flush any remaining clips
         if self.current_batch_paths:
             self.flush_batch()
-        
-        # Concatenate all segments using FFmpeg (with optional logo)
+
+        # Concatenate all segments using FFmpeg (with optional logo and audio trimming)
         success = self.segment_writer.concatenate_segments(
             output_path,
             audio_path=audio_path,
+            audio_duration=audio_duration,
             logo_path=logo_path
         )
         

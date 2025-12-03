@@ -62,6 +62,24 @@
                 <small>Natural language instructions for AI Director</small>
             </div>
 
+            <!-- NEW: Video Length & Music Controls -->
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="targetDuration">Target Video Length (seconds)</label>
+                    <input type="number" id="targetDuration" placeholder="Auto" min="10" max="600">
+                    <small>Leave empty for automatic length based on music</small>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="musicStart">Music Start (seconds)</label>
+                    <input type="number" id="musicStart" placeholder="0" min="0" step="0.1" value="0">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="musicEnd">Music End (seconds)</label>
+                    <input type="number" id="musicEnd" placeholder="Full length" min="0" step="0.1">
+                    <small>Leave empty for full track</small>
+                </div>
+            </div>
+
             <div class="options-grid">
                 <label class="checkbox-label">
                     <input type="checkbox" id="enhance" checked>
