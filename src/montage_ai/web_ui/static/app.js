@@ -234,6 +234,13 @@ function renderJob(job) {
         'timeout': '⏱️'
     }[job.status] || '❓';
 
+    // View Details button for all jobs
+    const detailsButton = `
+        <button onclick="showJobDetails('${job.id}')" class="btn-details">
+            📋 View Details & Logs
+        </button>
+    `;
+
     // Progress bar for queued/running jobs
     let progressSection = '';
     if (job.status === 'queued') {
@@ -314,6 +321,9 @@ function renderJob(job) {
             ${completedInfo}
             ${downloads}
             ${errorSection}
+            <div style="margin-top: 1rem;">
+                ${detailsButton}
+            </div>
         </div>
     `;
 }
@@ -360,6 +370,165 @@ function stopPolling() {
         clearInterval(pollInterval);
         pollInterval = null;
     }
+}
+
+// =============================================================================
+// Job Details & Logs
+// =============================================================================
+
+async function showJobDetails(jobId) {
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Job ${jobId} - Details & Logs</h2>
+                <button onclick="closeModal()" class="btn-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Fetch job details
+    try {
+        const [jobResponse, logsResponse, instructionsResponse] = await Promise.all([
+            fetch(`${API_BASE}/jobs/${jobId}`),
+            fetch(`${API_BASE}/jobs/${jobId}/logs?lines=500`),
+            fetch(`${API_BASE}/jobs/${jobId}/creative-instructions`)
+        ]);
+
+        const jobData = await jobResponse.json();
+        const logsData = logsResponse.ok ? await logsResponse.json() : null;
+        const instructionsData = instructionsResponse.ok ? await instructionsResponse.json() : null;
+
+        // Render details
+        const modalBody = modal.querySelector('.modal-body');
+        modalBody.innerHTML = renderJobDetails(jobData, logsData, instructionsData);
+
+        // Auto-refresh logs for running jobs
+        if (jobData.status === 'running') {
+            const refreshInterval = setInterval(async () => {
+                const updatedLogs = await fetch(`${API_BASE}/jobs/${jobId}/logs?lines=500`);
+                if (updatedLogs.ok) {
+                    const data = await updatedLogs.json();
+                    const logsEl = document.getElementById('job-logs-content');
+                    if (logsEl) {
+                        logsEl.textContent = data.logs;
+                        logsEl.scrollTop = logsEl.scrollHeight; // Scroll to bottom
+                    }
+                }
+
+                // Stop refreshing if modal is closed or job completed
+                if (!document.querySelector('.modal-overlay')) {
+                    clearInterval(refreshInterval);
+                }
+            }, 3000);
+        }
+
+    } catch (error) {
+        console.error('Error loading job details:', error);
+        modal.querySelector('.modal-body').innerHTML = `
+            <div class="error-message">Failed to load job details: ${error.message}</div>
+        `;
+    }
+}
+
+function renderJobDetails(job, logs, instructions) {
+    let html = '<div class="job-details-tabs">';
+
+    // Creative Instructions Tab
+    if (instructions && instructions.creative_prompt) {
+        html += `
+            <div class="detail-section">
+                <h3>🎬 Creative Director Instructions</h3>
+                <div class="detail-card">
+                    <div class="detail-row">
+                        <strong>Prompt:</strong>
+                        <span>"${instructions.creative_prompt}"</span>
+                    </div>
+                    <div class="detail-row">
+                        <strong>Style:</strong>
+                        <span>${instructions.style}</span>
+                    </div>
+                    <div class="detail-row">
+                        <strong>Options:</strong>
+                        <span>${Object.entries(instructions.options)
+                            .filter(([_, v]) => v === true)
+                            .map(([k, _]) => k)
+                            .join(', ') || 'none'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Logs Tab
+    if (logs) {
+        const logsAvailable = logs.logs && logs.logs.length > 0;
+        html += `
+            <div class="detail-section">
+                <h3>📋 Processing Logs</h3>
+                ${logsAvailable ? `
+                    <div class="detail-info">
+                        Showing last ${logs.returned_lines} of ${logs.total_lines} lines
+                    </div>
+                    <pre id="job-logs-content" class="logs-viewer">${logs.logs}</pre>
+                    <button onclick="downloadLogs('${job.id}')" class="btn-secondary" style="margin-top: 0.5rem;">
+                        💾 Download Full Logs
+                    </button>
+                ` : `
+                    <div class="detail-info">No logs available yet. Job may not have started.</div>
+                `}
+            </div>
+        `;
+    }
+
+    // Job Status
+    html += `
+        <div class="detail-section">
+            <h3>ℹ️ Job Status</h3>
+            <div class="detail-card">
+                <div class="detail-row">
+                    <strong>Status:</strong>
+                    <span>${job.status}</span>
+                </div>
+                <div class="detail-row">
+                    <strong>Created:</strong>
+                    <span>${formatDate(job.created_at)}</span>
+                </div>
+                ${job.started_at ? `
+                    <div class="detail-row">
+                        <strong>Started:</strong>
+                        <span>${formatDate(job.started_at)}</span>
+                    </div>
+                ` : ''}
+                ${job.completed_at ? `
+                    <div class="detail-row">
+                        <strong>Completed:</strong>
+                        <span>${formatDate(job.completed_at)}</span>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+
+    html += '</div>';
+    return html;
+}
+
+function closeModal() {
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function downloadLogs(jobId) {
+    window.open(`${API_BASE}/jobs/${jobId}/logs?lines=10000`, '_blank');
 }
 
 // =============================================================================

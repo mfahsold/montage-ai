@@ -8,6 +8,9 @@ tqdm
 scenedetect[opencv]
 requests>=2.31.0
 
+# Color Matching (Shot-to-Shot consistency)
+color-matcher>=0.5.0
+
 # HTTP / API
 requests
 

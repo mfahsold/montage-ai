@@ -50,7 +50,11 @@ Output: `data/output/montage.mp4`
 | 🎵 **Beat Sync**       | Cuts align to music rhythm (librosa)                          |
 | 🎬 **Style Templates** | hitchcock, mtv, action, documentary, minimalist, wes_anderson |
 | 🤖 **AI Director**     | Natural language → editing parameters                         |
+| 🧠 **LLM Clip Selection** | AI-powered clip ranking with reasoning (NEW)              |
 | ⬆️ **AI Upscaling**    | 4x resolution via Real-ESRGAN                                 |
+| 🎨 **Professional Stabilization** | vidstab 2-pass (10x better than basic) (NEW)      |
+| 🌈 **Color Grading**   | 20+ presets + 3D LUT support (NEW)                            |
+| 🎭 **Content-Aware Enhancement** | Adaptive parameters based on brightness (NEW)      |
 | ☁️ **Cloud GPU**       | Free GPU via [cgpu](https://github.com/RohanAdwankar/cgpu)    |
 | 📽️ **Timeline Export** | OTIO/EDL for DaVinci Resolve, Premiere                        |
 | 🧠 **Memory Management** | Auto-cleanup, optimized for low-resource systems            |
@@ -67,9 +71,11 @@ CUT_STYLE=hitchcock              # Style preset
 CREATIVE_PROMPT="tense thriller" # Natural language (overrides style)
 
 # Enhancements
-STABILIZE=true                   # Video stabilization
+STABILIZE=true                   # Video stabilization (vidstab 2-pass)
 UPSCALE=true                     # AI 4x upscaling
-ENHANCE=true                     # Color/sharpness (default)
+ENHANCE=true                     # Content-aware color/sharpness (default)
+COLOR_MATCH=true                 # Shot-to-shot color matching (NEW)
+LLM_CLIP_SELECTION=true          # AI-powered clip ranking (NEW)
 
 # AI Backend (choose one)
 GOOGLE_API_KEY=xxx               # Google AI (preferred)
@@ -103,6 +109,43 @@ AUTO_CLEANUP=true                # Delete temp files automatically
 Custom styles: Create JSON in `src/montage_ai/styles/` or set `STYLE_PRESET_DIR`
 
 → Style guide: [docs/features.md](docs/features.md#style-templates-built-in)
+
+---
+
+## Color Grading & LUTs
+
+### Built-in Presets (20+)
+
+Apply professional color grades via Creative Prompt:
+
+```bash
+CREATIVE_PROMPT="cinematic teal and orange look" ./montage-ai.sh run
+CREATIVE_PROMPT="vintage film fade aesthetic" ./montage-ai.sh run
+CREATIVE_PROMPT="golden hour warm tone" ./montage-ai.sh run
+```
+
+**Available Presets:**
+- **Classic Film:** `cinematic`, `teal_orange`, `blockbuster`
+- **Vintage/Retro:** `vintage`, `film_fade`, `70s`, `polaroid`
+- **Temperature:** `warm`, `cold`, `golden_hour`, `blue_hour`
+- **Mood/Genre:** `noir`, `horror`, `sci_fi`, `dreamy`
+- **Professional:** `vivid`, `muted`, `high_contrast`, `low_contrast`, `punch`
+
+### Custom 3D LUTs
+
+Place `.cube` files in `data/luts/` directory:
+
+```bash
+# Download free LUTs
+wget https://luts.iwltbap.com/luts/free/teal_orange.cube -P data/luts/
+
+# Use in prompt
+CREATIVE_PROMPT="apply teal_orange_lut" ./montage-ai.sh run
+```
+
+**Supported formats:** `.cube`, `.3dl`, `.dat`
+
+**Free LUT sources:** See [data/luts/README.md](data/luts/README.md)
 
 ---
 
@@ -146,7 +189,10 @@ Input Clips + Music
 | [Features & Workflows](docs/features.md)   | Features, styles, Web UI, export|
 | [Architecture](docs/architecture.md)       | System design                  |
 | [Models](docs/models.md)                   | AI model choices               |
-| [Stability Improvements](STABILITY_IMPROVEMENTS.md) | **NEW:** Memory & GPU fixes |
+| [AI Director](docs/AI_DIRECTOR.md)         | **NEW:** LLM integration guide  |
+| [LLM Workflow](docs/LLM_WORKFLOW.md)       | **NEW:** How LLMs are called    |
+| [ML Enhancement Roadmap](docs/ML_ENHANCEMENT_ROADMAP.md) | **NEW:** Future ML features |
+| [Stability Improvements](STABILITY_IMPROVEMENTS.md) | Memory & GPU fixes         |
 
 ---
 

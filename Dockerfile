@@ -3,6 +3,7 @@ FROM continuumio/miniconda3
 # Install system dependencies
 # Add build tools for Real-ESRGAN-ncnn-vulkan
 # Add Node.js for cgpu (cloud GPU via Google Colab)
+# Add libvidstab for professional video stabilization
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
@@ -20,6 +21,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     wget \
     curl \
+    libvidstab-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20 LTS for cgpu

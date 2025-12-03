@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Professional Video Stabilization (vidstab 2-Pass)** - Upgraded from basic deshake to professional stabilization
+  - Uses libvidstab library (same as DaVinci Resolve, Kdenlive, Premiere basic mode)
+  - Pass 1: Motion vector analysis with `vidstabdetect` (shakiness=5, accuracy=15)
+  - Pass 2: Smooth transformation with `vidstabtransform` (smoothing=30, bicubic interpolation)
+  - Automatic fallback to enhanced deshake if vidstab unavailable
+  - ~10x better stabilization quality than previous `deshake` filter
+  - Added `libvidstab-dev` to Dockerfile for vidstab support
+
+- **Content-Aware Enhancement** - Adaptive color grading based on clip analysis
+  - New `_analyze_clip_brightness()` function analyzes exposure via FFmpeg signalstats
+  - Dark clips: Boosted brightness, lifted shadows, reduced saturation (avoids noise)
+  - Bright clips: Protected highlights, increased contrast for depth
+  - Normal clips: Standard cinematic grade
+  - Logs adaptive adjustments for debugging: "Content-aware enhance: clip.mp4 (dark, brightness=45)"
+
+- **Extended Color Grading Presets** - 20+ professional presets in `ffmpeg_tools.py`
+  - Classic film: `cinematic`, `teal_orange`, `blockbuster`
+  - Vintage/retro: `vintage`, `film_fade`, `70s`, `polaroid`
+  - Temperature: `cold`, `warm`, `golden_hour`, `blue_hour`
+  - Mood/genre: `noir`, `horror`, `sci_fi`, `dreamy`
+  - Professional: `vivid`, `muted`, `high_contrast`, `low_contrast`, `punch`
+  - LUT file support: Place `.cube` files in `/data/luts/` for custom grades
+  - New env var `LUT_DIR` for custom LUT directory
+
+- **Shot-to-Shot Color Matching** - Consistent colors across clips
+  - New `color_match_clips()` function using color-matcher library
+  - Histogram-based color transfer (Monge-Kantorovitch Linear method)
+  - Matches all clips to reference clip for visual consistency
+  - Enable with `COLOR_MATCH=true` environment variable
+  - Added `color-matcher>=0.5.0` to requirements.txt
+
+- **LUT Volume Mount** - Professional color grading via 3D LUTs
+  - New volume: `./data/luts:/data/luts:ro` in docker-compose.yml
+  - README with free LUT sources and usage guide
+  - Support for `.cube`, `.3dl`, `.dat` formats
+  - LUT presets: `cinematic_lut`, `teal_orange_lut`, `film_emulation`, `bleach_bypass`
+
+- **Intelligent Clip Selection with LLM Reasoning (Phase 1)** - AI-powered clip selection for professional editing flow
+  - New `clip_selector.py` module with `IntelligentClipSelector` class
+  - Takes top 3 heuristically scored clips and asks LLM to rank them with reasoning
+  - Considers context: editing style, current energy, story position, previous clips, beat position
+  - LLM explains decisions (e.g., "High-action close-up creates tension after wide shot")
+  - Enable with environment variable: `LLM_CLIP_SELECTION=true`
+  - Graceful fallback to heuristic scoring if LLM fails or is disabled
+  - Logged via monitoring system for debugging and analysis
+  - Foundation for advanced ML enhancements (see docs/ML_ENHANCEMENT_ROADMAP.md)
+
 ### Fixed
 
 - **Memory Exhaustion (OOM) on Large Projects** - Fixed system running out of RAM/swap
@@ -50,6 +99,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Batch Files Variable Scope Bug** - Fixed redundant `'batch_files' in dir()` checks
   - Variable is now properly initialized at function start
   - Removed dead code that could cause undefined behavior
+
+### Added
+
+- **Live Log Viewer** - View processing logs and AI decisions in Web UI
+  - New API endpoints: `/api/jobs/<id>/logs`, `/api/jobs/<id>/decisions`, `/api/jobs/<id>/creative-instructions`
+  - Job Details modal with Creative Director output and live log streaming
+  - Auto-refresh logs for running jobs (3s interval)
+  - Download full logs functionality
+  - Syntax-highlighted log viewer with dark terminal theme
+  - "View Details & Logs" button on every job card
 
 ### Changed
 

@@ -361,5 +361,88 @@ def api_list_styles():
     return jsonify({"styles": styles})
 
 
+@app.route('/api/jobs/<job_id>/logs', methods=['GET'])
+def api_get_job_logs(job_id):
+    """Get logs for a specific job."""
+    # Look for log file
+    log_file = OUTPUT_DIR / f"render_{job_id}.log"
+
+    # Also try without job_id prefix (legacy format)
+    if not log_file.exists():
+        log_file = OUTPUT_DIR / "render.log"
+
+    if not log_file.exists():
+        return jsonify({"error": "Log file not found"}), 404
+
+    # Read last N lines (default 500, max 2000)
+    try:
+        lines = int(request.args.get('lines', 500))
+        lines = min(lines, 2000)  # Cap at 2000 lines
+
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+            all_lines = f.readlines()
+            last_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+
+        return jsonify({
+            "job_id": job_id,
+            "log_file": str(log_file.name),
+            "total_lines": len(all_lines),
+            "returned_lines": len(last_lines),
+            "logs": ''.join(last_lines)
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to read log: {str(e)}"}), 500
+
+
+@app.route('/api/jobs/<job_id>/decisions', methods=['GET'])
+def api_get_job_decisions(job_id):
+    """Get AI decisions/analysis for a specific job."""
+    # Look for decisions JSON file (exported by monitoring.py)
+    decisions_file = OUTPUT_DIR / f"decisions_{job_id}.json"
+
+    if not decisions_file.exists():
+        # Check for alternative naming
+        decisions_file = OUTPUT_DIR / f"montage_{job_id}_decisions.json"
+
+    if not decisions_file.exists():
+        return jsonify({
+            "job_id": job_id,
+            "available": False,
+            "message": "No decisions file found. Set EXPORT_DECISIONS=true in environment."
+        })
+
+    try:
+        with open(decisions_file, 'r') as f:
+            decisions_data = json.load(f)
+
+        return jsonify({
+            "job_id": job_id,
+            "available": True,
+            **decisions_data
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to read decisions: {str(e)}"}), 500
+
+
+@app.route('/api/jobs/<job_id>/creative-instructions', methods=['GET'])
+def api_get_creative_instructions(job_id):
+    """Get Creative Director instructions for a job."""
+    job = get_job_status(job_id)
+
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+
+    # Extract creative prompt and style from job options
+    options = job.get("options", {})
+
+    return jsonify({
+        "job_id": job_id,
+        "creative_prompt": options.get("prompt", ""),
+        "style": job.get("style", "dynamic"),
+        "options": options,
+        "status": job.get("status")
+    })
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

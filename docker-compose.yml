@@ -22,12 +22,18 @@ services:
       - ./data/music:/data/music:ro
       - ./data/assets:/data/assets:ro
       - ./data/output:/data/output
+      # LUT files for professional color grading (optional)
+      - ./data/luts:/data/luts:ro
       # cgpu Cloud GPU credentials (cgpu binary is installed in Docker image)
       - ${HOME}/.config/cgpu:/root/.config/cgpu:ro
     environment:
       # Creative Direction
       - CREATIVE_PROMPT=${CREATIVE_PROMPT:-}
       - CUT_STYLE=${CUT_STYLE:-dynamic}
+      
+      # Color Grading / LUTs
+      - LUT_DIR=${LUT_DIR:-/data/luts}
+      - COLOR_MATCH=${COLOR_MATCH:-false}
       
       # AI / LLM Configuration (Ollama - local fallback)
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}

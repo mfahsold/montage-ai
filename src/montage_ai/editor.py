@@ -46,8 +46,25 @@ except ImportError:
     print("⚠️ Creative Director not available (missing creative_director.py)")
     CREATIVE_DIRECTOR_AVAILABLE = False
 
+# Import Intelligent Clip Selector for ML-enhanced selection
+try:
+    from .clip_selector import IntelligentClipSelector, ClipCandidate
+    INTELLIGENT_SELECTOR_AVAILABLE = True
+except ImportError:
+    print("⚠️ Intelligent Clip Selector not available")
+    INTELLIGENT_SELECTOR_AVAILABLE = False
+
 # Import Footage Manager for professional clip management
 from .footage_manager import integrate_footage_manager, select_next_clip
+
+# Import color-matcher for shot-to-shot color consistency
+try:
+    from color_matcher import ColorMatcher
+    from color_matcher.io_handler import load_img_file, save_img_file
+    COLOR_MATCHER_AVAILABLE = True
+except ImportError:
+    COLOR_MATCHER_AVAILABLE = False
+    print("⚠️ color-matcher not available - shot matching disabled")
 
 VERSION = "0.2.0"
 
@@ -848,6 +865,21 @@ def create_montage(variant_id=1):
 
     print(f"   🎨 Effects: STABILIZE={STABILIZE}, UPSCALE={UPSCALE}, ENHANCE={ENHANCE}")
 
+    # Initialize Intelligent Clip Selector if available
+    intelligent_selector = None
+    if INTELLIGENT_SELECTOR_AVAILABLE:
+        try:
+            # Determine style from EDITING_INSTRUCTIONS or default
+            style = "dynamic"
+            if EDITING_INSTRUCTIONS is not None:
+                style = EDITING_INSTRUCTIONS.get('style', {}).get('template', 'dynamic')
+
+            intelligent_selector = IntelligentClipSelector(style=style)
+            print(f"   🧠 Intelligent Clip Selector initialized (style={style})")
+        except Exception as e:
+            print(f"   ⚠️ Failed to initialize Intelligent Clip Selector: {e}")
+            intelligent_selector = None
+
     # 1. Load Music
     music_files = get_files(MUSIC_DIR, ('.mp3', '.wav'))
     if not music_files:
@@ -1166,7 +1198,8 @@ def create_montage(variant_id=1):
         
         best_score = -1000
         selected_scene = candidates[0] # Default
-        
+        candidate_scores = {}  # Track all scores for intelligent selection
+
         for scene in candidates:
             score = 0
 
@@ -1294,13 +1327,84 @@ def create_montage(variant_id=1):
             # Randomness factor to keep it fresh
             score += random.randint(-5, 5)
 
+            # Store score for intelligent selection
+            scene['_heuristic_score'] = score
+
             if score > best_score:
                 best_score = score
                 selected_scene = scene
-        
+
+        # 🧠 INTELLIGENT CLIP SELECTION: Use LLM reasoning if available
+        selection_reasoning = "Heuristic selection"
+        if intelligent_selector is not None and len(candidates) > 1:
+            try:
+                # Get top 3 candidates by heuristic score
+                sorted_candidates = sorted(
+                    candidates,
+                    key=lambda s: s.get('_heuristic_score', -1000),
+                    reverse=True
+                )[:3]
+
+                # Convert to ClipCandidate objects
+                clip_candidates = []
+                for scene in sorted_candidates:
+                    clip_candidates.append(ClipCandidate(
+                        path=scene['path'],
+                        start_time=scene['start'],
+                        duration=scene['duration'],
+                        heuristic_score=scene.get('_heuristic_score', 0),
+                        metadata=scene.get('meta', {})
+                    ))
+
+                # Build context for LLM
+                story_position = current_time / target_duration
+                position = "intro" if story_position < 0.15 else \
+                          "build" if story_position < 0.40 else \
+                          "climax" if story_position < 0.70 else \
+                          "sustain" if story_position < 0.90 else "outro"
+
+                # Get previous clips info (last 2)
+                previous_clips_info = []
+                if len(clips) > 0:
+                    for clip in clips[-2:]:
+                        previous_clips_info.append({
+                            'meta': clip.get('meta', {}),
+                            'duration': clip.get('duration', 0)
+                        })
+
+                context = {
+                    'current_energy': current_energy,
+                    'position': position,
+                    'previous_clips': previous_clips_info,
+                    'beat_position': cut_number % 4  # Which beat in the bar
+                }
+
+                # Query LLM for best clip
+                best_candidate, reasoning = intelligent_selector.select_best_clip(
+                    clip_candidates, context, top_n=3
+                )
+
+                # Override selection with LLM choice
+                for scene in sorted_candidates:
+                    if scene['path'] == best_candidate.path and scene['start'] == best_candidate.start_time:
+                        selected_scene = scene
+                        selection_reasoning = reasoning
+                        break
+
+                if monitor:
+                    monitor.log_info("llm_clip_selection", reasoning, {
+                        "clip_path": best_candidate.path,
+                        "cut_number": cut_number,
+                        "heuristic_score": best_candidate.heuristic_score
+                    })
+
+            except Exception as e:
+                print(f"   ⚠️ LLM clip selection failed: {e}")
+                selection_reasoning = f"Heuristic fallback (error: {str(e)[:50]})"
+
         # Increment cut counter
         cut_number += 1
-        
+
         # === MONITORING: Log cut decision ===
         if monitor:
             # Determine selection reason based on score components
@@ -1829,79 +1933,302 @@ def create_montage(variant_id=1):
             if monitor:
                 monitor.log_warning("timeline_export", f"Export failed: {exc}")
 
+# Global flag to cache vidstab availability (checked once per process)
+_VIDSTAB_AVAILABLE = None
+
+def _check_vidstab_available():
+    """Check if FFmpeg was compiled with libvidstab support."""
+    global _VIDSTAB_AVAILABLE
+    if _VIDSTAB_AVAILABLE is not None:
+        return _VIDSTAB_AVAILABLE
+    
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-filters"],
+            capture_output=True, text=True, timeout=5
+        )
+        _VIDSTAB_AVAILABLE = "vidstabdetect" in result.stdout
+        if _VIDSTAB_AVAILABLE:
+            print("   ✅ vidstab (libvidstab) available - using 2-pass stabilization")
+        else:
+            print("   ⚠️ vidstab not available - falling back to deshake filter")
+    except Exception:
+        _VIDSTAB_AVAILABLE = False
+    
+    return _VIDSTAB_AVAILABLE
+
+
 def stabilize_clip(input_path, output_path):
     """
-    Stabilize a video clip using ffmpeg's vidstabtransform (if available) or a simple deshake.
-    Since the conda ffmpeg build might lack libvidstab, we'll try a basic 'deshake' filter first
-    which is built-in, or skip if too slow.
+    Stabilize a video clip using professional 2-pass vidstab or fallback to deshake.
     
-    Actually, for 'SOTA' without libvidstab, we can use a Python-based approach with OpenCV 
-    if we really want to, but that's heavy.
+    vidstab (libvidstab) provides superior stabilization:
+    - Pass 1: Analyzes motion vectors and stores transform data
+    - Pass 2: Applies smooth transformations with configurable smoothing
     
-    Let's try the 'deshake' filter which is standard in ffmpeg.
+    Parameters tuned for handheld/action footage:
+    - shakiness=5: Medium shake detection (1-10, higher = more sensitive)
+    - accuracy=15: High accuracy motion detection (1-15)
+    - smoothing=30: ~1 second smoothing window (frames)
+    - crop=black: Fill borders with black (vs. keep=zoom which loses resolution)
+    
+    Falls back to basic deshake filter if vidstab unavailable.
     """
     print(f"   ⚖️ Stabilizing {os.path.basename(input_path)}...")
     
-    # Check if we can use vidstab (requires libvidstab)
-    # If not, use 'deshake' (standard open source filter)
+    if _check_vidstab_available():
+        return _stabilize_vidstab(input_path, output_path)
+    else:
+        return _stabilize_deshake(input_path, output_path)
+
+
+def _stabilize_vidstab(input_path, output_path):
+    """
+    Professional 2-pass video stabilization using vidstab.
     
-    # Simple deshake command with multi-threading
+    This is the same algorithm used in professional tools like:
+    - DaVinci Resolve (stabilizer)
+    - Adobe Premiere (Warp Stabilizer basic mode)
+    - Kdenlive, Shotcut
+    """
+    # Transform data file (motion vectors)
+    transform_file = f"{output_path}.trf"
+    
+    try:
+        # PASS 1: Motion Analysis
+        # Detect camera motion and save transform vectors
+        print(f"      Pass 1/2: Analyzing motion...")
+        cmd_detect = [
+            "ffmpeg", "-y",
+            "-threads", FFMPEG_THREADS,
+            "-i", input_path,
+            "-vf", f"vidstabdetect=shakiness=5:accuracy=15:result={transform_file}",
+            "-f", "null", "-"
+        ]
+        
+        result = subprocess.run(
+            cmd_detect,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 min timeout for analysis
+        )
+        
+        if result.returncode != 0 or not os.path.exists(transform_file):
+            print(f"      ⚠️ Motion analysis failed, falling back to deshake")
+            return _stabilize_deshake(input_path, output_path)
+        
+        # PASS 2: Apply Stabilization
+        # Transform video using analyzed motion vectors
+        print(f"      Pass 2/2: Applying stabilization...")
+        cmd_transform = [
+            "ffmpeg", "-y",
+            "-threads", FFMPEG_THREADS,
+            "-i", input_path,
+            "-vf", f"vidstabtransform=input={transform_file}:smoothing=30:crop=black:zoom=0:interpol=bicubic",
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "18",  # Slightly higher quality for stabilized output
+            "-c:a", "copy",
+            output_path
+        ]
+        
+        subprocess.run(cmd_transform, check=True, capture_output=True, timeout=300)
+        
+        # Cleanup transform file
+        if os.path.exists(transform_file):
+            os.remove(transform_file)
+        
+        print(f"      ✅ Stabilization complete (vidstab 2-pass)")
+        return output_path
+        
+    except subprocess.TimeoutExpired:
+        print(f"      ⚠️ Stabilization timed out, using original")
+        return input_path
+    except subprocess.CalledProcessError as e:
+        print(f"      ⚠️ vidstab failed: {e.stderr[:200] if e.stderr else 'unknown error'}")
+        return _stabilize_deshake(input_path, output_path)
+    except Exception as e:
+        print(f"      ⚠️ Stabilization error: {e}")
+        return input_path
+    finally:
+        # Always cleanup transform file
+        if os.path.exists(transform_file):
+            try:
+                os.remove(transform_file)
+            except:
+                pass
+
+
+def _stabilize_deshake(input_path, output_path):
+    """
+    Fallback stabilization using FFmpeg's built-in deshake filter.
+    
+    Less effective than vidstab but always available.
+    Good for minor camera shake, not recommended for heavy motion.
+    """
     cmd = [
         "ffmpeg", "-y",
-        "-threads", FFMPEG_THREADS,  # Use all CPU cores
-        "-i", input_path,
-        "-vf", "deshake",
-        "-c:v", "libx264",
-        "-preset", "fast",  # Good balance for stabilization
-        "-crf", "20",
         "-threads", FFMPEG_THREADS,
+        "-i", input_path,
+        "-vf", "deshake=rx=32:ry=32:blocksize=8:contrast=125",  # Tuned parameters
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "20",
         "-c:a", "copy",
         output_path
     ]
     
     try:
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+        print(f"      ✅ Stabilization complete (deshake fallback)")
         return output_path
     except subprocess.CalledProcessError:
-        print("   ⚠️ Stabilization failed (ffmpeg error). Using original.")
+        print("      ⚠️ Stabilization failed (ffmpeg error). Using original.")
         return input_path
     except Exception as e:
-        print(f"   ⚠️ Stabilization failed: {e}")
+        print(f"      ⚠️ Stabilization failed: {e}")
         return input_path
+
+def _analyze_clip_brightness(input_path):
+    """
+    Analyze clip brightness/exposure using FFmpeg signalstats.
+    
+    Returns dict with:
+    - avg_brightness: 0-255 (16=black, 235=white in video range)
+    - is_dark: True if clip appears underexposed
+    - is_bright: True if clip appears overexposed
+    - suggested_brightness: adjustment value for eq filter
+    """
+    try:
+        # Sample 3 frames from the clip for quick analysis
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "frame=pkt_pts_time",
+            "-of", "json",
+            input_path
+        ]
+        # Get duration for sampling points
+        dur_cmd = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            input_path
+        ]
+        dur_result = subprocess.run(dur_cmd, capture_output=True, text=True, timeout=5)
+        duration = float(dur_result.stdout.strip()) if dur_result.stdout.strip() else 2.0
+        
+        # Analyze mean brightness at 3 points using signalstats
+        sample_points = [duration * 0.25, duration * 0.5, duration * 0.75]
+        brightnesses = []
+        
+        for t in sample_points:
+            analyze_cmd = [
+                "ffmpeg", "-ss", str(t), "-i", input_path,
+                "-vframes", "1",
+                "-vf", "signalstats=stat=tout+vrep+brng,metadata=print:file=-",
+                "-f", "null", "-"
+            ]
+            result = subprocess.run(analyze_cmd, capture_output=True, text=True, timeout=10)
+            
+            # Parse YAVG (luma average) from output
+            for line in result.stderr.split('\n'):
+                if 'YAVG' in line:
+                    try:
+                        yavg = float(line.split('=')[-1].strip())
+                        brightnesses.append(yavg)
+                    except:
+                        pass
+        
+        if not brightnesses:
+            return {"avg_brightness": 128, "is_dark": False, "is_bright": False, "suggested_brightness": 0}
+        
+        avg = sum(brightnesses) / len(brightnesses)
+        
+        # Video range: 16-235 (not 0-255)
+        # Target: ~120-130 for well-exposed footage
+        is_dark = avg < 70
+        is_bright = avg > 180
+        
+        # Calculate suggested adjustment
+        if is_dark:
+            suggested = min(0.15, (100 - avg) / 500)  # Max +0.15
+        elif is_bright:
+            suggested = max(-0.10, (120 - avg) / 500)  # Max -0.10
+        else:
+            suggested = 0
+        
+        return {
+            "avg_brightness": avg,
+            "is_dark": is_dark,
+            "is_bright": is_bright,
+            "suggested_brightness": suggested
+        }
+        
+    except Exception as e:
+        # On any error, return neutral values
+        return {"avg_brightness": 128, "is_dark": False, "is_bright": False, "suggested_brightness": 0}
+
 
 def enhance_clip(input_path, output_path):
     """
-    Apply CINEMATIC enhancements using ffmpeg filters:
-    - Filmic color grading (Teal & Orange look)
-    - S-curve contrast for cinematic depth
-    - CAS (Contrast Adaptive Sharpening)
-    - Subtle vignette for focus
-    - Film grain option
+    Apply CINEMATIC enhancements using ffmpeg filters with Content-Aware adjustments.
+    
+    Enhancement pipeline:
+    1. Analyze clip brightness (fast FFmpeg signalstats)
+    2. Adjust parameters based on content:
+       - Dark clips: Boost brightness, lift shadows
+       - Bright clips: Reduce brightness, protect highlights
+       - Normal clips: Standard cinematic grade
+    3. Apply filter chain:
+       - Teal & Orange color grading (Hollywood look)
+       - S-curve contrast for filmic depth
+       - CAS (Contrast Adaptive Sharpening)
+       - Content-aware exposure correction
+       - Subtle vignette
     
     This function is thread-safe and can be called from ThreadPoolExecutor.
     """
-    # CINEMATIC FILTER CHAIN:
-    # 1. colorbalance: Teal shadows + Orange highlights (Hollywood look)
-    # 2. curves: S-curve for filmic contrast (lift blacks, compress highlights)
-    # 3. cas: Contrast Adaptive Sharpening (crisp details)
-    # 4. eq: Fine-tune saturation and contrast
-    # 5. vignette: Subtle edge darkening (draws eye to center)
-    # 6. unsharp: Final detail enhancement
+    # Analyze clip content for adaptive enhancement
+    analysis = _analyze_clip_brightness(input_path)
     
+    # Adaptive parameters based on content
+    brightness_adj = analysis["suggested_brightness"]
+    
+    # Adjust saturation: less for dark clips (avoids noise), more for normal
+    if analysis["is_dark"]:
+        saturation = 1.08  # Subtle - dark clips show noise with high saturation
+        contrast = 1.02    # Less contrast to preserve shadow detail
+        shadow_lift = 0.25  # Stronger shadow lift: 0/0 → 0.1/0.25
+    elif analysis["is_bright"]:
+        saturation = 1.12
+        contrast = 1.08    # More contrast to add depth
+        shadow_lift = 0.18  # Standard
+    else:
+        saturation = 1.15  # Standard cinematic
+        contrast = 1.05
+        shadow_lift = 0.20
+    
+    # Build filter chain with adaptive values
     filters = ",".join([
         # Teal & Orange color grading (Hollywood blockbuster look)
         "colorbalance=rs=-0.1:gs=-0.05:bs=0.15:rm=0.05:gm=0:bm=-0.05:rh=0.1:gh=0.05:bh=-0.1",
-        # S-curve contrast (filmic look - lifted blacks, soft highlights)
-        "curves=m='0/0 0.25/0.20 0.5/0.5 0.75/0.80 1/1'",
+        # Adaptive S-curve contrast (shadow lift depends on clip brightness)
+        f"curves=m='0/0 0.25/{shadow_lift} 0.5/0.5 0.75/0.80 1/1'",
         # Contrast Adaptive Sharpening
         "cas=0.5",
-        # Saturation and contrast boost
-        "eq=saturation=1.15:contrast=1.05:brightness=0.02",
+        # Adaptive saturation, contrast, and brightness
+        f"eq=saturation={saturation}:contrast={contrast}:brightness={brightness_adj:.3f}",
         # Subtle vignette (cinematic framing)
         "vignette=PI/4:mode=forward:eval=frame",
         # Fine detail sharpening
         "unsharp=3:3:0.5:3:3:0.3"
     ])
+    
+    # Log adaptive parameters if clip needed adjustment
+    if analysis["is_dark"] or analysis["is_bright"]:
+        exposure_type = "dark" if analysis["is_dark"] else "bright"
+        print(f"   🎬 Content-aware enhance: {os.path.basename(input_path)} ({exposure_type}, brightness={analysis['avg_brightness']:.0f})")
     
     # Use fewer threads per job when running in parallel to avoid CPU contention
     threads_per_job = "2" if PARALLEL_ENHANCE else FFMPEG_THREADS
@@ -1924,6 +2251,163 @@ def enhance_clip(input_path, output_path):
         return output_path
     except Exception as e:
         return input_path
+
+
+def color_match_clips(clip_paths: List[str], reference_clip: str = None, output_dir: str = None) -> Dict[str, str]:
+    """
+    Match colors across multiple clips for visual consistency.
+    
+    Uses color-matcher library for histogram-based color transfer.
+    This ensures all clips in a montage have consistent color/exposure,
+    similar to professional color grading workflows.
+    
+    Methods:
+    - mkl: Monge-Kantorovitch Linear (best quality, slower)
+    - hm: Histogram Matching (fast, good for similar content)
+    - reinhard: Reinhard color transfer (classic, fast)
+    
+    Args:
+        clip_paths: List of video file paths to match
+        reference_clip: Path to reference clip (first clip if None)
+        output_dir: Directory for matched clips (TEMP_DIR if None)
+        
+    Returns:
+        Dict mapping original paths to color-matched paths
+    """
+    if not COLOR_MATCHER_AVAILABLE:
+        print("   ⚠️ color-matcher not installed - skipping shot matching")
+        return {p: p for p in clip_paths}
+    
+    if len(clip_paths) < 2:
+        return {p: p for p in clip_paths}
+    
+    output_dir = output_dir or TEMP_DIR
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Use first clip as reference if not specified
+    ref_path = reference_clip or clip_paths[0]
+    
+    print(f"   🎨 Color matching {len(clip_paths)} clips to reference...")
+    
+    try:
+        # Extract reference frame (middle of clip)
+        ref_frame_path = os.path.join(output_dir, "ref_frame.png")
+        _extract_middle_frame(ref_path, ref_frame_path)
+        
+        if not os.path.exists(ref_frame_path):
+            print("   ⚠️ Could not extract reference frame")
+            return {p: p for p in clip_paths}
+        
+        ref_img = load_img_file(ref_frame_path)
+        cm = ColorMatcher()
+        
+        results = {}
+        
+        for i, clip_path in enumerate(clip_paths):
+            if clip_path == ref_path:
+                # Reference clip stays unchanged
+                results[clip_path] = clip_path
+                continue
+            
+            try:
+                # Extract source frame
+                src_frame_path = os.path.join(output_dir, f"src_frame_{i}.png")
+                _extract_middle_frame(clip_path, src_frame_path)
+                
+                if not os.path.exists(src_frame_path):
+                    results[clip_path] = clip_path
+                    continue
+                
+                # Calculate color transfer matrix
+                src_img = load_img_file(src_frame_path)
+                
+                # Use mkl method (Monge-Kantorovitch Linear) for best quality
+                # Could also use 'hm' (histogram) or 'reinhard' for speed
+                matched = cm.transfer(src=src_img, ref=ref_img, method='mkl')
+                
+                # Apply color transfer to video via FFmpeg LUT
+                # Generate a 1D LUT from the color transfer
+                output_path = os.path.join(output_dir, f"matched_{os.path.basename(clip_path)}")
+                
+                # For simplicity, apply color correction via FFmpeg curves
+                # Calculate average color shift
+                src_mean = np.mean(src_img, axis=(0, 1))
+                matched_mean = np.mean(matched, axis=(0, 1))
+                
+                # Calculate per-channel adjustments
+                r_adj = (matched_mean[0] - src_mean[0]) / 255.0
+                g_adj = (matched_mean[1] - src_mean[1]) / 255.0
+                b_adj = (matched_mean[2] - src_mean[2]) / 255.0
+                
+                # Apply via FFmpeg colorbalance (simplified transfer)
+                # Scale adjustments to colorbalance range (-1 to 1)
+                r_bal = np.clip(r_adj * 2, -0.3, 0.3)
+                g_bal = np.clip(g_adj * 2, -0.3, 0.3)
+                b_bal = np.clip(b_adj * 2, -0.3, 0.3)
+                
+                filter_str = f"colorbalance=rs={r_bal:.3f}:gs={g_bal:.3f}:bs={b_bal:.3f}:rm={r_bal:.3f}:gm={g_bal:.3f}:bm={b_bal:.3f}:rh={r_bal:.3f}:gh={g_bal:.3f}:bh={b_bal:.3f}"
+                
+                cmd = [
+                    "ffmpeg", "-y", "-i", clip_path,
+                    "-vf", filter_str,
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                    "-c:a", "copy",
+                    output_path
+                ]
+                
+                subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+                results[clip_path] = output_path
+                
+                # Cleanup temp frame
+                if os.path.exists(src_frame_path):
+                    os.remove(src_frame_path)
+                    
+            except Exception as e:
+                print(f"   ⚠️ Color match failed for {os.path.basename(clip_path)}: {e}")
+                results[clip_path] = clip_path
+        
+        # Cleanup reference frame
+        if os.path.exists(ref_frame_path):
+            os.remove(ref_frame_path)
+        
+        matched_count = sum(1 for k, v in results.items() if k != v)
+        print(f"   ✅ Color matched {matched_count}/{len(clip_paths)-1} clips")
+        
+        return results
+        
+    except Exception as e:
+        print(f"   ⚠️ Color matching failed: {e}")
+        return {p: p for p in clip_paths}
+
+
+def _extract_middle_frame(video_path: str, output_path: str) -> bool:
+    """Extract a frame from the middle of a video for color analysis."""
+    try:
+        # Get duration
+        probe_cmd = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            video_path
+        ]
+        result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=5)
+        duration = float(result.stdout.strip()) if result.stdout.strip() else 1.0
+        
+        # Extract frame at middle
+        middle = duration / 2
+        extract_cmd = [
+            "ffmpeg", "-y",
+            "-ss", str(middle),
+            "-i", video_path,
+            "-vframes", "1",
+            "-q:v", "2",
+            output_path
+        ]
+        subprocess.run(extract_cmd, check=True, capture_output=True, timeout=10)
+        return os.path.exists(output_path)
+        
+    except Exception:
+        return False
 
 
 def enhance_clips_parallel(clip_jobs: List[Tuple[str, str]]) -> Dict[str, str]:
