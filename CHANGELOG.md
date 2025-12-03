@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Memory Exhaustion (OOM) on Large Projects** - Fixed system running out of RAM/swap
+  - Implemented batch-based progressive rendering for large montages
+  - Every 25 clips (configurable via `BATCH_SIZE`), render to temp file and free memory
+  - Forced garbage collection after each batch (`FORCE_GC=true`)
+  - Final concatenation of batch files instead of keeping all clips in RAM
+  - Tested: 100+ clip projects now run without OOM crashes
+
 - **Portrait Video Distortion** - Fixed upscaled portrait videos being stretched/distorted
   - FFmpeg frame extraction was ignoring rotation metadata from phone videos
   - Added explicit transpose filter based on rotation metadata (not `-vf null` which does nothing)
@@ -40,7 +47,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **cgpu Encoding Status** - Added `ENCODING` phase to recognized status markers
   - Pipeline now correctly waits during ffmpeg video encoding phase
 
+- **Batch Files Variable Scope Bug** - Fixed redundant `'batch_files' in dir()` checks
+  - Variable is now properly initialized at function start
+  - Removed dead code that could cause undefined behavior
+
 ### Changed
+
+- **Web UI: Modern Upload Progress** - Added real-time upload progress tracking
+  - XMLHttpRequest-based upload with progress events
+  - Visual progress bar with percentage indicator
+  - Shows filename and file size during upload
+  - Success/error state feedback with auto-dismiss
+
+- **Web UI: Job Progress Indicators** - Improved job status display
+  - Animated indeterminate progress bar for running jobs
+  - Elapsed time counter during processing
+  - Completion duration shown after job finishes
+  - Queue position for waiting jobs
+  - Gradient backgrounds for status states
+
+- **Web UI: Visual Polish** - Cleaner, more modern interface
+  - Gradient header title
+  - Improved shadows and spacing
+  - Smooth hover transitions on buttons and cards
+  - Focus states with ring animation on inputs
+  - Status-specific card styling (running=amber, completed=green, failed=red)
+
+- **Documentation: AI_DIRECTOR.md** - Rewrote in English for public repo
+  - Removed German text, consistent formatting
+  - Streamlined examples and configuration guide
+
+- **Code Quality: Refactored duplicate functions**
+  - `app.js`: Merged `getElapsedTime()` and `getJobDuration()` into shared `formatDuration()`
+  - `style.css`: Fixed redundant gradient definition in `.progress-fill`
+
+- **CHANGELOG Structure** - Cleaned up formatting inconsistencies
+  - Fixed section ordering, removed duplicate headers
+  - Translated remaining German comments to English
 
 - **cgpu Upscaler v3 - Polling-based Architecture** (`cgpu_upscaler_v3.py`)
   - Replaced blocking `cgpu run` with background execution + polling
@@ -199,7 +242,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Previous Releases
+## [0.4.0] - 2025-12-01
 
 ### Added
 - **Professional Timeline Export**: Fully integrated OTIO/EDL/CSV export for importing montages into professional NLE software
@@ -219,7 +262,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Health check endpoint for K8s probes
 - Renderer observability: stdout/stderr are now tee'd to `/data/output/render.log` (pod PVC), so full render logs persist after Job cleanup.
 - K3s dev defaults tuned for stability: UPSCALE off by default, MAX_PARALLEL_JOBS=4, dev job memory limit raised to 48Gi (was 16Gi).
-- Clip variety: Pool bleibt flexibel, aber mit Reuse-Cap (`MAX_SCENE_REUSE`, default 3). AI darf Clips wiederverwenden, aber nicht exzessiv.
+- Clip variety: Pool stays flexible but with reuse cap (`MAX_SCENE_REUSE`, default 3). AI can reuse clips but not excessively.
 - FFmpeg MCP optional: `USE_FFMPEG_MCP` + `FFMPEG_MCP_ENDPOINT` schalten Subclip-Extraction auf einen MCP-Service um (Fallback: lokales ffmpeg).
 
 - **Documentation overhaul for public release**

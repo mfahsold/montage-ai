@@ -31,24 +31,94 @@ async function uploadFile(file, type) {
     formData.append('file', file);
     formData.append('type', type);
 
-    try {
-        const response = await fetch(`${API_BASE}/upload`, {
-            method: 'POST',
-            body: formData
-        });
+    // Create progress UI element
+    const progressId = `upload-progress-${Date.now()}`;
+    const listId = type === 'video' ? 'videoList' : 'musicList';
+    const listElement = document.getElementById(listId);
 
-        if (!response.ok) {
-            const error = await response.json();
-            alert(`Upload failed: ${error.error}`);
-            return;
+    const progressHTML = `
+        <div id="${progressId}" class="upload-progress">
+            <div class="upload-info">
+                <span class="upload-filename">${file.name}</span>
+                <span class="upload-size">${formatFileSize(file.size)}</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+            <span class="upload-status">Uploading...</span>
+        </div>
+    `;
+    listElement.insertAdjacentHTML('afterbegin', progressHTML);
+
+    try {
+        // Use XMLHttpRequest for progress tracking
+        const result = await uploadFileWithProgress(formData, progressId);
+
+        // Update UI on success
+        const progressEl = document.getElementById(progressId);
+        if (progressEl) {
+            progressEl.querySelector('.upload-status').textContent = '✓ Uploaded';
+            progressEl.classList.add('upload-complete');
+            setTimeout(() => progressEl.remove(), 2000);
         }
 
-        const result = await response.json();
         console.log(`Uploaded ${type}:`, result);
     } catch (error) {
         console.error('Upload error:', error);
-        alert(`Upload failed: ${error.message}`);
+
+        // Update UI on error
+        const progressEl = document.getElementById(progressId);
+        if (progressEl) {
+            progressEl.querySelector('.upload-status').textContent = `✗ Failed: ${error.message}`;
+            progressEl.classList.add('upload-error');
+        }
     }
+}
+
+function uploadFileWithProgress(formData, progressId) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                const progressEl = document.getElementById(progressId);
+                if (progressEl) {
+                    progressEl.querySelector('.progress-fill').style.width = `${percentComplete}%`;
+                    progressEl.querySelector('.upload-status').textContent = `Uploading... ${Math.round(percentComplete)}%`;
+                }
+            }
+        });
+
+        xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const result = JSON.parse(xhr.responseText);
+                    resolve(result);
+                } catch (e) {
+                    reject(new Error('Invalid server response'));
+                }
+            } else {
+                try {
+                    const error = JSON.parse(xhr.responseText);
+                    reject(new Error(error.error || 'Upload failed'));
+                } catch (e) {
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+            }
+        });
+
+        xhr.addEventListener('error', () => {
+            reject(new Error('Network error'));
+        });
+
+        xhr.addEventListener('abort', () => {
+            reject(new Error('Upload cancelled'));
+        });
+
+        xhr.open('POST', `${API_BASE}/upload`);
+        xhr.send(formData);
+    });
 }
 
 async function refreshFiles() {
@@ -164,6 +234,32 @@ function renderJob(job) {
         'timeout': '⏱️'
     }[job.status] || '❓';
 
+    // Progress bar for queued/running jobs
+    let progressSection = '';
+    if (job.status === 'queued') {
+        const queuePos = job.queue_position || 0;
+        progressSection = `
+            <div class="job-progress-section">
+                <div class="job-progress-info">
+                    <span>⏳ Waiting in queue...</span>
+                    ${queuePos > 0 ? `<span>Position: ${queuePos}</span>` : ''}
+                </div>
+            </div>
+        `;
+    } else if (job.status === 'running') {
+        progressSection = `
+            <div class="job-progress-section">
+                <div class="job-progress-info">
+                    <span>▶️ Processing video...</span>
+                    <span>${getElapsedTime(job.started_at)}</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill indeterminate"></div>
+                </div>
+            </div>
+        `;
+    }
+
     let downloads = '';
     if (job.status === 'completed' && job.output_file) {
         downloads = `
@@ -178,7 +274,13 @@ function renderJob(job) {
 
     let errorSection = '';
     if (job.status === 'failed' && job.error) {
-        errorSection = `<pre style="color: var(--danger); font-size: 0.875rem; background: #fee2e2; padding: 0.5rem; border-radius: 0.25rem; overflow-x: auto;">${job.error}</pre>`;
+        errorSection = `<pre class="error-message">${job.error}</pre>`;
+    }
+
+    let completedInfo = '';
+    if (job.status === 'completed' && job.completed_at) {
+        const duration = getJobDuration(job.started_at, job.completed_at);
+        completedInfo = `<div class="job-duration">✓ Completed in ${duration}</div>`;
     }
 
     const options = job.options || {};
@@ -188,7 +290,7 @@ function renderJob(job) {
         .join(', ') || 'none';
 
     return `
-        <div class="job-card">
+        <div class="job-card ${statusClass}">
             <div class="job-header">
                 <span class="job-id">Job ${job.id}</span>
                 <span class="job-status ${statusClass}">${statusEmoji} ${job.status}</span>
@@ -208,6 +310,8 @@ function renderJob(job) {
                 </div>
             </div>
             ${options.prompt ? `<div style="margin-bottom: 1rem;"><strong>Prompt:</strong> "${options.prompt}"</div>` : ''}
+            ${progressSection}
+            ${completedInfo}
             ${downloads}
             ${errorSection}
         </div>
@@ -270,6 +374,38 @@ function formatDate(isoString) {
         hour: '2-digit',
         minute: '2-digit'
     });
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function formatDuration(seconds) {
+    if (seconds < 60) {
+        return `${seconds}s`;
+    } else if (seconds < 3600) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}m ${secs}s`;
+    } else {
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        return `${hours}h ${mins}m`;
+    }
+}
+
+function getElapsedTime(startTime) {
+    const elapsed = Math.floor((new Date() - new Date(startTime)) / 1000);
+    return formatDuration(elapsed);
+}
+
+function getJobDuration(startTime, endTime) {
+    const duration = Math.floor((new Date(endTime) - new Date(startTime)) / 1000);
+    return formatDuration(duration);
 }
 
 // =============================================================================

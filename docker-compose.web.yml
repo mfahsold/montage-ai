@@ -16,6 +16,8 @@ services:
       - "${WEB_PORT:-5001}:5000"
     volumes:
       - ./data:/data
+      # Source code mount for development (live reload)
+      - ./src/montage_ai:/app/src/montage_ai:ro
       # cgpu Cloud GPU credentials (optional)
       - ${HOME}/.config/cgpu:/root/.config/cgpu:ro
     environment:
@@ -39,11 +41,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: ${WEB_MEMORY_LIMIT:-8G}
-          cpus: '${WEB_CPU_LIMIT:-4.0}'
+          memory: ${WEB_MEMORY_LIMIT:-20G}
+          cpus: '${WEB_CPU_LIMIT:-6.0}'
         reservations:
-          memory: ${WEB_MEMORY_RESERVATION:-2G}
-          cpus: '${WEB_CPU_RESERVATION:-1.0}'
+          memory: ${WEB_MEMORY_RESERVATION:-4G}
+          cpus: '${WEB_CPU_RESERVATION:-2.0}'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
       interval: 30s

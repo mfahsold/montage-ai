@@ -18,6 +18,7 @@ import os
 import random
 import json
 import time
+import gc
 import requests
 import numpy as np
 from datetime import datetime
@@ -101,6 +102,11 @@ FFMPEG_THREADS = os.environ.get("FFMPEG_THREADS", "0")  # 0 = auto (all cores)
 FFMPEG_PRESET = os.environ.get("FFMPEG_PRESET", "medium")  # ultrafast/fast/medium/slow/veryslow
 PARALLEL_ENHANCE = os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true"  # Parallel clip enhancement
 MAX_PARALLEL_JOBS = int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, multiprocessing.cpu_count() - 2))))  # Leave 2 cores free
+
+# Memory Management: Batch processing to prevent OOM
+# Process clips in batches, render each batch to disk, then concatenate
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "25"))  # Clips per batch (lower = less RAM, slower)
+FORCE_GC = os.environ.get("FORCE_GC", "true").lower() == "true"  # Force garbage collection after each batch
 
 # Clip reuse control
 MAX_SCENE_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
@@ -998,6 +1004,7 @@ def create_montage(variant_id=1):
     # 3. Assemble Timeline
     clips = []
     clips_metadata = []  # Track metadata for timeline export (OTIO/EDL/CSV)
+    batch_files = []  # For batch processing (memory management)
     current_time = 0
     beat_idx = 0
     cut_number = 0  # For monitoring
@@ -1006,8 +1013,14 @@ def create_montage(variant_id=1):
     target_duration = audio_clip.duration
     
     # Estimate total cuts for progress tracking
-    avg_cut_duration = 2.0  # Rough estimate
-    estimated_total_cuts = int(target_duration / avg_cut_duration)
+    # Use tempo-aware estimate: faster tempo = more cuts
+    # Average 4 beats per cut, so cuts = beats / 4 = (duration * tempo / 60) / 4
+    avg_beats_per_cut = 4.0  # Common average
+    estimated_total_cuts = int((target_duration * tempo / 60) / avg_beats_per_cut)
+    
+    # Log batch processing config
+    if VERBOSE:
+        print(f"   ⚙️ Memory management: BATCH_SIZE={BATCH_SIZE}, FORCE_GC={FORCE_GC}")
     
     # Start assembling phase monitoring
     monitor = get_monitor()
@@ -1513,6 +1526,52 @@ def create_montage(variant_id=1):
 
         clips.append(v_clip)
 
+        # === MEMORY MANAGEMENT: Batch rendering to prevent OOM ===
+        # When we reach BATCH_SIZE clips, render them to a temp file and free memory
+        if len(clips) >= BATCH_SIZE:
+            batch_num = len(batch_files) + 1
+            
+            batch_file = os.path.join(TEMP_DIR, f"batch_{JOB_ID}_{batch_num:03d}.mp4")
+            print(f"   💾 Rendering batch {batch_num} ({len(clips)} clips) to free memory...")
+            
+            # Concatenate and render current batch
+            batch_video = concatenate_videoclips(clips, method="compose")
+            batch_video.write_videofile(
+                batch_file,
+                codec='libx264',
+                audio=False,  # No audio for intermediate files
+                fps=30,
+                preset='fast',  # Fast for intermediate
+                threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
+                ffmpeg_params=["-crf", "18", "-pix_fmt", "yuv420p", "-s", "1080x1920"],  # Force size
+                verbose=False,
+                logger=None
+            )
+            batch_files.append(batch_file)
+            
+            # Free memory: close all clips and run garbage collection
+            for clip in clips:
+                # Delete temp files
+                if hasattr(clip, '_temp_files'):
+                    for tf in clip._temp_files:
+                        try:
+                            if os.path.exists(tf):
+                                os.remove(tf)
+                        except:
+                            pass
+                try:
+                    clip.close()
+                except:
+                    pass
+            batch_video.close()
+            
+            clips = []  # Reset for next batch
+            
+            if FORCE_GC:
+                gc.collect()
+            
+            print(f"   ✅ Batch {batch_num} saved, memory freed")
+
         # === COLLECT METADATA FOR TIMELINE EXPORT ===
         # Store clip metadata for OTIO/EDL/CSV export
         clip_metadata = {
@@ -1548,14 +1607,58 @@ def create_montage(variant_id=1):
         monitor.end_phase({
             "total_cuts": cut_number,
             "timeline_duration": f"{current_time:.1f}s",
-            "clips_in_sequence": len(clips)
+            "clips_in_sequence": len(clips) + (len(batch_files) * BATCH_SIZE)
         })
         
     # 4. Final Composition
     if monitor:
         monitor.start_phase("composition")
     
-    final_video = concatenate_videoclips(clips, method="compose")
+    # === BATCH PROCESSING: Combine batch files with remaining clips ===
+    if batch_files:
+        print(f"   🔗 Combining {len(batch_files)} batch files + {len(clips)} remaining clips...")
+        
+        # Render any remaining clips to a final batch
+        if clips:
+            final_batch_file = os.path.join(TEMP_DIR, f"batch_{JOB_ID}_final.mp4")
+            final_batch = concatenate_videoclips(clips, method="compose")
+            final_batch.write_videofile(
+                final_batch_file,
+                codec='libx264',
+                audio=False,
+                fps=30,
+                preset='fast',
+                threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
+                ffmpeg_params=["-crf", "18", "-pix_fmt", "yuv420p", "-s", "1080x1920"],  # Force size
+                verbose=False,
+                logger=None
+            )
+            batch_files.append(final_batch_file)
+            
+            # Free memory
+            for clip in clips:
+                if hasattr(clip, '_temp_files'):
+                    for tf in clip._temp_files:
+                        try:
+                            if os.path.exists(tf): os.remove(tf)
+                        except: pass
+                try: clip.close()
+                except: pass
+            final_batch.close()
+            clips = []
+            if FORCE_GC:
+                gc.collect()
+        
+        # Load all batch files and concatenate
+        batch_clips = [VideoFileClip(bf) for bf in batch_files]
+        final_video = concatenate_videoclips(batch_clips, method="compose")
+        
+        # Clean up batch clips after concatenation
+        # (will be done after rendering)
+    else:
+        # No batching needed (small project) - use clips directly
+        final_video = concatenate_videoclips(clips, method="compose")
+    
     final_video = final_video.set_audio(audio_clip.subclip(0, current_time))
     
     # 5. Add Logo (Overlay)
@@ -1628,6 +1731,7 @@ def create_montage(variant_id=1):
     cleanup_count = 0
     cleanup_size_mb = 0
 
+    # Clean up remaining clips (if any weren't batched)
     for clip in clips:
         # Delete temp files associated with this clip
         if hasattr(clip, '_temp_files'):
@@ -1649,6 +1753,27 @@ def create_montage(variant_id=1):
             if monitor:
                 monitor.log_warning("cleanup", f"Failed to close clip: {e}")
 
+    # Clean up batch files (if batch processing was used)
+    if 'batch_files' in dir() and batch_files:
+        for bf in batch_files:
+            try:
+                if os.path.exists(bf):
+                    size = os.path.getsize(bf) / (1024 * 1024)
+                    os.remove(bf)
+                    cleanup_count += 1
+                    cleanup_size_mb += size
+            except Exception as e:
+                if monitor:
+                    monitor.log_warning("cleanup", f"Failed to delete batch file {bf}: {e}")
+        
+        # Close batch clips if they exist
+        if 'batch_clips' in dir():
+            for bc in batch_clips:
+                try:
+                    bc.close()
+                except:
+                    pass
+
     # Close audio clip
     try:
         audio_clip.close()
@@ -1660,6 +1785,10 @@ def create_montage(variant_id=1):
         final_video.close()
     except:
         pass
+
+    # Force garbage collection
+    if FORCE_GC:
+        gc.collect()
 
     print(f"   ✅ Deleted {cleanup_count} temp files ({cleanup_size_mb:.1f} MB freed)")
     if monitor:
