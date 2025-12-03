@@ -197,6 +197,122 @@ input[type="file"] {
     margin-bottom: 1.75rem;
 }
 
+/* Duration Presets */
+.duration-presets {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.preset-btn {
+    padding: 0.625rem 1.25rem;
+    border: 1.5px solid var(--border);
+    background: white;
+    color: var(--text);
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    transform: translateY(-1px);
+}
+
+.preset-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.duration-input {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.duration-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Music Controls */
+.music-controls {
+    background: var(--bg);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    border: 1.5px solid var(--border);
+}
+
+.music-control-row {
+    margin-bottom: 0.75rem;
+}
+
+.music-checkbox {
+    font-weight: 500;
+}
+
+.music-trim-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.music-trim-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+@media (max-width: 640px) {
+    .music-trim-inputs {
+        grid-template-columns: 1fr;
+    }
+}
+
+.music-trim-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.music-trim-field label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    min-width: 60px;
+    margin-bottom: 0;
+}
+
+.music-trim-field input {
+    flex: 1;
+    padding: 0.625rem 0.875rem;
+    border: 1.5px solid var(--border);
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+}
+
+.music-trim-field input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.time-unit {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
 .form-group label {
     display: block;
     margin-bottom: 0.625rem;

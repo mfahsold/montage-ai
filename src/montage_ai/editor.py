@@ -1687,12 +1687,40 @@ def create_montage(variant_id=1):
             print(f"  📐 Resized: {current_size} → {v_clip.size}")
         else:
             print(f"  📐 Final size: {v_clip.size} (no resize needed)")
-        
-        # Ensure dimensions are even (required by h264 encoder)
+
+        # CRITICAL: Verify and force exact dimensions
+        # MoviePy's resize sometimes returns slightly off dimensions (e.g. 1078 instead of 1080)
+        # This causes aspect ratio distortion. Force exact dimensions with crop/pad if needed.
+        actual_w, actual_h = v_clip.size
+        if actual_w != target_w or actual_h != target_h:
+            print(f"  ⚠️  Dimension mismatch after resize: {actual_w}x{actual_h} != {target_w}x{target_h}")
+            # Pad if too small, crop if too large
+            if actual_w < target_w or actual_h < target_h:
+                # Pad to target size (center)
+                pad_x = (target_w - actual_w) // 2 if actual_w < target_w else 0
+                pad_y = (target_h - actual_h) // 2 if actual_h < target_h else 0
+                print(f"  📦 Padding: ({pad_x}, {pad_y})")
+                # Create black background and composite
+                from moviepy.editor import ColorClip
+                bg = ColorClip(size=(target_w, target_h), color=(0, 0, 0), duration=v_clip.duration)
+                v_clip = moviepy.video.compositing.CompositeVideoClip.CompositeVideoClip(
+                    [bg.set_duration(v_clip.duration), v_clip.set_position(('center', 'center'))],
+                    size=(target_w, target_h)
+                )
+            else:
+                # Crop to exact size (center crop)
+                crop_x = (actual_w - target_w) // 2 if actual_w > target_w else 0
+                crop_y = (actual_h - target_h) // 2 if actual_h > target_h else 0
+                print(f"  ✂️  Corrective crop: ({crop_x}, {crop_y})")
+                v_clip = v_clip.crop(x1=crop_x, y1=crop_y, x2=crop_x + target_w, y2=crop_y + target_h)
+            print(f"  ✅ Corrected to: {v_clip.size}")
+
+        # Ensure dimensions are even (required by h264 encoder) - should always be true now
         clip_w, clip_h = v_clip.size
-        final_w = clip_w if clip_w % 2 == 0 else clip_w - 1
-        final_h = clip_h if clip_h % 2 == 0 else clip_h - 1
-        if final_w != clip_w or final_h != clip_h:
+        if clip_w % 2 != 0 or clip_h % 2 != 0:
+            print(f"  ⚠️  Odd dimensions detected: {clip_w}x{clip_h}, fixing...")
+            final_w = clip_w if clip_w % 2 == 0 else clip_w - 1
+            final_h = clip_h if clip_h % 2 == 0 else clip_h - 1
             v_clip = v_clip.crop(x2=final_w, y2=final_h)
 
         # 🎬 CREATIVE DIRECTOR INTEGRATION: Transitions control

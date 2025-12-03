@@ -161,10 +161,16 @@ async function createJob() {
     const exportTimeline = document.getElementById('exportTimeline').checked;
     const generateProxies = document.getElementById('generateProxies').checked;
 
-    // NEW: Video length and music controls
-    const targetDuration = parseFloat(document.getElementById('targetDuration').value) || null;
-    const musicStart = parseFloat(document.getElementById('musicStart').value) || 0;
-    const musicEnd = parseFloat(document.getElementById('musicEnd').value) || null;
+    // NEW: Video length control
+    const targetDuration = parseFloat(document.getElementById('targetDuration').value) || 60;
+
+    // NEW: Music trimming controls
+    const useFullTrack = document.getElementById('useFullTrack').checked;
+    const musicStart = useFullTrack ? 0 : (parseFloat(document.getElementById('musicStart').value) || 0);
+    const musicDuration = useFullTrack ? null : (parseFloat(document.getElementById('musicDuration').value) || null);
+
+    // Calculate musicEnd from start + duration if trimming
+    const musicEnd = (musicDuration && !useFullTrack) ? musicStart + musicDuration : null;
 
     const jobData = {
         style,
@@ -586,12 +592,68 @@ function getJobDuration(startTime, endTime) {
 }
 
 // =============================================================================
+// Duration Presets & Music Controls
+// =============================================================================
+
+function initDurationPresets() {
+    const presetButtons = document.querySelectorAll('.preset-btn');
+    const durationInput = document.getElementById('targetDuration');
+
+    presetButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active from all
+            presetButtons.forEach(b => b.classList.remove('active'));
+            // Add active to clicked
+            btn.classList.add('active');
+
+            const duration = btn.getAttribute('data-duration');
+            if (duration === 'custom') {
+                durationInput.focus();
+            } else {
+                durationInput.value = duration;
+            }
+        });
+    });
+
+    // When user types custom value, activate "Custom" button
+    durationInput.addEventListener('input', () => {
+        const value = durationInput.value;
+        const matchingBtn = Array.from(presetButtons).find(btn => btn.getAttribute('data-duration') === value);
+
+        presetButtons.forEach(b => b.classList.remove('active'));
+        if (matchingBtn) {
+            matchingBtn.classList.add('active');
+        } else {
+            const customBtn = Array.from(presetButtons).find(btn => btn.getAttribute('data-duration') === 'custom');
+            if (customBtn) customBtn.classList.add('active');
+        }
+    });
+}
+
+function initMusicControls() {
+    const useFullTrackCheckbox = document.getElementById('useFullTrack');
+    const musicTrimSection = document.getElementById('musicTrimSection');
+
+    useFullTrackCheckbox.addEventListener('change', () => {
+        if (useFullTrackCheckbox.checked) {
+            musicTrimSection.style.display = 'none';
+        } else {
+            musicTrimSection.style.display = 'block';
+        }
+    });
+}
+
+// =============================================================================
 // Init
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
     refreshFiles();
     refreshJobs();
+
+    // Initialize new UI controls
+    initDurationPresets();
+    initMusicControls();
 
     // Check for running jobs and start polling if needed
     fetch(`${API_BASE}/jobs`)
