@@ -14,9 +14,9 @@ services:
       resources:
         limits:
           cpus: '6'
-          memory: 16g  # Default: 16GB limit (safe for most systems)
+          memory: 8g  # Reduced from 16g to prevent OOM on ARM systems
         reservations:
-          memory: 4g   # Reserve at least 4GB
+          memory: 2g   # Reduced from 4g
     volumes:
       - ./data/input:/data/input:ro
       - ./data/music:/data/music:ro
@@ -64,16 +64,16 @@ services:
       - EXPORT_TIMELINE=${EXPORT_TIMELINE:-false}
       - GENERATE_PROXIES=${GENERATE_PROXIES:-false}
       
-      # Performance
+      # Performance (optimized for memory constraints)
       - FFMPEG_THREADS=${FFMPEG_THREADS:-0}
       - FFMPEG_PRESET=${FFMPEG_PRESET:-medium}
       - PARALLEL_ENHANCE=${PARALLEL_ENHANCE:-true}
-      - MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS:-4}
+      - MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS:-2}  # Reduced from 4 to prevent OOM
       - USE_GPU=${USE_GPU:-auto}
 
-      # Memory Management (NEW!)
-      - MEMORY_LIMIT_GB=${MEMORY_LIMIT_GB:-16}  # Match docker mem_limit
-      - MAX_CLIPS_IN_RAM=${MAX_CLIPS_IN_RAM:-50}  # Limit simultaneous clips
+      # Memory Management (optimized for ARM systems)
+      - MEMORY_LIMIT_GB=${MEMORY_LIMIT_GB:-8}  # Match docker mem_limit (reduced from 16)
+      - MAX_CLIPS_IN_RAM=${MAX_CLIPS_IN_RAM:-20}  # Limit simultaneous clips (reduced from 50)
       - AUTO_CLEANUP=${AUTO_CLEANUP:-true}  # Enable temp file cleanup
       
       # Deep Analysis

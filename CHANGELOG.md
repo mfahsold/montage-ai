@@ -9,6 +9,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ENV Control for Crossfades** - CLI/ENV override for xfade behavior
+  - `ENABLE_XFADE=""` (default) = auto from style, `"true"` = force on, `"false"` = force off
+  - `XFADE_DURATION=0.3` configurable crossfade duration in seconds
+  - Prevents unexpected re-encoding slowdowns when performance matters
+  - Warning log when xfade is enabled (slower render)
+
+- **Real FFmpeg Crossfades (xfade)** - True overlapping transitions instead of fade-to-black
+  - New `xfade_clips_ffmpeg()` function in `segment_writer.py`
+  - Creates real crossfade overlaps using FFmpeg's xfade filter
+  - Supports multiple transition types: fade, dissolve, wipeleft, etc.
+  - New `write_segment_with_xfade()` method for batch processing with xfades
+  - New env vars: `ENABLE_XFADE=false` (default off for speed), `XFADE_DURATION=0.5`
+
+- **FINAL_CRF Environment Variable** - Configurable quality for final encoding
+  - `FINAL_CRF=18` for master quality (visually lossless)
+  - `FINAL_CRF=23` for fast tests (smaller files)
+  - Applied consistently to per-clip encoding and legacy render path
+
+- **NORMALIZE_CLIPS Environment Variable** - Stream normalization control
+  - Ensures all clips have identical fps/pix_fmt/profile for FFmpeg concat
+  - Default: true (enables -c copy in segment concatenation)
+
+- **Stream Parameter Validation** - FFprobe-based concat compatibility check
+  - New `ffprobe_stream_params()` function validates fps, pix_fmt, width, height
+  - New `StreamParams` dataclass for structured stream info
+  - Automatic fallback to re-encoding if streams are incompatible
+
+- **Logo Overlay for Progressive Renderer** - Branding support in FFmpeg pipeline
+  - `finalize()` now accepts `logo_path` parameter
+  - Logo overlay applied as second FFmpeg pass after concat
+  - Position configurable: top-right (default), top-left, bottom-right, bottom-left
+  - New `_apply_logo_overlay()` method in SegmentWriter
+
+- **Adaptive Memory Management System** - Prevents OOM crashes with intelligent monitoring
+  - New `memory_monitor.py` module with `AdaptiveMemoryManager` class
+  - Real-time memory monitoring using psutil
+  - Automatic batch size adjustment based on available RAM
+  - Memory pressure levels: normal → elevated → high → critical
+  - Proactive garbage collection triggers at configurable thresholds
+  - `MemoryMonitorContext` for monitoring memory during operations
+  - New env vars: `MEMORY_WARNING_THRESHOLD`, `MEMORY_CRITICAL_THRESHOLD`
+
+- **Metadata Cache System** - Pre-computed video analysis for performance
+  - New `metadata_cache.py` module with `MetadataCache` class
+  - Caches scene metadata as JSON sidecars: `video.mp4.metadata.json`
+  - Visual histogram computation for match cut detection
+  - Brightness analysis for content-aware enhancement
+  - Motion blur scoring using Laplacian variance
+  - Optical flow magnitude for motion intensity detection
+  - Cache invalidation based on file hash and expiration time
+  - New env var: `CACHE_INVALIDATION_HOURS` (default: 24)
+
+- **Segment Writer for Progressive Rendering** - Memory-efficient video assembly
+  - New `segment_writer.py` module with `SegmentWriter` class
+  - Writes video segments incrementally to disk instead of RAM
+  - FFmpeg-based concatenation for final assembly
+  - `ProgressiveRenderer` high-level interface with automatic batch flushing
+  - Memory savings: ~200-400MB depending on project size
+  - Automatic temp file cleanup after concatenation
+
+- **Integrated Memory Monitoring in Editor** - Smart batch processing
+  - Editor now uses `AdaptiveMemoryManager` for dynamic batch sizing
+  - Automatic batch size reduction under memory pressure
+  - Critical memory detection forces immediate batch render
+  - Memory status logging before/after each batch render
+  - Prevents OOM by adapting to available resources
+
 - **Professional Video Stabilization (vidstab 2-Pass)** - Upgraded from basic deshake to professional stabilization
   - Uses libvidstab library (same as DaVinci Resolve, Kdenlive, Premiere basic mode)
   - Pass 1: Motion vector analysis with `vidstabdetect` (shakiness=5, accuracy=15)
@@ -57,6 +124,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Foundation for advanced ML enhancements (see docs/ML_ENHANCEMENT_ROADMAP.md)
 
 ### Fixed
+
+- **Double Fades with xfade Enabled** - Fixed brightness dip artifact
+  - Per-clip crossfadein/crossfadeout was applied even when xfade=true
+  - Result: fade-to-black + xfade = visible brightness dip instead of smooth transition
+  - Now per-clip fades are ONLY applied when `enable_xfade == False`
+  - xfade-enabled path: SegmentWriter handles real transitions, no per-clip fades
+
+- **Xfade Auto-Enabled for All Styles** - Fixed unexpected re-encoding slowdowns
+  - xfade was enabled automatically for any non-hard_cuts transition type
+  - This caused slow renders even when performance was more important than transitions
+  - Now only explicitly enabled via `ENABLE_XFADE=true` ENV or style `type: crossfade`
+  - Other transition types (energy_aware, mixed) use fast concat without xfade
+
+- **Timeline Export Crash in Progressive Path** - Fixed `final_video` undefined error
+  - Progressive rendering path doesn't create `final_video` variable
+  - Now correctly uses `progressive_renderer.get_stats()['total_duration']`
+  - Falls back to `current_time` if stats unavailable
+  - Timeline export (OTIO/EDL/CSV) now works with progressive renderer
+
+- **Fake Crossfades (Fade-to-Black)** - Replaced with real xfade overlaps
+  - Old code: fade-out clip A, then fade-in clip B → visible black gap
+  - New code: FFmpeg xfade filter creates true overlap transition
+  - `xfade_clips_ffmpeg()` function handles real crossfade math
+  - Timeline duration accounts for overlap: `clip_duration - xfade_duration`
+  - Enable with `ENABLE_XFADE=true` (disabled by default for speed)
+
+- **NORMALIZE_CLIPS Flag Unused** - Now properly applied in ProgressiveRenderer
+  - Added `normalize_clips` parameter to `ProgressiveRenderer.__init__()`
+  - New `_normalize_batch_clips()` method normalizes all clips before concat
+  - Forces identical stream parameters (fps, pix_fmt, profile) for `-c copy` concat
+  - Prevents subtle artifacts from mismatched encoding settings
+
+- **Inconsistent Render Timing Metrics** - Unified timing calculation
+  - Progressive path: `render_start_time` set BEFORE `finalize()` call
+  - Both paths now use `time.time() - render_start_time` consistently
+  - `render_duration` reflects actual FFmpeg encoding time
+
+- **Inconsistent CRF in Reencode Fallback** - Now uses `FINAL_CRF` consistently
+  - `_write_segment_ffmpeg_reencode()` now uses `self.ffmpeg_crf`
+  - All encoding paths respect configured quality setting
+  - CRF flows from `FINAL_CRF` env → `SegmentWriter.ffmpeg_crf`
+
+- **Crossfades Disabled in Progressive Path** - Transitions now work with progressive rendering
+  - Transition logic checked `len(clips) > 0` but progressive path never fills `clips[]`
+  - Refactored to apply crossfade-in/out directly per-clip before writing to disk
+  - Energy-aware, mixed, and always-crossfade modes now work correctly
+  - No more abrupt cuts in final video when using progressive renderer
+
+- **Triple Re-Encoding Quality Loss** - Single-encode pipeline implemented
+  - Problem: Clips were encoded 3x (MoviePy→libx264, segment→libx264, finale→libx264)
+  - Solution: Per-clip encoding with standardized params, then `-c copy` for concat
+  - `write_segment_ffmpeg()` now uses `-c copy` (stream copy) instead of re-encoding
+  - Final concatenation also uses `-c copy` for video, only audio is re-encoded
+  - Quality preserved, CPU usage reduced significantly
+
+- **Concat Demuxer Stream Mismatch** - Parameter guard prevents artifacts
+  - FFmpeg concat demuxer requires identical stream parameters (fps, pix_fmt, profile)
+  - New `ffprobe_stream_params()` validates streams before concatenation
+  - Automatic fallback to `_write_segment_ffmpeg_reencode()` if streams incompatible
+  - Per-clip encoding now enforces: yuv420p, profile:high, level:4.1, 30fps
+
+- **Missing Pixel Format in Per-Clip Export** - Prevents concat compatibility issues
+  - Added explicit `ffmpeg_params` to per-clip `write_videofile()` calls
+  - Forces `-pix_fmt yuv420p -profile:v high -level 4.1 -crf $FINAL_CRF`
+  - Guarantees all clips have identical encoding parameters
+
+- **Logo/Branding Missing in Progressive Path** - Now unified across both paths
+  - Progressive `finalize()` now accepts `logo_path` parameter
+  - Logo applied as second FFmpeg pass with `overlay` filter
+  - Both progressive and legacy paths now apply branding consistently
+
+- **Incorrect Render Timing Metrics** - Monitoring now measures actual finalize duration
+  - Problem: `render_duration` only measured cleanup time, not actual FFmpeg work
+  - `render_start_time` now set BEFORE `progressive_renderer.finalize()`
+  - New `get_finalize_duration()` method returns accurate timing
+  - `log_render_complete()` receives correct duration in milliseconds
+
+- **ProgressiveRenderer Actually Wired** - Critical integration fix for memory optimization
+  - `ProgressiveRenderer` was imported in `editor.py` but never instantiated or used
+  - Old MoviePy batching still ran, defeating OOM prevention completely
+  - Now properly initializes `ProgressiveRenderer` in timeline assembly
+  - Clips are rendered to disk immediately via `add_clip_path()` instead of accumulated in memory
+  - Final composition uses FFmpeg concat demuxer instead of loading all batches into RAM
+  - Legacy MoviePy path preserved as fallback when `ProgressiveRenderer` unavailable
+
+- **FFmpeg Concat Demuxer for Memory-Efficient Rendering** - Replaced MoviePy concatenation
+  - `segment_writer.py` refactored: `flush_batch()` uses FFmpeg concat instead of MoviePy
+  - `finalize()` method concatenates all segments using FFmpeg concat demuxer (no re-encoding)
+  - Audio muxing done separately with stream copying for speed
+  - Peak memory reduced from ~2-4GB to ~200-400MB for large projects
+  - Added `write_segment_ffmpeg()` helper for FFmpeg-based segment writing
+
+- **Duplicate Render Code Cleanup** - Removed DRY violation in `editor.py`
+  - Old "6. Render" section removed (was duplicate of progressive render path)
+  - `final_video.write_videofile()` only called in legacy path now
+  - `monitor.end_phase()` updated to handle both progressive and legacy paths
+  - Proper variable initialization (`clips = []`, `batch_files = []`) for legacy fallback
 
 - **Memory Exhaustion (OOM) on Large Projects** - Fixed system running out of RAM/swap
   - Implemented batch-based progressive rendering for large montages

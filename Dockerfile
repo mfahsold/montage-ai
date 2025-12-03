@@ -58,13 +58,15 @@ RUN wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/reale
     find realesrgan_temp -name "*.bin" -exec mv {} /usr/local/share/realesrgan-models/ \; && \
     find realesrgan_temp -name "*.pth" -exec mv {} /usr/local/share/realesrgan-models/ \; && \
     # Cleanup
-    rm -rf realesrgan.zip realesrgan_temp
+    rm -rf realesrgan.zip realesrgan_temp && \
+    # Create symlink so realesrgan-ncnn-vulkan finds models in default location
+    ln -s /usr/local/share/realesrgan-models /usr/local/bin/models
 
 # Install librosa and numba from conda-forge (better ARM64 support)
 # Force Python 3.10 to avoid issues with removed modules in 3.13 (like aifc)
-# Install ffmpeg via conda to avoid library conflicts
+# Note: ffmpeg is already installed via apt (line 8) with vidstab support
 # Add wget for model downloads
-RUN conda install -y -c conda-forge python=3.10 librosa numba numpy scipy ffmpeg wget && \
+RUN conda install -y -c conda-forge python=3.10 librosa numba numpy scipy wget && \
     conda clean -afy
 
 COPY requirements.txt .
@@ -77,5 +79,11 @@ COPY pyproject.toml .
 
 # Install package
 RUN pip install --no-cache-dir -e .
+
+# Vulkan headless environment for GPU acceleration (AMD/Intel)
+# Note: For NVIDIA, use VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json
+ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
+ENV XDG_RUNTIME_DIR=/tmp/runtime-root
+RUN mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
 
 ENTRYPOINT ["python", "-u", "-m", "montage_ai.editor"]

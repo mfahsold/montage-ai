@@ -66,6 +66,30 @@ except ImportError:
     COLOR_MATCHER_AVAILABLE = False
     print("⚠️ color-matcher not available - shot matching disabled")
 
+# Import Memory Management modules
+try:
+    from .memory_monitor import AdaptiveMemoryManager, MemoryMonitorContext, get_memory_manager
+    MEMORY_MONITOR_AVAILABLE = True
+except ImportError:
+    MEMORY_MONITOR_AVAILABLE = False
+    print("⚠️ Memory monitor not available")
+
+# Import Metadata Cache for pre-computed scene analysis
+try:
+    from .metadata_cache import MetadataCache, get_metadata_cache
+    METADATA_CACHE_AVAILABLE = True
+except ImportError:
+    METADATA_CACHE_AVAILABLE = False
+    print("⚠️ Metadata cache not available")
+
+# Import Segment Writer for progressive rendering
+try:
+    from .segment_writer import SegmentWriter, ProgressiveRenderer
+    SEGMENT_WRITER_AVAILABLE = True
+except ImportError:
+    SEGMENT_WRITER_AVAILABLE = False
+    print("⚠️ Segment writer not available")
+
 VERSION = "0.2.0"
 
 # ============================================================================
@@ -120,10 +144,21 @@ FFMPEG_PRESET = os.environ.get("FFMPEG_PRESET", "medium")  # ultrafast/fast/medi
 PARALLEL_ENHANCE = os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true"  # Parallel clip enhancement
 MAX_PARALLEL_JOBS = int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, multiprocessing.cpu_count() - 2))))  # Leave 2 cores free
 
+# Quality: CRF for final encoding (18 = visually lossless, 23 = good balance for tests)
+FINAL_CRF = int(os.environ.get("FINAL_CRF", "18"))  # Lower = better quality, higher file size
+
+# Stream normalization: Ensure all clips have identical parameters for concat demuxer
+NORMALIZE_CLIPS = os.environ.get("NORMALIZE_CLIPS", "true").lower() == "true"  # fps/pix_fmt/profile
+
 # Memory Management: Batch processing to prevent OOM
 # Process clips in batches, render each batch to disk, then concatenate
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "25"))  # Clips per batch (lower = less RAM, slower)
 FORCE_GC = os.environ.get("FORCE_GC", "true").lower() == "true"  # Force garbage collection after each batch
+
+# Crossfade Configuration: Real FFmpeg xfade vs simple fade-to-black
+# xfade creates real overlapping transitions but requires re-encoding (slower)
+ENABLE_XFADE = os.environ.get("ENABLE_XFADE", "")  # "" = auto (from style), "true" = force on, "false" = force off
+XFADE_DURATION = float(os.environ.get("XFADE_DURATION", "0.3"))  # Crossfade duration in seconds
 
 # Clip reuse control
 MAX_SCENE_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
@@ -1034,9 +1069,7 @@ def create_montage(variant_id=1):
         print(f"   ✓ Footage Pool: {len(all_scenes)} clips ready")
 
     # 3. Assemble Timeline
-    clips = []
     clips_metadata = []  # Track metadata for timeline export (OTIO/EDL/CSV)
-    batch_files = []  # For batch processing (memory management)
     current_time = 0
     beat_idx = 0
     cut_number = 0  # For monitoring
@@ -1050,9 +1083,65 @@ def create_montage(variant_id=1):
     avg_beats_per_cut = 4.0  # Common average
     estimated_total_cuts = int((target_duration * tempo / 60) / avg_beats_per_cut)
     
+    # Initialize Memory Manager for adaptive batch sizing
+    memory_manager = None
+    if MEMORY_MONITOR_AVAILABLE:
+        memory_manager = get_memory_manager()
+        memory_manager.print_memory_status("   ")
+    
+    # Determine if crossfades should use xfade (real overlap) or simple fade
+    # Priority: ENV override > Creative Director settings > default (off)
+    enable_xfade = False
+    xfade_duration = XFADE_DURATION  # From ENV, default 0.3
+    
+    # Check ENV override first
+    if ENABLE_XFADE == "true":
+        enable_xfade = True
+        print(f"   ⚠️ ENABLE_XFADE=true: Real crossfades enabled (slower, higher quality)")
+    elif ENABLE_XFADE == "false":
+        enable_xfade = False
+        # No log needed, this is the expected default
+    elif EDITING_INSTRUCTIONS is not None:
+        # No ENV override - check Creative Director settings
+        transitions = EDITING_INSTRUCTIONS.get('transitions', {})
+        transition_type = transitions.get('type', 'energy_aware')
+        xfade_duration = transitions.get('crossfade_duration_sec', xfade_duration)
+        # Only enable xfade if explicitly requested, NOT automatically for all non-hard_cuts
+        # This prevents unexpected re-encoding slowdowns
+        if transition_type == 'crossfade':
+            enable_xfade = True
+            print(f"   ⚠️ Style requests crossfades: enabling xfade (slower render)")
+    
+    # Initialize Progressive Renderer for memory-efficient batch processing
+    # Uses FFmpeg concat demuxer instead of MoviePy in-memory concatenation
+    progressive_renderer = None
+    if SEGMENT_WRITER_AVAILABLE:
+        progressive_renderer = ProgressiveRenderer(
+            batch_size=BATCH_SIZE,
+            output_dir=os.path.join(TEMP_DIR, f"segments_{JOB_ID}"),
+            memory_manager=memory_manager,
+            job_id=JOB_ID,
+            enable_xfade=enable_xfade,
+            xfade_duration=xfade_duration,
+            ffmpeg_crf=FINAL_CRF,
+            normalize_clips=NORMALIZE_CLIPS
+        )
+        xfade_status = f"xfade={enable_xfade}" if enable_xfade else "concat"
+        print(f"   ✅ Progressive Renderer initialized (batch={BATCH_SIZE}, {xfade_status}, crf={FINAL_CRF})")
+    else:
+        print(f"   ⚠️ Progressive Renderer not available - using legacy batching")
+    
+    # Initialize clips and batch_files for legacy path (used when progressive_renderer is None)
+    clips = []
+    batch_files = []
+    
     # Log batch processing config
     if VERBOSE:
         print(f"   ⚙️ Memory management: BATCH_SIZE={BATCH_SIZE}, FORCE_GC={FORCE_GC}")
+        if memory_manager:
+            safe_batch = memory_manager.calculate_safe_batch_size(BATCH_SIZE)
+            if safe_batch < BATCH_SIZE:
+                print(f"   ⚠️ Adaptive batch size: {safe_batch} (reduced from {BATCH_SIZE} due to memory pressure)")
     
     # Start assembling phase monitoring
     monitor = get_monitor()
@@ -1593,88 +1682,132 @@ def create_montage(variant_id=1):
             v_clip = v_clip.crop(x2=final_w, y2=final_h)
 
         # 🎬 CREATIVE DIRECTOR INTEGRATION: Transitions control
-        if EDITING_INSTRUCTIONS is not None:
-            transitions = EDITING_INSTRUCTIONS.get('transitions', {})
-            transition_type = transitions.get('type', 'energy_aware')
-            crossfade_duration_sec = transitions.get('crossfade_duration_sec', 0.5)
-
-            if transition_type == "crossfade":
-                # Always crossfade
-                if len(clips) > 0:
-                    fade_duration = min(crossfade_duration_sec, cut_duration * 0.3)
-                    v_clip = v_clip.crossfadein(fade_duration)
-                    clips[-1] = clips[-1].crossfadeout(fade_duration)
-
-            elif transition_type == "mixed":
-                # Random crossfade (50% of the time)
-                if len(clips) > 0 and random.random() > 0.5:
-                    fade_duration = min(crossfade_duration_sec, cut_duration * 0.3)
-                    v_clip = v_clip.crossfadein(fade_duration)
-                    clips[-1] = clips[-1].crossfadeout(fade_duration)
-
-            elif transition_type == "energy_aware":
-                # Crossfade on low energy (default)
-                if len(clips) > 0 and current_energy < 0.3:
-                    fade_duration = min(crossfade_duration_sec, cut_duration * 0.2)
-                    v_clip = v_clip.crossfadein(fade_duration)
-                    clips[-1] = clips[-1].crossfadeout(fade_duration)
-
-            # "hard_cuts" = no crossfade (skip)
-
-        else:
-            # Legacy: Energy-aware crossfade
-            if len(clips) > 0 and current_energy < 0.3:
-                fade_duration = min(0.5, cut_duration * 0.2)  # Max 0.5s or 20% of clip
+        # Progressive path with xfade: Real crossfades handled by xfade filter in SegmentWriter
+        # Progressive path without xfade: No per-clip fades (hard cuts)
+        # Legacy path: Apply per-clip fade-in/out (limited to fade-to-black)
+        apply_per_clip_fade = False
+        crossfade_duration = xfade_duration  # Use global setting
+        
+        # CRITICAL: Per-clip fades create fade-to-black artifacts when combined with xfade
+        # Only apply per-clip fades if:
+        # 1. Using legacy path (no progressive_renderer), AND
+        # 2. xfade is NOT enabled (otherwise xfade handles transitions)
+        if progressive_renderer and enable_xfade:
+            # xfade enabled: SegmentWriter handles real crossfades, no per-clip fades
+            apply_per_clip_fade = False
+        elif not progressive_renderer:
+            # Legacy path: use per-clip fades based on style
+            if EDITING_INSTRUCTIONS is not None:
+                transitions = EDITING_INSTRUCTIONS.get('transitions', {})
+                transition_type = transitions.get('type', 'energy_aware')
+                crossfade_duration = transitions.get('crossfade_duration_sec', crossfade_duration)
+                
+                if transition_type != 'hard_cuts':
+                    if transition_type == "crossfade":
+                        apply_per_clip_fade = True
+                    elif transition_type == "mixed":
+                        apply_per_clip_fade = random.random() > 0.5
+                    elif transition_type == "energy_aware":
+                        apply_per_clip_fade = current_energy < 0.3
+            else:
+                # Legacy default: Energy-aware crossfade
+                if current_energy < 0.3:
+                    apply_per_clip_fade = True
+        
+        # Apply per-clip fades only when appropriate (legacy path, no xfade)
+        if apply_per_clip_fade:
+            fade_duration = min(crossfade_duration, cut_duration * 0.3)
+            if cut_number > 0:
                 v_clip = v_clip.crossfadein(fade_duration)
-                clips[-1] = clips[-1].crossfadeout(fade_duration)
+                if VERBOSE:
+                    print(f"   ↗️ Crossfade-in: {fade_duration:.2f}s")
+            v_clip = v_clip.crossfadeout(fade_duration)
+            if VERBOSE:
+                print(f"   ↘️ Crossfade-out: {fade_duration:.2f}s")
 
-        clips.append(v_clip)
-
-        # === MEMORY MANAGEMENT: Batch rendering to prevent OOM ===
-        # When we reach BATCH_SIZE clips, render them to a temp file and free memory
-        if len(clips) >= BATCH_SIZE:
-            batch_num = len(batch_files) + 1
+        # === PROGRESSIVE RENDERING: Write clip to disk immediately ===
+        # This is memory-efficient: each clip is rendered and freed before next
+        if progressive_renderer:
+            # Generate temp file path for this clip
+            clip_temp_path = os.path.join(TEMP_DIR, f"clip_{JOB_ID}_{cut_number:04d}.mp4")
             
-            batch_file = os.path.join(TEMP_DIR, f"batch_{JOB_ID}_{batch_num:03d}.mp4")
-            print(f"   💾 Rendering batch {batch_num} ({len(clips)} clips) to free memory...")
-            
-            # Concatenate and render current batch
-            batch_video = concatenate_videoclips(clips, method="compose")
-            batch_video.write_videofile(
-                batch_file,
-                codec='libx264',
-                audio=False,  # No audio for intermediate files
-                fps=30,
-                preset='fast',  # Fast for intermediate
-                threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
-                ffmpeg_params=["-crf", "18", "-pix_fmt", "yuv420p", "-s", "1080x1920"],  # Force size
-                verbose=False,
-                logger=None
-            )
-            batch_files.append(batch_file)
-            
-            # Free memory: close all clips and run garbage collection
-            for clip in clips:
-                # Delete temp files
-                if hasattr(clip, '_temp_files'):
-                    for tf in clip._temp_files:
+            # Render clip to temp file with normalized parameters for concat compatibility
+            try:
+                v_clip.write_videofile(
+                    clip_temp_path,
+                    codec='libx264',
+                    audio=False,  # Audio added in final composition
+                    fps=30,
+                    preset='fast',
+                    ffmpeg_params=[
+                        "-pix_fmt", "yuv420p",  # Standard pixel format
+                        "-profile:v", "high",    # H.264 profile
+                        "-level", "4.1",         # Compatibility level
+                        "-crf", str(FINAL_CRF),  # Quality setting
+                    ],
+                    verbose=False,
+                    logger=None
+                )
+                
+                # Close MoviePy clip to free memory
+                if hasattr(v_clip, '_temp_files'):
+                    for tf in v_clip._temp_files:
                         try:
                             if os.path.exists(tf):
                                 os.remove(tf)
                         except:
                             pass
                 try:
-                    clip.close()
+                    v_clip.close()
                 except:
                     pass
-            batch_video.close()
+                
+                # Add to progressive renderer (handles batching automatically)
+                segment_info = progressive_renderer.add_clip_path(clip_temp_path)
+                
+                if segment_info:
+                    print(f"   ✅ Segment {segment_info.index} written ({segment_info.clip_count} clips)")
+                    
+            except Exception as e:
+                print(f"   ❌ Failed to render clip {cut_number}: {e}")
+                try:
+                    v_clip.close()
+                except:
+                    pass
+        else:
+            # Legacy fallback: keep clips in memory (will batch later)
+            clips.append(v_clip)
             
-            clips = []  # Reset for next batch
-            
-            if FORCE_GC:
-                gc.collect()
-            
-            print(f"   ✅ Batch {batch_num} saved, memory freed")
+            # Legacy batch processing (only used if ProgressiveRenderer unavailable)
+            if len(clips) >= BATCH_SIZE:
+                batch_num = len(batch_files) + 1
+                batch_file = os.path.join(TEMP_DIR, f"batch_{JOB_ID}_{batch_num:03d}.mp4")
+                
+                print(f"   💾 Legacy: Rendering batch {batch_num} ({len(clips)} clips)...")
+                
+                batch_video = concatenate_videoclips(clips, method="compose")
+                batch_video.write_videofile(
+                    batch_file,
+                    codec='libx264',
+                    audio=False,
+                    fps=30,
+                    preset='fast',
+                    threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
+                    verbose=False,
+                    logger=None
+                )
+                batch_files.append(batch_file)
+                
+                for clip in clips:
+                    try:
+                        clip.close()
+                    except:
+                        pass
+                batch_video.close()
+                clips = []
+                
+                if FORCE_GC:
+                    gc.collect()
 
         # === COLLECT METADATA FOR TIMELINE EXPORT ===
         # Store clip metadata for OTIO/EDL/CSV export
@@ -1708,75 +1841,17 @@ def create_montage(variant_id=1):
     
     # End assembling phase
     if monitor:
+        total_clips_processed = progressive_renderer.get_total_clips() if progressive_renderer else len(clips) + (len(batch_files) * BATCH_SIZE)
         monitor.end_phase({
             "total_cuts": cut_number,
             "timeline_duration": f"{current_time:.1f}s",
-            "clips_in_sequence": len(clips) + (len(batch_files) * BATCH_SIZE)
+            "clips_in_sequence": total_clips_processed
         })
         
     # 4. Final Composition
     if monitor:
         monitor.start_phase("composition")
     
-    # === BATCH PROCESSING: Combine batch files with remaining clips ===
-    if batch_files:
-        print(f"   🔗 Combining {len(batch_files)} batch files + {len(clips)} remaining clips...")
-        
-        # Render any remaining clips to a final batch
-        if clips:
-            final_batch_file = os.path.join(TEMP_DIR, f"batch_{JOB_ID}_final.mp4")
-            final_batch = concatenate_videoclips(clips, method="compose")
-            final_batch.write_videofile(
-                final_batch_file,
-                codec='libx264',
-                audio=False,
-                fps=30,
-                preset='fast',
-                threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
-                ffmpeg_params=["-crf", "18", "-pix_fmt", "yuv420p", "-s", "1080x1920"],  # Force size
-                verbose=False,
-                logger=None
-            )
-            batch_files.append(final_batch_file)
-            
-            # Free memory
-            for clip in clips:
-                if hasattr(clip, '_temp_files'):
-                    for tf in clip._temp_files:
-                        try:
-                            if os.path.exists(tf): os.remove(tf)
-                        except: pass
-                try: clip.close()
-                except: pass
-            final_batch.close()
-            clips = []
-            if FORCE_GC:
-                gc.collect()
-        
-        # Load all batch files and concatenate
-        batch_clips = [VideoFileClip(bf) for bf in batch_files]
-        final_video = concatenate_videoclips(batch_clips, method="compose")
-        
-        # Clean up batch clips after concatenation
-        # (will be done after rendering)
-    else:
-        # No batching needed (small project) - use clips directly
-        final_video = concatenate_videoclips(clips, method="compose")
-    
-    final_video = final_video.set_audio(audio_clip.subclip(0, current_time))
-    
-    # 5. Add Logo (Overlay)
-    logo_files = get_files(ASSETS_DIR, ('.png', '.jpg'))
-    if logo_files:
-        logo = ImageClip(logo_files[0]).set_duration(final_video.duration).resize(height=150).margin(right=50, top=50, opacity=0).set_pos(("right", "top"))
-        final_video = CompositeVideoClip([final_video, logo])
-        if monitor:
-            monitor.log_info("composition", f"Logo overlay added: {os.path.basename(logo_files[0])}")
-    
-    if monitor:
-        monitor.end_phase({"final_duration": f"{final_video.duration:.1f}s"})
-        
-    # 6. Render
     # 🎬 CREATIVE DIRECTOR INTEGRATION: Use style name in filename
     if EDITING_INSTRUCTIONS is not None:
         style_name = EDITING_INSTRUCTIONS.get('style', {}).get('name', CUT_STYLE)
@@ -1785,41 +1860,196 @@ def create_montage(variant_id=1):
 
     output_filename = os.path.join(OUTPUT_DIR, f"gallery_montage_{JOB_ID}_v{variant_id}_{style_name}.mp4")
     
-    # === MONITORING: Render phase ===
+    # Check for logo files (for branding overlay)
+    logo_files = get_files(ASSETS_DIR, ('.png', '.jpg'))
+    logo_path = logo_files[0] if logo_files else None
+    
+    # === PROGRESSIVE RENDERING: Final composition using FFmpeg ===
+    if progressive_renderer:
+        print(f"\n   🔗 Finalizing with Progressive Renderer ({progressive_renderer.get_segment_count()} segments)...")
+        
+        # Start timing BEFORE finalize (this is the actual render time)
+        render_start_time = time.time()
+        
+        if monitor:
+            method = "ffmpeg_xfade" if enable_xfade else "ffmpeg_concat_copy"
+            monitor.log_render_start(output_filename, {
+                "codec": "libx264",
+                "method": method,
+                "segments": progressive_renderer.get_segment_count(),
+                "total_clips": progressive_renderer.get_total_clips(),
+                "xfade_enabled": enable_xfade,
+                "crf": FINAL_CRF,
+                "logo": os.path.basename(logo_path) if logo_path else None
+            })
+        
+        # Finalize: flush remaining clips and concatenate all segments with audio + logo
+        success = progressive_renderer.finalize(
+            output_path=output_filename,
+            audio_path=music_path,
+            logo_path=logo_path  # Logo overlay (if available)
+        )
+        
+        # Calculate render duration consistently with legacy path
+        render_duration = time.time() - render_start_time
+        
+        if success:
+            method_str = "xfade" if enable_xfade else "-c copy"
+            print(f"   ✅ Final video rendered via FFmpeg ({method_str}) in {render_duration:.1f}s")
+            if logo_path:
+                print(f"   🏷️ Logo overlay: {os.path.basename(logo_path)}")
+            
+            # Get stats for logging
+            stats = progressive_renderer.get_stats()
+            if monitor:
+                monitor.log_info("composition", f"Progressive render complete", stats)
+        else:
+            print(f"   ❌ Progressive render failed - attempting legacy fallback")
+            progressive_renderer = None  # Fall through to legacy path
+    
+    # === LEGACY FALLBACK: MoviePy-based composition ===
+    if not progressive_renderer:
+        # Initialize clips list if not already (for legacy path)
+        if 'clips' not in dir() or clips is None:
+            clips = []
+            
+        if batch_files:
+            print(f"   🔗 Legacy: Combining {len(batch_files)} batch files + {len(clips)} remaining clips...")
+            
+            # Render any remaining clips to a final batch
+            if clips:
+                final_batch_file = os.path.join(TEMP_DIR, f"batch_{JOB_ID}_final.mp4")
+                final_batch = concatenate_videoclips(clips, method="compose")
+                final_batch.write_videofile(
+                    final_batch_file,
+                    codec='libx264',
+                    audio=False,
+                    fps=30,
+                    preset='fast',
+                    threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
+                    verbose=False,
+                    logger=None
+                )
+                batch_files.append(final_batch_file)
+                
+                # Free memory
+                for clip in clips:
+                    try:
+                        clip.close()
+                    except:
+                        pass
+                final_batch.close()
+                clips = []
+                if FORCE_GC:
+                    gc.collect()
+            
+            # Load all batch files and concatenate (legacy - memory intensive!)
+            batch_clips = [VideoFileClip(bf) for bf in batch_files]
+            final_video = concatenate_videoclips(batch_clips, method="compose")
+            
+        else:
+            # No batching needed (small project) - use clips directly
+            if clips:
+                final_video = concatenate_videoclips(clips, method="compose")
+            else:
+                print("   ❌ No clips to compose!")
+                return None
+        
+        final_video = final_video.set_audio(audio_clip.subclip(0, current_time))
+        
+        # Render legacy way
+        print(f"   🎬 Rendering (legacy MoviePy)...")
+        final_video.write_videofile(
+            output_filename,
+            codec='libx264',
+            audio_codec='aac',
+            fps=30,
+            preset=FFMPEG_PRESET,
+            threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
+            verbose=False,
+            logger=None
+        )
+        
+        # Cleanup legacy
+        try:
+            final_video.close()
+            for bf in batch_files:
+                if os.path.exists(bf):
+                    os.remove(bf)
+        except:
+            pass
+    
+    # 5. Legacy Logo Overlay (only needed if progressive didn't handle it)
+    # Progressive renderer handles logo in finalize(), legacy needs separate pass
+    if not progressive_renderer and logo_path and 'final_video' in dir():
+        try:
+            logo = ImageClip(logo_path).set_duration(final_video.duration).resize(height=150).margin(right=50, top=50, opacity=0).set_pos(("right", "top"))
+            final_video = CompositeVideoClip([final_video, logo])
+            if monitor:
+                monitor.log_info("composition", f"Logo overlay added: {os.path.basename(logo_path)}")
+        except Exception as e:
+            print(f"   ⚠️ Logo overlay failed: {e}")
+    
     if monitor:
-        monitor.log_render_start(output_filename, {
-            "codec": "libx264",
-            "preset": FFMPEG_PRESET,
-            "crf": 18,
-            "fps": 30,
-            "duration": f"{final_video.duration:.1f}s"
-        })
+        if progressive_renderer:
+            stats = progressive_renderer.get_stats()
+            monitor.end_phase({"final_duration": f"{stats.get('total_duration', current_time):.1f}s", "method": "progressive_ffmpeg_copy"})
+        elif 'final_video' in dir() and final_video:
+            monitor.end_phase({"final_duration": f"{final_video.duration:.1f}s", "method": "legacy_moviepy"})
+        else:
+            monitor.end_phase({"method": "unknown"})
+    
+    # 6. Final Render (only needed for legacy path - progressive already rendered)
+    if progressive_renderer:
+        # Progressive render already completed in finalize() above
+        # Just cleanup temp files
+        progressive_renderer.cleanup()
+        
     else:
-        print(f"🚀 Rendering Variant #{variant_id} to {output_filename}...")
-        print(f"   Job-ID: {JOB_ID}")
-    
-    render_start_time = time.time()
-    
-    # Multi-threaded rendering with quality settings
-    # Using pixel format yuv420p for maximum compatibility
-    final_video.write_videofile(
-        output_filename,
-        codec='libx264',
-        audio_codec='aac',
-        fps=30,
-        preset=FFMPEG_PRESET,
-        threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,  # None = auto
-        ffmpeg_params=[
-            "-crf", "18",  # High quality (lower = better, 18 is visually lossless)
-            "-tune", "film",  # Optimize for film content
-            "-pix_fmt", "yuv420p",  # Standard pixel format for wide compatibility
-            "-level", "4.1",  # Compatibility
-            "-movflags", "+faststart"  # Web-optimized
-        ]
-    )
+        # Legacy MoviePy render path
+        # === MONITORING: Render phase ===
+        if monitor:
+            monitor.log_render_start(output_filename, {
+                "codec": "libx264",
+                "preset": FFMPEG_PRESET,
+                "crf": FINAL_CRF,
+                "fps": 30,
+                "duration": f"{final_video.duration:.1f}s" if 'final_video' in dir() else "unknown"
+            })
+        else:
+            print(f"🚀 Rendering Variant #{variant_id} to {output_filename}...")
+            print(f"   Job-ID: {JOB_ID}")
+        
+        render_start_time = time.time()
+        
+        # Multi-threaded rendering with quality settings (LEGACY PATH ONLY)
+        # Using pixel format yuv420p for maximum compatibility
+        final_video.write_videofile(
+            output_filename,
+            codec='libx264',
+            audio_codec='aac',
+            fps=30,
+            preset=FFMPEG_PRESET,
+            threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,  # None = auto
+            ffmpeg_params=[
+                "-crf", str(FINAL_CRF),  # Quality from env var
+                "-tune", "film",  # Optimize for film content
+                "-pix_fmt", "yuv420p",  # Standard pixel format for wide compatibility
+                "-profile:v", "high",  # H.264 profile for quality
+                "-level", "4.1",  # Compatibility
+                "-movflags", "+faststart"  # Web-optimized
+            ]
+        )
+        
+        render_duration = time.time() - render_start_time
     
     # === MONITORING: Render complete ===
-    render_duration_ms = (time.time() - render_start_time) * 1000
+    # Use correct render_duration based on path
+    if progressive_renderer:
+        render_duration_ms = render_duration * 1000  # Already set from finalize
+    else:
+        render_duration_ms = render_duration * 1000 if 'render_duration' in dir() else 0
+    
     if monitor:
         # Get file size
         try:
@@ -1835,29 +2065,30 @@ def create_montage(variant_id=1):
     cleanup_count = 0
     cleanup_size_mb = 0
 
-    # Clean up remaining clips (if any weren't batched)
-    for clip in clips:
-        # Delete temp files associated with this clip
-        if hasattr(clip, '_temp_files'):
-            for temp_file in clip._temp_files:
-                try:
-                    if os.path.exists(temp_file):
-                        size = os.path.getsize(temp_file) / (1024 * 1024)
-                        os.remove(temp_file)
-                        cleanup_count += 1
-                        cleanup_size_mb += size
-                except Exception as e:
-                    if monitor:
-                        monitor.log_warning("cleanup", f"Failed to delete {temp_file}: {e}")
+    # Clean up remaining clips (if any weren't batched) - LEGACY PATH
+    if 'clips' in dir() and clips:
+        for clip in clips:
+            # Delete temp files associated with this clip
+            if hasattr(clip, '_temp_files'):
+                for temp_file in clip._temp_files:
+                    try:
+                        if os.path.exists(temp_file):
+                            size = os.path.getsize(temp_file) / (1024 * 1024)
+                            os.remove(temp_file)
+                            cleanup_count += 1
+                            cleanup_size_mb += size
+                    except Exception as e:
+                        if monitor:
+                            monitor.log_warning("cleanup", f"Failed to delete {temp_file}: {e}")
 
-        # Close clip to free memory
-        try:
-            clip.close()
-        except Exception as e:
-            if monitor:
-                monitor.log_warning("cleanup", f"Failed to close clip: {e}")
+            # Close clip to free memory
+            try:
+                clip.close()
+            except Exception as e:
+                if monitor:
+                    monitor.log_warning("cleanup", f"Failed to close clip: {e}")
 
-    # Clean up batch files (if batch processing was used)
+    # Clean up batch files (if batch processing was used) - LEGACY PATH
     if 'batch_files' in dir() and batch_files:
         for bf in batch_files:
             try:
@@ -1884,11 +2115,12 @@ def create_montage(variant_id=1):
     except:
         pass
 
-    # Close final video
-    try:
-        final_video.close()
-    except:
-        pass
+    # Close final video (LEGACY PATH)
+    if 'final_video' in dir() and final_video:
+        try:
+            final_video.close()
+        except:
+            pass
 
     # Force garbage collection
     if FORCE_GC:
@@ -1909,11 +2141,21 @@ def create_montage(variant_id=1):
             if EDITING_INSTRUCTIONS is not None:
                 style_name = EDITING_INSTRUCTIONS.get('style_name', 'custom')
 
+            # Get final video duration from appropriate source
+            # Progressive path: use stats, Legacy path: use final_video.duration
+            if progressive_renderer:
+                final_video_duration = progressive_renderer.get_stats().get('total_duration', current_time)
+            elif 'final_video' in dir() and final_video:
+                final_video_duration = final_video.duration
+            else:
+                # Fallback to tracked timeline position
+                final_video_duration = current_time
+
             # Export to OTIO/EDL/CSV for professional NLE software
             exported_files = export_timeline_from_montage(
                 clips_metadata,
                 music_path,
-                final_video.duration,
+                final_video_duration,
                 output_dir=OUTPUT_DIR,
                 project_name=f"montage_{JOB_ID}_v{variant_id}_{style_name}",
                 generate_proxies=GENERATE_PROXIES
