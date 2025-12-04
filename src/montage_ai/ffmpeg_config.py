@@ -140,10 +140,30 @@ def detect_gpu_encoders() -> Dict[str, bool]:
     except Exception:
         return _gpu_cache
     
-    # Check each GPU encoder type
+    # Check each GPU encoder type with runtime verification
     for hwaccel_type, config in GPU_ENCODERS.items():
         encoder = config["h264"].lower()
-        _gpu_cache[hwaccel_type] = encoder in encoders_output
+        
+        # First check: encoder exists in ffmpeg
+        if encoder not in encoders_output:
+            _gpu_cache[hwaccel_type] = False
+            continue
+
+        # Second check: runtime test - actually try to use the encoder
+        # This catches cases where encoder is compiled in but GPU is unavailable
+        try:
+            test_result = subprocess.run(
+                [
+                    "ffmpeg", "-hide_banner", "-f", "lavfi",
+                    "-i", "color=black:s=64x64:d=0.1",
+                    "-c:v", config["h264"], "-f", "null", "-"
+                ],
+                capture_output=True, text=True, timeout=5
+            )
+            # Encoder works if return code is 0
+            _gpu_cache[hwaccel_type] = (test_result.returncode == 0)
+        except (subprocess.TimeoutExpired, Exception):
+            _gpu_cache[hwaccel_type] = False
     
     # Additional VAAPI check: verify device exists
     if _gpu_cache.get("vaapi"):
