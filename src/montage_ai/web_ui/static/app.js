@@ -158,6 +158,7 @@ async function createJob() {
     const upscale = document.getElementById('upscale').checked;
     const enhance = document.getElementById('enhance').checked;
     const cgpu = document.getElementById('cgpu').checked;
+    const llmClipSelection = document.getElementById('llmClipSelection').checked;
     const exportTimeline = document.getElementById('exportTimeline').checked;
     const generateProxies = document.getElementById('generateProxies').checked;
 
@@ -179,6 +180,7 @@ async function createJob() {
         upscale,
         enhance,
         cgpu,
+        llm_clip_selection: llmClipSelection,
         export_timeline: exportTimeline,
         generate_proxies: generateProxies,
         target_duration: targetDuration,

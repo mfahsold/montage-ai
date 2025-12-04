@@ -30,8 +30,8 @@ except ImportError:
 
 VERSION = "0.1.0"
 
-# Feature toggle
-LLM_CLIP_SELECTION = os.environ.get("LLM_CLIP_SELECTION", "false").lower() == "true"
+# Feature toggle - enabled by default for better clip selection
+LLM_CLIP_SELECTION = os.environ.get("LLM_CLIP_SELECTION", "true").lower() == "true"
 
 
 @dataclass

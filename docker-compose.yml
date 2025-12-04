@@ -44,6 +44,9 @@ services:
       - DIRECTOR_MODEL=${DIRECTOR_MODEL:-llama3.1:70b}
       - ENABLE_AI_FILTER=${ENABLE_AI_FILTER:-false}
       
+      # LLM-powered clip selection (uses configured LLM backend) - enabled by default
+      - LLM_CLIP_SELECTION=${LLM_CLIP_SELECTION:-true}
+      
       # Google AI (direct API - preferred for LLM)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GOOGLE_AI_MODEL=${GOOGLE_AI_MODEL:-gemini-2.0-flash}

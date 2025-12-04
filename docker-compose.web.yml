@@ -33,6 +33,8 @@ services:
       # Google AI (preferred LLM backend)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GOOGLE_AI_MODEL=${GOOGLE_AI_MODEL:-gemini-2.0-flash}
+      # LLM-powered clip selection (uses Ollama or Google AI) - enabled by default
+      - LLM_CLIP_SELECTION=${LLM_CLIP_SELECTION:-true}
       # cgpu Cloud GPU for upscaling
       - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-false}
       - CGPU_TIMEOUT=${CGPU_TIMEOUT:-1200}

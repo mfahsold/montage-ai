@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **MoviePy 2.x resize compatibility**: Fixed `TypeError: VideoClip.resized() got an unexpected keyword argument 'newsize'`
+  - MoviePy 2.x uses `new_size` (with underscore), not `newsize`
+  - `moviepy_compat.resize()` now correctly normalizes the parameter name
+  - This fixes the crash at Cut #12 when processing videos with different aspect ratios
+
 ### Added
+
+- **Modern Web UI Redesign** - Elegant, professional interface
+  - New animated SVG logo combining film reel with AI circuit design
+  - Inter font family for improved typography
+  - Gradient-based color scheme (indigo → purple)
+  - Option cards with icons, titles, and descriptions
+  - Highlighted "LLM Selection" option with golden accent
+  - Floating animation on logo
+  - Improved footer with Open Source badge
+  - Better responsive design for mobile
+
+- **LLM Clip Selection Toggle** - Web UI control for AI-powered clip choices
+  - New checkbox "🧠 LLM Selection" in configuration section
+  - Sends `llm_clip_selection` to backend API
+  - Sets `LLM_CLIP_SELECTION` env var per job in subprocess
+  - Added to `docker-compose.yml` and `docker-compose.web.yml`
+  - **Enabled by default** for better clip selection quality
+
+- **GPU Cluster Architecture Documentation** (`docs/GPU_CLUSTER_ARCHITECTURE.md`)
+  - Comprehensive planning document for GPU offloading and cluster distribution
+  - Workload analysis: CPU vs GPU for beat detection, scene detection, encoding
+  - cgpu extension strategy: Beat detection, scene detection, encoding on cloud GPU
+  - Kubernetes distributed processing architecture with Redis task queue
+  - Implementation phases and timeline (8 weeks total)
+  - Performance expectations and break-even analysis
 
 - **FFmpeg Config Module** (`ffmpeg_config.py`) - DRY centralization
   - Single source of truth for all FFmpeg encoding parameters
@@ -24,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dimension helpers: `enforce_dimensions`, `pad_to_target`, `ensure_even_dimensions`
   - Unified logging: `log_clip_info` replaces scattered print statements
   - Future MoviePy API changes only need updates in one file
+- **UI toggle for LLM Clip Selection**
+  - Web UI adds an `LLM Clip Selection` checkbox
+  - Backend sends `LLM_CLIP_SELECTION` per job to the editor process
+  - docker-compose.yml / docker-compose.web.yml expose `LLM_CLIP_SELECTION` env default
 
 ### Changed
 
@@ -57,6 +92,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Single place to modify encoding defaults for entire project
 
 ### Fixed
+
+- **Web UI: Job Status Detection Improved** - Video download now works correctly
+  - Fixed: Jobs showing "failed" even when video was successfully created
+  - Root cause: Python RuntimeWarnings causing non-zero exit code despite success
+  - Solution: Check for output file existence in addition to return code
+  - Now: Job shows "completed" if output file exists, regardless of warnings
+
+- **LLM_CLIP_SELECTION Missing from Docker Compose**
+  - Added `LLM_CLIP_SELECTION` env var to `docker-compose.yml` and `docker-compose.web.yml`
+  - Enables LLM-powered clip selection when set to `true`
+  - Default: `false` (heuristic selection for faster processing)
 
 - **MoviePy 2.x: crossfadein/crossfadeout Removed** - Critical runtime fix
   - Error: `got an unexpected keyword argument 'verbose'` during clip rendering

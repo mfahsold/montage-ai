@@ -5,19 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Montage AI - Self-Hosted Video Editing</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
+        <!-- Header with new Logo -->
         <header>
-            <h1>🎬 Montage AI</h1>
-            <p class="subtitle">AI-powered video montage with beat-synchronized editing</p>
+            <div class="logo-container">
+                <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Film reel outer ring -->
+                    <circle cx="32" cy="32" r="28" stroke="url(#gradient1)" stroke-width="3" fill="none"/>
+                    <!-- Inner film holes -->
+                    <circle cx="32" cy="14" r="4" fill="url(#gradient1)"/>
+                    <circle cx="32" cy="50" r="4" fill="url(#gradient1)"/>
+                    <circle cx="14" cy="32" r="4" fill="url(#gradient1)"/>
+                    <circle cx="50" cy="32" r="4" fill="url(#gradient1)"/>
+                    <!-- AI brain/circuit in center -->
+                    <circle cx="32" cy="32" r="12" fill="url(#gradient2)"/>
+                    <path d="M26 32h4m4 0h4M32 26v4m0 4v4" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="32" cy="32" r="3" fill="white"/>
+                    <!-- Sparkle accents -->
+                    <circle cx="44" cy="20" r="2" fill="#f59e0b"/>
+                    <circle cx="20" cy="44" r="1.5" fill="#8b5cf6"/>
+                    <!-- Gradient definitions -->
+                    <defs>
+                        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#3b82f6"/>
+                            <stop offset="100%" stop-color="#8b5cf6"/>
+                        </linearGradient>
+                        <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#3b82f6"/>
+                            <stop offset="50%" stop-color="#6366f1"/>
+                            <stop offset="100%" stop-color="#8b5cf6"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="logo-text">
+                    <h1>Montage<span class="logo-ai">AI</span></h1>
+                    <p class="subtitle">Beat-synchronized video editing powered by AI</p>
+                </div>
+            </div>
             <span class="version">v{{ version }}</span>
         </header>
 
         <!-- Upload Section -->
         <section class="card">
-            <h2>1. Upload Media</h2>
+            <h2><span class="section-icon">📁</span> Upload Media</h2>
             <div class="upload-area">
                 <div class="upload-box">
                     <h3>📹 Videos</h3>
@@ -41,18 +76,18 @@
 
         <!-- Configuration Section -->
         <section class="card">
-            <h2>2. Configure Montage</h2>
+            <h2><span class="section-icon">⚙️</span> Configure Montage</h2>
 
             <div class="form-group">
-                <label for="style">Style</label>
+                <label for="style">Style Preset</label>
                 <select id="style">
-                    <option value="dynamic">Dynamic (Default)</option>
-                    <option value="hitchcock">Hitchcock (Suspense)</option>
-                    <option value="mtv">MTV (Fast Cuts)</option>
-                    <option value="action">Action (Michael Bay)</option>
-                    <option value="documentary">Documentary</option>
-                    <option value="minimalist">Minimalist</option>
-                    <option value="wes_anderson">Wes Anderson</option>
+                    <option value="dynamic">🎯 Dynamic (Default)</option>
+                    <option value="hitchcock">🎬 Hitchcock (Suspense)</option>
+                    <option value="mtv">⚡ MTV (Fast Cuts)</option>
+                    <option value="action">💥 Action (Michael Bay)</option>
+                    <option value="documentary">📹 Documentary</option>
+                    <option value="minimalist">🌿 Minimalist</option>
+                    <option value="wes_anderson">🎨 Wes Anderson</option>
                 </select>
             </div>
 
@@ -105,45 +140,103 @@
             </div>
 
             <div class="options-grid">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="enhance" checked>
-                    <span>✨ Enhance (Color & Sharpness)</span>
+                <label class="checkbox-label option-card">
+                    <input type="checkbox" id="enhance" {{ 'checked' if defaults.enhance else '' }}>
+                    <span class="option-content">
+                        <span class="option-icon">✨</span>
+                        <span class="option-text">
+                            <span class="option-title">Enhance</span>
+                            <span class="option-desc">Color & Sharpness</span>
+                        </span>
+                    </span>
                 </label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="stabilize">
-                    <span>⚖️ Stabilize</span>
+                <label class="checkbox-label option-card">
+                    <input type="checkbox" id="stabilize" {{ 'checked' if defaults.stabilize else '' }}>
+                    <span class="option-content">
+                        <span class="option-icon">⚖️</span>
+                        <span class="option-text">
+                            <span class="option-title">Stabilize</span>
+                            <span class="option-desc">Smooth shaky footage</span>
+                        </span>
+                    </span>
                 </label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="upscale">
-                    <span>🔍 AI Upscale (Slow!)</span>
+                <label class="checkbox-label option-card">
+                    <input type="checkbox" id="upscale" {{ 'checked' if defaults.upscale else '' }}>
+                    <span class="option-content">
+                        <span class="option-icon">🔍</span>
+                        <span class="option-text">
+                            <span class="option-title">AI Upscale</span>
+                            <span class="option-desc">Higher resolution (slow)</span>
+                        </span>
+                    </span>
                 </label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="cgpu">
-                    <span>☁️ Use Cloud GPU (cgpu)</span>
+                <label class="checkbox-label option-card">
+                    <input type="checkbox" id="cgpu" {{ 'checked' if defaults.cgpu else '' }}>
+                    <span class="option-content">
+                        <span class="option-icon">☁️</span>
+                        <span class="option-text">
+                            <span class="option-title">Cloud GPU</span>
+                            <span class="option-desc">Use cgpu for processing</span>
+                        </span>
+                    </span>
                 </label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="exportTimeline">
-                    <span>📽️ Export Timeline (OTIO/EDL)</span>
+                <label class="checkbox-label option-card highlight">
+                    <input type="checkbox" id="llmClipSelection" {{ 'checked' if defaults.llm_clip_selection else '' }}>
+                    <span class="option-content">
+                        <span class="option-icon">🧠</span>
+                        <span class="option-text">
+                            <span class="option-title">LLM Selection</span>
+                            <span class="option-desc">AI-powered clip choices</span>
+                        </span>
+                    </span>
                 </label>
-                <label class="checkbox-label">
+                <label class="checkbox-label option-card">
+                    <input type="checkbox" id="exportTimeline" {{ 'checked' if defaults.export_timeline else '' }}>
+                    <span class="option-content">
+                        <span class="option-icon">📽️</span>
+                        <span class="option-text">
+                            <span class="option-title">Export Timeline</span>
+                            <span class="option-desc">OTIO/EDL for NLE</span>
+                        </span>
+                    </span>
+                </label>
+                <label class="checkbox-label option-card">
                     <input type="checkbox" id="generateProxies">
-                    <span>🎞️ Generate Proxies</span>
+                    <span class="option-content">
+                        <span class="option-icon">🎞️</span>
+                        <span class="option-text">
+                            <span class="option-title">Generate Proxies</span>
+                            <span class="option-desc">Low-res editing copies</span>
+                        </span>
+                    </span>
                 </label>
             </div>
 
-            <button onclick="createJob()" class="btn-primary">🚀 Create Montage</button>
+            <button onclick="createJob()" class="btn-primary btn-large">
+                <span class="btn-icon">🚀</span>
+                Create Montage
+            </button>
         </section>
 
         <!-- Jobs Section -->
         <section class="card">
-            <h2>3. Jobs & Output</h2>
-            <button onclick="refreshJobs()" class="btn-secondary">🔄 Refresh</button>
+            <h2><span class="section-icon">📊</span> Jobs & Output</h2>
+            <button onclick="refreshJobs()" class="btn-secondary btn-refresh">
+                <span class="btn-icon">🔄</span> Refresh
+            </button>
             <div id="jobsList"></div>
         </section>
 
         <!-- Footer -->
         <footer>
-            <p>Open Source | <a href="https://github.com/mfahsold/montage-ai" target="_blank">GitHub</a> | <a href="/api/status">API Status</a></p>
+            <div class="footer-content">
+                <p>
+                    <span class="footer-badge">Open Source</span>
+                    <a href="https://github.com/mfahsold/montage-ai" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    <span class="footer-divider">•</span>
+                    <a href="/api/status">API Status</a>
+                </p>
+            </div>
         </footer>
     </div>
 

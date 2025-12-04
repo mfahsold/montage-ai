@@ -59,6 +59,19 @@ INPUT_DIR.mkdir(parents=True, exist_ok=True)
 MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# =============================================================================
+# DEFAULT OPTIONS (single source of truth - controlled via environment)
+# =============================================================================
+DEFAULT_OPTIONS = {
+    "enhance": os.environ.get("DEFAULT_ENHANCE", "true").lower() == "true",
+    "stabilize": os.environ.get("DEFAULT_STABILIZE", "false").lower() == "true",
+    "upscale": os.environ.get("DEFAULT_UPSCALE", "false").lower() == "true",
+    "cgpu": os.environ.get("DEFAULT_CGPU", "false").lower() == "true",
+    "llm_clip_selection": os.environ.get("LLM_CLIP_SELECTION", "true").lower() == "true",
+    "export_timeline": os.environ.get("DEFAULT_EXPORT_TIMELINE", "false").lower() == "true",
+    "generate_proxies": os.environ.get("DEFAULT_GENERATE_PROXIES", "false").lower() == "true",
+}
+
 # Flask app
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max upload
@@ -147,14 +160,22 @@ def normalize_options(data: dict) -> dict:
     if music_end is not None:
         music_end = max(music_start + 1, music_end)  # At least 1s after start
     
+    # Helper to get boolean with centralized default
+    def get_bool(key: str) -> bool:
+        val = opts.get(key, data.get(key))
+        if val is None:
+            return DEFAULT_OPTIONS.get(key, False)
+        return bool(val)
+    
     return {
         "prompt": str(opts.get('prompt', data.get('prompt', ''))),
-        "stabilize": bool(opts.get('stabilize', data.get('stabilize', False))),
-        "upscale": bool(opts.get('upscale', data.get('upscale', False))),
-        "enhance": bool(opts.get('enhance', data.get('enhance', True))),
-        "export_timeline": bool(opts.get('export_timeline', data.get('export_timeline', False))),
-        "generate_proxies": bool(opts.get('generate_proxies', data.get('generate_proxies', False))),
-        "cgpu": bool(opts.get('cgpu', data.get('cgpu', False))),
+        "stabilize": get_bool('stabilize'),
+        "upscale": get_bool('upscale'),
+        "enhance": get_bool('enhance'),
+        "llm_clip_selection": get_bool('llm_clip_selection'),
+        "export_timeline": get_bool('export_timeline'),
+        "generate_proxies": get_bool('generate_proxies'),
+        "cgpu": get_bool('cgpu'),
         "target_duration": target_duration,
         "music_start": music_start,
         "music_end": music_end,
@@ -184,18 +205,20 @@ def run_montage(job_id: str, style: str, options: dict):
         cmd = ["python", "-m", "montage_ai.editor"]
 
         # Set environment variables
+        # options dict is already normalized via normalize_options() with DEFAULT_OPTIONS
         env = os.environ.copy()
         env["JOB_ID"] = job_id
         env["CUT_STYLE"] = style
         env["CREATIVE_PROMPT"] = options.get("prompt", "")
-        env["STABILIZE"] = "true" if options.get("stabilize", False) else "false"
-        env["UPSCALE"] = "true" if options.get("upscale", False) else "false"
-        env["ENHANCE"] = "true" if options.get("enhance", True) else "false"
-        env["EXPORT_TIMELINE"] = "true" if options.get("export_timeline", False) else "false"
-        env["GENERATE_PROXIES"] = "true" if options.get("generate_proxies", False) else "false"
+        env["STABILIZE"] = "true" if options.get("stabilize") else "false"
+        env["UPSCALE"] = "true" if options.get("upscale") else "false"
+        env["ENHANCE"] = "true" if options.get("enhance") else "false"
+        env["LLM_CLIP_SELECTION"] = "true" if options.get("llm_clip_selection") else "false"
+        env["EXPORT_TIMELINE"] = "true" if options.get("export_timeline") else "false"
+        env["GENERATE_PROXIES"] = "true" if options.get("generate_proxies") else "false"
         # cgpu checkbox enables BOTH LLM and GPU upscaling
-        env["CGPU_ENABLED"] = "true" if options.get("cgpu", False) else "false"
-        env["CGPU_GPU_ENABLED"] = "true" if options.get("cgpu", False) else "false"
+        env["CGPU_ENABLED"] = "true" if options.get("cgpu") else "false"
+        env["CGPU_GPU_ENABLED"] = "true" if options.get("cgpu") else "false"
         # Video duration & music trimming (already normalized by normalize_options)
         env["TARGET_DURATION"] = str(options.get("target_duration", 0))
         env["MUSIC_START"] = str(options.get("music_start", 0))
@@ -214,15 +237,22 @@ def run_montage(job_id: str, style: str, options: dict):
 
         # Update job status
         with job_lock:
-            if result.returncode == 0:
+            # Find output files (check regardless of return code - video may succeed despite warnings)
+            output_pattern = f"*{job_id}*.mp4"
+            output_files = list(OUTPUT_DIR.glob(output_pattern))
+            
+            # Success if: return code 0 OR output file exists
+            # Python warnings (like RuntimeWarning) can cause non-zero exit even on success
+            if result.returncode == 0 or output_files:
                 jobs[job_id]["status"] = "completed"
                 jobs[job_id]["completed_at"] = datetime.now().isoformat()
 
-                # Find output files
-                output_pattern = f"*{job_id}*.mp4"
-                output_files = list(OUTPUT_DIR.glob(output_pattern))
                 if output_files:
                     jobs[job_id]["output_file"] = str(output_files[0].name)
+                
+                # Log warning if non-zero exit but file exists
+                if result.returncode != 0 and output_files:
+                    jobs[job_id]["warning"] = f"Process exited with code {result.returncode} but output was created successfully"
 
                 # Timeline files (if exported)
                 if options.get("export_timeline"):
@@ -264,7 +294,7 @@ def run_montage(job_id: str, style: str, options: dict):
 @app.route('/')
 def index():
     """Main page."""
-    return render_template('index.html', version=VERSION)
+    return render_template('index.html', version=VERSION, defaults=DEFAULT_OPTIONS)
 
 
 @app.route('/api/status')

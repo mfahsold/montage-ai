@@ -108,10 +108,20 @@ def rotate(clip, angle, expand=True):
 def resize(clip, **kwargs):
     """Resize clip - works with MoviePy 1.x and 2.x.
     
-    Args:
-        clip: VideoFileClip or ImageClip
-        **kwargs: newsize=(w,h) or width=x or height=y
+    Handles parameter naming differences:
+    - MoviePy 1.x: `newsize=(w,h)` or `width`/`height`  
+    - MoviePy 2.x: `new_size=(w,h)` (with underscore!) or `width`/`height`
+    
+    IMPORTANT: When both width and height are specified, MoviePy 2.x
+    keeps aspect ratio. Use new_size=(w,h) for exact dimensions.
+    
+    Accepts any of these and normalizes for the installed version.
     """
+    # Normalize newsize -> new_size for MoviePy 2.x compatibility
+    if 'newsize' in kwargs:
+        kwargs['new_size'] = kwargs.pop('newsize')
+    
+    # For MoviePy 2.x: new_size works for exact dimensions
     if hasattr(clip, 'resized'):
         return clip.resized(**kwargs)
     return clip.resize(**kwargs)
