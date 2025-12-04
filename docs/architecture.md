@@ -338,14 +338,26 @@ The system uses `ProgressiveRenderer` (in `segment_writer.py`) to prevent OOM cr
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Key Constants (DRY):**
-| Constant           | Value   | Purpose                      |
-| ------------------ | ------- | ---------------------------- |
-| `STANDARD_WIDTH`   | 1080    | Target width (9:16 vertical) |
-| `STANDARD_HEIGHT`  | 1920    | Target height                |
-| `STANDARD_FPS`     | 30      | Frame rate                   |
-| `STANDARD_PIX_FMT` | yuv420p | Pixel format                 |
-| `STANDARD_PROFILE` | high    | H.264 profile                |
+**Key Constants (Dynamically Determined):**
+
+These constants are automatically determined from input footage using `determine_output_profile()`:
+
+| Constant           | Default | Determination Method                                           |
+| ------------------ | ------- | -------------------------------------------------------------- |
+| `STANDARD_WIDTH`   | 1080    | Weighted median of input widths, snapped to standard presets   |
+| `STANDARD_HEIGHT`  | 1920    | Weighted median of input heights, snapped to standard presets  |
+| `STANDARD_FPS`     | 30      | Weighted median of input frame rates                           |
+| `STANDARD_PIX_FMT` | yuv420p | Dominant pixel format from inputs (by duration)                |
+| `TARGET_CODEC`     | libx264 | Dominant codec from inputs, or env `OUTPUT_CODEC`              |
+| `TARGET_PROFILE`   | high    | Auto-selected based on resolution (4.1 for HD, 5.1 for 4K)     |
+| `TARGET_BITRATE`   | auto    | Weighted median of input bitrates, or calculated from pixels   |
+
+**Output Profile Heuristics:**
+
+- Orientation (horizontal/vertical/square) determined by weighted aspect ratios
+- Resolution snapped to common presets (1080p, 720p, 4K) if within 12% variance
+- Avoids upscaling beyond maximum input resolution
+- Honors environment overrides: `OUTPUT_CODEC`, `OUTPUT_PIX_FMT`, `OUTPUT_PROFILE`, `OUTPUT_LEVEL`
 
 ---
 

@@ -10,12 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Automatic Output Format Detection** - Intelligent heuristics for optimal output
-  - `determine_output_profile()` analyzes all input footage
+  - `determine_output_profile()` analyzes all input footage (codec, dimensions, fps, pix_fmt, bitrate)
   - Weighted median by duration for orientation, aspect ratio, resolution, fps
   - Snaps to common presets (16:9, 9:16, 1:1, 4:3) when within 8%
   - Auto-selects codec (h264/h265) based on dominant input
+  - Auto-selects pixel format based on dominant input (yuv420p/yuv422p/etc.)
+  - Estimates target bitrate from input median or calculates from resolution
   - Avoids unnecessary transcoding when footage is homogeneous
-  - Logs decision reasoning for transparency
+  - Logs decision reasoning with verbose input analysis when `VERBOSE=true`
+  - Honors environment overrides: `OUTPUT_CODEC`, `OUTPUT_PIX_FMT`, `OUTPUT_PROFILE`, `OUTPUT_LEVEL`
 
 - **Centralized Standard Constants (DRY)** - Single source of truth for video parameters
   - `STANDARD_WIDTH=1080`, `STANDARD_HEIGHT=1920` defined in `segment_writer.py`

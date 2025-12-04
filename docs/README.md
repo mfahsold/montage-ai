@@ -17,8 +17,3 @@ Technical documentation for Montage AI.
 | [Architecture](architecture.md) | System design and data flow        |
 | [AI Director](AI_DIRECTOR.md)   | LLM integration and prompt parsing |
 | [Models](models.md)             | AI model choices and rationale     |
-| [Decisions](decisions.md)       | Architecture decision records      |
-
-## Archive
-
-Internal development notes in [archive/](archive/) (not user-facing).

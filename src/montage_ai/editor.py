@@ -433,12 +433,12 @@ def _even_int(value: float) -> int:
 
 
 def ffprobe_video_metadata(video_path: str) -> Optional[Dict[str, Any]]:
-    """Lightweight ffprobe wrapper to extract width/height/fps/codec/pix_fmt/duration."""
+    """Lightweight ffprobe wrapper to extract width/height/fps/codec/pix_fmt/duration/bitrate."""
     try:
         cmd = [
             "ffprobe", "-v", "error",
             "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,codec_name,pix_fmt,r_frame_rate,avg_frame_rate:format=duration",
+            "-show_entries", "stream=width,height,codec_name,pix_fmt,r_frame_rate,avg_frame_rate,bit_rate:format=duration,bit_rate",
             "-of", "json",
             video_path
         ]
@@ -457,6 +457,9 @@ def ffprobe_video_metadata(video_path: str) -> Optional[Dict[str, Any]]:
         codec = (stream.get("codec_name") or "unknown").lower()
         pix_fmt = (stream.get("pix_fmt") or "unknown").lower()
 
+        # Try to get bitrate from stream or format
+        bitrate = int(stream.get("bit_rate") or format_info.get("bit_rate") or 0)
+
         return {
             "path": video_path,
             "width": width,
@@ -464,7 +467,8 @@ def ffprobe_video_metadata(video_path: str) -> Optional[Dict[str, Any]]:
             "fps": fps,
             "duration": duration if duration > 0 else 1.0,  # avoid zero weights
             "codec": codec,
-            "pix_fmt": pix_fmt
+            "pix_fmt": pix_fmt,
+            "bitrate": bitrate
         }
     except Exception as exc:
         print(f"   ⚠️ ffprobe failed for {os.path.basename(video_path)}: {exc}")
@@ -596,6 +600,33 @@ def determine_output_profile(video_files: List[str]) -> Dict[str, Any]:
     dominant_input_codec = max(input_codec_weights.items(), key=lambda kv: kv[1])[0] if input_codec_weights else "h264"
     target_codec = codec_map.get(env_codec.lower(), "libx264") if env_codec else codec_map.get(dominant_input_codec, "libx264")
 
+    # Pixel format selection: honor env override, otherwise use dominant input pix_fmt
+    env_pix_fmt = os.environ.get("OUTPUT_PIX_FMT")
+    if env_pix_fmt:
+        target_pix_fmt = env_pix_fmt
+    else:
+        # Find dominant pixel format by weighted duration
+        pix_fmt_weights: Dict[str, float] = {}
+        for meta, weight in zip(metadata, weights):
+            pf = meta.get("pix_fmt", "yuv420p")
+            pix_fmt_weights[pf] = pix_fmt_weights.get(pf, 0.0) + weight
+
+        dominant_pix_fmt = max(pix_fmt_weights.items(), key=lambda kv: kv[1])[0] if pix_fmt_weights else "yuv420p"
+
+        # Use dominant if it's compatible, otherwise fallback to yuv420p for maximum compatibility
+        compatible_formats = ["yuv420p", "yuv422p", "yuv444p", "yuvj420p", "yuvj422p", "yuvj444p"]
+        target_pix_fmt = dominant_pix_fmt if dominant_pix_fmt in compatible_formats else "yuv420p"
+
+    # Bitrate estimation: use weighted median of input bitrates, or calculate from resolution
+    bitrates = [m["bitrate"] for m in metadata if m.get("bitrate", 0) > 0]
+    if bitrates:
+        bitrate_weights = [weights[i] for i, m in enumerate(metadata) if m.get("bitrate", 0) > 0]
+        target_bitrate = int(_weighted_median(bitrates, bitrate_weights))
+    else:
+        # Fallback heuristic: ~0.1 bits per pixel at 30fps
+        pixels_per_frame = target_w * target_h
+        target_bitrate = int(pixels_per_frame * target_fps * 0.1)
+
     # Profile/level: keep safe defaults, bump level for 4K/high fps
     high_res = max_long_side >= 3200 or target_fps > 60
     if target_codec == "libx265":
@@ -609,10 +640,11 @@ def determine_output_profile(video_files: List[str]) -> Dict[str, Any]:
         "width": target_w,
         "height": target_h,
         "fps": target_fps,
-        "pix_fmt": OUTPUT_PIX_FMT,
+        "pix_fmt": target_pix_fmt,
         "codec": target_codec,
         "profile": target_profile,
         "level": target_level,
+        "bitrate": target_bitrate,
         "orientation": orientation,
         "aspect_ratio": ratio_name,
         "source_summary": {
@@ -621,9 +653,13 @@ def determine_output_profile(video_files: List[str]) -> Dict[str, Any]:
             "median_long_side": long_med,
             "median_short_side": short_med,
             "dominant_codec": dominant_input_codec,
-            "fps_selected": target_fps
+            "dominant_pix_fmt": pix_fmt_weights.get(max(pix_fmt_weights, key=lambda k: pix_fmt_weights[k])) if 'pix_fmt_weights' in locals() else "yuv420p",
+            "fps_selected": target_fps,
+            "bitrate_median": target_bitrate,
+            "total_input_files": len(metadata),
+            "total_input_duration": sum(weights)
         },
-        "reason": f"{orientation} dominant; snapped to {ratio_name} aspect"
+        "reason": f"{orientation} dominant; snapped to {ratio_name} aspect; {dominant_input_codec} codec with {target_pix_fmt}"
     }
 
 
@@ -1239,6 +1275,17 @@ def create_montage(variant_id=1):
     print(f"   Resolution:  {STANDARD_WIDTH}x{STANDARD_HEIGHT}")
     print(f"   Frame rate:  {STANDARD_FPS:.2f} fps")
     print(f"   Codec:       {OUTPUT_CODEC} (profile={OUTPUT_PROFILE or 'auto'}, level={OUTPUT_LEVEL or 'auto'})")
+    print(f"   Pixel fmt:   {OUTPUT_PIX_FMT}")
+    if output_profile.get('bitrate', 0) > 0:
+        bitrate_mbps = output_profile['bitrate'] / 1_000_000
+        print(f"   Bitrate:     {bitrate_mbps:.1f} Mbps (from input median)")
+
+    if VERBOSE:
+        summary = output_profile.get('source_summary', {})
+        print(f"\n   📊 Input analysis:")
+        print(f"      Files:     {summary.get('total_input_files', 0)} videos ({summary.get('total_input_duration', 0):.1f}s total)")
+        print(f"      Dominant:  {summary.get('dominant_codec', 'n/a')} @ {summary.get('dominant_pix_fmt', 'n/a')}")
+        print(f"      Reason:    {output_profile.get('reason', 'default')}")
 
     if monitor:
         monitor.log_info("output_profile", "Selected output format", output_profile)
