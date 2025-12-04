@@ -20,7 +20,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Progressive renderer receives `audio_duration` for FFmpeg `atrim` filter
   - Deprecation fix: Replaced `subclip()` with `subclipped()` (MoviePy 2.x)
 
+- **Auto-Derive MUSIC_END from TARGET_DURATION** - UX improvement
+  - When user sets target duration but doesn't manually trim music, 
+    `MUSIC_END` is now auto-derived as `MUSIC_START + TARGET_DURATION`
+  - Ensures audio always matches target video length
+  - New `normalize_options()` helper centralizes option parsing (DRY principle)
+
+- **Log Output Chaos Fixed** - TQDM progress bars no longer interleave with logs
+  - Set `TQDM_DISABLE=true` globally at module load
+  - All `write_videofile()` calls now have `logger=None, verbose=False`
+  - Clean, sequential log output in Web UI
+
+- **MP4 Download Improved** - Better error handling and MIME types
+  - Explicit `mimetype='video/mp4'` for video downloads
+  - Added `download_name` parameter for consistent filenames
+  - Debug logging when file not found
+
 ### Added
+
+- **AI Agent Instructions** (`.github/agents.md`)
+  - KISS/DRY principles for code contributions
+  - Architecture patterns and file ownership
+  - Common pitfalls and quick reference commands
 
 - **Automatic Output Format Detection** - Intelligent heuristics for optimal output
   - `determine_output_profile()` analyzes all input footage (codec, dimensions, fps, pix_fmt, bitrate)

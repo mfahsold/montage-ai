@@ -383,13 +383,26 @@ def api_list_jobs():
 
 @app.route('/api/download/<filename>', methods=['GET'])
 def api_download(filename):
-    """Download output file."""
-    filepath = OUTPUT_DIR / secure_filename(filename)
+    """Download output file with proper MIME type."""
+    # secure_filename sanitizes but preserves the base name
+    safe_filename = secure_filename(filename)
+    filepath = OUTPUT_DIR / safe_filename
 
     if not filepath.exists():
-        return jsonify({"error": "File not found"}), 404
+        # Debug: log what we're looking for
+        print(f"⚠️ Download requested but file not found: {filepath}")
+        print(f"   Available files: {list(OUTPUT_DIR.glob('*.mp4'))[:5]}")
+        return jsonify({"error": f"File not found: {safe_filename}"}), 404
 
-    return send_file(filepath, as_attachment=True)
+    # Explicit MIME type for video files
+    mimetype = 'video/mp4' if safe_filename.endswith('.mp4') else None
+    
+    return send_file(
+        filepath, 
+        as_attachment=True,
+        download_name=safe_filename,  # Explicit filename for download
+        mimetype=mimetype
+    )
 
 
 @app.route('/api/styles', methods=['GET'])

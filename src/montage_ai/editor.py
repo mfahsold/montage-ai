@@ -22,6 +22,11 @@ import gc
 import requests
 import numpy as np
 from datetime import datetime
+
+# Disable TQDM progress bars globally - they create chaotic output when mixed with logs
+# This affects librosa, moviepy, and any other library using tqdm
+os.environ["TQDM_DISABLE"] = "true"
+
 import librosa
 import cv2
 import base64
@@ -2465,7 +2470,9 @@ def create_montage(variant_id=1):
                 "-crf", str(FINAL_CRF),  # Quality from env var
                 "-tune", "film",  # Optimize for film content
                 "-movflags", "+faststart"  # Web-optimized
-            ]
+            ],
+            verbose=False,
+            logger=None  # Suppress tqdm progress bars
         )
         
         render_duration = time.time() - render_start_time
