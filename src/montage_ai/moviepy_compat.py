@@ -239,11 +239,17 @@ def pad_to_target(clip, target_w: int, target_h: int):
     )
 
 
-def enforce_dimensions(clip, target_w: int, target_h: int, verbose: bool = True):
+def enforce_dimensions(
+    clip, 
+    target_w: int, 
+    target_h: int, 
+    verbose: bool = True,
+    preserve_aspect: bool = False
+):
     """Ensure clip has exact target dimensions via crop/pad.
     
     Handles:
-    1. Aspect ratio correction (crop to target ratio)
+    1. Aspect ratio correction (crop to target ratio, or letterbox if preserve_aspect=True)
     2. Scaling to target size
     3. Corrective crop/pad for off-by-one errors
     4. Even dimension enforcement
@@ -253,6 +259,8 @@ def enforce_dimensions(clip, target_w: int, target_h: int, verbose: bool = True)
         target_w: Exact target width
         target_h: Exact target height
         verbose: Print progress info
+        preserve_aspect: If True, use letterbox/pillarbox instead of cropping
+                        (adds black bars to preserve full frame content)
         
     Returns:
         Processed clip with exact dimensions
@@ -264,7 +272,38 @@ def enforce_dimensions(clip, target_w: int, target_h: int, verbose: bool = True)
     if verbose:
         log_clip_info("Input", clip, f"ratio={current_ratio:.3f}")
     
-    # Step 1: Crop to target aspect ratio
+    # Letterbox/Pillarbox mode: Scale to fit, add black bars
+    if preserve_aspect:
+        # Calculate scaling to fit within target while preserving aspect ratio
+        scale_w = target_w / w
+        scale_h = target_h / h
+        scale = min(scale_w, scale_h)  # Fit inside target
+        
+        new_w = round(w * scale)
+        new_h = round(h * scale)
+        
+        # Ensure even dimensions for the scaled size
+        new_w = new_w if new_w % 2 == 0 else new_w - 1
+        new_h = new_h if new_h % 2 == 0 else new_h - 1
+        
+        if verbose:
+            if scale_w < scale_h:
+                print(f"  📦 Letterbox mode: {w}x{h} → {new_w}x{new_h} (pillarbox)")
+            else:
+                print(f"  📦 Letterbox mode: {w}x{h} → {new_w}x{new_h} (letterbox)")
+        
+        # Scale the clip
+        clip = resize(clip, newsize=(new_w, new_h))
+        
+        # Add black padding to reach target size
+        clip = pad_to_target(clip, target_w, target_h)
+        
+        if verbose:
+            log_clip_info("Output", clip, "✅ (letterboxed)")
+        
+        return clip
+    
+    # Standard crop mode: Crop to match target aspect ratio
     if current_ratio > target_ratio + 0.01:
         # Video is wider - crop width
         new_w = round(h * target_ratio)

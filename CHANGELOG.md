@@ -7,12 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **GPU Hardware Acceleration for Video Encoding** (`ffmpeg_config.py`)
+  - Auto-detection of available GPU encoders (NVENC, VAAPI, QSV, VideoToolbox)
+  - New env var `FFMPEG_HWACCEL`: auto, nvenc, vaapi, qsv, videotoolbox, none
+  - Automatic fallback to CPU encoding if GPU not available
+  - Preset mapping for different GPU encoder families
+  - Quality parameter translation (CRF → CQ for NVENC, QP for VAAPI)
+  - Hardware-accelerated decoding support (`hwaccel_input_params()`)
+  - New `effective_codec` property returns GPU encoder when HW-accel active
+  - `OUTPUT_CODEC` now correctly uses GPU encoder (e.g., `h264_nvenc`) in MoviePy path
+  - GPU status display at editor startup shows effective codec
+  - `docker-compose.yml` updated with `/dev/dri` device access for VAAPI
+
+- **Letterbox/Pillarbox Mode** (`PRESERVE_ASPECT`)
+  - New env var `PRESERVE_ASPECT=true` to preserve full frame content
+  - Adds black bars instead of cropping when aspect ratios differ
+  - Useful for horizontal clips in 9:16 vertical output
+  - `enforce_dimensions()` now accepts `preserve_aspect` parameter
+
 ### Fixed
 
 - **MoviePy 2.x resize compatibility**: Fixed `TypeError: VideoClip.resized() got an unexpected keyword argument 'newsize'`
   - MoviePy 2.x uses `new_size` (with underscore), not `newsize`
   - `moviepy_compat.resize()` now correctly normalizes the parameter name
   - This fixes the crash at Cut #12 when processing videos with different aspect ratios
+
+- **GPU Encoder not used in MoviePy path**
+  - `OUTPUT_CODEC` was always `libx264` even with GPU acceleration enabled
+  - Now uses `effective_codec` property to get GPU encoder (e.g., `h264_nvenc`)
+
+- **GPU Quality Parameters** (`ffmpeg_config.py`, `editor.py`)
+  - Fixed incorrect use of `-crf` with GPU encoders
+  - `moviepy_params()` now automatically selects encoder-specific quality parameters:
+    - NVENC: `-cq` (constant quality) instead of `-crf`
+    - VAAPI: `-qp` (quantization parameter) + hwupload filter
+    - QSV: `-global_quality` instead of `-crf`
+    - VideoToolbox: `-q:v` with 1-100 scale (converted from CRF)
+  - Removed duplicate `-crf` additions in `editor.py` write_videofile() calls
+  - `build_video_ffmpeg_params()` now accepts `crf` parameter for proper forwarding
+
+### Improved
+
+- **Web UI GPU Support** (`docker-compose.web.yml`)
+  - Added `FFMPEG_HWACCEL` and `PRESERVE_ASPECT` environment variables
+  - Added `/dev/dri` device access for VAAPI GPU encoding
+  - Web UI now has feature parity with main compose for GPU acceleration
+
+- **GPU Documentation** (`docs/configuration.md`)
+  - Added section on automatic quality parameter adjustment per encoder
+  - Documented current limitations (hardware decoding not supported with MoviePy)
+  - Clarified that only encoding benefits from GPU acceleration
+
+- **Algorithm Documentation** (`docs/algorithms.md`)
+  - New comprehensive documentation of analysis algorithms and heuristics
+  - Music Analysis: Beat detection, energy levels, tempo extraction (librosa)
+  - Video Analysis: Scene detection, motion blur, visual similarity, brightness (PySceneDetect, OpenCV)
+  - Cutting Strategies: Fibonacci pacing, energy-adaptive pacing, invisible cuts
+  - LLM Integration: Scene content analysis prompting strategies
+  - Performance: Metadata caching, progressive rendering optimizations
 
 ### Added
 

@@ -112,6 +112,9 @@ from .ffmpeg_config import (
     FFmpegConfig,
     get_config as get_ffmpeg_config,
     get_moviepy_params,
+    detect_gpu_encoders,
+    get_best_gpu_encoder,
+    print_gpu_status,
     STANDARD_WIDTH_VERTICAL as STANDARD_WIDTH,
     STANDARD_HEIGHT_VERTICAL as STANDARD_HEIGHT,
     STANDARD_FPS,
@@ -121,11 +124,13 @@ from .ffmpeg_config import (
     STANDARD_PIX_FMT,
 )
 
-# Get runtime FFmpeg config (env vars applied)
-_ffmpeg_config = get_ffmpeg_config()
+# Get runtime FFmpeg config (env vars applied, with GPU auto-detection)
+_hwaccel_setting = os.environ.get("FFMPEG_HWACCEL", "auto")
+_ffmpeg_config = get_ffmpeg_config(hwaccel=_hwaccel_setting)
 
 # Output encoding defaults (from centralized config, overridable by heuristics)
-OUTPUT_CODEC = _ffmpeg_config.codec
+# Use effective_codec to get GPU encoder when HW accel is active
+OUTPUT_CODEC = _ffmpeg_config.effective_codec
 OUTPUT_PIX_FMT = _ffmpeg_config.pix_fmt
 OUTPUT_PROFILE = _ffmpeg_config.profile
 OUTPUT_LEVEL = _ffmpeg_config.level
@@ -167,6 +172,11 @@ CUT_STYLE = os.environ.get("CUT_STYLE", "dynamic").lower()  # fast, hyper, slow,
 STABILIZE = os.environ.get("STABILIZE", "false").lower() == "true"
 UPSCALE = os.environ.get("UPSCALE", "false").lower() == "true"  # AI Upscaling (Slow!)
 ENHANCE = os.environ.get("ENHANCE", "true").lower() == "true"  # Color/Sharpness (Fast)
+
+# Aspect Ratio Handling
+# If true: letterbox/pillarbox horizontal clips to preserve full content
+# If false (default): crop to fill frame (may cut content at edges)
+PRESERVE_ASPECT = os.environ.get("PRESERVE_ASPECT", "false").lower() == "true"
 
 # Logging / Debug
 VERBOSE = os.environ.get("VERBOSE", "true").lower() == "true"  # Show detailed analysis
@@ -722,13 +732,22 @@ def apply_output_profile(profile: Dict[str, Any]) -> None:
     segment_writer_module.TARGET_LEVEL = OUTPUT_LEVEL
 
 
-def build_video_ffmpeg_params() -> List[str]:
+def build_video_ffmpeg_params(crf: Optional[int] = None) -> List[str]:
     """ffmpeg params for MoviePy writes that mirror the selected output profile.
-    
+
     Uses centralized FFmpegConfig for DRY. The config respects env vars
     like OUTPUT_PROFILE, OUTPUT_LEVEL, OUTPUT_PIX_FMT.
+
+    Automatically uses GPU-appropriate quality parameters when HW accel is active:
+    - NVENC: -cq instead of -crf
+    - VAAPI: -qp instead of -crf
+    - QSV: -global_quality instead of -crf
+    - CPU: -crf (standard)
+
+    Args:
+        crf: Quality value (0-51, lower=better). Uses config default if not specified.
     """
-    return _ffmpeg_config.moviepy_params()
+    return _ffmpeg_config.moviepy_params(crf=crf)
 
 def interpret_creative_prompt():
     """
@@ -751,6 +770,18 @@ def interpret_creative_prompt():
         print(f"   FFmpeg Preset:    {FFMPEG_PRESET}")
         print(f"   FFmpeg Threads:   {FFMPEG_THREADS}")
         print(f"   Variants:         {NUM_VARIANTS}")
+        
+        # GPU Encoder Status
+        if _ffmpeg_config.is_gpu_accelerated:
+            gpu_type = _ffmpeg_config.gpu_encoder_type.upper()
+            effective = _ffmpeg_config.effective_codec
+            print(f"   🎮 GPU Encoder:   {gpu_type} → {effective}")
+        else:
+            best_gpu = get_best_gpu_encoder()
+            if best_gpu:
+                print(f"   🎮 GPU Available: {best_gpu.upper()} (use FFMPEG_HWACCEL=auto to enable)")
+            else:
+                print(f"   🎮 GPU Encoder:   None (using {OUTPUT_CODEC})")
         print(f"")
         print(f"📊 ENHANCEMENT SETTINGS (from ENV):")
         print(f"   STABILIZE:        {os.environ.get('STABILIZE', 'false')}")
@@ -2066,8 +2097,13 @@ def create_montage(variant_id=1):
         w, h = v_clip.size
         
         # Resize/crop to target dimensions using DRY helper
+        # PRESERVE_ASPECT: letterbox horizontal clips instead of cropping
         target_w, target_h = STANDARD_WIDTH, STANDARD_HEIGHT
-        v_clip = enforce_dimensions(v_clip, target_w, target_h, verbose=True)
+        v_clip = enforce_dimensions(
+            v_clip, target_w, target_h, 
+            verbose=True, 
+            preserve_aspect=PRESERVE_ASPECT
+        )
 
         # 🎬 CREATIVE DIRECTOR INTEGRATION: Transitions control
         # Progressive path with xfade: Real crossfades handled by xfade filter in SegmentWriter
@@ -2127,7 +2163,7 @@ def create_montage(variant_id=1):
                     audio=False,  # Audio added in final composition
                     fps=STANDARD_FPS,
                     preset='fast',
-                    ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
+                    ffmpeg_params=build_video_ffmpeg_params(crf=FINAL_CRF),
                     logger=None
                 )
                 
@@ -2174,7 +2210,7 @@ def create_montage(variant_id=1):
                     audio=False,
                     fps=STANDARD_FPS,
                     preset='fast',
-                    ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
+                    ffmpeg_params=build_video_ffmpeg_params(crf=FINAL_CRF),
                     threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
                     logger=None
                 )
@@ -2311,7 +2347,7 @@ def create_montage(variant_id=1):
                     audio=False,
                     fps=STANDARD_FPS,
                     preset='fast',
-                    ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
+                    ffmpeg_params=build_video_ffmpeg_params(crf=FINAL_CRF),
                     threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
                     logger=None
                 )

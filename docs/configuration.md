@@ -41,12 +41,26 @@ Complete reference for all environment variables and settings.
 
 ## Visual Enhancement
 
-| Variable        | Default | Description                                 |
-| --------------- | ------- | ------------------------------------------- |
-| `STABILIZE`     | `false` | Enable video stabilization                  |
-| `UPSCALE`       | `false` | Enable AI upscaling (Real-ESRGAN)           |
-| `ENHANCE`       | `true`  | Enable color/sharpness enhancement          |
-| `DEEP_ANALYSIS` | `false` | Enable deep footage analysis (experimental) |
+| Variable          | Default | Description                                   |
+| ----------------- | ------- | --------------------------------------------- |
+| `STABILIZE`       | `false` | Enable video stabilization                    |
+| `UPSCALE`         | `false` | Enable AI upscaling (Real-ESRGAN)             |
+| `ENHANCE`         | `true`  | Enable color/sharpness enhancement            |
+| `PRESERVE_ASPECT` | `false` | Letterbox instead of crop when aspect differs |
+| `DEEP_ANALYSIS`   | `false` | Enable deep footage analysis (experimental)   |
+
+### Aspect Ratio Handling
+
+When the input footage has a different aspect ratio than the target output:
+
+| `PRESERVE_ASPECT` | Behavior                                              |
+| ----------------- | ----------------------------------------------------- |
+| `false` (default) | **Crop to fill** - cuts edges to fill entire frame    |
+| `true`            | **Letterbox/Pillarbox** - adds black bars to preserve |
+
+Use `PRESERVE_ASPECT=true` when:
+- Horizontal clips should keep full content in vertical (9:16) output
+- You want to avoid cutting important content at frame edges
 
 ---
 
@@ -55,10 +69,44 @@ Complete reference for all environment variables and settings.
 | Variable            | Default           | Description                                                       |
 | ------------------- | ----------------- | ----------------------------------------------------------------- |
 | `USE_GPU`           | `auto`            | GPU mode: `auto`, `vulkan`, `v4l2`, `none`                        |
+| `FFMPEG_HWACCEL`    | `auto`            | Video encoding GPU: `auto`, `nvenc`, `vaapi`, `qsv`, `none`       |
 | `FFMPEG_THREADS`    | `0`               | FFmpeg thread count (`0` = auto)                                  |
 | `FFMPEG_PRESET`     | `medium`          | Encoding speed: `ultrafast`, `fast`, `medium`, `slow`, `veryslow` |
 | `PARALLEL_ENHANCE`  | `true`            | Enable parallel clip enhancement                                  |
 | `MAX_PARALLEL_JOBS` | *(CPU cores - 2)* | Maximum parallel workers                                          |
+
+### GPU Hardware Acceleration
+
+`FFMPEG_HWACCEL` enables hardware-accelerated video **encoding**:
+
+| Value          | GPU Type          | Notes                                   |
+| -------------- | ----------------- | --------------------------------------- |
+| `auto`         | Auto-detect       | Uses best available GPU encoder         |
+| `nvenc`        | NVIDIA            | Requires NVIDIA GPU with NVENC support  |
+| `vaapi`        | AMD/Intel (Linux) | Requires `/dev/dri` access in container |
+| `qsv`          | Intel QuickSync   | Requires Intel GPU with QSV support     |
+| `videotoolbox` | macOS             | Apple Silicon or Intel Mac with GPU     |
+| `none`         | CPU only          | Software encoding (libx264/libx265)     |
+
+**Quality parameters are automatically adjusted per encoder:**
+- **NVENC:** `-cq` (constant quality, similar to CRF)
+- **VAAPI:** `-qp` (quantization parameter)
+- **QSV:** `-global_quality` (quality scale)
+- **CPU/VideoToolbox:** `-crf` (constant rate factor)
+
+**Performance comparison (1080p encoding):**
+
+| Encoder    | Speed       | Quality   | Power Usage |
+| ---------- | ----------- | --------- | ----------- |
+| CPU (x264) | 1x baseline | Excellent | High        |
+| NVENC      | 5-10x       | Very Good | Low         |
+| VAAPI      | 3-6x        | Good      | Low         |
+| QSV        | 4-8x        | Very Good | Low         |
+
+**Current Limitations:**
+- Hardware-accelerated **decoding** is not supported (MoviePy limitation)
+- Only encoding benefits from GPU acceleration
+- Decoding remains CPU-based for maximum compatibility
 
 ---
 

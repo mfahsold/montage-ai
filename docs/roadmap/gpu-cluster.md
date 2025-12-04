@@ -18,16 +18,26 @@ Dieses Dokument beschreibt die Architektur für:
 
 ### Aktuelle CPU-intensive Operationen
 
-| Operation            | Modul                        | CPU-Last  | GPU-geeignet            | Priorität |
-| -------------------- | ---------------------------- | --------- | ----------------------- | --------- |
-| **Beat Detection**   | `editor.py` (librosa)        | Hoch      | ✅ Ja (cupy/torch-audio) | P1        |
-| **Scene Detection**  | `editor.py` (scenedetect)    | Hoch      | ✅ Ja (CUDA backend)     | P1        |
-| **Video Encoding**   | `segment_writer.py` (FFmpeg) | Sehr hoch | ✅ Ja (NVENC/VAAPI)      | P0        |
-| **AI Upscaling**     | `cgpu_upscaler.py`           | Sehr hoch | ✅ Bereits via cgpu      | ✓         |
-| **Frame Extraction** | `ffmpeg_tools.py`            | Mittel    | ✅ Ja (CUVID decode)     | P2        |
-| **Color Grading**    | `editor.py` (cv2/LUTs)       | Mittel    | ✅ Ja (OpenCV CUDA)      | P2        |
-| **Image Similarity** | `clip_selector.py`           | Mittel    | ✅ Ja (torch)            | P2        |
-| **Stabilization**    | `editor.py` (vidstab)        | Hoch      | ⚠️ Begrenzt              | P3        |
+| Operation            | Modul                        | CPU-Last  | GPU-geeignet            | Status              |
+| -------------------- | ---------------------------- | --------- | ----------------------- | ------------------- |
+| **Video Encoding**   | `segment_writer.py` (FFmpeg) | Sehr hoch | ✅ NVENC/VAAPI/QSV       | ✅ **Implementiert** |
+| **AI Upscaling**     | `cgpu_upscaler.py`           | Sehr hoch | ✅ CUDA via cgpu         | ✅ **Implementiert** |
+| **Beat Detection**   | `editor.py` (librosa)        | Hoch      | ✅ Ja (cupy/torch-audio) | ⏳ Geplant           |
+| **Scene Detection**  | `editor.py` (scenedetect)    | Hoch      | ✅ Ja (CUDA backend)     | ⏳ Geplant           |
+| **Frame Extraction** | `ffmpeg_tools.py`            | Mittel    | ✅ Ja (CUVID decode)     | ⏳ Geplant           |
+| **Color Grading**    | `editor.py` (cv2/LUTs)       | Mittel    | ✅ Ja (OpenCV CUDA)      | ⏳ Geplant           |
+| **Image Similarity** | `clip_selector.py`           | Mittel    | ✅ Ja (torch)            | ⏳ Geplant           |
+| **Stabilization**    | `editor.py` (vidstab)        | Hoch      | ⚠️ Begrenzt              | ❌ CPU only          |
+
+### GPU Encoder Unterstützung (Neu!)
+
+```
+FFMPEG_HWACCEL=auto  # Auto-Erkennung
+FFMPEG_HWACCEL=nvenc # NVIDIA (h264_nvenc, hevc_nvenc)
+FFMPEG_HWACCEL=vaapi # AMD/Intel Linux (h264_vaapi, hevc_vaapi)
+FFMPEG_HWACCEL=qsv   # Intel QuickSync (h264_qsv, hevc_qsv)
+FFMPEG_HWACCEL=none  # CPU (libx264, libx265)
+```
 
 ### Workload-Kategorien für Verteilung
 
@@ -40,7 +50,7 @@ Dieses Dokument beschreibt die Architektur für:
 │  │   LOKAL (CPU)    │     │  LOKAL (GPU)     │     │   CLOUD (cgpu)   │ │
 │  ├──────────────────┤     ├──────────────────┤     ├──────────────────┤ │
 │  │ • File I/O       │     │ • Video Decode   │     │ • AI Upscaling   │ │
-│  │ • Timeline Logic │     │ • Video Encode   │     │ • LLM Inference  │ │
+│  │ • Timeline Logic │     │ • Video Encode ✅│     │ • LLM Inference  │ │
 │  │ • Clip Selection │     │ • Scene Detect   │     │ • Batch Transcode│ │
 │  │ • Story Arc      │     │ • Beat Detect    │     │ • Training Jobs  │ │
 │  │ • Metadata       │     │ • Color Grade    │     │                  │ │

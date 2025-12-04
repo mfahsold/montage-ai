@@ -64,6 +64,11 @@ services:
       - UPSCALE=${UPSCALE:-false}
       - ENHANCE=${ENHANCE:-true}
       
+      # Aspect Ratio Handling
+      # false (default): Crop to fill frame (may cut edges)
+      # true: Letterbox/pillarbox to preserve full content
+      - PRESERVE_ASPECT=${PRESERVE_ASPECT:-false}
+      
       # Output Configuration
       - NUM_VARIANTS=${NUM_VARIANTS:-1}
       - VERBOSE=${VERBOSE:-true}
@@ -76,6 +81,10 @@ services:
       - PARALLEL_ENHANCE=${PARALLEL_ENHANCE:-true}
       - MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS:-2}  # Reduced from 4 to prevent OOM
       - USE_GPU=${USE_GPU:-auto}
+      
+      # FFmpeg Hardware Acceleration (GPU encoding/decoding)
+      # Options: auto (detect), nvenc (NVIDIA), vaapi (AMD/Intel), qsv (Intel), none (CPU)
+      - FFMPEG_HWACCEL=${FFMPEG_HWACCEL:-auto}
 
       # Memory Management (optimized for ARM systems)
       - MEMORY_LIMIT_GB=${MEMORY_LIMIT_GB:-8}  # Match docker mem_limit (reduced from 16)
@@ -84,6 +93,19 @@ services:
       
       # Deep Analysis
       - DEEP_ANALYSIS=${DEEP_ANALYSIS:-false}
+    # === GPU ACCESS (for hardware video encoding) ===
+    # Uncomment for NVIDIA GPU:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu, video]
+    # 
+    # For AMD/Intel VAAPI, add:
+    devices:
+      - /dev/dri:/dev/dri  # VAAPI/VA-API access for AMD/Intel GPU
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: "no"

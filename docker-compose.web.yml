@@ -40,9 +40,21 @@ services:
       - CGPU_TIMEOUT=${CGPU_TIMEOUT:-1200}
       # cgpu LLM serve (alternative to Google AI)
       - CGPU_ENABLED=${CGPU_ENABLED:-false}
+      # Aspect Ratio Handling
+      # false (default): Crop to fill frame (may cut edges)
+      # true: Letterbox/pillarbox to preserve full content
+      - PRESERVE_ASPECT=${PRESERVE_ASPECT:-false}
+      # FFmpeg Hardware Acceleration (GPU encoding/decoding)
+      # Options: auto (detect), nvenc (NVIDIA), vaapi (AMD/Intel), qsv (Intel), none (CPU)
+      - FFMPEG_HWACCEL=${FFMPEG_HWACCEL:-auto}
       - VERBOSE=${VERBOSE:-true}
       - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-2}
     restart: unless-stopped
+    # === GPU ACCESS (for hardware video encoding) ===
+    # For AMD/Intel VAAPI, add:
+    devices:
+      - /dev/dri:/dev/dri  # VAAPI/VA-API access for AMD/Intel GPU
+    # Note: For NVIDIA GPU, uncomment the nvidia runtime in deploy.resources.reservations
     # Resource limits (override via env values)
     deploy:
       resources:
