@@ -1086,7 +1086,6 @@ class ProgressiveRenderer:
                 audio_codec='aac',
                 fps=STANDARD_FPS,
                 preset='fast',
-                verbose=False,
                 logger=None,
                 ffmpeg_params=_moviepy_params()
             )

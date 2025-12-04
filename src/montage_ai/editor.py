@@ -40,6 +40,7 @@ from .moviepy_compat import (
     VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, TextClip,
     concatenate_videoclips,
     subclip, set_audio, set_duration, set_position, resize, crop, rotate,
+    crossfadein, crossfadeout,
     enforce_dimensions, log_clip_info, ensure_even_dimensions, pad_to_target,
 )
 from scenedetect import open_video, SceneManager
@@ -2105,10 +2106,10 @@ def create_montage(variant_id=1):
         if apply_per_clip_fade:
             fade_duration = min(crossfade_duration, cut_duration * 0.3)
             if cut_number > 0:
-                v_clip = v_clip.crossfadein(fade_duration)
+                v_clip = crossfadein(v_clip, fade_duration)
                 if VERBOSE:
                     print(f"   ↗️ Crossfade-in: {fade_duration:.2f}s")
-            v_clip = v_clip.crossfadeout(fade_duration)
+            v_clip = crossfadeout(v_clip, fade_duration)
             if VERBOSE:
                 print(f"   ↘️ Crossfade-out: {fade_duration:.2f}s")
 
@@ -2127,7 +2128,6 @@ def create_montage(variant_id=1):
                     fps=STANDARD_FPS,
                     preset='fast',
                     ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
-                    verbose=False,
                     logger=None
                 )
                 
@@ -2176,7 +2176,6 @@ def create_montage(variant_id=1):
                     preset='fast',
                     ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
                     threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
-                    verbose=False,
                     logger=None
                 )
                 batch_files.append(batch_file)
@@ -2314,7 +2313,6 @@ def create_montage(variant_id=1):
                     preset='fast',
                     ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
                     threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
-                    verbose=False,
                     logger=None
                 )
                 batch_files.append(final_batch_file)
@@ -2354,7 +2352,6 @@ def create_montage(variant_id=1):
             preset=FFMPEG_PRESET,
             ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
             threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
-            verbose=False,
             logger=None
         )
         
@@ -2424,7 +2421,6 @@ def create_montage(variant_id=1):
                 "-tune", "film",  # Optimize for film content
                 "-movflags", "+faststart"  # Web-optimized
             ],
-            verbose=False,
             logger=None  # Suppress tqdm progress bars
         )
         

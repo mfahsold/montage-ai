@@ -11,6 +11,8 @@ MoviePy 2.x changes (from 1.x):
 - .set_position() → .with_position()
 - .resize() → .resized()
 - .crop() → .cropped()
+- .rotate() → .rotated()
+- write_videofile(): 'verbose' parameter REMOVED (use logger=None instead)
 """
 
 from moviepy import (
@@ -125,6 +127,48 @@ def crop(clip, **kwargs):
     if hasattr(clip, 'cropped'):
         return clip.cropped(**kwargs)
     return clip.crop(**kwargs)
+
+
+def crossfadein(clip, duration):
+    """Apply fade-in from black - works with MoviePy 1.x and 2.x.
+    
+    In MoviePy 2.x, crossfadein() was removed. Use fadein() fx instead.
+    
+    Args:
+        clip: VideoFileClip
+        duration: Fade duration in seconds
+    """
+    # MoviePy 2.x: use fx function
+    if hasattr(clip, 'with_effects'):
+        from moviepy.video.fx.all import fadein
+        return fadein(clip, duration)
+    # MoviePy 1.x: method on clip
+    if hasattr(clip, 'crossfadein'):
+        return clip.crossfadein(duration)
+    # Fallback: try fx module
+    from moviepy.video.fx.all import fadein
+    return fadein(clip, duration)
+
+
+def crossfadeout(clip, duration):
+    """Apply fade-out to black - works with MoviePy 1.x and 2.x.
+    
+    In MoviePy 2.x, crossfadeout() was removed. Use fadeout() fx instead.
+    
+    Args:
+        clip: VideoFileClip
+        duration: Fade duration in seconds
+    """
+    # MoviePy 2.x: use fx function
+    if hasattr(clip, 'with_effects'):
+        from moviepy.video.fx.all import fadeout
+        return fadeout(clip, duration)
+    # MoviePy 1.x: method on clip
+    if hasattr(clip, 'crossfadeout'):
+        return clip.crossfadeout(duration)
+    # Fallback: try fx module
+    from moviepy.video.fx.all import fadeout
+    return fadeout(clip, duration)
 
 
 # =============================================================================
