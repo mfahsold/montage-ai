@@ -39,7 +39,7 @@ from typing import Dict, Optional, Any, List, Tuple
 from .moviepy_compat import (
     VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, TextClip,
     concatenate_videoclips,
-    subclip, set_audio, set_duration, set_position, resize, crop,
+    subclip, set_audio, set_duration, set_position, resize, crop, rotate,
     enforce_dimensions, log_clip_info, ensure_even_dimensions, pad_to_target,
 )
 from scenedetect import open_video, SceneManager
@@ -2042,13 +2042,13 @@ def create_montage(variant_id=1):
         if rotation != 0:
             if VERBOSE:
                 print(f"  🔄 Rotation metadata: {rotation}°")
-            # Apply rotation correction
+            # Apply rotation correction using compat wrapper
             if rotation == 90 or rotation == -270:
-                v_clip = v_clip.rotate(-90, expand=True)
+                v_clip = rotate(v_clip, -90, expand=True)
             elif rotation == -90 or rotation == 270:
-                v_clip = v_clip.rotate(90, expand=True)
+                v_clip = rotate(v_clip, 90, expand=True)
             elif rotation == 180 or rotation == -180:
-                v_clip = v_clip.rotate(180)
+                v_clip = rotate(v_clip, 180, expand=False)
         
         # Get video dimensions (after rotation correction)
         w, h = v_clip.size

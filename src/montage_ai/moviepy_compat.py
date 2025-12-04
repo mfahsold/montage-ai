@@ -39,6 +39,7 @@ __all__ = [
     "set_position",
     "resize",
     "crop",
+    "rotate",
     # Dimension helpers
     "enforce_dimensions",
     "pad_to_target",
@@ -87,6 +88,19 @@ def set_position(clip, pos):
     if hasattr(clip, 'with_position'):
         return clip.with_position(pos)
     return clip.set_position(pos)
+
+
+def rotate(clip, angle, expand=True):
+    """Rotate clip - works with MoviePy 1.x and 2.x.
+    
+    Args:
+        clip: VideoFileClip
+        angle: Rotation angle in degrees
+        expand: If True, expand frame to fit rotated content
+    """
+    if hasattr(clip, 'rotated'):
+        return clip.rotated(angle, expand=expand)
+    return clip.rotate(angle, expand=expand)
 
 
 def resize(clip, **kwargs):
