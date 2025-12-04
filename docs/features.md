@@ -1,6 +1,8 @@
-# Features & Workflows
+# Features
 
-One page for what Montage AI does, how styles work, how to use the Web UI, enable timeline export, and run cloud upscaling.
+Everything Montage AI can do for you.
+
+---
 
 ## Core Editing
 
@@ -11,15 +13,15 @@ One page for what Montage AI does, how styles work, how to use the Web UI, enabl
 
 ## Style Templates (Built-in)
 
-| Style          | Best for                     | Traits                                  |
-| -------------- | ---------------------------- | --------------------------------------- |
-| `dynamic`      | General purpose              | Adapts to music energy                  |
-| `hitchcock`    | Thrillers, reveals           | Slow build, explosive climax, high contrast |
-| `mtv`          | Music videos, dance          | 1-2 beat cuts, vibrant, hard cuts only  |
-| `action`       | Sports, adventure            | Fast pacing, motion preference          |
-| `documentary`  | Travel, interviews           | Natural pacing, mixed transitions       |
-| `minimalist`   | Art house, meditation        | Very slow, desaturated, long takes      |
-| `wes_anderson` | Quirky, aesthetic pieces     | Symmetry bias, warm pastel look         |
+| Style          | Best for                 | Traits                                      |
+| -------------- | ------------------------ | ------------------------------------------- |
+| `dynamic`      | General purpose          | Adapts to music energy                      |
+| `hitchcock`    | Thrillers, reveals       | Slow build, explosive climax, high contrast |
+| `mtv`          | Music videos, dance      | 1-2 beat cuts, vibrant, hard cuts only      |
+| `action`       | Sports, adventure        | Fast pacing, motion preference              |
+| `documentary`  | Travel, interviews       | Natural pacing, mixed transitions           |
+| `minimalist`   | Art house, meditation    | Very slow, desaturated, long takes          |
+| `wes_anderson` | Quirky, aesthetic pieces | Symmetry bias, warm pastel look             |
 
 ### Custom Styles (JSON)
 
@@ -86,8 +88,6 @@ Import tips:
 
 Fallback order for upscaling: cgpu T4/A100 → local Vulkan GPU → FFmpeg Lanczos (CPU).
 
-## Troubleshooting quickies
+## Troubleshooting
 
-- Missing FFmpeg: install via package manager (Ubuntu: `sudo apt install ffmpeg`, macOS: `brew install ffmpeg`)
-- Web UI not reachable: `docker compose -f docker-compose.web.yml logs` and ensure port `5001` not in use
-- OpenTimelineIO missing: `pip install OpenTimelineIO>=0.16.0`
+Having issues? Check [troubleshooting.md](troubleshooting.md) for common fixes.

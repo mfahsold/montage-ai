@@ -64,13 +64,13 @@ Complete reference for all environment variables and settings.
 
 ## Memory Management
 
-**NEW:** Stability improvements for large projects and constrained hardware.
+Settings for large projects and constrained hardware.
 
-| Variable           | Default | Description                                                    |
-| ------------------ | ------- | -------------------------------------------------------------- |
-| `MEMORY_LIMIT_GB`  | `16`    | Docker container memory limit (GB) - match docker-compose.yml  |
-| `MAX_CLIPS_IN_RAM` | `50`    | Maximum clips to keep in RAM simultaneously                    |
-| `AUTO_CLEANUP`     | `true`  | Automatically delete temp files after rendering                |
+| Variable           | Default | Description                                                   |
+| ------------------ | ------- | ------------------------------------------------------------- |
+| `MEMORY_LIMIT_GB`  | `16`    | Docker container memory limit (GB) - match docker-compose.yml |
+| `MAX_CLIPS_IN_RAM` | `50`    | Maximum clips to keep in RAM simultaneously                   |
+| `AUTO_CLEANUP`     | `true`  | Automatically delete temp files after rendering               |
 
 **Hardware-specific recommendations:**
 
@@ -84,13 +84,13 @@ See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
 
 ## Output / Export
 
-| Variable           | Default | Description                                 |
-| ------------------ | ------- | ------------------------------------------- |
-| `EXPORT_TIMELINE`  | `false` | Export OTIO/EDL timeline (experimental)     |
-| `GENERATE_PROXIES` | `false` | Generate proxy files for NLE (experimental) |
+| Variable           | Default | Description                                                                               |
+| ------------------ | ------- | ----------------------------------------------------------------------------------------- |
+| `EXPORT_TIMELINE`  | `false` | Export OTIO/EDL timeline (experimental)                                                   |
+| `GENERATE_PROXIES` | `false` | Generate proxy files for NLE (experimental)                                               |
 | `OUTPUT_CODEC`     | *auto*  | `libx264` by default; switches to `libx265` when most footage is HEVC (override to force) |
-| `OUTPUT_PROFILE`   | *auto*  | FFmpeg profile passed to encoder (usually `high` for H.264, `main` for HEVC) |
-| `OUTPUT_LEVEL`     | *auto*  | Encoder level; raised automatically for 4K/high‑FPS projects |
+| `OUTPUT_PROFILE`   | *auto*  | FFmpeg profile passed to encoder (usually `high` for H.264, `main` for HEVC)              |
+| `OUTPUT_LEVEL`     | *auto*  | Encoder level; raised automatically for 4K/high‑FPS projects                              |
 
 *Resolution and FPS are inferred from the dominant input footage (orientation, median size, and common framerate) to minimize re-encoding and quality loss.*
 

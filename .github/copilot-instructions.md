@@ -31,7 +31,7 @@ AI-powered video montage creation with beat-synchronized editing.
 
 **New env vars:** `CGPU_ENABLED`, `CGPU_HOST`, `CGPU_PORT`, `CGPU_MODEL=gemini-2.0-flash`, `CGPU_GPU_ENABLED`
 
-See `docs/CGPU_INTEGRATION.md` for full implementation plan.
+See `docs/roadmap/gpu-cluster.md` for full implementation plan.
 
 ## Architecture Overview
 

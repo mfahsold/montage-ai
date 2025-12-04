@@ -1,19 +1,42 @@
 # Documentation
 
-Technical documentation for Montage AI.
+Welcome! Here's everything you need to know about Montage AI.
 
-## User Guides
+---
 
-| Document                            | Description                      |
-| ----------------------------------- | -------------------------------- |
-| [Quick Start](QUICKSTART.md)        | Fast setup paths                 |
-| [Configuration](configuration.md)   | All environment variables        |
-| [Features & Workflows](features.md) | Features, styles, Web UI, export |
+## For Users
 
-## Technical Reference
+| Doc                                   | Description                                  |
+| ------------------------------------- | -------------------------------------------- |
+| [Getting Started](getting-started.md) | Installation, first montage, all run options |
+| [Configuration](configuration.md)     | Every environment variable explained         |
+| [Features](features.md)               | Styles, enhancements, timeline export        |
+| [Troubleshooting](troubleshooting.md) | Common issues and fixes                      |
 
-| Document                        | Description                        |
-| ------------------------------- | ---------------------------------- |
-| [Architecture](architecture.md) | System design and data flow        |
-| [AI Director](AI_DIRECTOR.md)   | LLM integration and prompt parsing |
-| [Models](models.md)             | AI model choices and rationale     |
+---
+
+## For Developers
+
+| Doc                                | Description                               |
+| ---------------------------------- | ----------------------------------------- |
+| [Architecture](architecture.md)    | System design, data flow, module overview |
+| [AI Director](AI_DIRECTOR.md)      | How the LLM translates prompts to edits   |
+| [Models](models.md)                | Which AI/ML libraries we use and why      |
+| [Contributing](../CONTRIBUTING.md) | How to contribute code                    |
+
+---
+
+## Roadmap & Ideas
+
+| Doc                                                | Description                          |
+| -------------------------------------------------- | ------------------------------------ |
+| [GPU Cluster Architecture](roadmap/gpu-cluster.md) | Plans for distributed GPU processing |
+
+---
+
+## Archive
+
+Older docs that might still be useful:
+
+- [LLM Workflow](archive/LLM_WORKFLOW.md) — Early LLM integration notes
+- [Decisions](archive/decisions.md) — Historical architecture decisions

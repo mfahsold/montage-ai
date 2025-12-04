@@ -1,185 +1,161 @@
-# Contributing to Montage AI
+# Contributing
 
-Thank you for your interest in contributing! This guide will help you get started.
+Hey! Thanks for thinking about contributing. Here's how to get started.
 
-## Development Setup
+---
+
+## Quick Setup
 
 ```bash
 # Fork and clone
 git clone https://github.com/YOUR_USERNAME/montage-ai.git
 cd montage-ai
 
-# Build and test
+# Build
 make build
+
+# Run tests
 make test
 ```
 
-## Workflow
+---
 
-### 1. Create a Branch
+## Making Changes
+
+### 1. Create a branch
 
 ```bash
-git checkout -b feature/your-feature-name
+git checkout -b feature/my-cool-thing
 # or
-git checkout -b fix/your-bug-fix
+git checkout -b fix/that-annoying-bug
 ```
 
-### 2. Make Changes
+### 2. Do your thing
 
-- Follow existing code style
-- Add tests for new features
-- Update documentation
+- Write some code
+- Add tests if it's a new feature
+- Update docs if needed
 
-### 3. Test Your Changes
+### 3. Test it
 
 ```bash
-# Local Docker test
-make test-local
-
-# Kubernetes manifest validation
-make validate
+# Quick test
+./montage-ai.sh preview
 
 # Full test suite
 make test
+
+# If you changed K8s manifests
+make validate
 ```
 
-### 4. Commit with Clear Messages
+### 4. Commit
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) style:
 
 ```bash
-git commit -m "feat: add new style template for music videos"
-# or
-git commit -m "fix: resolve beat detection timing issue"
+git commit -m "feat: add support for vertical videos"
+git commit -m "fix: beat detection crash on short clips"
+git commit -m "docs: update configuration examples"
 ```
-
-Use [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation
-- `refactor:` Code refactoring
-- `test:` Tests
-- `chore:` Maintenance
 
 ### 5. Update CHANGELOG
 
-Add your changes to `CHANGELOG.md` under `[Unreleased]`:
+Add your change to `CHANGELOG.md` under `[Unreleased]`:
 
 ```markdown
 ## [Unreleased]
 
 ### Added
-- Your new feature description
-
-### Fixed
-- Your bug fix description
+- Support for vertical videos
 ```
 
-### 6. Submit Pull Request
+### 6. Open a PR
 
-- Push your branch
-- Open a PR against `main`
-- Fill out the PR template
-- Wait for review
+Push your branch and open a pull request. We'll review it as soon as we can.
 
-## Code Style
-
-### Python
-
-- Use type hints
-- Docstrings for public functions
-- Follow PEP 8
-
-```python
-def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
-    """Process a video clip with the specified style.
-    
-    Args:
-        clip_path: Path to the video file.
-        style: Processing style name.
-        
-    Returns:
-        Processed VideoClip object.
-    """
-    pass
-```
-
-### YAML (Kubernetes)
-
-- Use 2-space indentation
-- Include comments for non-obvious settings
-- Follow Kubernetes naming conventions
-
-## Testing
-
-### Local Testing
-
-```bash
-# Build image
-make build
-
-# Run with test footage
-./montage-ai.sh preview
-
-# Interactive debugging
-make shell
-```
-
-### Kubernetes Testing
-
-```bash
-# Validate manifests
-make validate
-
-# Dry-run deployment
-kubectl apply -k deploy/k3s/base/ --dry-run=client
-
-# Test on local cluster
-make deploy
-make job
-make logs
-```
+---
 
 ## Adding a New Style
 
-1. Create JSON in `src/montage_ai/styles/`:
+Styles are just JSON files. Super easy:
+
+1. Create `src/montage_ai/styles/your_style.json`:
 
 ```json
 {
   "id": "your_style",
   "name": "Your Style",
-  "description": "Brief description",
+  "description": "What it does",
   "params": {
-    "style": {"name": "your_style", "mood": "energetic"},
-    "pacing": {"speed": "fast", "variation": "high"},
-    "transitions": {"type": "hard_cuts"},
-    "effects": {"color_grading": "neutral"}
+    "style": {"name": "your_style", "mood": "chill"},
+    "pacing": {"speed": "medium", "variation": "moderate"},
+    "transitions": {"type": "crossfade"},
+    "effects": {"color_grading": "warm"}
   }
 }
 ```
 
-2. Test with:
+2. Test it:
 
 ```bash
 ./montage-ai.sh run your_style
 ```
 
-3. Add to documentation in `docs/features.md`
+3. Add it to `docs/features.md`
 
-## Release Process
+---
 
-Releases are managed by maintainers:
+## Code Style
 
-```bash
-# Create release
-make release VERSION=v1.0.0
+### Python
+
+Nothing fancy:
+
+- Type hints are nice
+- Docstrings for public functions
+- PEP 8 (your editor probably handles this)
+
+```python
+def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
+    """Process a video clip with the specified style."""
+    ...
 ```
 
-This builds multi-arch images and pushes to GHCR.
+### YAML
 
-## Getting Help
+- 2-space indentation
+- Comments for anything non-obvious
+
+---
+
+## Testing
+
+### Local
+
+```bash
+make build          # Build image
+make test           # Run tests
+make shell          # Debug inside container
+```
+
+### Kubernetes
+
+```bash
+make validate       # Check manifests
+make deploy         # Deploy to cluster
+make logs           # Watch job logs
+```
+
+---
+
+## Questions?
 
 - [Open an issue](https://github.com/mfahsold/montage-ai/issues)
-- Check existing [discussions](https://github.com/mfahsold/montage-ai/discussions)
+- Check [existing discussions](https://github.com/mfahsold/montage-ai/discussions)
 
-## License
+---
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+## License Note
+
+By contributing, you agree your code will be licensed under the same [PolyForm Noncommercial](LICENSE) license as the project.

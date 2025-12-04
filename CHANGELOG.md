@@ -8,12 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+
 - **MoviePy 2.x resize compatibility**: Fixed `TypeError: VideoClip.resized() got an unexpected keyword argument 'newsize'`
   - MoviePy 2.x uses `new_size` (with underscore), not `newsize`
   - `moviepy_compat.resize()` now correctly normalizes the parameter name
   - This fixes the crash at Cut #12 when processing videos with different aspect ratios
 
 ### Added
+
+- **Documentation overhaul** - Cleaner, friendlier docs
+  - Slimmed down README to essentials (~90 lines)
+  - New `docs/getting-started.md` replaces QUICKSTART.md
+  - New `docs/troubleshooting.md` for common issues
+  - `docs/README.md` as navigation hub for all docs
+  - Moved GPU cluster planning to `docs/roadmap/gpu-cluster.md`
+  - Removed redundancies between root README and docs/
 
 - **Modern Web UI Redesign** - Elegant, professional interface
   - New animated SVG logo combining film reel with AI circuit design
