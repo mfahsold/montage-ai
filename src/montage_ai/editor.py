@@ -100,22 +100,34 @@ except ImportError:
 try:
     from .segment_writer import (
         SegmentWriter, ProgressiveRenderer,
-        STANDARD_WIDTH, STANDARD_HEIGHT, STANDARD_FPS
     )
     SEGMENT_WRITER_AVAILABLE = True
 except ImportError:
     SEGMENT_WRITER_AVAILABLE = False
-    # Fallback constants if segment_writer not available
-    STANDARD_WIDTH = 1080
-    STANDARD_HEIGHT = 1920
-    STANDARD_FPS = 30
     print("⚠️ Segment writer not available")
 
-# Output encoding defaults (can be overridden by heuristics)
-OUTPUT_CODEC = getattr(segment_writer_module, "TARGET_CODEC", "libx264")
-OUTPUT_PIX_FMT = getattr(segment_writer_module, "TARGET_PIX_FMT", "yuv420p")
-OUTPUT_PROFILE = getattr(segment_writer_module, "TARGET_PROFILE", None)
-OUTPUT_LEVEL = getattr(segment_writer_module, "TARGET_LEVEL", None)
+# Import centralized FFmpeg config (DRY)
+from .ffmpeg_config import (
+    FFmpegConfig,
+    get_config as get_ffmpeg_config,
+    get_moviepy_params,
+    STANDARD_WIDTH_VERTICAL as STANDARD_WIDTH,
+    STANDARD_HEIGHT_VERTICAL as STANDARD_HEIGHT,
+    STANDARD_FPS,
+    STANDARD_CODEC,
+    STANDARD_PROFILE,
+    STANDARD_LEVEL,
+    STANDARD_PIX_FMT,
+)
+
+# Get runtime FFmpeg config (env vars applied)
+_ffmpeg_config = get_ffmpeg_config()
+
+# Output encoding defaults (from centralized config, overridable by heuristics)
+OUTPUT_CODEC = _ffmpeg_config.codec
+OUTPUT_PIX_FMT = _ffmpeg_config.pix_fmt
+OUTPUT_PROFILE = _ffmpeg_config.profile
+OUTPUT_LEVEL = _ffmpeg_config.level
 
 VERSION = "0.2.0"
 
@@ -165,9 +177,9 @@ NUM_VARIANTS = int(os.environ.get("NUM_VARIANTS", "1"))
 EXPORT_TIMELINE = os.environ.get("EXPORT_TIMELINE", "false").lower() == "true"
 GENERATE_PROXIES = os.environ.get("GENERATE_PROXIES", "false").lower() == "true"
 
-# Performance: CPU Threading & Parallelization
-FFMPEG_THREADS = os.environ.get("FFMPEG_THREADS", "0")  # 0 = auto (all cores)
-FFMPEG_PRESET = os.environ.get("FFMPEG_PRESET", "medium")  # ultrafast/fast/medium/slow/veryslow
+# Performance: CPU Threading & Parallelization (from centralized config)
+FFMPEG_THREADS = _ffmpeg_config.threads
+FFMPEG_PRESET = _ffmpeg_config.preset
 PARALLEL_ENHANCE = os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true"  # Parallel clip enhancement
 MAX_PARALLEL_JOBS = int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, multiprocessing.cpu_count() - 2))))  # Leave 2 cores free
 
@@ -710,13 +722,12 @@ def apply_output_profile(profile: Dict[str, Any]) -> None:
 
 
 def build_video_ffmpeg_params() -> List[str]:
-    """ffmpeg params for MoviePy writes that mirror the selected output profile."""
-    params = ["-pix_fmt", OUTPUT_PIX_FMT]
-    if OUTPUT_PROFILE:
-        params.extend(["-profile:v", OUTPUT_PROFILE])
-    if OUTPUT_LEVEL:
-        params.extend(["-level", OUTPUT_LEVEL])
-    return params
+    """ffmpeg params for MoviePy writes that mirror the selected output profile.
+    
+    Uses centralized FFmpegConfig for DRY. The config respects env vars
+    like OUTPUT_PROFILE, OUTPUT_LEVEL, OUTPUT_PIX_FMT.
+    """
+    return _ffmpeg_config.moviepy_params()
 
 def interpret_creative_prompt():
     """

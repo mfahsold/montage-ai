@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **FFmpeg Config Module** (`ffmpeg_config.py`) - DRY centralization
+  - Single source of truth for all FFmpeg encoding parameters
+  - `FFmpegConfig` dataclass with codec, preset, crf, profile, level, threads, pix_fmt
+  - Environment variable support: `FFMPEG_THREADS`, `FFMPEG_PRESET`, `FFMPEG_CRF`, 
+    `OUTPUT_CODEC`, `OUTPUT_PROFILE`, `OUTPUT_LEVEL`, `OUTPUT_PIX_FMT`
+  - Convenience functions: `get_ffmpeg_video_params()`, `get_moviepy_params()`
+  - Resolution constants: `STANDARD_WIDTH_VERTICAL`, `STANDARD_HEIGHT_VERTICAL`, etc.
+  - Removes ~40 lines of duplicated parameter definitions across 3 modules
+
 - **MoviePy Compatibility Layer** (`moviepy_compat.py`) - KISS/DRY refactoring
   - Centralizes all MoviePy 1.x/2.x API differences in one module
   - Exports: `subclip`, `set_audio`, `set_duration`, `set_position`, `resize`, `crop`
@@ -40,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extracted dimension logic into `enforce_dimensions()` helper
   - Handles aspect ratio, scaling, crop/pad, even-dimension enforcement
   - Removes duplicated code blocks for resize/crop operations
+
+- **Code Quality: DRY FFmpeg Parameters** - Centralized encoding config
+  - `editor.py` and `segment_writer.py` now import from `ffmpeg_config.py`
+  - Removed duplicated `STANDARD_*` constants and `TARGET_*` variables
+  - `build_video_ffmpeg_params()` and `_moviepy_params()` now delegate to config
+  - Single place to modify encoding defaults for entire project
 
 ### Fixed
 

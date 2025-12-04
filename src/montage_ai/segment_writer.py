@@ -23,18 +23,25 @@ from typing import List, Optional, Dict, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Import centralized FFmpeg config (DRY)
+from .ffmpeg_config import (
+    FFmpegConfig,
+    get_config,
+    STANDARD_FPS,
+    STANDARD_PIX_FMT,
+    STANDARD_CODEC,
+    STANDARD_PROFILE,
+    STANDARD_LEVEL,
+    STANDARD_WIDTH_VERTICAL as STANDARD_WIDTH,
+    STANDARD_HEIGHT_VERTICAL as STANDARD_HEIGHT,
+)
 
-# Standard encoding parameters for concat compatibility
-STANDARD_FPS = 30
-STANDARD_PIX_FMT = "yuv420p"
-STANDARD_PROFILE = "high"
-STANDARD_LEVEL = "4.1"
-STANDARD_WIDTH = 1080   # Target width for vertical HD (9:16)
-STANDARD_HEIGHT = 1920  # Target height for vertical HD (9:16)
-TARGET_CODEC = os.environ.get("OUTPUT_CODEC", "libx264")  # Runtime-adjustable (can be overridden by editor heuristics)
-TARGET_PROFILE: Optional[str] = os.environ.get("OUTPUT_PROFILE", STANDARD_PROFILE)
-TARGET_LEVEL: Optional[str] = os.environ.get("OUTPUT_LEVEL", STANDARD_LEVEL)
-TARGET_PIX_FMT = STANDARD_PIX_FMT
+# Get runtime config (env vars applied)
+_ffmpeg_config = get_config()
+TARGET_CODEC = _ffmpeg_config.codec
+TARGET_PROFILE = _ffmpeg_config.profile
+TARGET_LEVEL = _ffmpeg_config.level
+TARGET_PIX_FMT = _ffmpeg_config.pix_fmt
 
 # Default crossfade duration in seconds
 DEFAULT_XFADE_DURATION = 0.3
@@ -43,13 +50,9 @@ DEFAULT_XFADE_DURATION = 0.3
 def _moviepy_params() -> List[str]:
     """
     Shared ffmpeg parameters for MoviePy writes to keep video streams aligned.
+    Uses centralized FFmpegConfig for DRY.
     """
-    params = ["-pix_fmt", TARGET_PIX_FMT]
-    if TARGET_PROFILE:
-        params.extend(["-profile:v", TARGET_PROFILE])
-    if TARGET_LEVEL:
-        params.extend(["-level", TARGET_LEVEL])
-    return params
+    return _ffmpeg_config.moviepy_params()
 
 
 @dataclass
