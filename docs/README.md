@@ -20,4 +20,6 @@ Technical documentation for Montage AI.
 
 ## Archive
 
-Internal development notes and analysis documents are in [archive/](archive/).
+Internal development, ops, and release notes live in [archive/](archive/). Start with:
+- `archive/OPERATIONS_LOG.md` (stability & cgpu ops history)
+- `archive/IMPLEMENTATION_SUMMARY.md` (feature drops & roadmap checkpoints)

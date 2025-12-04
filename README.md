@@ -90,7 +90,7 @@ AUTO_CLEANUP=true                # Delete temp files automatically
 ```
 
 → Full reference: [docs/configuration.md](docs/configuration.md)
-→ **Stability improvements:** [STABILITY_IMPROVEMENTS.md](STABILITY_IMPROVEMENTS.md)
+→ **Stability improvements:** [docs/archive/OPERATIONS_LOG.md](docs/archive/OPERATIONS_LOG.md)
 
 ---
 
@@ -192,7 +192,7 @@ Input Clips + Music
 | [AI Director](docs/AI_DIRECTOR.md)         | **NEW:** LLM integration guide  |
 | [LLM Workflow](docs/LLM_WORKFLOW.md)       | **NEW:** How LLMs are called    |
 | [ML Enhancement Roadmap](docs/ML_ENHANCEMENT_ROADMAP.md) | **NEW:** Future ML features |
-| [Stability Improvements](STABILITY_IMPROVEMENTS.md) | Memory & GPU fixes         |
+| [Stability Notes](docs/archive/OPERATIONS_LOG.md) | Memory & GPU fixes         |
 
 ---
 
@@ -266,7 +266,7 @@ export AUTO_CLEANUP=true
 docker exec montage-ai rm -rf /tmp/*.mp4
 ```
 
-See [STABILITY_IMPROVEMENTS.md](STABILITY_IMPROVEMENTS.md) for detailed diagnostics.
+See [docs/archive/OPERATIONS_LOG.md](docs/archive/OPERATIONS_LOG.md) for detailed diagnostics.
 
 ---
 

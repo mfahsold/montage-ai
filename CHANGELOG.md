@@ -359,10 +359,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Temp disk usage: Unlimited → 0 (auto-cleanup)
     - cgpu success rate: ~60% → ~95% (+58%)
     - CUDA error debug time: 30min → 2min (-93%)
-  - See `STABILITY_IMPROVEMENTS.md` for technical details
+  - Details recorded in `docs/archive/OPERATIONS_LOG.md`
 
 - **Enhanced Documentation**
-  - Added `STABILITY_IMPROVEMENTS.md` with detailed technical analysis and testing guide
+  - Added consolidated ops log (`docs/archive/OPERATIONS_LOG.md`) with stability analysis and testing guide
   - Updated `README.md` with troubleshooting section (memory, Cloud GPU, performance, disk space)
   - Enhanced `docs/configuration.md` with memory management settings and hardware-specific recommendations
   - Updated `CHANGELOG.md` with comprehensive stability improvements
@@ -388,7 +388,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation Cleanup**
   - Streamlined `README.md` - focused on essentials, removed redundancy
   - Moved internal analysis docs to `docs/archive/` (ROBUSTNESS_*, OVER_ENGINEERING_REVIEW, INTEGRATION_PLAN)
-  - Archived development planning files (BACKLOG.md, TODO.md, IMPLEMENTATION_SUMMARY.md)
+  - Archived development planning files (BACKLOG.md, TODO.md, IMPLEMENTATION_SUMMARY.md) under `docs/archive/`
   - Updated `docs/README.md` as clean documentation index
 
 - **Generalized Configuration Files**

@@ -78,7 +78,7 @@ Complete reference for all environment variables and settings.
 - **16-32GB RAM:** Default settings are optimal
 - **32GB+ RAM:** `MEMORY_LIMIT_GB=48`, `MAX_CLIPS_IN_RAM=100`
 
-See [STABILITY_IMPROVEMENTS.md](../STABILITY_IMPROVEMENTS.md) for details.
+See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
 
 ---
 
