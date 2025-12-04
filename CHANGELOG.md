@@ -19,12 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Dependencies Updated to Latest Versions**
-  - `moviepy>=2.2.1`, `Pillow>=12.0.0`
+  - `moviepy>=2.2.1`, `Pillow>=10.0.0,<12.0` (moviepy 2.2.x constraint)
   - `opencv-python-headless>=4.12.0.88`, `scenedetect>=0.6.7.1`
   - `tqdm>=4.67.1`, `requests>=2.32.5`, `jsonschema>=4.25.1`
   - `OpenTimelineIO>=0.18.1`, `psutil>=7.1.3`
   - `Flask>=3.1.2`, `Werkzeug>=3.1.4`, `pytest>=9.0.1`
   - `openai>=2.8.1`
+
+- **Docker Build: Host Network Mode**
+  - Added `network: host` to docker-compose.web.yml for reliable DNS during build
+  - Fixes intermittent DNS resolution failures in BuildKit
 
 - **Version Tracking via Git Commit Hash**
   - Removed hardcoded version numbers
