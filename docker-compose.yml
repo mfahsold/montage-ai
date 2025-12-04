@@ -44,7 +44,8 @@ services:
       # OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.) - PREFERRED
       - OPENAI_API_BASE=${OPENAI_API_BASE:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-not-needed}
-      - OPENAI_MODEL=${OPENAI_MODEL:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}  # Creative Director (e.g. gemma3-4b, qwen2-5-32b)
+      - OPENAI_VISION_MODEL=${OPENAI_VISION_MODEL:-}  # Scene analysis (e.g. moondream2, llava-7b)
       
       # Ollama (local fallback)
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}

@@ -23,19 +23,26 @@ LLM backends are used in **priority order**: OpenAI-compatible > Google AI > cgp
 
 For KubeAI, vLLM, LocalAI, or any OpenAI-compatible endpoint:
 
-| Variable          | Default      | Description                                              |
-| ----------------- | ------------ | -------------------------------------------------------- |
-| `OPENAI_API_BASE` | *(empty)*    | API base URL (e.g., `http://kubeai.svc.local/openai/v1`) |
-| `OPENAI_API_KEY`  | `not-needed` | API key (KubeAI ignores this)                            |
-| `OPENAI_MODEL`    | *(empty)*    | Model name as configured in cluster (e.g., `gemma3-4b`)  |
+| Variable              | Default      | Description                                                      |
+| --------------------- | ------------ | ---------------------------------------------------------------- |
+| `OPENAI_API_BASE`     | *(empty)*    | API base URL (e.g., `http://kubeai.svc.local/openai/v1`)         |
+| `OPENAI_API_KEY`      | `not-needed` | API key (KubeAI ignores this)                                    |
+| `OPENAI_MODEL`        | *(empty)*    | Creative Director model (e.g., `gemma3-4b`, `qwen2-5-32b`)       |
+| `OPENAI_VISION_MODEL` | *(empty)*    | Vision model for scene analysis (e.g., `moondream2`, `llava-7b`) |
 
 **Example (KubeAI cluster):**
 
 ```bash
 OPENAI_API_BASE=http://kubeai.kubeai-system.svc.cluster.local/openai/v1 \
 OPENAI_MODEL=gemma3-4b \
+OPENAI_VISION_MODEL=moondream2 \
 ./montage-ai.sh run
 ```
+
+**Model Selection:**
+- **Creative Director**: Use small, fast models (gemma3-4b, llama3-8b)
+- **Vision Analysis**: Use vision models (moondream2, llava-7b)
+- **Complex Tasks**: Use larger models on-demand (qwen2-5-32b, llama3-70b)
 
 ### Ollama (Local LLM)
 
@@ -86,8 +93,43 @@ When the input footage has a different aspect ratio than the target output:
 | `true`            | **Letterbox/Pillarbox** - adds black bars to preserve |
 
 Use `PRESERVE_ASPECT=true` when:
+
 - Horizontal clips should keep full content in vertical (9:16) output
 - You want to avoid cutting important content at frame edges
+
+---
+
+## Quick-Start Configurations
+
+### KubeAI Cluster with GPU Encoding
+
+```bash
+# .env file or docker-compose environment
+OPENAI_API_BASE=http://kubeai.kubeai-system.svc.cluster.local/openai/v1
+OPENAI_MODEL=gemma3-4b
+OPENAI_VISION_MODEL=moondream2
+ENABLE_AI_FILTER=true
+FFMPEG_HWACCEL=auto
+PRESERVE_ASPECT=false
+```
+
+### Local Development (Ollama + CPU)
+
+```bash
+OLLAMA_HOST=http://localhost:11434
+DIRECTOR_MODEL=llama3.1:8b
+OLLAMA_MODEL=llava
+FFMPEG_HWACCEL=none
+```
+
+### Cloud GPU Processing (cgpu)
+
+```bash
+CGPU_ENABLED=true
+CGPU_GPU_ENABLED=true
+CGPU_MODEL=gemini-2.0-flash
+UPSCALE=true
+```
 
 ---
 

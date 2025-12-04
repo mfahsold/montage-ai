@@ -20,6 +20,7 @@ Welcome! Here's everything you need to know about Montage AI.
 | Doc                                | Description                               |
 | ---------------------------------- | ----------------------------------------- |
 | [Architecture](architecture.md)    | System design, data flow, module overview |
+| [Algorithms](algorithms.md)        | Technical details of analysis algorithms  |
 | [AI Director](AI_DIRECTOR.md)      | How the LLM translates prompts to edits   |
 | [Models](models.md)                | Which AI/ML libraries we use and why      |
 | [Contributing](../CONTRIBUTING.md) | How to contribute code                    |

@@ -210,6 +210,16 @@
                         </span>
                     </span>
                 </label>
+                <label class="checkbox-label option-card">
+                    <input type="checkbox" id="preserveAspect" {{ 'checked' if defaults.preserve_aspect else '' }}>
+                    <span class="option-content">
+                        <span class="option-icon">📐</span>
+                        <span class="option-text">
+                            <span class="option-title">Preserve Aspect</span>
+                            <span class="option-desc">Letterbox instead of crop</span>
+                        </span>
+                    </span>
+                </label>
             </div>
 
             <button onclick="createJob()" class="btn-primary btn-large">

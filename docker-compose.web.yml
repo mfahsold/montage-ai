@@ -29,11 +29,18 @@ services:
       - INPUT_DIR=${INPUT_DIR:-/data/input}
       - MUSIC_DIR=${MUSIC_DIR:-/data/music}
       - OUTPUT_DIR=${OUTPUT_DIR:-/data/output}
+      # AI / LLM Configuration - Priority: OpenAI-compatible > Google AI > cgpu > Ollama
+      # OpenAI-compatible API (KubeAI, vLLM, LocalAI) - RECOMMENDED
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-not-needed}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}  # Creative Director (e.g. gemma3-4b)
+      - OPENAI_VISION_MODEL=${OPENAI_VISION_MODEL:-}  # Scene analysis (e.g. moondream2)
+      # Ollama (local fallback)
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
-      # Google AI (preferred LLM backend)
+      # Google AI (alternative LLM backend)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GOOGLE_AI_MODEL=${GOOGLE_AI_MODEL:-gemini-2.0-flash}
-      # LLM-powered clip selection (uses Ollama or Google AI) - enabled by default
+      # LLM-powered clip selection - enabled by default
       - LLM_CLIP_SELECTION=${LLM_CLIP_SELECTION:-true}
       # cgpu Cloud GPU for upscaling
       - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-false}

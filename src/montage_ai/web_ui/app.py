@@ -70,6 +70,7 @@ DEFAULT_OPTIONS = {
     "llm_clip_selection": os.environ.get("LLM_CLIP_SELECTION", "true").lower() == "true",
     "export_timeline": os.environ.get("DEFAULT_EXPORT_TIMELINE", "false").lower() == "true",
     "generate_proxies": os.environ.get("DEFAULT_GENERATE_PROXIES", "false").lower() == "true",
+    "preserve_aspect": os.environ.get("PRESERVE_ASPECT", "false").lower() == "true",
 }
 
 # Flask app
@@ -176,6 +177,7 @@ def normalize_options(data: dict) -> dict:
         "export_timeline": get_bool('export_timeline'),
         "generate_proxies": get_bool('generate_proxies'),
         "cgpu": get_bool('cgpu'),
+        "preserve_aspect": get_bool('preserve_aspect'),
         "target_duration": target_duration,
         "music_start": music_start,
         "music_end": music_end,
@@ -216,6 +218,8 @@ def run_montage(job_id: str, style: str, options: dict):
         env["LLM_CLIP_SELECTION"] = "true" if options.get("llm_clip_selection") else "false"
         env["EXPORT_TIMELINE"] = "true" if options.get("export_timeline") else "false"
         env["GENERATE_PROXIES"] = "true" if options.get("generate_proxies") else "false"
+        # Aspect ratio handling: letterbox/pillarbox vs crop
+        env["PRESERVE_ASPECT"] = "true" if options.get("preserve_aspect") else "false"
         # cgpu checkbox enables BOTH LLM and GPU upscaling
         env["CGPU_ENABLED"] = "true" if options.get("cgpu") else "false"
         env["CGPU_GPU_ENABLED"] = "true" if options.get("cgpu") else "false"

@@ -16,7 +16,8 @@ data:
   # Option 1: OpenAI-compatible endpoint (KubeAI, vLLM, LocalAI) - RECOMMENDED
   OPENAI_API_BASE: "http://kubeai.kubeai-system.svc.cluster.local/openai/v1"
   OPENAI_API_KEY: "not-needed"
-  OPENAI_MODEL: "gemma3-4b"  # Or: qwen2-5-32b, llava-7b, etc.
+  OPENAI_MODEL: "gemma3-4b"  # Creative Director: gemma3-4b, qwen2-5-32b
+  OPENAI_VISION_MODEL: "moondream2"  # Scene Analysis: moondream2, llava-7b
   
   # Option 2: Ollama (local fallback)
   OLLAMA_HOST: "http://ollama.montage-ai.svc.cluster.local:11434"
@@ -36,6 +37,7 @@ data:
   UPSCALE: "false"
   ENHANCE: "true"
   ENABLE_AI_FILTER: "true"
+  PRESERVE_ASPECT: "false"  # true=letterbox/pillarbox, false=crop to fill
   
   # Output Configuration
   NUM_VARIANTS: "1"
@@ -43,7 +45,8 @@ data:
   EXPORT_TIMELINE: "true"  # Export OTIO/EDL/CSV for professional NLE software
   GENERATE_PROXIES: "false"
   
-  # Performance
+  # Performance / Hardware Acceleration
+  FFMPEG_HWACCEL: "auto"  # auto, nvenc, vaapi, qsv, none
   FFMPEG_THREADS: "0"
   FFMPEG_PRESET: "medium"
   PARALLEL_ENHANCE: "true"

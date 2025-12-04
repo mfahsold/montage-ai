@@ -128,15 +128,6 @@ from .ffmpeg_config import (
 _hwaccel_setting = os.environ.get("FFMPEG_HWACCEL", "auto")
 _ffmpeg_config = get_ffmpeg_config(hwaccel=_hwaccel_setting)
 
-# Output encoding defaults (from centralized config, overridable by heuristics)
-# Use effective_codec to get GPU encoder when HW accel is active
-OUTPUT_CODEC = _ffmpeg_config.effective_codec
-OUTPUT_PIX_FMT = _ffmpeg_config.pix_fmt
-OUTPUT_PROFILE = _ffmpeg_config.profile
-OUTPUT_LEVEL = _ffmpeg_config.level
-
-VERSION = "0.2.0"
-
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -152,10 +143,19 @@ TEMP_DIR = "/tmp"
 JOB_ID = os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 # LLM / AI Configuration
+# Priority: OpenAI-compatible > Google AI > Ollama
+OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE", "")  # e.g. http://kubeai.kubeai-system.svc.cluster.local/openai/v1
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "not-needed")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "")  # Creative Director model (e.g. gemma3-4b)
+OPENAI_VISION_MODEL = os.environ.get("OPENAI_VISION_MODEL", "")  # Vision model (e.g. moondream2)
+
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llava")  # For scene analysis
-DIRECTOR_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # For creative direction
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llava")  # For scene analysis (fallback)
+DIRECTOR_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # For creative direction (fallback)
 ENABLE_AI_FILTER = os.environ.get("ENABLE_AI_FILTER", "false").lower() == "true"
+
+# OpenAI Vision Client Cache (initialized on first use)
+_vision_client = None
 
 # Natural Language Control (NEW!)
 CREATIVE_PROMPT = os.environ.get("CREATIVE_PROMPT", "").strip()
@@ -167,6 +167,30 @@ CREATIVE_PROMPT = os.environ.get("CREATIVE_PROMPT", "").strip()
 
 # Legacy Cut Style (backwards compatible, overridden by CREATIVE_PROMPT if set)
 CUT_STYLE = os.environ.get("CUT_STYLE", "dynamic").lower()  # fast, hyper, slow, dynamic
+
+# Output encoding defaults (from centralized config, overridable by heuristics)
+# Use effective_codec to get GPU encoder when HW accel is active
+OUTPUT_CODEC = _ffmpeg_config.effective_codec
+OUTPUT_PIX_FMT = _ffmpeg_config.pix_fmt
+OUTPUT_PROFILE = _ffmpeg_config.profile
+OUTPUT_LEVEL = _ffmpeg_config.level
+
+VERSION = "0.2.0"
+
+def _log_startup_backends():
+    """Log GPU encoding and Vision AI backend once at import."""
+    if _ffmpeg_config.is_gpu_accelerated:
+        print(f"🎮 GPU Encoding: {OUTPUT_CODEC} ({_ffmpeg_config.gpu_encoder_type})")
+    else:
+        print(f"💻 CPU Encoding: {OUTPUT_CODEC}")
+
+    if OPENAI_API_BASE and OPENAI_VISION_MODEL:
+        print(f"👁️  Vision AI: {OPENAI_VISION_MODEL} @ {OPENAI_API_BASE}")
+    elif ENABLE_AI_FILTER:
+        print(f"👁️  Vision AI: {OLLAMA_MODEL} (Ollama fallback)")
+
+# Emit startup logs
+_log_startup_backends()
 
 # Visual Enhancement
 STABILIZE = os.environ.get("STABILIZE", "false").lower() == "true"
@@ -864,28 +888,77 @@ def detect_scenes(video_path, threshold=30.0):
     return scenes
 
 def analyze_scene_content(video_path, time_point):
-    """Extract a frame and ask AI to describe it."""
+    """
+    Extract a frame and ask AI to describe it.
+
+    Supports OpenAI-compatible Vision APIs (KubeAI moondream2, llava)
+    with fallback to Ollama.
+    """
     if not ENABLE_AI_FILTER:
         return {"quality": "YES", "description": "unknown", "action": "medium", "shot": "medium"}
-        
+
     try:
         cap = cv2.VideoCapture(video_path)
         cap.set(cv2.CAP_PROP_POS_MSEC, time_point * 1000)
         ret, frame = cap.read()
         cap.release()
-        
+
         if not ret:
             return {"quality": "NO", "description": "read error", "action": "low", "shot": "medium"}
-            
+
         _, buffer = cv2.imencode('.jpg', frame)
         b64_img = base64.b64encode(buffer).decode('utf-8')
-        
+
         prompt = (
             "Analyze this image for a video editor. Return a JSON object with these keys: "
-            "quality (YES/NO), description (5 words), action (low/medium/high), shot (close-up/medium/wide). "
+            "quality (YES/NO), description (5 words), action (low/medium/high), shot (close/medium/wide). "
             "Example: {\"quality\": \"YES\", \"description\": \"Man running in park\", \"action\": \"high\", \"shot\": \"wide\"}"
         )
-        
+
+        # Try OpenAI-compatible Vision API first (KubeAI moondream2, llava, etc.)
+        if OPENAI_API_BASE and OPENAI_VISION_MODEL:
+            try:
+                # Initialize cached client on first use
+                global _vision_client
+                if _vision_client is None:
+                    from openai import OpenAI
+                    _vision_client = OpenAI(base_url=OPENAI_API_BASE, api_key=OPENAI_API_KEY)
+
+                response = _vision_client.chat.completions.create(
+                    model=OPENAI_VISION_MODEL,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
+                        ]
+                    }],
+                    max_tokens=100,
+                    temperature=0.2,
+                    timeout=30  # Prevent hanging on slow models
+                )
+
+                if response.choices and response.choices[0].message.content:
+                    content = response.choices[0].message.content.strip()
+                    # Clean markdown wrapping if present
+                    if content.startswith("```json"):
+                        content = content[7:]
+                    if content.startswith("```"):
+                        content = content[3:]
+                    if content.endswith("```"):
+                        content = content[:-3]
+
+                    res_json = json.loads(content.strip())
+                    return {
+                        "quality": res_json.get("quality", "YES"),
+                        "description": res_json.get("description", "unknown"),
+                        "action": res_json.get("action", "medium").lower(),
+                        "shot": res_json.get("shot", "medium").lower()
+                    }
+            except Exception as e:
+                print(f"   ⚠️ OpenAI Vision API failed, falling back to Ollama: {e}")
+
+        # Fallback to Ollama
         payload = {
             "model": OLLAMA_MODEL,
             "prompt": prompt,
@@ -893,12 +966,11 @@ def analyze_scene_content(video_path, time_point):
             "stream": False,
             "format": "json"
         }
-        
+
         response = requests.post(f"{OLLAMA_HOST}/api/generate", json=payload)
         if response.status_code == 200:
             try:
                 res_json = json.loads(response.json().get("response", "{}"))
-                # Normalize keys
                 return {
                     "quality": res_json.get("quality", "YES"),
                     "description": res_json.get("description", "unknown"),
@@ -908,11 +980,11 @@ def analyze_scene_content(video_path, time_point):
             except:
                 text = response.json().get("response", "")
                 return {"quality": "YES", "description": text[:50], "action": "medium", "shot": "medium"}
-                
+
     except Exception as e:
         print(f"   ⚠️ AI Analysis failed: {e}")
         return {"quality": "YES", "description": "error", "action": "medium", "shot": "medium"}
-        
+
     return {"quality": "YES", "description": "unknown", "action": "medium", "shot": "medium"}
 
 def calculate_visual_similarity(frame1_path, frame1_time, frame2_path, frame2_time):

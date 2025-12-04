@@ -161,6 +161,7 @@ async function createJob() {
     const llmClipSelection = document.getElementById('llmClipSelection').checked;
     const exportTimeline = document.getElementById('exportTimeline').checked;
     const generateProxies = document.getElementById('generateProxies').checked;
+    const preserveAspect = document.getElementById('preserveAspect').checked;
 
     // NEW: Video length control
     const targetDuration = parseFloat(document.getElementById('targetDuration').value) || 60;
@@ -183,6 +184,7 @@ async function createJob() {
         llm_clip_selection: llmClipSelection,
         export_timeline: exportTimeline,
         generate_proxies: generateProxies,
+        preserve_aspect: preserveAspect,
         target_duration: targetDuration,
         music_start: musicStart,
         music_end: musicEnd

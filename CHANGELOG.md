@@ -9,13 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **OpenAI-Compatible LLM Backend** (`creative_director.py`)
+- **OpenAI-Compatible LLM Backend** (`creative_director.py`, `editor.py`)
   - New backend for KubeAI, vLLM, LocalAI, and other OpenAI-compatible APIs
-  - Uses standard `/v1/chat/completions` endpoint
-  - New env vars: `OPENAI_API_BASE`, `OPENAI_API_KEY`, `OPENAI_MODEL`
+  - Uses standard `/v1/chat/completions` endpoint for text and vision
+  - New env vars: `OPENAI_API_BASE`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_VISION_MODEL`
+  - **Creative Director**: Uses `OPENAI_MODEL` (e.g., gemma3-4b for fast text generation)
+  - **Scene Analysis**: Uses `OPENAI_VISION_MODEL` (e.g., moondream2 for vision tasks)
   - Automatic fallback to JSON mode without `response_format` for models that don't support it
   - Priority order: OpenAI-compatible > Google AI > cgpu > Ollama
   - System prompts and editing instructions managed by montage-ai, only model name needs cluster configuration
+  - Fallback to Ollama if OpenAI Vision API fails
 
 - **GPU Hardware Acceleration for Video Encoding** (`ffmpeg_config.py`)
   - Auto-detection of available GPU encoders (NVENC, VAAPI, QSV, VideoToolbox)
@@ -34,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Adds black bars instead of cropping when aspect ratios differ
   - Useful for horizontal clips in 9:16 vertical output
   - `enforce_dimensions()` now accepts `preserve_aspect` parameter
+  - **Web UI checkbox** added for easy aspect ratio control
+  - Added to k3s ConfigMap for Kubernetes deployments
+
+- **Bootstrap Script** (`scripts/bootstrap.sh`)
+  - Idempotent prerequisite installer for dev and production environments
+  - Auto-detects OS (Ubuntu/Debian, Fedora/RHEL, macOS, Arch)
+  - Checks and optionally installs: Python 3.10+, FFmpeg (with GPU encoder detection), Docker
+  - GPU access verification (/dev/dri, nvidia-smi, VideoToolbox)
+  - Python virtual environment setup with dependencies
+  - `--check-only` mode for CI/CD validation
+  - `--dev` mode for development dependencies
 
 ### Fixed
 
