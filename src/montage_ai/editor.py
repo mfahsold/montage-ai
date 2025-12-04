@@ -177,6 +177,14 @@ XFADE_DURATION = float(os.environ.get("XFADE_DURATION", "0.3"))  # Crossfade dur
 # Clip reuse control
 MAX_SCENE_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
 
+# Target Duration & Music Trimming (from Web UI)
+# TARGET_DURATION: Override video length (0 or empty = use full music duration)
+# MUSIC_START/MUSIC_END: Trim music track (seconds)
+TARGET_DURATION = float(os.environ.get("TARGET_DURATION", "0") or "0")
+MUSIC_START = float(os.environ.get("MUSIC_START", "0") or "0")
+MUSIC_END_RAW = os.environ.get("MUSIC_END", "")
+MUSIC_END = float(MUSIC_END_RAW) if MUSIC_END_RAW else None
+
 # GPU/Hardware Acceleration (auto-detected)
 USE_GPU = os.environ.get("USE_GPU", "auto").lower()  # auto, vulkan, v4l2, none
 
@@ -1417,7 +1425,39 @@ def create_montage(variant_id=1):
     cut_number = 0  # For monitoring
     
     audio_clip = AudioFileClip(music_path)
-    target_duration = audio_clip.duration
+    original_audio_duration = audio_clip.duration
+    
+    # Log UI settings for debugging (helps confirm values arrived correctly)
+    if VERBOSE:
+        print(f"\n   📋 Duration Settings (from UI):")
+        print(f"      TARGET_DURATION: {TARGET_DURATION}s {'(override active)' if TARGET_DURATION > 0 else '(use full audio)'}")
+        print(f"      MUSIC_START: {MUSIC_START}s")
+        print(f"      MUSIC_END: {MUSIC_END}s" if MUSIC_END else "      MUSIC_END: (not set, will use full track or target)")
+        print(f"      Original audio: {original_audio_duration:.1f}s")
+    
+    # Apply music trimming (from Web UI)
+    music_start = MUSIC_START
+    music_end = MUSIC_END if MUSIC_END else audio_clip.duration
+    
+    # Validate and apply trimming
+    if music_start > 0 or music_end < audio_clip.duration:
+        # Ensure valid range
+        music_start = max(0, min(music_start, audio_clip.duration - 1))
+        music_end = max(music_start + 1, min(music_end, audio_clip.duration))
+        if VERBOSE:
+            print(f"   🎵 Music trim: {music_start:.1f}s → {music_end:.1f}s (from {original_audio_duration:.1f}s)")
+        audio_clip = audio_clip.subclipped(music_start, music_end)
+    
+    # Determine target duration
+    # Priority: TARGET_DURATION env > trimmed audio duration
+    if TARGET_DURATION > 0:
+        target_duration = TARGET_DURATION
+        if VERBOSE:
+            print(f"   ⏱️ Target duration: {target_duration:.1f}s (from UI setting)")
+    else:
+        target_duration = audio_clip.duration
+        if VERBOSE:
+            print(f"   ⏱️ Target duration: {target_duration:.1f}s (from trimmed audio)")
     
     # Estimate total cuts for progress tracking
     # Use tempo-aware estimate: faster tempo = more cuts
@@ -2269,9 +2309,12 @@ def create_montage(variant_id=1):
             })
         
         # Finalize: flush remaining clips and concatenate all segments with audio + logo
+        # Pass audio_duration for proper trimming when target duration is set
+        audio_duration = target_duration if TARGET_DURATION > 0 else current_time
         success = progressive_renderer.finalize(
             output_path=output_filename,
             audio_path=music_path,
+            audio_duration=audio_duration,  # Trim audio to match video
             logo_path=logo_path  # Logo overlay (if available)
         )
         
@@ -2341,7 +2384,7 @@ def create_montage(variant_id=1):
                 print("   ❌ No clips to compose!")
                 return None
         
-        final_video = final_video.set_audio(audio_clip.subclip(0, current_time))
+        final_video = final_video.set_audio(audio_clip.subclipped(0, current_time))
         
         # Render legacy way
         print(f"   🎬 Rendering (legacy MoviePy)...")

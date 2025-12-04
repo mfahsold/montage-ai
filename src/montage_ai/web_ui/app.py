@@ -81,6 +81,55 @@ def get_job_status(job_id: str) -> dict:
         return jobs.get(job_id, {"status": "not_found"})
 
 
+def normalize_options(data: dict) -> dict:
+    """Normalize and validate job options from API request.
+    
+    Single source of truth for option parsing, type casting, and defaults.
+    Automatically derives MUSIC_END from TARGET_DURATION if not explicitly set.
+    
+    Args:
+        data: Raw request data (may have nested 'options' or flat structure)
+        
+    Returns:
+        Normalized options dict with consistent types
+    """
+    # Support both nested and flat structure (backwards compatible)
+    opts = data.get('options', {})
+    
+    # Parse with defaults and type casting
+    target_duration = float(opts.get('target_duration', data.get('target_duration', 0)) or 0)
+    music_start = float(opts.get('music_start', data.get('music_start', 0)) or 0)
+    music_end_raw = opts.get('music_end', data.get('music_end', None))
+    
+    # Convert music_end to float if provided
+    music_end = float(music_end_raw) if music_end_raw is not None else None
+    
+    # AUTO-DERIVE: If target_duration is set but music_end is not,
+    # derive music_end from music_start + target_duration
+    # This ensures the audio is trimmed to match the target video length
+    if target_duration > 0 and music_end is None:
+        music_end = music_start + target_duration
+    
+    # Clamp values to sensible ranges
+    target_duration = max(0, min(target_duration, 3600))  # 0-1h
+    music_start = max(0, music_start)
+    if music_end is not None:
+        music_end = max(music_start + 1, music_end)  # At least 1s after start
+    
+    return {
+        "prompt": str(opts.get('prompt', data.get('prompt', ''))),
+        "stabilize": bool(opts.get('stabilize', data.get('stabilize', False))),
+        "upscale": bool(opts.get('upscale', data.get('upscale', False))),
+        "enhance": bool(opts.get('enhance', data.get('enhance', True))),
+        "export_timeline": bool(opts.get('export_timeline', data.get('export_timeline', False))),
+        "generate_proxies": bool(opts.get('generate_proxies', data.get('generate_proxies', False))),
+        "cgpu": bool(opts.get('cgpu', data.get('cgpu', False))),
+        "target_duration": target_duration,
+        "music_start": music_start,
+        "music_end": music_end,
+    }
+
+
 def run_montage(job_id: str, style: str, options: dict):
     """Run montage creation in background."""
     global active_jobs
@@ -116,6 +165,11 @@ def run_montage(job_id: str, style: str, options: dict):
         # cgpu checkbox enables BOTH LLM and GPU upscaling
         env["CGPU_ENABLED"] = "true" if options.get("cgpu", False) else "false"
         env["CGPU_GPU_ENABLED"] = "true" if options.get("cgpu", False) else "false"
+        # Video duration & music trimming (already normalized by normalize_options)
+        env["TARGET_DURATION"] = str(options.get("target_duration", 0))
+        env["MUSIC_START"] = str(options.get("music_start", 0))
+        music_end = options.get("music_end")
+        env["MUSIC_END"] = str(music_end) if music_end is not None else ""
         env["VERBOSE"] = "true"
 
         # Run montage
@@ -271,22 +325,14 @@ def api_create_job():
     # Generate job ID
     job_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Extract options from nested object or top-level (backwards compatible)
-    options_data = data.get('options', {})
+    # Normalize options (single source of truth for parsing/defaults/derivation)
+    normalized_options = normalize_options(data)
     
-    # Create job
+    # Create job with normalized options
     job = {
         "id": job_id,
         "style": data['style'],
-        "options": {
-            "prompt": options_data.get('prompt', data.get('prompt', '')),
-            "stabilize": options_data.get('stabilize', data.get('stabilize', False)),
-            "upscale": options_data.get('upscale', data.get('upscale', False)),
-            "enhance": options_data.get('enhance', data.get('enhance', True)),
-            "export_timeline": options_data.get('export_timeline', data.get('export_timeline', False)),
-            "generate_proxies": options_data.get('generate_proxies', data.get('generate_proxies', False)),
-            "cgpu": options_data.get('cgpu', data.get('cgpu', False))
-        },
+        "options": normalized_options,
         "status": "queued",
         "created_at": datetime.now().isoformat()
     }

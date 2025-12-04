@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Web UI: Video Duration & Music Trimming Now Functional** - Critical bug fix
+  - Target Duration, Music Start, Music End controls in Web UI were non-functional
+  - Root cause: Frontend sent values but backend didn't pass them to editor subprocess
+  - Fixed 3-layer data flow: Frontend → Backend API → ENV vars → Editor
+  - New ENV variables: `TARGET_DURATION`, `MUSIC_START`, `MUSIC_END`
+  - `api_create_job()` now includes duration/music params in job options
+  - `run_montage()` now sets corresponding ENV variables for subprocess
+  - `editor.py` reads ENV vars and applies music trimming via `subclipped()`
+  - Progressive renderer receives `audio_duration` for FFmpeg `atrim` filter
+  - Deprecation fix: Replaced `subclip()` with `subclipped()` (MoviePy 2.x)
+
 ### Added
 
 - **Automatic Output Format Detection** - Intelligent heuristics for optimal output
