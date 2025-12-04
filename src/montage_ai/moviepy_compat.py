@@ -52,7 +52,17 @@ __all__ = [
 # =============================================================================
 
 def subclip(clip, start, end):
-    """Extract subclip - works with MoviePy 1.x and 2.x."""
+    """Extract subclip - works with MoviePy 1.x and 2.x.
+    
+    Automatically clamps start/end to valid clip duration to prevent
+    ValueError when scene boundaries exceed actual clip length.
+    """
+    # Clamp to valid range
+    duration = clip.duration
+    if duration is not None:
+        start = max(0, min(start, duration))
+        end = max(start, min(end, duration))
+    
     if hasattr(clip, 'subclipped'):
         return clip.subclipped(start, end)
     return clip.subclip(start, end)
