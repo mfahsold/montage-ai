@@ -12,6 +12,7 @@ services:
   web-ui:
     build:
       context: .
+      network: host
       args:
         GIT_COMMIT: ${GIT_COMMIT:-dev}
     entrypoint: ["python", "-u", "-m", "montage_ai.web_ui.app"]
