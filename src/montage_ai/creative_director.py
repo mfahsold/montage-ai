@@ -34,17 +34,25 @@ except ImportError:
 VERSION = "0.3.0"
 
 # Backend configuration
-# Priority: GOOGLE_API_KEY (direct Gemini) > CGPU_ENABLED (cgpu serve) > Ollama (local)
+# Priority: OPENAI_API_BASE (KubeAI/OpenAI-compatible) > GOOGLE_API_KEY (direct Gemini) > CGPU_ENABLED (cgpu serve) > Ollama (local)
+
+# OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.)
+OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE", "")  # e.g. http://kubeai.kubeai-system.svc.cluster.local/openai/v1
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "not-needed")  # KubeAI ignores this
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "")  # e.g. gemma3-4b, qwen2-5-32b
+
+# Google AI (direct API)
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 GOOGLE_AI_MODEL = os.environ.get("GOOGLE_AI_MODEL", "gemini-2.0-flash")
 GOOGLE_AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 
+# cgpu serve (Gemini via OpenAI Responses API)
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
 CGPU_PORT = os.environ.get("CGPU_PORT", "8080")  # Updated default port
 CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
 
-# Ollama (fallback/local)
+# Ollama (local fallback)
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # or deepseek-r1:70b
 
@@ -149,8 +157,9 @@ class CreativeDirector:
 
     Translates natural language prompts into structured editing instructions.
     Supports multiple backends:
-      - Google AI (direct API with GOOGLE_API_KEY) - preferred
-      - cgpu serve (OpenAI-compatible proxy)
+      - OpenAI-compatible API (KubeAI, vLLM, LocalAI) - use OPENAI_API_BASE
+      - Google AI (direct API with GOOGLE_API_KEY)
+      - cgpu serve (OpenAI-compatible proxy for Gemini)
       - Ollama (local LLM fallback)
     """
 
@@ -160,7 +169,8 @@ class CreativeDirector:
         model: str = OLLAMA_MODEL,
         timeout: int = 60,
         use_cgpu: bool = None,
-        use_google_ai: bool = None
+        use_google_ai: bool = None,
+        use_openai_api: bool = None
     ):
         """
         Initialize Creative Director.
@@ -171,30 +181,50 @@ class CreativeDirector:
             timeout: Request timeout in seconds
             use_cgpu: Force cgpu backend (None = auto-detect from env)
             use_google_ai: Force Google AI backend (None = auto-detect from env)
+            use_openai_api: Force OpenAI-compatible backend (None = auto-detect from env)
         """
         self.ollama_host = ollama_host
         self.ollama_model = model
         self.timeout = timeout
         
-        # Determine backend priority: Google AI > cgpu > Ollama
-        if use_google_ai is None:
-            self.use_google_ai = bool(GOOGLE_API_KEY)
+        # Determine backend priority: OpenAI-compatible > Google AI > cgpu > Ollama
+        if use_openai_api is None:
+            self.use_openai_api = bool(OPENAI_API_BASE and OPENAI_MODEL)
         else:
-            self.use_google_ai = use_google_ai
+            self.use_openai_api = use_openai_api
+            
+        if use_google_ai is None:
+            self.use_google_ai = bool(GOOGLE_API_KEY) and not self.use_openai_api
+        else:
+            self.use_google_ai = use_google_ai and not self.use_openai_api
             
         if use_cgpu is None:
-            self.use_cgpu = CGPU_ENABLED and OPENAI_AVAILABLE and not self.use_google_ai
+            self.use_cgpu = CGPU_ENABLED and OPENAI_AVAILABLE and not self.use_google_ai and not self.use_openai_api
         else:
-            self.use_cgpu = use_cgpu and OPENAI_AVAILABLE and not self.use_google_ai
+            self.use_cgpu = use_cgpu and OPENAI_AVAILABLE and not self.use_google_ai and not self.use_openai_api
         
         # Log backend selection
-        if self.use_google_ai:
+        if self.use_openai_api:
+            print(f"   🌐 Creative Director using OpenAI-compatible API ({OPENAI_MODEL} @ {OPENAI_API_BASE})")
+        elif self.use_google_ai:
             print(f"   🌐 Creative Director using Google AI ({GOOGLE_AI_MODEL})")
         elif self.use_cgpu:
             cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}/v1"
             print(f"   🌐 Creative Director using cgpu/Gemini at {cgpu_url}")
         else:
             print(f"   🏠 Creative Director using Ollama ({self.ollama_model})")
+        
+        # Initialize OpenAI client for OpenAI-compatible or cgpu backend
+        self.openai_client = None
+        if self.use_openai_api and OPENAI_AVAILABLE:
+            try:
+                self.openai_client = OpenAI(
+                    base_url=OPENAI_API_BASE,
+                    api_key=OPENAI_API_KEY
+                )
+            except Exception as e:
+                print(f"   ⚠️ Failed to initialize OpenAI client: {e}")
+                self.use_openai_api = False
         
         # Initialize cgpu client if enabled
         self.cgpu_client = None
@@ -306,7 +336,7 @@ class CreativeDirector:
 
     def _query_llm(self, user_prompt: str) -> Optional[str]:
         """
-        Query LLM with user prompt (Google AI, cgpu, or Ollama).
+        Query LLM with user prompt (OpenAI-compatible, Google AI, cgpu, or Ollama).
 
         Args:
             user_prompt: User's natural language request
@@ -314,12 +344,89 @@ class CreativeDirector:
         Returns:
             LLM response text (should be JSON)
         """
-        # Try backends in priority order: Google AI > cgpu > Ollama
-        if self.use_google_ai:
+        # Try backends in priority order: OpenAI-compatible > Google AI > cgpu > Ollama
+        if self.use_openai_api and self.openai_client:
+            return self._query_openai_api(user_prompt)
+        elif self.use_google_ai:
             return self._query_google_ai(user_prompt)
         elif self.use_cgpu and self.cgpu_client:
             return self._query_cgpu(user_prompt)
         else:
+            return self._query_ollama(user_prompt)
+
+    def _query_openai_api(self, user_prompt: str) -> Optional[str]:
+        """
+        Query OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.).
+        
+        Uses standard /v1/chat/completions endpoint.
+        """
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1024,
+                response_format={"type": "json_object"}  # Force JSON output
+            )
+            
+            if response.choices and response.choices[0].message.content:
+                content = response.choices[0].message.content
+                # Clean up response - some models wrap JSON in markdown
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.startswith("```"):
+                    content = content[3:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                return content.strip()
+            else:
+                print("   ⚠️ OpenAI API returned empty response")
+                return None
+                
+        except Exception as e:
+            error_str = str(e)
+            # Check if it's a model-not-found or similar error
+            if "response_format" in error_str.lower() or "json" in error_str.lower():
+                # Model doesn't support JSON mode, retry without it
+                print("   ⚠️ Model doesn't support JSON mode, retrying without...")
+                return self._query_openai_api_no_json_mode(user_prompt)
+            print(f"   ⚠️ OpenAI API error: {e}")
+            # Fallback to Ollama
+            print("   🔄 Falling back to Ollama...")
+            return self._query_ollama(user_prompt)
+
+    def _query_openai_api_no_json_mode(self, user_prompt: str) -> Optional[str]:
+        """
+        Query OpenAI-compatible API without JSON mode (for models that don't support it).
+        """
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1024
+            )
+            
+            if response.choices and response.choices[0].message.content:
+                content = response.choices[0].message.content
+                # Clean up response
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.startswith("```"):
+                    content = content[3:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                return content.strip()
+            else:
+                return None
+        except Exception as e:
+            print(f"   ⚠️ OpenAI API error (no JSON mode): {e}")
             return self._query_ollama(user_prompt)
 
     def _query_google_ai(self, user_prompt: str) -> Optional[str]:

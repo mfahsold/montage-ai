@@ -11,12 +11,19 @@ data:
   CREATIVE_PROMPT: ""
   
   # AI / LLM Configuration
-  # Option 1: KubeAI OpenAI-compatible endpoint
-  OLLAMA_HOST: "http://kubeai.kubeai-system.svc.cluster.local/openai/v1"
-  OLLAMA_MODEL: "qwen3-axera-1-7b"
-  DIRECTOR_MODEL: "qwen3-axera-1-7b"
+  # Priority: OPENAI_API_BASE > GOOGLE_API_KEY > CGPU > OLLAMA
   
-  # Option 2: cgpu (cloud GPU + Gemini LLM)
+  # Option 1: OpenAI-compatible endpoint (KubeAI, vLLM, LocalAI) - RECOMMENDED
+  OPENAI_API_BASE: "http://kubeai.kubeai-system.svc.cluster.local/openai/v1"
+  OPENAI_API_KEY: "not-needed"
+  OPENAI_MODEL: "gemma3-4b"  # Or: qwen2-5-32b, llava-7b, etc.
+  
+  # Option 2: Ollama (local fallback)
+  OLLAMA_HOST: "http://ollama.montage-ai.svc.cluster.local:11434"
+  OLLAMA_MODEL: "llava"
+  DIRECTOR_MODEL: "llama3.1:70b"
+  
+  # Option 3: cgpu (cloud GPU + Gemini LLM)
   CGPU_ENABLED: "false"
   CGPU_HOST: "cgpu-server.montage-ai.svc.cluster.local"
   CGPU_PORT: "8080"

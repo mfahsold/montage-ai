@@ -17,6 +17,26 @@ Complete reference for all environment variables and settings.
 
 ## AI / LLM Settings
 
+LLM backends are used in **priority order**: OpenAI-compatible > Google AI > cgpu > Ollama
+
+### OpenAI-Compatible API (Recommended for Kubernetes)
+
+For KubeAI, vLLM, LocalAI, or any OpenAI-compatible endpoint:
+
+| Variable          | Default      | Description                                              |
+| ----------------- | ------------ | -------------------------------------------------------- |
+| `OPENAI_API_BASE` | *(empty)*    | API base URL (e.g., `http://kubeai.svc.local/openai/v1`) |
+| `OPENAI_API_KEY`  | `not-needed` | API key (KubeAI ignores this)                            |
+| `OPENAI_MODEL`    | *(empty)*    | Model name as configured in cluster (e.g., `gemma3-4b`)  |
+
+**Example (KubeAI cluster):**
+
+```bash
+OPENAI_API_BASE=http://kubeai.kubeai-system.svc.cluster.local/openai/v1 \
+OPENAI_MODEL=gemma3-4b \
+./montage-ai.sh run
+```
+
 ### Ollama (Local LLM)
 
 | Variable           | Default                             | Description                    |
@@ -26,7 +46,14 @@ Complete reference for all environment variables and settings.
 | `DIRECTOR_MODEL`   | `llama3.1:70b`                      | Model for Creative Director    |
 | `ENABLE_AI_FILTER` | `false`                             | Enable AI-based clip filtering |
 
-### cgpu / Gemini (Cloud LLM)
+### Google AI (Direct API)
+
+| Variable          | Default            | Description                |
+| ----------------- | ------------------ | -------------------------- |
+| `GOOGLE_API_KEY`  | *(empty)*          | Google AI API key          |
+| `GOOGLE_AI_MODEL` | `gemini-2.0-flash` | Gemini model for LLM tasks |
+
+### cgpu / Gemini (Cloud LLM via cgpu serve)
 
 | Variable           | Default                | Description                                      |
 | ------------------ | ---------------------- | ------------------------------------------------ |

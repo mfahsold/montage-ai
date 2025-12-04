@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OpenAI-Compatible LLM Backend** (`creative_director.py`)
+  - New backend for KubeAI, vLLM, LocalAI, and other OpenAI-compatible APIs
+  - Uses standard `/v1/chat/completions` endpoint
+  - New env vars: `OPENAI_API_BASE`, `OPENAI_API_KEY`, `OPENAI_MODEL`
+  - Automatic fallback to JSON mode without `response_format` for models that don't support it
+  - Priority order: OpenAI-compatible > Google AI > cgpu > Ollama
+  - System prompts and editing instructions managed by montage-ai, only model name needs cluster configuration
+
 - **GPU Hardware Acceleration for Video Encoding** (`ffmpeg_config.py`)
   - Auto-detection of available GPU encoders (NVENC, VAAPI, QSV, VideoToolbox)
   - New env var `FFMPEG_HWACCEL`: auto, nvenc, vaapi, qsv, videotoolbox, none

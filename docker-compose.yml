@@ -38,7 +38,15 @@ services:
       - LUT_DIR=${LUT_DIR:-/data/luts}
       - COLOR_MATCH=${COLOR_MATCH:-false}
       
-      # AI / LLM Configuration (Ollama - local fallback)
+      # AI / LLM Configuration
+      # Priority: OPENAI_API_BASE > GOOGLE_API_KEY > CGPU > OLLAMA
+      
+      # OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.) - PREFERRED
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-not-needed}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}
+      
+      # Ollama (local fallback)
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llava}
       - DIRECTOR_MODEL=${DIRECTOR_MODEL:-llama3.1:70b}
@@ -47,7 +55,7 @@ services:
       # LLM-powered clip selection (uses configured LLM backend) - enabled by default
       - LLM_CLIP_SELECTION=${LLM_CLIP_SELECTION:-true}
       
-      # Google AI (direct API - preferred for LLM)
+      # Google AI (direct API)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GOOGLE_AI_MODEL=${GOOGLE_AI_MODEL:-gemini-2.0-flash}
       
