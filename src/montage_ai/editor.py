@@ -34,25 +34,20 @@ import subprocess
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Optional, Any, List, Tuple
-from moviepy.editor import (
-    VideoFileClip, AudioFileClip, concatenate_videoclips,
-    ImageClip, CompositeVideoClip, TextClip
+
+# MoviePy 1.x/2.x compatibility layer
+from .moviepy_compat import (
+    VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, TextClip,
+    concatenate_videoclips,
+    subclip, set_audio, set_duration, set_position, resize, crop,
+    enforce_dimensions, log_clip_info, ensure_even_dimensions, pad_to_target,
 )
 from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector
 from tqdm import tqdm
 
-
-def subclip_compat(clip, start, end):
-    """MoviePy version-compatible subclip function.
-    
-    MoviePy 1.x uses .subclip(), MoviePy 2.x uses .subclipped()
-    This helper works with both versions.
-    """
-    if hasattr(clip, 'subclipped'):
-        return clip.subclipped(start, end)
-    else:
-        return clip.subclip(start, end)
+# Alias for backward compatibility
+subclip_compat = subclip
 
 
 # Import Creative Director for natural language control
@@ -2058,75 +2053,9 @@ def create_montage(variant_id=1):
         # Get video dimensions (after rotation correction)
         w, h = v_clip.size
         
-        # Debug: Show original dimensions
-        print(f"  📏 Video dimensions: {w}x{h}")
-        
-        # Resize/crop to the chosen output aspect ratio (preserving composition)
-        # Uses STANDARD_WIDTH/HEIGHT from segment_writer for consistency
+        # Resize/crop to target dimensions using DRY helper
         target_w, target_h = STANDARD_WIDTH, STANDARD_HEIGHT
-        target_ratio = target_w / target_h
-        current_ratio = w / h
-
-        print(f"  📏 Current ratio: {current_ratio:.3f}, target: {target_ratio:.3f}")
-
-        if current_ratio > target_ratio + 0.01:  # Add tolerance for floating point
-            # Video is wider than target ratio - crop width to fit
-            # Use round() instead of int() to avoid accumulating rounding errors
-            new_w = round(h * target_ratio)
-            crop_x = (w - new_w) // 2
-            print(f"  ✂️ Cropping width: {w} -> {new_w} (crop_x={crop_x})")
-            v_clip = v_clip.crop(x1=crop_x, x2=crop_x + new_w)
-        elif current_ratio < target_ratio - 0.01:
-            # Video is taller than target ratio - crop height to fit
-            new_h = round(w / target_ratio)
-            crop_y = (h - new_h) // 2
-            print(f"  ✂️ Cropping height: {h} -> {new_h} (crop_y={crop_y})")
-            v_clip = v_clip.crop(y1=crop_y, y2=crop_y + new_h)
-        # else: already near target ratio, no crop needed
-
-        # Scale to exact target dimensions
-        # Only resize if dimensions don't match to avoid unnecessary quality loss
-        current_size = v_clip.size
-        if current_size != (target_w, target_h):
-            v_clip = v_clip.resize(newsize=(target_w, target_h))
-            print(f"  📐 Resized: {current_size} → {v_clip.size}")
-        else:
-            print(f"  📐 Final size: {v_clip.size} (no resize needed)")
-
-        # CRITICAL: Verify and force exact dimensions
-        # MoviePy's resize sometimes returns slightly off dimensions (e.g. 1078 instead of 1080)
-        # This causes aspect ratio distortion. Force exact dimensions with crop/pad if needed.
-        actual_w, actual_h = v_clip.size
-        if actual_w != target_w or actual_h != target_h:
-            print(f"  ⚠️  Dimension mismatch after resize: {actual_w}x{actual_h} != {target_w}x{target_h}")
-            # Pad if too small, crop if too large
-            if actual_w < target_w or actual_h < target_h:
-                # Pad to target size (center)
-                pad_x = (target_w - actual_w) // 2 if actual_w < target_w else 0
-                pad_y = (target_h - actual_h) // 2 if actual_h < target_h else 0
-                print(f"  📦 Padding: ({pad_x}, {pad_y})")
-                # Create black background and composite
-                from moviepy.editor import ColorClip
-                bg = ColorClip(size=(target_w, target_h), color=(0, 0, 0), duration=v_clip.duration)
-                v_clip = moviepy.video.compositing.CompositeVideoClip.CompositeVideoClip(
-                    [bg.set_duration(v_clip.duration), v_clip.set_position(('center', 'center'))],
-                    size=(target_w, target_h)
-                )
-            else:
-                # Crop to exact size (center crop)
-                crop_x = (actual_w - target_w) // 2 if actual_w > target_w else 0
-                crop_y = (actual_h - target_h) // 2 if actual_h > target_h else 0
-                print(f"  ✂️  Corrective crop: ({crop_x}, {crop_y})")
-                v_clip = v_clip.crop(x1=crop_x, y1=crop_y, x2=crop_x + target_w, y2=crop_y + target_h)
-            print(f"  ✅ Corrected to: {v_clip.size}")
-
-        # Ensure dimensions are even (required by h264 encoder) - should always be true now
-        clip_w, clip_h = v_clip.size
-        if clip_w % 2 != 0 or clip_h % 2 != 0:
-            print(f"  ⚠️  Odd dimensions detected: {clip_w}x{clip_h}, fixing...")
-            final_w = clip_w if clip_w % 2 == 0 else clip_w - 1
-            final_h = clip_h if clip_h % 2 == 0 else clip_h - 1
-            v_clip = v_clip.crop(x2=final_w, y2=final_h)
+        v_clip = enforce_dimensions(v_clip, target_w, target_h, verbose=True)
 
         # 🎬 CREATIVE DIRECTOR INTEGRATION: Transitions control
         # Progressive path with xfade: Real crossfades handled by xfade filter in SegmentWriter
@@ -2402,7 +2331,7 @@ def create_montage(variant_id=1):
                 print("   ❌ No clips to compose!")
                 return None
         
-        final_video = final_video.set_audio(subclip_compat(audio_clip, 0, current_time))
+        final_video = set_audio(final_video, subclip(audio_clip, 0, current_time))
         
         # Render legacy way
         print(f"   🎬 Rendering (legacy MoviePy)...")
@@ -2431,7 +2360,7 @@ def create_montage(variant_id=1):
     # Progressive renderer handles logo in finalize(), legacy needs separate pass
     if not progressive_renderer and logo_path and 'final_video' in dir():
         try:
-            logo = ImageClip(logo_path).set_duration(final_video.duration).resize(height=150).margin(right=50, top=50, opacity=0).set_pos(("right", "top"))
+            logo = set_position(resize(set_duration(ImageClip(logo_path), final_video.duration), height=150), ("right", "top"))
             final_video = CompositeVideoClip([final_video, logo])
             if monitor:
                 monitor.log_info("composition", f"Logo overlay added: {os.path.basename(logo_path)}")

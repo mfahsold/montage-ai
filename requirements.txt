@@ -1,12 +1,12 @@
 # Video Processing
-moviepy>=2.2.1  # 2.x uses .subclipped() instead of .subclip()
-opencv-python-headless>=4.12.0.88
+moviepy>=2.1.1,<2.3  # 2.x uses .subclipped(); 2.2.x requires pillow<12
+opencv-python-headless>=4.10.0
 soundfile>=0.12.0
-Pillow>=12.0.0
+Pillow>=10.0.0,<12.0  # moviepy 2.2.x constraint
 proglog>=0.1.10
-tqdm>=4.67.1
-scenedetect[opencv]>=0.6.7.1
-requests>=2.32.5
+tqdm>=4.66.0
+scenedetect[opencv]>=0.6.4
+requests>=2.32.0
 
 # Color Matching (Shot-to-Shot consistency)
 color-matcher>=0.5.0
@@ -15,19 +15,19 @@ color-matcher>=0.5.0
 # (requests already listed above)
 
 # LLM API (cgpu/Gemini integration)
-openai>=2.8.1
+openai>=1.55.0
 
 # System Monitoring
-psutil>=7.1.3
+psutil>=6.0.0
 
 # Timeline Export (Professional NLE Integration)
-OpenTimelineIO>=0.18.1  # Academy Software Foundation standard
-jsonschema>=4.25.1  # JSON schema validation for Creative Director
+OpenTimelineIO>=0.17.0  # Academy Software Foundation standard
+jsonschema>=4.23.0  # JSON schema validation for Creative Director
 
 # Web UI
-Flask>=3.1.2
-Werkzeug>=3.1.4
+Flask>=3.0.0
+Werkzeug>=3.0.0
 
 # Testing
-pytest>=9.0.1
+pytest>=8.0.0
 pytest-flask>=1.3.0

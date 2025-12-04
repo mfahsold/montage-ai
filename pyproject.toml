@@ -7,18 +7,24 @@ name = "montage-ai"
 dynamic = ["version"]  # Version from git commit hash at runtime
 description = "AI-powered automatic video montage creation"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "PolyForm Noncommercial 1.0.0"}
 requires-python = ">=3.10"
 
 dependencies = [
-    "moviepy>=2.1.1",  # 2.x API (.subclipped instead of .subclip)
-    "opencv-python-headless>=4.10.0",
+    # Core video stack
+    "moviepy>=2.2.1",
+    "Pillow>=12.0.0",
+    "opencv-python-headless>=4.12.0.88",
     "librosa>=0.10.0",
     "numpy>=1.26.0",
-    "scenedetect[opencv]>=0.6.4",
-    "tqdm>=4.66.0",
-    "requests>=2.32.0",
-    "jsonschema>=4.23.0",
+    "scenedetect[opencv]>=0.6.7.1",
+    "tqdm>=4.67.1",
+    "requests>=2.32.5",
+    "jsonschema>=4.25.1",
+    # Timeline / tooling
+    "OpenTimelineIO>=0.18.1",
+    # System
+    "psutil>=7.1.3",
 ]
 
 [tool.setuptools.packages.find]

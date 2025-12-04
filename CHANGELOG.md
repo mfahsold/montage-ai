@@ -7,15 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MoviePy Compatibility Layer** (`moviepy_compat.py`) - KISS/DRY refactoring
+  - Centralizes all MoviePy 1.x/2.x API differences in one module
+  - Exports: `subclip`, `set_audio`, `set_duration`, `set_position`, `resize`, `crop`
+  - Dimension helpers: `enforce_dimensions`, `pad_to_target`, `ensure_even_dimensions`
+  - Unified logging: `log_clip_info` replaces scattered print statements
+  - Future MoviePy API changes only need updates in one file
+
 ### Changed
 
 - **Dependencies Updated to Latest Versions**
-  - `moviepy>=2.1.1` (was 1.0.3) - Uses modern `.subclipped()` API
-  - `opencv-python-headless>=4.10.0` (was unversioned)
-  - `Pillow>=10.4.0`, `tqdm>=4.66.0`, `requests>=2.32.0`
-  - `scenedetect>=0.6.4`, `openai>=1.55.0`, `psutil>=6.1.0`
-  - `OpenTimelineIO>=0.17.0`, `jsonschema>=4.23.0`
-  - `Flask>=3.1.0`, `Werkzeug>=3.1.0`, `pytest>=8.3.0`
+  - `moviepy>=2.2.1`, `Pillow>=12.0.0`
+  - `opencv-python-headless>=4.12.0.88`, `scenedetect>=0.6.7.1`
+  - `tqdm>=4.67.1`, `requests>=2.32.5`, `jsonschema>=4.25.1`
+  - `OpenTimelineIO>=0.18.1`, `psutil>=7.1.3`
+  - `Flask>=3.1.2`, `Werkzeug>=3.1.4`, `pytest>=9.0.1`
+  - `openai>=2.8.1`
 
 - **Version Tracking via Git Commit Hash**
   - Removed hardcoded version numbers
@@ -23,11 +32,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - UI shows 8-char commit hash instead of semver
   - New `_version.py` for setuptools compatibility
 
+- **Code Quality: DRY Dimension Handling** - Reduced ~70 lines in `editor.py`
+  - Extracted dimension logic into `enforce_dimensions()` helper
+  - Handles aspect ratio, scaling, crop/pad, even-dimension enforcement
+  - Removes duplicated code blocks for resize/crop operations
+
 ### Fixed
 
-- **MoviePy 1.x/2.x Compatibility** - `subclip_compat()` helper
-  - Works with both `.subclip()` (1.x) and `.subclipped()` (2.x)
-  - Prevents `AttributeError` when running on different MoviePy versions
+- **MoviePy 1.x/2.x Compatibility** - Full API migration
+  - All 1.x methods converted: `subclip→subclipped`, `set_audio→with_audio`, etc.
+  - Works with both MoviePy versions via compatibility layer
+  - No more `ModuleNotFoundError: No module named 'moviepy.editor'`
 
 - **Web UI: Video Duration & Music Trimming Now Functional** - Critical bug fix
   - Target Duration, Music Start, Music End controls in Web UI were non-functional

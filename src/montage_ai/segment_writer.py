@@ -365,7 +365,7 @@ class SegmentWriter:
         if not clips:
             return None
         
-        from moviepy.editor import concatenate_videoclips
+        from .moviepy_compat import concatenate_videoclips
         
         segment_path = self.get_segment_path(segment_index)
         

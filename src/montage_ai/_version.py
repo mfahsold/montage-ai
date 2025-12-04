@@ -8,12 +8,15 @@ import os
 import subprocess
 from pathlib import Path
 
+# Base version for PEP 440 compliance (used by pip/setuptools)
+BASE_VERSION = "0.4.0"
 
-def get_version() -> str:
-    """Get version from git commit hash or fallback."""
+
+def get_git_commit() -> str:
+    """Get git commit hash for display purposes."""
     # Check env var first (set at Docker build time)
     git_commit = os.environ.get("GIT_COMMIT", "").strip()
-    if git_commit:
+    if git_commit and git_commit != "dev":
         return git_commit[:8]
     
     # Try live git command
@@ -33,5 +36,18 @@ def get_version() -> str:
     return "dev"
 
 
+def get_version() -> str:
+    """Get PEP 440 compliant version string."""
+    commit = get_git_commit()
+    if commit and commit != "dev":
+        # Format: 0.4.0+c6eea1c5 (local version identifier)
+        return f"{BASE_VERSION}+{commit}"
+    return BASE_VERSION
+
+
+# For setuptools/pip
+__version__ = BASE_VERSION  # Must be static for build tools
+
+# For runtime display (includes git commit)
 VERSION = get_version()
-__version__ = VERSION
+GIT_COMMIT = get_git_commit()
