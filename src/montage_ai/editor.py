@@ -42,6 +42,19 @@ from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector
 from tqdm import tqdm
 
+
+def subclip_compat(clip, start, end):
+    """MoviePy version-compatible subclip function.
+    
+    MoviePy 1.x uses .subclip(), MoviePy 2.x uses .subclipped()
+    This helper works with both versions.
+    """
+    if hasattr(clip, 'subclipped'):
+        return clip.subclipped(start, end)
+    else:
+        return clip.subclip(start, end)
+
+
 # Import Creative Director for natural language control
 try:
     from .creative_director import CreativeDirector, interpret_natural_language
@@ -1451,7 +1464,7 @@ def create_montage(variant_id=1):
         music_end = max(music_start + 1, min(music_end, audio_clip.duration))
         if VERBOSE:
             print(f"   🎵 Music trim: {music_start:.1f}s → {music_end:.1f}s (from {original_audio_duration:.1f}s)")
-        audio_clip = audio_clip.subclipped(music_start, music_end)
+        audio_clip = subclip_compat(audio_clip, music_start, music_end)
     
     # Determine target duration
     # Priority: TARGET_DURATION env > trimmed audio duration
@@ -2026,7 +2039,7 @@ def create_montage(variant_id=1):
                 if 'temp_enhance_path' in locals() and os.path.exists(temp_enhance_path):
                     v_clip._temp_files.append(temp_enhance_path)
             else:
-                v_clip = VideoFileClip(selected_scene['path']).subclip(clip_start, clip_start + cut_duration)
+                v_clip = subclip_compat(VideoFileClip(selected_scene['path']), clip_start, clip_start + cut_duration)
         
         # Handle video rotation metadata
         # MoviePy's automatic rotation handling is inconsistent, so we check and apply manually
@@ -2389,7 +2402,7 @@ def create_montage(variant_id=1):
                 print("   ❌ No clips to compose!")
                 return None
         
-        final_video = final_video.set_audio(audio_clip.subclipped(0, current_time))
+        final_video = final_video.set_audio(subclip_compat(audio_clip, 0, current_time))
         
         # Render legacy way
         print(f"   🎬 Rendering (legacy MoviePy)...")

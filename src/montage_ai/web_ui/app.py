@@ -16,7 +16,38 @@ from collections import deque
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
-VERSION = "0.3.0"
+
+def get_version() -> str:
+    """Get version from git commit hash (short) or fallback to env/default.
+    
+    Priority:
+    1. GIT_COMMIT env var (set at build time in Dockerfile)
+    2. Live git rev-parse (if in git repo)
+    3. Fallback to "dev"
+    """
+    # Check env var first (set at Docker build time)
+    git_commit = os.environ.get("GIT_COMMIT", "").strip()
+    if git_commit:
+        return git_commit[:8]  # Short hash
+    
+    # Try live git command (works in dev, not in container usually)
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short=8", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            cwd=Path(__file__).parent.parent.parent.parent  # repo root
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    
+    return "dev"
+
+
+VERSION = get_version()
 
 # Paths
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))

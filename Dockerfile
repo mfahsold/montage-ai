@@ -1,5 +1,9 @@
 FROM continuumio/miniconda3
 
+# Build argument for version tracking (git commit hash)
+ARG GIT_COMMIT=dev
+ENV GIT_COMMIT=${GIT_COMMIT}
+
 # Install system dependencies
 # Add build tools for Real-ESRGAN-ncnn-vulkan
 # Add Node.js for cgpu (cloud GPU via Google Colab)

@@ -77,13 +77,17 @@ web-deploy: ## Deploy web UI to Kubernetes
 # LOCAL DEVELOPMENT
 # ============================================================================
 
+# Get current git commit hash for version tracking
+GIT_COMMIT := $(shell git rev-parse --short=8 HEAD 2>/dev/null || echo "dev")
+
 build: ## Build Docker image for local architecture
-	@echo "$(CYAN)Building montage-ai (local arch)...$(RESET)"
-	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
+	@echo "$(CYAN)Building montage-ai (local arch, commit: $(GIT_COMMIT))...$(RESET)"
+	docker build --build-arg GIT_COMMIT=$(GIT_COMMIT) -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
 build-amd64: ## Build Docker image for amd64 (cluster deployment)
-	@echo "$(CYAN)Building montage-ai for linux/amd64...$(RESET)"
+	@echo "$(CYAN)Building montage-ai for linux/amd64 (commit: $(GIT_COMMIT))...$(RESET)"
 	docker buildx build --platform linux/amd64 \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \
 		--load .
 
@@ -188,8 +192,9 @@ clean-k8s: ## Clean up Kubernetes resources
 
 release: validate ## Create a release (builds, tags, pushes)
 	@if [ -z "$(VERSION)" ]; then echo "Usage: make release VERSION=v1.0.0"; exit 1; fi
-	@echo "$(CYAN)Creating release $(VERSION)...$(RESET)"
+	@echo "$(CYAN)Creating release $(VERSION) (commit: $(GIT_COMMIT))...$(RESET)"
 	docker buildx build --platform linux/amd64,linux/arm64 \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		-t $(IMAGE_NAME):$(VERSION) \
 		-t $(IMAGE_NAME):latest \
 		--push .

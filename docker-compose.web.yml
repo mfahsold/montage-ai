@@ -10,7 +10,10 @@
 
 services:
   web-ui:
-    build: .
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-dev}
     entrypoint: ["python", "-u", "-m", "montage_ai.web_ui.app"]
     ports:
       - "${WEB_PORT:-5001}:5000"

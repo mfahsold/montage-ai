@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependencies Updated to Latest Versions**
+  - `moviepy>=2.1.1` (was 1.0.3) - Uses modern `.subclipped()` API
+  - `opencv-python-headless>=4.10.0` (was unversioned)
+  - `Pillow>=10.4.0`, `tqdm>=4.66.0`, `requests>=2.32.0`
+  - `scenedetect>=0.6.4`, `openai>=1.55.0`, `psutil>=6.1.0`
+  - `OpenTimelineIO>=0.17.0`, `jsonschema>=4.23.0`
+  - `Flask>=3.1.0`, `Werkzeug>=3.1.0`, `pytest>=8.3.0`
+
+- **Version Tracking via Git Commit Hash**
+  - Removed hardcoded version numbers
+  - `GIT_COMMIT` env var set at Docker build time
+  - UI shows 8-char commit hash instead of semver
+  - New `_version.py` for setuptools compatibility
+
 ### Fixed
+
+- **MoviePy 1.x/2.x Compatibility** - `subclip_compat()` helper
+  - Works with both `.subclip()` (1.x) and `.subclipped()` (2.x)
+  - Prevents `AttributeError` when running on different MoviePy versions
 
 - **Web UI: Video Duration & Music Trimming Now Functional** - Critical bug fix
   - Target Duration, Music Start, Music End controls in Web UI were non-functional

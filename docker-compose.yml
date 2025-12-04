@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Pass git commit hash for version tracking
+        GIT_COMMIT: ${GIT_COMMIT:-dev}
     image: montage-ai:latest
     container_name: montage-ai
     # === RESOURCE LIMITS (IMPORTANT for stability) ===

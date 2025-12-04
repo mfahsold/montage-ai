@@ -4,21 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "montage-ai"
-version = "0.3.0"
+dynamic = ["version"]  # Version from git commit hash at runtime
 description = "AI-powered automatic video montage creation"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 
 dependencies = [
-    "moviepy>=1.0.3",
-    "opencv-python-headless>=4.8.0",
+    "moviepy>=2.1.1",  # 2.x API (.subclipped instead of .subclip)
+    "opencv-python-headless>=4.10.0",
     "librosa>=0.10.0",
-    "numpy>=1.24.0",
-    "scenedetect[opencv]>=0.6.0",
-    "tqdm>=4.65.0",
-    "requests>=2.31.0",
-    "jsonschema>=4.0.0",
+    "numpy>=1.26.0",
+    "scenedetect[opencv]>=0.6.4",
+    "tqdm>=4.66.0",
+    "requests>=2.32.0",
+    "jsonschema>=4.23.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -26,3 +26,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "montage_ai" = ["styles/*.json"]
+
+[tool.setuptools.dynamic]
+version = {attr = "montage_ai._version.VERSION"}  # Fallback, actual version from GIT_COMMIT env

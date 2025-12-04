@@ -1,21 +1,40 @@
-MIT License
+PolyForm Noncommercial License 1.0.0
 
-Copyright (c) 2025 Matthias Fahsold
+Acceptance
+By using the software, you agree to all of the terms and conditions below.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Copyright License
+The licensor grants you a non-exclusive, worldwide, non-transferable license to use, copy, distribute, and prepare derivative works of the software, in each case subject to the limitations and conditions below.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Limitations
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+    Noncommercial Use Only
+    You may use the software for any noncommercial purpose. “Noncommercial” means not primarily intended for or directed towards commercial advantage or monetary compensation. If you use the software for both commercial and noncommercial purposes, the licensor grants you the right to use the software for noncommercial purposes only. You may not sublicense or distribute the software for commercial purposes.
+
+    No Sublicensing
+    You may not sublicense the software.
+
+    No Trademark License
+    This license does not grant you any right in the licensor’s trademarks or trade names.
+
+Patents
+The licensor grants you a license under any patent claims they own or control that you would infringe by using the software as allowed by this license.
+
+Notices
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms.
+
+No Other Rights
+These terms do not imply any licenses other than those expressly granted in these terms.
+
+Termination
+If you use the software in violation of these terms, such use is not licensed, and your rights will terminate automatically.
+
+No Liability
+As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.
+
+Definitions
+The “licensor” is Matthias Fahsold.
+The “software” is the Montage AI code and documentation distributed by the licensor.
+“You” refers to the individual or entity agreeing to these terms.
+“Your company” means the organization you work for, contract with, or control.
+“Use” means anything you do with the software requiring permission under these terms, such as running, copying, modifying, and distributing.
