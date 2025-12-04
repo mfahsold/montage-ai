@@ -58,6 +58,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MoviePy 2.x: crossfadein/crossfadeout Removed** - Critical runtime fix
+  - Error: `got an unexpected keyword argument 'verbose'` during clip rendering
+  - Root cause: MoviePy 2.x removed `clip.crossfadein()` and `clip.crossfadeout()` methods
+  - Added `crossfadein()` and `crossfadeout()` wrapper functions to `moviepy_compat.py`
+  - Wrappers use `moviepy.video.fx.all.fadein/fadeout` for 2.x, fall back to methods for 1.x
+  - Updated `editor.py` to use `crossfadein(v_clip, duration)` instead of `v_clip.crossfadein(duration)`
+  - This fixes "Failed to render clip" errors that caused 0 segments in output
+
 - **MoviePy 1.x/2.x Compatibility** - Full API migration
   - All 1.x methods converted: `subclip→subclipped`, `set_audio→with_audio`, etc.
   - Works with both MoviePy versions via compatibility layer
