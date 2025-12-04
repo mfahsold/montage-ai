@@ -56,6 +56,7 @@ except ImportError:
 
 # Import Footage Manager for professional clip management
 from .footage_manager import integrate_footage_manager, select_next_clip
+from . import segment_writer as segment_writer_module
 
 # Import color-matcher for shot-to-shot color consistency
 try:
@@ -96,6 +97,12 @@ except ImportError:
     STANDARD_HEIGHT = 1920
     STANDARD_FPS = 30
     print("⚠️ Segment writer not available")
+
+# Output encoding defaults (can be overridden by heuristics)
+OUTPUT_CODEC = getattr(segment_writer_module, "TARGET_CODEC", "libx264")
+OUTPUT_PIX_FMT = getattr(segment_writer_module, "TARGET_PIX_FMT", "yuv420p")
+OUTPUT_PROFILE = getattr(segment_writer_module, "TARGET_PROFILE", None)
+OUTPUT_LEVEL = getattr(segment_writer_module, "TARGET_LEVEL", None)
 
 VERSION = "0.2.0"
 
@@ -385,6 +392,274 @@ def get_ffmpeg_encoder_params() -> List[str]:
 
 def get_files(directory, extensions):
     return [os.path.join(directory, f) for f in os.listdir(directory) if f.lower().endswith(extensions)]
+
+
+def _parse_frame_rate(fps_str: str) -> float:
+    """Parse FFprobe frame rate strings like '30000/1001'."""
+    if not fps_str:
+        return 0.0
+    try:
+        if "/" in fps_str:
+            num, den = fps_str.split("/")
+            den = float(den)
+            return float(num) / den if den else 0.0
+        return float(fps_str)
+    except Exception:
+        return 0.0
+
+
+def _weighted_median(values: List[float], weights: List[float]) -> float:
+    """Compute weighted median; falls back to simple median on error."""
+    if not values:
+        return 0.0
+    try:
+        ordered = sorted(zip(values, weights), key=lambda v: v[0])
+        cumulative = np.cumsum([w for _, w in ordered])
+        threshold = cumulative[-1] / 2.0
+        for (val, _), total in zip(ordered, cumulative):
+            if total >= threshold:
+                return val
+        return ordered[-1][0]
+    except Exception:
+        return float(np.median(values))
+
+
+def _even_int(value: float) -> int:
+    """Ensure integer is even and >= 2."""
+    rounded = int(round(value))
+    if rounded % 2 != 0:
+        rounded += 1
+    return max(2, rounded)
+
+
+def ffprobe_video_metadata(video_path: str) -> Optional[Dict[str, Any]]:
+    """Lightweight ffprobe wrapper to extract width/height/fps/codec/pix_fmt/duration."""
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height,codec_name,pix_fmt,r_frame_rate,avg_frame_rate:format=duration",
+            "-of", "json",
+            video_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            return None
+
+        data = json.loads(result.stdout)
+        stream = (data.get("streams") or [None])[0] or {}
+        format_info = data.get("format", {})
+
+        width = int(stream.get("width") or 0)
+        height = int(stream.get("height") or 0)
+        fps = _parse_frame_rate(stream.get("r_frame_rate") or stream.get("avg_frame_rate", "0"))
+        duration = float(format_info.get("duration") or 0.0)
+        codec = (stream.get("codec_name") or "unknown").lower()
+        pix_fmt = (stream.get("pix_fmt") or "unknown").lower()
+
+        return {
+            "path": video_path,
+            "width": width,
+            "height": height,
+            "fps": fps,
+            "duration": duration if duration > 0 else 1.0,  # avoid zero weights
+            "codec": codec,
+            "pix_fmt": pix_fmt
+        }
+    except Exception as exc:
+        print(f"   ⚠️ ffprobe failed for {os.path.basename(video_path)}: {exc}")
+        return None
+
+
+def _snap_aspect_ratio(ratio: float) -> Tuple[str, float]:
+    """Snap aspect ratio to common presets if within 8%."""
+    common = {
+        "16:9": 16 / 9,
+        "9:16": 9 / 16,
+        "1:1": 1.0,
+        "4:3": 4 / 3,
+        "3:4": 3 / 4,
+    }
+    best_name, best_val = min(common.items(), key=lambda kv: abs(kv[1] - ratio))
+    rel_diff = abs(best_val - ratio) / best_val if best_val else 1.0
+    return (best_name, best_val) if rel_diff <= 0.08 else ("custom", ratio)
+
+
+def _snap_resolution(resolution: Tuple[int, int], orientation: str, max_long_side: int) -> Tuple[int, int]:
+    """Prefer standard resolutions when they are close to the measured median."""
+    presets = {
+        "horizontal": [(3840, 2160), (2560, 1440), (1920, 1080), (1600, 900), (1280, 720)],
+        "vertical": [(2160, 3840), (1440, 2560), (1080, 1920), (720, 1280)],
+        "square": [(1920, 1920), (1080, 1080), (720, 720)]
+    }
+    target_w, target_h = resolution
+    if orientation not in presets:
+        return target_w, target_h
+
+    # Avoid choosing a preset that upscales far beyond available footage
+    candidates = [p for p in presets[orientation] if max(p) <= max_long_side * 1.05]
+    if not candidates:
+        candidates = presets[orientation]
+
+    def _diff(p):
+        return max(abs(p[0] - target_w) / target_w, abs(p[1] - target_h) / target_h)
+
+    best = min(candidates, key=_diff)
+    return best if _diff(best) <= 0.12 else (target_w, target_h)
+
+
+def _normalize_codec_name(codec: str) -> str:
+    c = (codec or "").lower()
+    if "265" in c or "hevc" in c:
+        return "hevc"
+    if "264" in c or "avc" in c:
+        return "h264"
+    return c or "unknown"
+
+
+def determine_output_profile(video_files: List[str]) -> Dict[str, Any]:
+    """Pick output dimensions/fps/codec that match dominant input footage."""
+    default_profile = {
+        "width": STANDARD_WIDTH,
+        "height": STANDARD_HEIGHT,
+        "fps": STANDARD_FPS,
+        "pix_fmt": OUTPUT_PIX_FMT,
+        "codec": OUTPUT_CODEC,
+        "profile": OUTPUT_PROFILE,
+        "level": OUTPUT_LEVEL,
+        "reason": "defaults"
+    }
+
+    if not video_files:
+        return default_profile
+
+    metadata = [ffprobe_video_metadata(v) for v in video_files]
+    metadata = [m for m in metadata if m]
+    if not metadata:
+        return default_profile
+
+    weights = [m["duration"] if m["duration"] > 0 else 1.0 for m in metadata]
+    aspect_ratios = [(m["width"] / m["height"]) if m["height"] > 0 else 1.0 for m in metadata]
+    long_sides = [max(m["width"], m["height"]) for m in metadata]
+    short_sides = [min(m["width"], m["height"]) for m in metadata]
+    max_long_side = max(long_sides) if long_sides else STANDARD_HEIGHT
+
+    # Orientation by weighted duration
+    orientation_weights = {"horizontal": 0.0, "vertical": 0.0, "square": 0.0}
+    for meta, weight in zip(metadata, weights):
+        ratio = (meta["width"] / meta["height"]) if meta["height"] else 1.0
+        if ratio > 1.1:
+            orientation_weights["horizontal"] += weight
+        elif ratio < 0.9:
+            orientation_weights["vertical"] += weight
+        else:
+            orientation_weights["square"] += weight
+    orientation = max(orientation_weights, key=lambda k: orientation_weights[k])
+
+    # Aspect ratio: snap to common ratios if close
+    raw_aspect = _weighted_median(aspect_ratios, weights) or (16 / 9)
+    ratio_name, snapped_ratio = _snap_aspect_ratio(raw_aspect)
+    aspect_for_calc = snapped_ratio
+
+    long_med = _weighted_median(long_sides, weights) or STANDARD_HEIGHT
+    short_med = _weighted_median(short_sides, weights) or STANDARD_WIDTH
+
+    if orientation == "vertical":
+        target_h = _even_int(long_med)
+        target_w = _even_int(target_h * aspect_for_calc)
+    elif orientation == "square":
+        target_w = target_h = _even_int(min(long_med, short_med))
+    else:
+        target_w = _even_int(long_med)
+        target_h = _even_int(target_w / aspect_for_calc)
+
+    target_w, target_h = _snap_resolution((target_w, target_h), orientation, max_long_side)
+
+    # FPS: choose nearest common value to weighted median
+    fps_pairs = [(m["fps"], w) for m, w in zip(metadata, weights) if m.get("fps")]
+    if fps_pairs:
+        fps_values, fps_weights = zip(*fps_pairs)
+        raw_fps = _weighted_median(list(fps_values), list(fps_weights))
+    else:
+        raw_fps = STANDARD_FPS
+    common_fps = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60]
+    target_fps = min(common_fps, key=lambda f: abs(f - raw_fps))
+
+    # Codec selection: honor env override, otherwise follow dominant input
+    env_codec = os.environ.get("OUTPUT_CODEC")
+    codec_map = {"hevc": "libx265", "h265": "libx265", "h264": "libx264", "avc": "libx264"}
+    input_codec_weights: Dict[str, float] = {}
+    for meta, weight in zip(metadata, weights):
+        norm = _normalize_codec_name(meta.get("codec"))
+        input_codec_weights[norm] = input_codec_weights.get(norm, 0.0) + weight
+
+    dominant_input_codec = max(input_codec_weights.items(), key=lambda kv: kv[1])[0] if input_codec_weights else "h264"
+    target_codec = codec_map.get(env_codec.lower(), "libx264") if env_codec else codec_map.get(dominant_input_codec, "libx264")
+
+    # Profile/level: keep safe defaults, bump level for 4K/high fps
+    high_res = max_long_side >= 3200 or target_fps > 60
+    if target_codec == "libx265":
+        target_profile = os.environ.get("OUTPUT_PROFILE") or "main"
+        target_level = os.environ.get("OUTPUT_LEVEL") or ("5.1" if high_res else "4.0")
+    else:
+        target_profile = os.environ.get("OUTPUT_PROFILE") or "high"
+        target_level = os.environ.get("OUTPUT_LEVEL") or ("5.1" if high_res else "4.1")
+
+    return {
+        "width": target_w,
+        "height": target_h,
+        "fps": target_fps,
+        "pix_fmt": OUTPUT_PIX_FMT,
+        "codec": target_codec,
+        "profile": target_profile,
+        "level": target_level,
+        "orientation": orientation,
+        "aspect_ratio": ratio_name,
+        "source_summary": {
+            "orientation_weights": orientation_weights,
+            "median_aspect": raw_aspect,
+            "median_long_side": long_med,
+            "median_short_side": short_med,
+            "dominant_codec": dominant_input_codec,
+            "fps_selected": target_fps
+        },
+        "reason": f"{orientation} dominant; snapped to {ratio_name} aspect"
+    }
+
+
+def apply_output_profile(profile: Dict[str, Any]) -> None:
+    """Propagate chosen output format into module-level constants."""
+    global STANDARD_WIDTH, STANDARD_HEIGHT, STANDARD_FPS
+    global OUTPUT_CODEC, OUTPUT_PIX_FMT, OUTPUT_PROFILE, OUTPUT_LEVEL
+
+    STANDARD_WIDTH = int(profile.get("width", STANDARD_WIDTH))
+    STANDARD_HEIGHT = int(profile.get("height", STANDARD_HEIGHT))
+    STANDARD_FPS = float(profile.get("fps", STANDARD_FPS))
+
+    OUTPUT_CODEC = profile.get("codec", OUTPUT_CODEC)
+    OUTPUT_PIX_FMT = profile.get("pix_fmt", OUTPUT_PIX_FMT)
+    OUTPUT_PROFILE = profile.get("profile", OUTPUT_PROFILE)
+    OUTPUT_LEVEL = profile.get("level", OUTPUT_LEVEL)
+
+    # Update segment_writer defaults so normalization/xfade stay in sync
+    segment_writer_module.STANDARD_WIDTH = STANDARD_WIDTH
+    segment_writer_module.STANDARD_HEIGHT = STANDARD_HEIGHT
+    segment_writer_module.STANDARD_FPS = STANDARD_FPS
+    segment_writer_module.STANDARD_PIX_FMT = OUTPUT_PIX_FMT
+    segment_writer_module.TARGET_PIX_FMT = OUTPUT_PIX_FMT
+    segment_writer_module.TARGET_CODEC = OUTPUT_CODEC
+    segment_writer_module.TARGET_PROFILE = OUTPUT_PROFILE
+    segment_writer_module.TARGET_LEVEL = OUTPUT_LEVEL
+
+
+def build_video_ffmpeg_params() -> List[str]:
+    """ffmpeg params for MoviePy writes that mirror the selected output profile."""
+    params = ["-pix_fmt", OUTPUT_PIX_FMT]
+    if OUTPUT_PROFILE:
+        params.extend(["-profile:v", OUTPUT_PROFILE])
+    if OUTPUT_LEVEL:
+        params.extend(["-level", OUTPUT_LEVEL])
+    return params
 
 def interpret_creative_prompt():
     """
@@ -720,7 +995,7 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
                     "start": start,
                     "duration": duration,
                     "output": output_path,
-                    "video_codec": "libx264",
+                    "video_codec": OUTPUT_CODEC,
                     "preset": "ultrafast",
                     "copy_audio": True
                 },
@@ -733,7 +1008,7 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
 
     cmd_extract = [
         "ffmpeg", "-y", "-ss", str(start), "-i", input_path,
-        "-t", str(duration), "-c:v", "libx264", "-preset", "ultrafast",
+        "-t", str(duration), "-c:v", OUTPUT_CODEC, "-preset", "ultrafast",
         "-c:a", "copy", output_path
     ]
     subprocess.run(cmd_extract, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -954,7 +1229,20 @@ def create_montage(variant_id=1):
     if not video_files:
         print("❌ No videos found in /data/input")
         return
-        
+
+    # 🔧 Determine ideal output format from incoming footage
+    output_profile = determine_output_profile(video_files)
+    apply_output_profile(output_profile)
+
+    print("\n🧭 Output format heuristic:")
+    print(f"   Orientation: {output_profile.get('orientation')} ({output_profile.get('aspect_ratio')})")
+    print(f"   Resolution:  {STANDARD_WIDTH}x{STANDARD_HEIGHT}")
+    print(f"   Frame rate:  {STANDARD_FPS:.2f} fps")
+    print(f"   Codec:       {OUTPUT_CODEC} (profile={OUTPUT_PROFILE or 'auto'}, level={OUTPUT_LEVEL or 'auto'})")
+
+    if monitor:
+        monitor.log_info("output_profile", "Selected output format", output_profile)
+
     all_scenes = [] # List of (video_path, start, end, duration)
     
     if monitor:
@@ -1648,38 +1936,50 @@ def create_montage(variant_id=1):
             else:
                 v_clip = VideoFileClip(selected_scene['path']).subclip(clip_start, clip_start + cut_duration)
         
-        # Get video dimensions
-        # NOTE: MoviePy automatically handles rotation metadata since recent versions
-        # So we should NOT manually apply rotation - the video is already correctly oriented
+        # Handle video rotation metadata
+        # MoviePy's automatic rotation handling is inconsistent, so we check and apply manually
+        rotation = get_video_rotation(selected_scene['path'])
+        if rotation != 0:
+            if VERBOSE:
+                print(f"  🔄 Rotation metadata: {rotation}°")
+            # Apply rotation correction
+            if rotation == 90 or rotation == -270:
+                v_clip = v_clip.rotate(-90, expand=True)
+            elif rotation == -90 or rotation == 270:
+                v_clip = v_clip.rotate(90, expand=True)
+            elif rotation == 180 or rotation == -180:
+                v_clip = v_clip.rotate(180)
+        
+        # Get video dimensions (after rotation correction)
         w, h = v_clip.size
         
         # Debug: Show original dimensions
         print(f"  📏 Video dimensions: {w}x{h}")
         
-        # Resize/Crop logic for 9:16 vertical video (preserving aspect ratio)
+        # Resize/crop to the chosen output aspect ratio (preserving composition)
         # Uses STANDARD_WIDTH/HEIGHT from segment_writer for consistency
         target_w, target_h = STANDARD_WIDTH, STANDARD_HEIGHT
-        target_ratio = target_w / target_h  # 0.5625
+        target_ratio = target_w / target_h
         current_ratio = w / h
 
         print(f"  📏 Current ratio: {current_ratio:.3f}, target: {target_ratio:.3f}")
 
         if current_ratio > target_ratio + 0.01:  # Add tolerance for floating point
-            # Video is wider than 9:16 - crop width to fit
+            # Video is wider than target ratio - crop width to fit
             # Use round() instead of int() to avoid accumulating rounding errors
             new_w = round(h * target_ratio)
             crop_x = (w - new_w) // 2
             print(f"  ✂️ Cropping width: {w} -> {new_w} (crop_x={crop_x})")
             v_clip = v_clip.crop(x1=crop_x, x2=crop_x + new_w)
         elif current_ratio < target_ratio - 0.01:
-            # Video is taller than 9:16 - crop height to fit
+            # Video is taller than target ratio - crop height to fit
             new_h = round(w / target_ratio)
             crop_y = (h - new_h) // 2
             print(f"  ✂️ Cropping height: {h} -> {new_h} (crop_y={crop_y})")
             v_clip = v_clip.crop(y1=crop_y, y2=crop_y + new_h)
-        # else: already ~9:16, no crop needed
+        # else: already near target ratio, no crop needed
 
-        # Scale to exact target dimensions (1080x1920 for vertical HD)
+        # Scale to exact target dimensions
         # Only resize if dimensions don't match to avoid unnecessary quality loss
         current_size = v_clip.size
         if current_size != (target_w, target_h):
@@ -1777,16 +2077,11 @@ def create_montage(variant_id=1):
             try:
                 v_clip.write_videofile(
                     clip_temp_path,
-                    codec='libx264',
+                    codec=OUTPUT_CODEC,
                     audio=False,  # Audio added in final composition
-                    fps=30,
+                    fps=STANDARD_FPS,
                     preset='fast',
-                    ffmpeg_params=[
-                        "-pix_fmt", "yuv420p",  # Standard pixel format
-                        "-profile:v", "high",    # H.264 profile
-                        "-level", "4.1",         # Compatibility level
-                        "-crf", str(FINAL_CRF),  # Quality setting
-                    ],
+                    ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
                     verbose=False,
                     logger=None
                 )
@@ -1830,10 +2125,11 @@ def create_montage(variant_id=1):
                 batch_video = concatenate_videoclips(clips, method="compose")
                 batch_video.write_videofile(
                     batch_file,
-                    codec='libx264',
+                    codec=OUTPUT_CODEC,
                     audio=False,
-                    fps=30,
+                    fps=STANDARD_FPS,
                     preset='fast',
+                    ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
                     threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
                     verbose=False,
                     logger=None
@@ -1916,7 +2212,7 @@ def create_montage(variant_id=1):
         if monitor:
             method = "ffmpeg_xfade" if enable_xfade else "ffmpeg_concat_copy"
             monitor.log_render_start(output_filename, {
-                "codec": "libx264",
+                "codec": OUTPUT_CODEC,
                 "method": method,
                 "segments": progressive_renderer.get_segment_count(),
                 "total_clips": progressive_renderer.get_total_clips(),
@@ -1964,10 +2260,11 @@ def create_montage(variant_id=1):
                 final_batch = concatenate_videoclips(clips, method="compose")
                 final_batch.write_videofile(
                     final_batch_file,
-                    codec='libx264',
+                    codec=OUTPUT_CODEC,
                     audio=False,
-                    fps=30,
+                    fps=STANDARD_FPS,
                     preset='fast',
+                    ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
                     threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
                     verbose=False,
                     logger=None
@@ -2003,10 +2300,11 @@ def create_montage(variant_id=1):
         print(f"   🎬 Rendering (legacy MoviePy)...")
         final_video.write_videofile(
             output_filename,
-            codec='libx264',
+            codec=OUTPUT_CODEC,
             audio_codec='aac',
-            fps=30,
+            fps=STANDARD_FPS,
             preset=FFMPEG_PRESET,
+            ffmpeg_params=build_video_ffmpeg_params() + ["-crf", str(FINAL_CRF)],
             threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,
             verbose=False,
             logger=None
@@ -2052,10 +2350,10 @@ def create_montage(variant_id=1):
         # === MONITORING: Render phase ===
         if monitor:
             monitor.log_render_start(output_filename, {
-                "codec": "libx264",
+                "codec": OUTPUT_CODEC,
                 "preset": FFMPEG_PRESET,
                 "crf": FINAL_CRF,
-                "fps": 30,
+                "fps": STANDARD_FPS,
                 "duration": f"{final_video.duration:.1f}s" if 'final_video' in dir() else "unknown"
             })
         else:
@@ -2068,17 +2366,14 @@ def create_montage(variant_id=1):
         # Using pixel format yuv420p for maximum compatibility
         final_video.write_videofile(
             output_filename,
-            codec='libx264',
+            codec=OUTPUT_CODEC,
             audio_codec='aac',
-            fps=30,
+            fps=STANDARD_FPS,
             preset=FFMPEG_PRESET,
             threads=int(FFMPEG_THREADS) if FFMPEG_THREADS != "0" else None,  # None = auto
-            ffmpeg_params=[
+            ffmpeg_params=build_video_ffmpeg_params() + [
                 "-crf", str(FINAL_CRF),  # Quality from env var
                 "-tune", "film",  # Optimize for film content
-                "-pix_fmt", "yuv420p",  # Standard pixel format for wide compatibility
-                "-profile:v", "high",  # H.264 profile for quality
-                "-level", "4.1",  # Compatibility
                 "-movflags", "+faststart"  # Web-optimized
             ]
         )
@@ -2200,7 +2495,9 @@ def create_montage(variant_id=1):
                 final_video_duration,
                 output_dir=OUTPUT_DIR,
                 project_name=f"montage_{JOB_ID}_v{variant_id}_{style_name}",
-                generate_proxies=GENERATE_PROXIES
+                generate_proxies=GENERATE_PROXIES,
+                resolution=(STANDARD_WIDTH, STANDARD_HEIGHT),
+                fps=STANDARD_FPS
             )
 
             print(f"   ✅ Timeline exported successfully!")
@@ -2309,12 +2606,14 @@ def _stabilize_vidstab(input_path, output_path):
             "-threads", FFMPEG_THREADS,
             "-i", input_path,
             "-vf", f"vidstabtransform=input={transform_file}:smoothing=30:crop=black:zoom=0:interpol=bicubic",
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "18",  # Slightly higher quality for stabilized output
-            "-c:a", "copy",
-            output_path
         ]
+        
+        cmd_transform.extend(["-c:v", OUTPUT_CODEC, "-preset", "fast", "-crf", "18"])
+        if OUTPUT_PROFILE:
+            cmd_transform.extend(["-profile:v", OUTPUT_PROFILE])
+        if OUTPUT_LEVEL:
+            cmd_transform.extend(["-level", OUTPUT_LEVEL])
+        cmd_transform.extend(["-pix_fmt", OUTPUT_PIX_FMT, "-c:a", "copy", output_path])
         
         subprocess.run(cmd_transform, check=True, capture_output=True, timeout=300)
         
@@ -2355,12 +2654,14 @@ def _stabilize_deshake(input_path, output_path):
         "-threads", FFMPEG_THREADS,
         "-i", input_path,
         "-vf", "deshake=rx=32:ry=32:blocksize=8:contrast=125",  # Tuned parameters
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "20",
-        "-c:a", "copy",
-        output_path
     ]
+
+    cmd.extend(["-c:v", OUTPUT_CODEC, "-preset", "fast", "-crf", "20"])
+    if OUTPUT_PROFILE:
+        cmd.extend(["-profile:v", OUTPUT_PROFILE])
+    if OUTPUT_LEVEL:
+        cmd.extend(["-level", OUTPUT_LEVEL])
+    cmd.extend(["-pix_fmt", OUTPUT_PIX_FMT, "-c:a", "copy", output_path])
     
     try:
         subprocess.run(cmd, check=True, capture_output=True, timeout=120)
@@ -2522,13 +2823,14 @@ def enhance_clip(input_path, output_path):
         "-threads", threads_per_job,
         "-i", input_path,
         "-vf", filters,
-        "-c:v", "libx264",
-        "-preset", FFMPEG_PRESET,
-        "-crf", "18",  # Higher quality for cinematic output
-        "-threads", threads_per_job,
-        "-c:a", "copy",
-        output_path
     ]
+
+    cmd.extend(["-c:v", OUTPUT_CODEC, "-preset", FFMPEG_PRESET, "-crf", "18", "-threads", threads_per_job])
+    if OUTPUT_PROFILE:
+        cmd.extend(["-profile:v", OUTPUT_PROFILE])
+    if OUTPUT_LEVEL:
+        cmd.extend(["-level", OUTPUT_LEVEL])
+    cmd.extend(["-pix_fmt", OUTPUT_PIX_FMT, "-c:a", "copy", output_path])
     
     try:
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -2634,10 +2936,14 @@ def color_match_clips(clip_paths: List[str], reference_clip: str = None, output_
                 cmd = [
                     "ffmpeg", "-y", "-i", clip_path,
                     "-vf", filter_str,
-                    "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-                    "-c:a", "copy",
-                    output_path
                 ]
+                
+                cmd.extend(["-c:v", OUTPUT_CODEC, "-preset", "fast", "-crf", "18"])
+                if OUTPUT_PROFILE:
+                    cmd.extend(["-profile:v", OUTPUT_PROFILE])
+                if OUTPUT_LEVEL:
+                    cmd.extend(["-level", OUTPUT_LEVEL])
+                cmd.extend(["-pix_fmt", OUTPUT_PIX_FMT, "-c:a", "copy", output_path])
                 
                 subprocess.run(cmd, check=True, capture_output=True, timeout=60)
                 results[clip_path] = output_path
@@ -2875,9 +3181,15 @@ def _upscale_with_realesrgan(input_path, output_path):
             fps_arg = fps_str
 
         # Real-ESRGAN writes PNG frames by default; re-encode from PNGs
-        subprocess.run(["ffmpeg", "-y", "-framerate", fps_arg, "-i", f"{out_frame_dir}/frame_%08d.png", 
-                       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", output_path],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        esrgan_cmd = ["ffmpeg", "-y", "-framerate", fps_arg, "-i", f"{out_frame_dir}/frame_%08d.png",
+                      "-c:v", OUTPUT_CODEC, "-crf", "18"]
+        if OUTPUT_PROFILE:
+            esrgan_cmd.extend(["-profile:v", OUTPUT_PROFILE])
+        if OUTPUT_LEVEL:
+            esrgan_cmd.extend(["-level", OUTPUT_LEVEL])
+        esrgan_cmd.extend(["-pix_fmt", OUTPUT_PIX_FMT, output_path])
+
+        subprocess.run(esrgan_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                        
         return output_path
         
@@ -2946,13 +3258,15 @@ def _upscale_with_ffmpeg(input_path, output_path):
             "ffmpeg", "-y",
             "-i", input_path,
             "-vf", filter_chain,
-            "-c:v", "libx264",
-            "-preset", "slow",      # Better quality encoding
-            "-crf", "18",           # High quality
-            "-c:a", "copy",         # Keep original audio
-            output_path
         ]
-        
+
+        ffmpeg_cmd.extend(["-c:v", OUTPUT_CODEC, "-preset", "slow", "-crf", "18"])
+        if OUTPUT_PROFILE:
+            ffmpeg_cmd.extend(["-profile:v", OUTPUT_PROFILE])
+        if OUTPUT_LEVEL:
+            ffmpeg_cmd.extend(["-level", OUTPUT_LEVEL])
+        ffmpeg_cmd.extend(["-pix_fmt", OUTPUT_PIX_FMT, "-c:a", "copy", output_path])
+
         subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"   ✅ FFmpeg upscaling complete")
         return output_path

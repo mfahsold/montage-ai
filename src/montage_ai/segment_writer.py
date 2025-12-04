@@ -31,9 +31,25 @@ STANDARD_PROFILE = "high"
 STANDARD_LEVEL = "4.1"
 STANDARD_WIDTH = 1080   # Target width for vertical HD (9:16)
 STANDARD_HEIGHT = 1920  # Target height for vertical HD (9:16)
+TARGET_CODEC = os.environ.get("OUTPUT_CODEC", "libx264")  # Runtime-adjustable (can be overridden by editor heuristics)
+TARGET_PROFILE: Optional[str] = os.environ.get("OUTPUT_PROFILE", STANDARD_PROFILE)
+TARGET_LEVEL: Optional[str] = os.environ.get("OUTPUT_LEVEL", STANDARD_LEVEL)
+TARGET_PIX_FMT = STANDARD_PIX_FMT
 
 # Default crossfade duration in seconds
 DEFAULT_XFADE_DURATION = 0.3
+
+
+def _moviepy_params() -> List[str]:
+    """
+    Shared ffmpeg parameters for MoviePy writes to keep video streams aligned.
+    """
+    params = ["-pix_fmt", TARGET_PIX_FMT]
+    if TARGET_PROFILE:
+        params.extend(["-profile:v", TARGET_PROFILE])
+    if TARGET_LEVEL:
+        params.extend(["-level", TARGET_LEVEL])
+    return params
 
 
 @dataclass
@@ -53,7 +69,8 @@ class StreamParams:
             abs(self.fps - other.fps) < 0.1 and
             self.pix_fmt == other.pix_fmt and
             self.width == other.width and
-            self.height == other.height
+            self.height == other.height and
+            self.codec == other.codec
         )
 
 
@@ -112,7 +129,10 @@ def ffprobe_stream_params(video_path: str) -> Optional[StreamParams]:
 
 def normalize_clip_ffmpeg(input_path: str, output_path: str,
                           target_fps: float = STANDARD_FPS,
-                          target_pix_fmt: str = STANDARD_PIX_FMT,
+                          target_pix_fmt: str = TARGET_PIX_FMT,
+                          target_codec: str = TARGET_CODEC,
+                          target_profile: Optional[str] = TARGET_PROFILE,
+                          target_level: Optional[str] = TARGET_LEVEL,
                           crf: int = 18,
                           preset: str = "fast") -> bool:
     """
@@ -146,16 +166,22 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
             "ffmpeg", "-y",
             "-i", input_path,
             "-vf", vf_chain,
-            "-c:v", "libx264",
-            "-profile:v", STANDARD_PROFILE,
-            "-level", STANDARD_LEVEL,
+            "-c:v", target_codec,
+        ]
+
+        if target_profile:
+            cmd.extend(["-profile:v", target_profile])
+        if target_level:
+            cmd.extend(["-level", target_level])
+
+        cmd.extend([
             "-preset", preset,
             "-crf", str(crf),
             "-pix_fmt", target_pix_fmt,
             "-an",  # No audio (added later)
             "-movflags", "+faststart",
             output_path
-        ]
+        ])
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         return result.returncode == 0
@@ -169,7 +195,11 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
                     xfade_duration: float = DEFAULT_XFADE_DURATION,
                     transition: str = "fade",
                     crf: int = 18,
-                    preset: str = "fast") -> bool:
+                    preset: str = "fast",
+                    target_codec: str = TARGET_CODEC,
+                    target_profile: Optional[str] = TARGET_PROFILE,
+                    target_level: Optional[str] = TARGET_LEVEL,
+                    target_pix_fmt: str = TARGET_PIX_FMT) -> bool:
     """
     Create a real crossfade between two clips using FFmpeg xfade filter.
     
@@ -210,15 +240,21 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
             "-i", clip2_path,
             "-filter_complex", filter_complex,
             "-map", "[v]",
-            "-c:v", "libx264",
-            "-profile:v", STANDARD_PROFILE,
-            "-level", STANDARD_LEVEL,
+        ]
+
+        cmd.extend(["-c:v", target_codec])
+        if target_profile:
+            cmd.extend(["-profile:v", target_profile])
+        if target_level:
+            cmd.extend(["-level", target_level])
+
+        cmd.extend([
             "-preset", preset,
             "-crf", str(crf),
-            "-pix_fmt", STANDARD_PIX_FMT,
+            "-pix_fmt", target_pix_fmt,
             "-an",  # No audio - handled separately
             output_path
-        ]
+        ])
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         
@@ -342,12 +378,13 @@ class SegmentWriter:
             # Write to disk
             combined.write_videofile(
                 segment_path,
-                codec="libx264",
+                codec=TARGET_CODEC,
                 preset=self.ffmpeg_preset,
                 audio_codec="aac",
-                fps=30,
+                fps=STANDARD_FPS,
                 logger=None,  # Suppress MoviePy progress bar
-                threads=4
+                threads=4,
+                ffmpeg_params=_moviepy_params()
             )
             
             # Get duration before closing
@@ -509,7 +546,11 @@ class SegmentWriter:
             # Re-encode with normalized parameters
             # CRITICAL: Also scale to standard resolution to handle dimension mismatches
             # This ensures all clips have identical dimensions before concat
-            vf_chain = f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,fps={STANDARD_FPS},format={STANDARD_PIX_FMT}"
+            vf_chain = (
+                f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,"
+                f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
+                f"fps={STANDARD_FPS},format={TARGET_PIX_FMT}"
+            )
 
             cmd = [
                 "ffmpeg", "-y",
@@ -517,15 +558,21 @@ class SegmentWriter:
                 "-safe", "0",
                 "-i", concat_list_path,
                 "-vf", vf_chain,
-                "-c:v", "libx264",
-                "-profile:v", STANDARD_PROFILE,
-                "-level", STANDARD_LEVEL,
+            ]
+
+            cmd.extend(["-c:v", TARGET_CODEC])
+            if TARGET_PROFILE:
+                cmd.extend(["-profile:v", TARGET_PROFILE])
+            if TARGET_LEVEL:
+                cmd.extend(["-level", TARGET_LEVEL])
+
+            cmd.extend([
                 "-preset", self.ffmpeg_preset,
                 "-crf", str(self.ffmpeg_crf),
-                "-pix_fmt", STANDARD_PIX_FMT,
+                "-pix_fmt", TARGET_PIX_FMT,
                 "-an",  # No audio in segments
                 segment_path
-            ]
+            ])
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
             
@@ -820,13 +867,22 @@ class SegmentWriter:
                 "-i", logo_path,
                 "-filter_complex", 
                 f"[1:v]scale=150:-1[logo];[0:v][logo]overlay={overlay_pos}",
-                "-c:v", "libx264",
+            ]
+
+            cmd.extend(["-c:v", TARGET_CODEC])
+            if TARGET_PROFILE:
+                cmd.extend(["-profile:v", TARGET_PROFILE])
+            if TARGET_LEVEL:
+                cmd.extend(["-level", TARGET_LEVEL])
+
+            cmd.extend([
                 "-preset", self.ffmpeg_preset,
                 "-crf", str(self.ffmpeg_crf),
+                "-pix_fmt", TARGET_PIX_FMT,
                 "-c:a", "copy",  # Audio copy
                 "-movflags", "+faststart",
                 output_path
-            ]
+            ])
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
             return result.returncode == 0
@@ -1023,12 +1079,13 @@ class ProgressiveRenderer:
             # Render clip to temp file (with audio preserved)
             clip.write_videofile(
                 temp_path,
-                codec='libx264',
+                codec=TARGET_CODEC,
                 audio_codec='aac',
-                fps=30,
+                fps=STANDARD_FPS,
                 preset='fast',
                 verbose=False,
-                logger=None
+                logger=None,
+                ffmpeg_params=_moviepy_params()
             )
             
             # Close MoviePy clip to free memory

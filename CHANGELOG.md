@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Automatic Output Format Detection** - Intelligent heuristics for optimal output
+  - `determine_output_profile()` analyzes all input footage
+  - Weighted median by duration for orientation, aspect ratio, resolution, fps
+  - Snaps to common presets (16:9, 9:16, 1:1, 4:3) when within 8%
+  - Auto-selects codec (h264/h265) based on dominant input
+  - Avoids unnecessary transcoding when footage is homogeneous
+  - Logs decision reasoning for transparency
+
 - **Centralized Standard Constants (DRY)** - Single source of truth for video parameters
   - `STANDARD_WIDTH=1080`, `STANDARD_HEIGHT=1920` defined in `segment_writer.py`
   - Imported into `editor.py` - no more hardcoded values scattered across codebase
@@ -139,6 +147,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Foundation for advanced ML enhancements (see docs/ML_ENHANCEMENT_ROADMAP.md)
 
 ### Fixed
+
+- **Video Rotation Not Applied** - Fixed upside-down/sideways videos from phones
+  - MoviePy's automatic rotation handling is inconsistent
+  - Now explicitly reads rotation metadata via ffprobe and applies correction
+  - Handles 90°, -90°, 180°, 270° rotations correctly
+  - Fixes iPhone/Android videos that appear upside-down in output
 
 - **Double Fades with xfade Enabled** - Fixed brightness dip artifact
   - Per-clip crossfadein/crossfadeout was applied even when xfade=true

@@ -522,7 +522,9 @@ def export_timeline_from_montage(
     total_duration: float,
     output_dir: str = "/data/output",
     project_name: str = "montage_ai",
-    generate_proxies: bool = False
+    generate_proxies: bool = False,
+    resolution: Optional[Tuple[int, int]] = None,
+    fps: Optional[float] = None
 ) -> Dict[str, str]:
     """
     Convenience function to export timeline from montage data.
@@ -534,6 +536,8 @@ def export_timeline_from_montage(
         output_dir: Where to save exports
         project_name: Name of the project
         generate_proxies: Whether to generate proxy files
+        resolution: Optional (width, height) for the target project
+        fps: Optional frame rate for the target project
 
     Returns:
         Dictionary of exported file paths
@@ -564,7 +568,9 @@ def export_timeline_from_montage(
         clips=clips,
         audio_path=audio_path,
         total_duration=total_duration,
-        project_name=project_name
+        project_name=project_name,
+        fps=fps if fps else 30.0,
+        resolution=resolution if resolution else (1080, 1920)
     )
 
     # Export

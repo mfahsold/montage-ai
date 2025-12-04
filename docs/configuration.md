@@ -88,6 +88,11 @@ See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
 | ------------------ | ------- | ------------------------------------------- |
 | `EXPORT_TIMELINE`  | `false` | Export OTIO/EDL timeline (experimental)     |
 | `GENERATE_PROXIES` | `false` | Generate proxy files for NLE (experimental) |
+| `OUTPUT_CODEC`     | *auto*  | `libx264` by default; switches to `libx265` when most footage is HEVC (override to force) |
+| `OUTPUT_PROFILE`   | *auto*  | FFmpeg profile passed to encoder (usually `high` for H.264, `main` for HEVC) |
+| `OUTPUT_LEVEL`     | *auto*  | Encoder level; raised automatically for 4K/high‑FPS projects |
+
+*Resolution and FPS are inferred from the dominant input footage (orientation, median size, and common framerate) to minimize re-encoding and quality loss.*
 
 ---
 
