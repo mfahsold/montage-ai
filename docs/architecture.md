@@ -55,6 +55,16 @@ System design and component overview.
 
 ---
 
+## Hybrid Architecture (Cloud Offloading)
+
+For systems with limited resources (e.g., laptops), Montage AI supports a hybrid mode where heavy compute tasks are offloaded to the cloud via `cgpu`.
+
+See [Hybrid Workflow](hybrid-workflow.md) for details.
+
+- **LLM Inference:** Offloaded to Google Gemini via `cgpu serve`.
+- **Upscaling:** Offloaded to Google Colab GPUs via `cgpu run`.
+- **Local:** Orchestration, cutting, and basic rendering.
+
 ## Module Responsibilities
 
 ### editor.py (Main Orchestrator)

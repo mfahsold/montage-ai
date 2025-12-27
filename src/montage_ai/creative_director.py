@@ -57,7 +57,7 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # or deepseek-r1:70b
 
 # System prompt for the Creative Director LLM (style list is injected at runtime)
-DIRECTOR_SYSTEM_PROMPT = """You are the Creative Director for the Fluxibri video editing system.
+DIRECTOR_SYSTEM_PROMPT = """You are {persona}.
 
 Your role: Translate natural language editing requests into structured JSON editing instructions.
 
@@ -170,7 +170,8 @@ class CreativeDirector:
         timeout: int = 60,
         use_cgpu: bool = None,
         use_google_ai: bool = None,
-        use_openai_api: bool = None
+        use_openai_api: bool = None,
+        persona: str = "the Creative Director for the Fluxibri video editing system"
     ):
         """
         Initialize Creative Director.
@@ -182,6 +183,7 @@ class CreativeDirector:
             use_cgpu: Force cgpu backend (None = auto-detect from env)
             use_google_ai: Force Google AI backend (None = auto-detect from env)
             use_openai_api: Force OpenAI-compatible backend (None = auto-detect from env)
+            persona: The persona/role description for the LLM
         """
         self.ollama_host = ollama_host
         self.ollama_model = model
@@ -246,6 +248,7 @@ class CreativeDirector:
         )
         style_name_options = " | ".join([f'\"{name}\"' for name in available_styles] + ['"custom"'])
         self.system_prompt = DIRECTOR_SYSTEM_PROMPT.format(
+            persona=persona,
             styles_list=styles_list,
             style_name_options=style_name_options,
         )

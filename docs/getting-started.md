@@ -10,6 +10,8 @@ Everything you need to go from zero to your first montage.
 - **8 GB RAM** minimum (16 GB recommended for high-quality mode)
 - Optional: [cgpu](https://github.com/RohanAdwankar/cgpu) for cloud GPU/LLM
 
+> **Laptop User?** Check out the [Hybrid Workflow](hybrid-workflow.md) to run Montage AI on 16GB RAM by offloading AI tasks to the cloud.
+
 ---
 
 ## Installation
