@@ -53,11 +53,13 @@ VERSION = get_version()
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))
 MUSIC_DIR = Path(os.environ.get("MUSIC_DIR", "/data/music"))
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/data/output"))
+ASSETS_DIR = Path(os.environ.get("ASSETS_DIR", "/data/assets"))
 
 # Ensure directories exist
 INPUT_DIR.mkdir(parents=True, exist_ok=True)
 MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
 # =============================================================================
 # DEFAULT OPTIONS (single source of truth - controlled via environment)
@@ -221,6 +223,10 @@ def run_montage(job_id: str, style: str, options: dict):
         # Set environment variables
         # options dict is already normalized via normalize_options() with DEFAULT_OPTIONS
         env = os.environ.copy()
+        env["INPUT_DIR"] = str(INPUT_DIR)
+        env["MUSIC_DIR"] = str(MUSIC_DIR)
+        env["OUTPUT_DIR"] = str(OUTPUT_DIR)
+        env["ASSETS_DIR"] = str(ASSETS_DIR)
         env["JOB_ID"] = job_id
         env["CUT_STYLE"] = style
         env["CREATIVE_PROMPT"] = options.get("prompt", "")
