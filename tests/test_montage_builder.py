@@ -46,7 +46,7 @@ class TestAudioAnalysisResult:
             energy_values=np.array([0.4, 0.8]),
             duration=30.0,
         )
-        assert result.avg_energy == 0.6
+        assert result.avg_energy == pytest.approx(0.6)
 
     def test_energy_profile_high(self):
         """energy_profile returns 'high' for high energy."""

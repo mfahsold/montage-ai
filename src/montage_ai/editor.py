@@ -164,7 +164,6 @@ analyze_scene_content = _analyze_scene_content_new
 # Import video metadata module (extracted for modularity)
 from .video_metadata import (
     probe_metadata,
-    ffprobe_video_metadata,
     determine_output_profile as _determine_output_profile_new,
     build_ffmpeg_params as _build_ffmpeg_params_new,
     VideoMetadata,
@@ -541,8 +540,6 @@ def get_files(directory, extensions):
 # _snap_aspect_ratio, _snap_resolution, _normalize_codec_name) are now
 # imported directly from video_metadata module for backward compatibility.
 
-# Note: ffprobe_video_metadata is imported directly from video_metadata module.
-
 
 def determine_output_profile(video_files: List[str]) -> Dict[str, Any]:
     """
@@ -597,80 +594,80 @@ def interpret_creative_prompt():
     """
     global EDITING_INSTRUCTIONS
 
-    print(f"\n{'='*60}")
-    print(f"🎬 Montage AI v{VERSION}")
-    print(f"{'='*60}")
-    
+    logger.info(f"\n{'='*60}")
+    logger.info(f"🎬 Montage AI v{VERSION}")
+    logger.info(f"{'='*60}")
+
     # Show system configuration
     if VERBOSE:
-        print(f"\n📊 SYSTEM CONFIGURATION:")
-        print(f"   CPU Cores:        {multiprocessing.cpu_count()}")
-        print(f"   Parallel Jobs:    {MAX_PARALLEL_JOBS}")
-        print(f"   FFmpeg Preset:    {FFMPEG_PRESET}")
-        print(f"   FFmpeg Threads:   {FFMPEG_THREADS}")
-        print(f"   Variants:         {NUM_VARIANTS}")
-        
+        logger.info(f"\n📊 SYSTEM CONFIGURATION:")
+        logger.info(f"   CPU Cores:        {multiprocessing.cpu_count()}")
+        logger.info(f"   Parallel Jobs:    {MAX_PARALLEL_JOBS}")
+        logger.info(f"   FFmpeg Preset:    {FFMPEG_PRESET}")
+        logger.info(f"   FFmpeg Threads:   {FFMPEG_THREADS}")
+        logger.info(f"   Variants:         {NUM_VARIANTS}")
+
         # GPU Encoder Status
         if _ffmpeg_config.is_gpu_accelerated:
             gpu_type = _ffmpeg_config.gpu_encoder_type.upper()
             effective = _ffmpeg_config.effective_codec
-            print(f"   🎮 GPU Encoder:   {gpu_type} → {effective}")
+            logger.info(f"   🎮 GPU Encoder:   {gpu_type} → {effective}")
         else:
             best_gpu = get_best_gpu_encoder()
             if best_gpu:
-                print(f"   🎮 GPU Available: {best_gpu.upper()} (use FFMPEG_HWACCEL=auto to enable)")
+                logger.info(f"   🎮 GPU Available: {best_gpu.upper()} (use FFMPEG_HWACCEL=auto to enable)")
             else:
-                print(f"   🎮 GPU Encoder:   None (using {OUTPUT_CODEC})")
-        print(f"")
-        print(f"📊 ENHANCEMENT SETTINGS (from config):")
-        print(f"   STABILIZE:        {_settings.features.stabilize}")
-        print(f"   UPSCALE:          {_settings.features.upscale}")
-        print(f"   ENHANCE:          {_settings.features.enhance}")
-        print(f"   PARALLEL_ENHANCE: {_settings.processing.parallel_enhance}")
-        print(f"")
+                logger.info(f"   🎮 GPU Encoder:   None (using {OUTPUT_CODEC})")
+        logger.info("")
+        logger.info(f"📊 ENHANCEMENT SETTINGS (from config):")
+        logger.info(f"   STABILIZE:        {_settings.features.stabilize}")
+        logger.info(f"   UPSCALE:          {_settings.features.upscale}")
+        logger.info(f"   ENHANCE:          {_settings.features.enhance}")
+        logger.info(f"   PARALLEL_ENHANCE: {_settings.processing.parallel_enhance}")
+        logger.info("")
 
     if CREATIVE_PROMPT and CREATIVE_DIRECTOR_AVAILABLE:
-        print(f"\n🎯 Creative Prompt: '{CREATIVE_PROMPT}'")
+        logger.info(f"\n🎯 Creative Prompt: '{CREATIVE_PROMPT}'")
         EDITING_INSTRUCTIONS = interpret_natural_language(CREATIVE_PROMPT)
 
         if EDITING_INSTRUCTIONS:
             style_name = EDITING_INSTRUCTIONS['style']['name']
-            print(f"   ✅ Style Applied: {style_name}")
-            
+            logger.info(f"   ✅ Style Applied: {style_name}")
+
             # Show full style details in verbose mode
             if VERBOSE:
-                print(f"\n📋 STYLE TEMPLATE DETAILS:")
+                logger.info(f"\n📋 STYLE TEMPLATE DETAILS:")
                 style = EDITING_INSTRUCTIONS.get('style', {})
                 pacing = EDITING_INSTRUCTIONS.get('pacing', {})
                 effects = EDITING_INSTRUCTIONS.get('effects', {})
                 transitions = EDITING_INSTRUCTIONS.get('transitions', {})
-                
-                print(f"   Style Name:       {style.get('name', 'unknown')}")
-                print(f"   Description:      {style.get('description', 'N/A')[:60]}...")
-                print(f"   Pacing Speed:     {pacing.get('speed', 'N/A')}")
-                print(f"   Cut Duration:     {pacing.get('min_cut_duration', 'N/A')}-{pacing.get('max_cut_duration', 'N/A')}s")
-                print(f"   Beat Sync:        {pacing.get('beat_sync', 'N/A')}")
-                print(f"   Transition Style: {transitions.get('preferred', ['N/A'])}")
-                print(f"   Template Effects:")
-                print(f"      - Stabilization: {effects.get('stabilization', 'N/A')}")
-                print(f"      - Upscale:       {effects.get('upscale', 'N/A')}")
-                print(f"      - Sharpness:     {effects.get('sharpness_boost', 'N/A')}")
-                print(f"      - Contrast:      {effects.get('contrast_boost', 'N/A')}")
-                print(f"      - Color Grade:   {effects.get('color_grade', 'N/A')}")
+
+                logger.info(f"   Style Name:       {style.get('name', 'unknown')}")
+                logger.info(f"   Description:      {style.get('description', 'N/A')[:60]}...")
+                logger.info(f"   Pacing Speed:     {pacing.get('speed', 'N/A')}")
+                logger.info(f"   Cut Duration:     {pacing.get('min_cut_duration', 'N/A')}-{pacing.get('max_cut_duration', 'N/A')}s")
+                logger.info(f"   Beat Sync:        {pacing.get('beat_sync', 'N/A')}")
+                logger.info(f"   Transition Style: {transitions.get('preferred', ['N/A'])}")
+                logger.info(f"   Template Effects:")
+                logger.info(f"      - Stabilization: {effects.get('stabilization', 'N/A')}")
+                logger.info(f"      - Upscale:       {effects.get('upscale', 'N/A')}")
+                logger.info(f"      - Sharpness:     {effects.get('sharpness_boost', 'N/A')}")
+                logger.info(f"      - Contrast:      {effects.get('contrast_boost', 'N/A')}")
+                logger.info(f"      - Color Grade:   {effects.get('color_grade', 'N/A')}")
         else:
-            print(f"   ⚠️ Falling back to legacy CUT_STYLE={CUT_STYLE}")
+            logger.warning(f"Falling back to legacy CUT_STYLE={CUT_STYLE}")
             EDITING_INSTRUCTIONS = None
 
     elif CREATIVE_PROMPT and not CREATIVE_DIRECTOR_AVAILABLE:
-        print(f"   ⚠️ Creative Prompt ignored (Creative Director not available)")
-        print(f"   Using legacy CUT_STYLE={CUT_STYLE}")
+        logger.warning(f"Creative Prompt ignored (Creative Director not available)")
+        logger.info(f"   Using legacy CUT_STYLE={CUT_STYLE}")
         EDITING_INSTRUCTIONS = None
 
     else:
-        print(f"   ℹ️ Using legacy CUT_STYLE={CUT_STYLE}")
+        logger.info(f"   ℹ️ Using legacy CUT_STYLE={CUT_STYLE}")
         EDITING_INSTRUCTIONS = None
 
-    print(f"{'='*60}\n")
+    logger.info(f"{'='*60}\n")
 
 # =============================================================================
 # Scene Analysis (delegated to scene_analysis module)
@@ -718,7 +715,7 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
             resp.raise_for_status()
             return
         except Exception as exc:
-            print(f"   ⚠️ MCP clip failed, falling back to local ffmpeg: {exc}")
+            logger.warning(f"MCP clip failed, falling back to local ffmpeg: {exc}")
 
     cmd_extract = [
         "ffmpeg", "-y", "-ss", str(start), "-i", input_path,
@@ -778,20 +775,20 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
         result = builder.build()
 
         if result.success:
-            print(f"\n✅ Variant #{variant_id} Done!")
-            print(f"   Output: {result.output_path}")
-            print(f"   Duration: {result.duration:.1f}s")
-            print(f"   Cuts: {result.cut_count}")
-            print(f"   Render time: {result.render_time:.1f}s")
+            logger.info(f"\n✅ Variant #{variant_id} Done!")
+            logger.info(f"   Output: {result.output_path}")
+            logger.info(f"   Duration: {result.duration:.1f}s")
+            logger.info(f"   Cuts: {result.cut_count}")
+            logger.info(f"   Render time: {result.render_time:.1f}s")
             if result.file_size_mb > 0:
-                print(f"   File size: {result.file_size_mb:.1f} MB")
+                logger.info(f"   File size: {result.file_size_mb:.1f} MB")
             return result.output_path
         else:
-            print(f"\n❌ Variant #{variant_id} Failed: {result.error}")
+            logger.error(f"Variant #{variant_id} Failed: {result.error}")
             return None
 
     except Exception as e:
-        print(f"\n❌ Variant #{variant_id} Failed with exception: {e}")
+        logger.error(f"Variant #{variant_id} Failed with exception: {e}")
         import traceback
         traceback.print_exc()
         return None

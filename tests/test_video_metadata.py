@@ -17,7 +17,6 @@ from src.montage_ai.video_metadata import (
     probe_metadata,
     determine_output_profile,
     build_ffmpeg_params,
-    ffprobe_video_metadata,
     _parse_frame_rate,
     _weighted_median,
     _even_int,
@@ -439,30 +438,3 @@ class TestBuildFfmpegParams:
         """build_ffmpeg_params accepts CRF parameter."""
         params = build_ffmpeg_params(crf=23)
         assert isinstance(params, list)
-
-
-class TestLegacyFunctions:
-    """Tests for legacy compatibility functions."""
-
-    @patch('src.montage_ai.video_metadata.probe_metadata')
-    def test_ffprobe_video_metadata_returns_dict(self, mock_probe):
-        """ffprobe_video_metadata returns dictionary."""
-        mock_probe.return_value = VideoMetadata(
-            path="/test.mp4", width=1920, height=1080,
-            fps=30.0, duration=10.0, codec="h264", pix_fmt="yuv420p", bitrate=5000000
-        )
-
-        result = ffprobe_video_metadata("/test.mp4")
-
-        assert isinstance(result, dict)
-        assert result["width"] == 1920
-        assert result["height"] == 1080
-        assert result["codec"] == "h264"
-
-    @patch('src.montage_ai.video_metadata.probe_metadata')
-    def test_ffprobe_video_metadata_returns_none(self, mock_probe):
-        """ffprobe_video_metadata returns None on failure."""
-        mock_probe.return_value = None
-
-        result = ffprobe_video_metadata("/nonexistent.mp4")
-        assert result is None

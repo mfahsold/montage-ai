@@ -22,6 +22,8 @@ from pathlib import Path
 import numpy as np
 
 from ..config import get_settings, Settings
+from ..logger import logger
+from .analysis_cache import get_analysis_cache
 
 
 # =============================================================================
@@ -318,7 +320,7 @@ class MontageBuilder:
             MontageResult with success status and output path
         """
         try:
-            print(f"\n🎬 Starting Montage Variant #{self.variant_id}")
+            logger.info(f"\n🎬 Starting Montage Variant #{self.variant_id}")
 
             # Phase 1: Setup
             self._setup_workspace()
@@ -351,7 +353,7 @@ class MontageBuilder:
             )
 
         except Exception as e:
-            print(f"❌ Montage build failed: {e}")
+            logger.error(f"❌ Montage build failed: {e}")
             self._cleanup()
             return MontageResult(
                 success=False,
@@ -375,7 +377,7 @@ class MontageBuilder:
         - Initialize intelligent clip selector
         - Ensure directories exist
         """
-        print("   📁 Setting up workspace...")
+        logger.info("   📁 Setting up workspace...")
 
         # Ensure temp directory exists
         os.makedirs(str(self.ctx.temp_dir), exist_ok=True)
@@ -389,7 +391,7 @@ class MontageBuilder:
         # Initialize intelligent clip selector (if available)
         self._init_intelligent_selector()
 
-        print(f"   🎨 Effects: STABILIZE={self.ctx.stabilize}, UPSCALE={self.ctx.upscale}, ENHANCE={self.ctx.enhance}")
+        logger.info(f"   🎨 Effects: STABILIZE={self.ctx.stabilize}, UPSCALE={self.ctx.upscale}, ENHANCE={self.ctx.enhance}")
 
     def _analyze_assets(self):
         """
@@ -400,7 +402,7 @@ class MontageBuilder:
         - Run AI content analysis on scenes
         - Determine output profile
         """
-        print("\n   🎵 Analyzing assets...")
+        logger.info("\n   🎵 Analyzing assets...")
 
         # Analyze music
         self._analyze_music()
@@ -422,7 +424,7 @@ class MontageBuilder:
         - Initialize progressive renderer
         - Run clip selection loop (beat-synced, AI-scored)
         """
-        print("\n   📋 Planning montage...")
+        logger.info("\n   📋 Planning montage...")
 
         # Initialize audio clip and calculate duration
         self._init_audio_duration()
@@ -454,7 +456,7 @@ class MontageBuilder:
         self.ctx.logo_path = logo_files[0] if logo_files else None
 
         # Run the main assembly loop
-        print("   ✂️ Assembling cuts...")
+        logger.info("   ✂️ Assembling cuts...")
         self._run_assembly_loop()
 
     def _enhance_assets(self):
@@ -465,7 +467,7 @@ class MontageBuilder:
         - Upscaling (if enabled)
         - Color enhancement (if enabled)
         """
-        print("\n   ✨ Enhancing assets...")
+        logger.info("\n   ✨ Enhancing assets...")
 
         # Initialize ClipEnhancer if needed
         if self._clip_enhancer is None:
@@ -484,13 +486,13 @@ class MontageBuilder:
         - Add audio
         - Add logo overlay (if present)
         """
-        print("\n   🎬 Rendering output...")
+        logger.info("\n   🎬 Rendering output...")
 
         render_start_time = time.time()
 
         if self._progressive_renderer:
             # Progressive path: finalize with FFmpeg
-            print(f"   🔗 Finalizing with Progressive Renderer ({self._progressive_renderer.get_segment_count()} segments)...")
+            logger.info(f"   🔗 Finalizing with Progressive Renderer ({self._progressive_renderer.get_segment_count()} segments)...")
 
             audio_duration = self.ctx.target_duration
             success = self._progressive_renderer.finalize(
@@ -503,9 +505,9 @@ class MontageBuilder:
             if success:
                 method_str = "xfade" if self.ctx.enable_xfade else "-c copy"
                 self.ctx.render_duration = time.time() - render_start_time
-                print(f"   ✅ Final video rendered via FFmpeg ({method_str}) in {self.ctx.render_duration:.1f}s")
+                logger.info(f"   ✅ Final video rendered via FFmpeg ({method_str}) in {self.ctx.render_duration:.1f}s")
                 if self.ctx.logo_path:
-                    print(f"   🏷️ Logo overlay: {os.path.basename(self.ctx.logo_path)}")
+                    logger.info(f"   🏷️ Logo overlay: {os.path.basename(self.ctx.logo_path)}")
             else:
                 raise RuntimeError("Progressive render failed")
         else:
@@ -521,7 +523,7 @@ class MontageBuilder:
         - Export timeline (if enabled)
         - Force GC if configured
         """
-        print("\n   🧹 Cleaning up...")
+        logger.info("\n   🧹 Cleaning up...")
 
         cleanup_count = 0
         cleanup_size_mb = 0.0
@@ -531,7 +533,7 @@ class MontageBuilder:
             try:
                 self._progressive_renderer.cleanup()
             except Exception as e:
-                print(f"   ⚠️ Progressive renderer cleanup failed: {e}")
+                logger.warning(f"   ⚠️ Progressive renderer cleanup failed: {e}")
 
         # Cleanup temp directory
         temp_dir = str(self.ctx.temp_dir)
@@ -547,7 +549,7 @@ class MontageBuilder:
                     except Exception:
                         pass
 
-        print(f"   ✅ Deleted {cleanup_count} temp files ({cleanup_size_mb:.1f} MB freed)")
+        logger.info(f"   ✅ Deleted {cleanup_count} temp files ({cleanup_size_mb:.1f} MB freed)")
 
         if self.settings.processing.force_gc:
             gc.collect()
@@ -601,15 +603,15 @@ class MontageBuilder:
             if self.ctx.editing_instructions is not None:
                 style = self.ctx.editing_instructions.get('style', {}).get('template', 'dynamic')
             self._intelligent_selector = IntelligentClipSelector(style=style)
-            print(f"   🧠 Intelligent Clip Selector initialized (style={style})")
+            logger.info(f"   🧠 Intelligent Clip Selector initialized (style={style})")
         except ImportError:
             self._intelligent_selector = None
         except Exception as e:
-            print(f"   ⚠️ Failed to initialize Intelligent Clip Selector: {e}")
+            logger.warning(f"   ⚠️ Failed to initialize Intelligent Clip Selector: {e}")
             self._intelligent_selector = None
 
     def _analyze_music(self):
-        """Load and analyze music file."""
+        """Load and analyze music file with caching support."""
         from ..audio_analysis import get_beat_times, analyze_music_energy
 
         # Get music files
@@ -621,33 +623,51 @@ class MontageBuilder:
         music_index = (self.variant_id - 1) % len(music_files)
         music_path = music_files[music_index]
 
-        # Analyze beats
-        beat_info = get_beat_times(music_path, verbose=self.settings.features.verbose)
+        # Try cache first
+        cache = get_analysis_cache()
+        cached = cache.load_audio(music_path)
 
-        # Analyze energy
-        energy_profile = analyze_music_energy(music_path, verbose=self.settings.features.verbose)
+        if cached:
+            # Cache hit - use cached analysis
+            logger.info("   ⚡ Using cached audio analysis")
+            self.ctx.audio_result = AudioAnalysisResult(
+                music_path=music_path,
+                beat_times=np.array(cached.beat_times),
+                tempo=cached.tempo,
+                energy_times=np.array(cached.energy_times),
+                energy_values=np.array(cached.energy_values),
+                duration=cached.duration,
+            )
+        else:
+            # Cache miss - analyze and cache
+            beat_info = get_beat_times(music_path, verbose=self.settings.features.verbose)
+            energy_profile = analyze_music_energy(music_path, verbose=self.settings.features.verbose)
 
-        # Store in context
-        self.ctx.audio_result = AudioAnalysisResult(
-            music_path=music_path,
-            beat_times=beat_info.beat_times,
-            tempo=beat_info.tempo,
-            energy_times=energy_profile.times,
-            energy_values=energy_profile.rms,
-            duration=beat_info.duration,
-        )
+            # Store in context
+            self.ctx.audio_result = AudioAnalysisResult(
+                music_path=music_path,
+                beat_times=beat_info.beat_times,
+                tempo=beat_info.tempo,
+                energy_times=energy_profile.times,
+                energy_values=energy_profile.rms,
+                duration=beat_info.duration,
+            )
+
+            # Save to cache
+            cache.save_audio(music_path, beat_info, energy_profile)
 
         if self._monitor:
             self._monitor.log_beat_analysis(
                 music_path,
-                beat_info.tempo,
-                len(beat_info.beat_times),
+                self.ctx.audio_result.tempo,
+                len(self.ctx.audio_result.beat_times),
                 self.ctx.audio_result.energy_profile
             )
 
     def _detect_scenes(self):
-        """Detect scenes in all video files."""
+        """Detect scenes in all video files with caching support."""
         from ..scene_analysis import detect_scenes, analyze_scene_content
+        from .analysis_cache import get_analysis_cache
 
         # Get video files
         video_files = self._get_files(self.ctx.input_dir, ('.mp4', '.mov'))
@@ -658,9 +678,24 @@ class MontageBuilder:
         self.ctx.all_scenes = []
         self.ctx.all_scenes_dicts = []
 
+        # Scene detection threshold (from scenedetect defaults)
+        threshold = 30.0
+        cache = get_analysis_cache()
+        cache_hits = 0
+
         # Detect scenes in each video
         for v_path in video_files:
-            scenes = detect_scenes(v_path)
+            # Check cache first
+            cached = cache.load_scenes(v_path, threshold)
+            if cached:
+                cache_hits += 1
+                scenes = [(s["start"], s["end"]) for s in cached.scenes]
+            else:
+                # Fresh detection
+                scenes = detect_scenes(v_path, threshold=threshold)
+                # Save to cache (convert to Scene-like objects)
+                cache.save_scenes(v_path, threshold, scenes)
+
             for start, end in scenes:
                 duration = end - start
                 if duration > 1.0:  # Ignore tiny clips
@@ -672,8 +707,11 @@ class MontageBuilder:
                     )
                     self.ctx.all_scenes.append(scene_info)
 
+        if cache_hits > 0:
+            logger.info(f"   ⚡ Used cached scene detection for {cache_hits}/{len(video_files)} videos")
+
         # AI scene analysis (limit to first 20 for speed)
-        print("   🤖 AI Director is watching footage...")
+        logger.info("   🤖 AI Director is watching footage...")
         scenes_to_analyze = self.ctx.all_scenes[:20]
         for scene in scenes_to_analyze:
             meta = analyze_scene_content(scene.path, scene.midpoint)
@@ -685,7 +723,7 @@ class MontageBuilder:
         # Create legacy dict format (needed for footage_manager compatibility)
         self.ctx.all_scenes_dicts = [s.to_dict() for s in self.ctx.all_scenes]
 
-        print(f"   📹 Found {len(self.ctx.all_scenes)} scenes in {len(video_files)} videos")
+        logger.info(f"   📹 Found {len(self.ctx.all_scenes)} scenes in {len(video_files)} videos")
 
     def _determine_output_profile(self):
         """Determine output profile from input footage."""
@@ -709,7 +747,7 @@ class MontageBuilder:
         )
 
         if self.settings.features.verbose:
-            print(f"\n   🧭 Output profile: {self.ctx.output_profile.width}x{self.ctx.output_profile.height} @ {self.ctx.output_profile.fps:.1f}fps")
+            logger.info(f"\n   🧭 Output profile: {self.ctx.output_profile.width}x{self.ctx.output_profile.height} @ {self.ctx.output_profile.fps:.1f}fps")
 
     def _init_footage_pool(self):
         """Initialize footage pool manager."""
@@ -776,7 +814,7 @@ class MontageBuilder:
             self.ctx.target_duration = audio_duration
 
         if self.settings.features.verbose:
-            print(f"   ⏱️ Target duration: {self.ctx.target_duration:.1f}s")
+            logger.info(f"   ⏱️ Target duration: {self.ctx.target_duration:.1f}s")
 
     def _init_crossfade_settings(self):
         """Initialize crossfade settings from config and Creative Director."""
@@ -814,11 +852,11 @@ class MontageBuilder:
                 ffmpeg_crf=self.settings.encoding.crf,
                 normalize_clips=self.settings.encoding.normalize_clips,
             )
-            print(f"   ✅ Progressive Renderer initialized (batch={self.settings.processing.batch_size})")
+            logger.info(f"   ✅ Progressive Renderer initialized (batch={self.settings.processing.batch_size})")
         except ImportError:
             self._progressive_renderer = None
             self._memory_manager = None
-            print("   ⚠️ Progressive Renderer not available")
+            logger.warning("   ⚠️ Progressive Renderer not available")
 
     def _run_assembly_loop(self):
         """
@@ -873,7 +911,7 @@ class MontageBuilder:
             available_footage = self._footage_pool.get_available_clips(min_duration=min_dur)
 
             if not available_footage:
-                print("   ⚠️ No more footage available. Stopping.")
+                logger.warning("   ⚠️ No more footage available. Stopping.")
                 break
 
             # Score and select clip
@@ -882,7 +920,7 @@ class MontageBuilder:
             )
 
             if selected_scene is None:
-                print("   ⚠️ No valid scene found. Stopping.")
+                logger.warning("   ⚠️ No valid scene found. Stopping.")
                 break
 
             # Find best start point
@@ -924,7 +962,7 @@ class MontageBuilder:
                     "cuts placed"
                 )
 
-        print(f"   ✅ Assembly complete: {self.ctx.cut_number} cuts, {self.ctx.current_time:.1f}s")
+        logger.info(f"   ✅ Assembly complete: {self.ctx.cut_number} cuts, {self.ctx.current_time:.1f}s")
 
     def _get_energy_at_time(
         self, time_sec: float, energy_times: np.ndarray, energy_values: np.ndarray
