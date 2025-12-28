@@ -67,29 +67,30 @@ See [Hybrid Workflow](hybrid-workflow.md) for details.
 
 ## Module Responsibilities
 
-### editor.py (Main Orchestrator)
+### Core Pipeline (src/montage_ai/core/)
 
-The central module that coordinates all processing.
+The editing engine has been refactored into a modular pipeline.
 
-**Responsibilities:**
+**MontageBuilder (`montage_builder.py`)**
+The central orchestrator that executes the editing pipeline in phases:
+1. **Setup:** Initialize workspace and logging.
+2. **Analyze:** Process audio (beats/energy) and video (scenes/content).
+3. **Plan:** Select clips and map them to the timeline based on the story arc.
+4. **Enhance:** Apply stabilization, upscaling, and color grading.
+5. **Render:** Generate the final video file.
 
-- Load and validate input clips
-- Perform beat detection and energy analysis
-- Coordinate scene detection
-- Execute clip selection via Footage Manager
-- Apply visual effects
-- Render final output via FFmpeg
+**Components:**
 
-**Key functions:**
+| Module | Purpose |
+|--------|---------|
+| `audio_analysis.py` | Beat detection, tempo extraction, energy profiling (librosa wrapper) |
+| `scene_analysis.py` | Scene detection, content analysis, motion estimation |
+| `video_metadata.py` | Technical metadata extraction (ffprobe wrapper) |
+| `clip_enhancement.py` | Stabilization, upscaling, color matching (Local/Cloud hybrid) |
 
-| Function              | Purpose                                 |
-| --------------------- | --------------------------------------- |
-| `detect_beats()`      | Extract beats, tempo, energy from audio |
-| `detect_scenes()`     | Find scene changes in clips             |
-| `assemble_timeline()` | Build clip sequence                     |
-| `render_output()`     | Export final video                      |
-| `upscale_clip()`      | Apply AI upscaling                      |
-| `stabilize_clip()`    | Apply stabilization                     |
+### editor.py (CLI Entry Point)
+
+A thin wrapper that initializes the `MontageBuilder` and handles CLI arguments.
 
 ---
 

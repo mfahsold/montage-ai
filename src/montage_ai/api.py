@@ -27,15 +27,16 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# Directories (must match editor.py)
-INPUT_DIR = os.environ.get("INPUT_DIR", "/data/input")
-MUSIC_DIR = os.environ.get("MUSIC_DIR", "/data/music")
-ASSETS_DIR = os.environ.get("ASSETS_DIR", "/data/assets")
-OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/data/output")
+from .config import settings
+
+# Directories (from centralized config)
+INPUT_DIR = str(settings.paths.input_dir)
+MUSIC_DIR = str(settings.paths.music_dir)
+ASSETS_DIR = str(settings.paths.assets_dir)
+OUTPUT_DIR = str(settings.paths.output_dir)
 
 # Ensure directories exist
-for directory in [INPUT_DIR, MUSIC_DIR, ASSETS_DIR, OUTPUT_DIR]:
-    os.makedirs(directory, exist_ok=True)
+settings.paths.ensure_directories()
 
 # Allowed file extensions
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
