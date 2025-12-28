@@ -117,19 +117,27 @@ class WanVACEService:
     COLAB_SETUP_SCRIPT = '''
 import subprocess
 import sys
+import os
 
 # Install dependencies
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", 
     "torch", "torchvision", "transformers", "accelerate", "diffusers>=0.28.0",
-    "opencv-python", "einops", "decord"], check=True)
+    "opencv-python", "einops", "decord", "huggingface_hub"], check=True)
 
 # Clone Wan2.1 if not exists
-import os
 if not os.path.exists("Wan2.1"):
     subprocess.run(["git", "clone", "https://github.com/Wan-Video/Wan2.1.git"], check=True)
-    
+
+# Install Wan2.1
 os.chdir("Wan2.1")
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", "."], check=True)
+os.chdir("..")
+
+# Download Checkpoints
+from huggingface_hub import snapshot_download
+if not os.path.exists("Wan2.1-T2V-1.3B"):
+    print("Downloading Wan2.1-T2V-1.3B checkpoints...")
+    snapshot_download(repo_id="Wan-AI/Wan2.1-T2V-1.3B", local_dir="Wan2.1-T2V-1.3B")
 
 print("Wan2.1 setup complete!")
 '''
@@ -140,11 +148,14 @@ import torch
 import os
 import sys
 import base64
+import torchvision
 
 # Add Wan2.1 to path
 sys.path.insert(0, "Wan2.1")
 
-from wan.pipeline import WanPipeline
+import wan
+from wan.configs import WAN_CONFIGS
+from wan.text2video import WanT2V
 
 # Configuration
 PROMPT = """{prompt}"""
@@ -156,32 +167,56 @@ FPS = {fps}
 GUIDANCE_SCALE = {guidance_scale}
 NUM_STEPS = {num_inference_steps}
 OUTPUT_PATH = "/tmp/wan_output.mp4"
+MODEL_SIZE = "{model_size}"
 
-# Load model
-print("Loading Wan2.1 model...")
-pipe = WanPipeline.from_pretrained(
-    "Wan-AI/Wan2.1-T2V-{model_size}",
-    torch_dtype=torch.float16
+# Map model size to config key
+config_key = f"t2v-{MODEL_SIZE}"
+if config_key not in WAN_CONFIGS:
+    print(f"Warning: Config {{config_key}} not found, defaulting to t2v-1.3B")
+    config_key = "t2v-1.3B"
+
+print(f"Loading Wan2.1 model ({{config_key}})...")
+config = WAN_CONFIGS[config_key]
+checkpoint_dir = f"Wan2.1-T2V-{MODEL_SIZE}"
+
+wan_t2v = WanT2V(
+    config=config,
+    checkpoint_dir=checkpoint_dir,
+    device_id=0,
+    rank=0,
+    t5_fsdp=False,
+    dit_fsdp=False,
+    use_usp=False,
+    t5_cpu=True
 )
-pipe.to("cuda")
-pipe.enable_model_cpu_offload()  # Save VRAM
 
 print(f"Generating video: {{PROMPT[:50]}}...")
 
 # Generate
-video = pipe(
-    prompt=PROMPT,
-    negative_prompt=NEGATIVE_PROMPT,
-    width=WIDTH,
-    height=HEIGHT,
-    num_frames=NUM_FRAMES,
-    guidance_scale=GUIDANCE_SCALE,
-    num_inference_steps=NUM_STEPS,
-).frames[0]
+video = wan_t2v.generate(
+    input_prompt=PROMPT,
+    size=(WIDTH, HEIGHT),
+    frame_num=NUM_FRAMES,
+    shift=5.0,
+    sample_solver='unipc',
+    sampling_steps=NUM_STEPS,
+    guide_scale=GUIDANCE_SCALE,
+    n_prompt=NEGATIVE_PROMPT,
+    seed=-1,
+    offload_model=True
+)
 
-# Save
-from diffusers.utils import export_to_video
-export_to_video(video, OUTPUT_PATH, fps=FPS)
+# Save video
+# video shape is (C, F, H, W). Normalize to [0, 255]
+if video.min() < 0:
+    video = (video + 1) / 2.0
+video = video.clamp(0, 1) * 255
+video = video.byte()
+
+# Permute: (C, F, H, W) -> (F, H, W, C)
+video = video.permute(1, 2, 3, 0)
+
+torchvision.io.write_video(OUTPUT_PATH, video, fps=FPS)
 
 print(f"Video saved to {{OUTPUT_PATH}}")
 

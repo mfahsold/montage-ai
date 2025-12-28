@@ -20,8 +20,8 @@ services:
       - "${WEB_PORT:-8080}:5000"
     volumes:
       - ./data:/data
-      # Source code mount for development (live reload)
-      - ./src/montage_ai:/app/src/montage_ai:ro
+      # Source code mount disabled to ensure image consistency
+      # - ./src/montage_ai:/app/src/montage_ai:ro
       # cgpu Cloud GPU credentials (optional)
       - ${HOME}/.config/cgpu:/root/.config/cgpu:ro
     environment:

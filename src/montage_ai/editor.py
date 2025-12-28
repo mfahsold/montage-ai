@@ -1799,10 +1799,22 @@ def create_montage(variant_id=1):
         
         # Find the time of the next cut
         target_beat_idx = beat_idx + beats_per_cut
+        
+        # Helper for sub-beat interpolation (handles float indices)
+        def get_beat_time_interp(idx):
+            idx_int = int(idx)
+            if idx_int >= len(beat_times) - 1:
+                return beat_times[-1]
+            frac = idx - idx_int
+            return beat_times[idx_int] + (beat_times[idx_int+1] - beat_times[idx_int]) * frac
+
         if target_beat_idx >= len(beat_times):
             cut_duration = target_duration - current_time
         else:
-            cut_duration = beat_times[target_beat_idx] - beat_times[beat_idx]
+            # Use interpolation to handle fractional beats (e.g. 0.5, 1.5)
+            t_start = get_beat_time_interp(beat_idx)
+            t_end = get_beat_time_interp(target_beat_idx)
+            cut_duration = t_end - t_start
             
             # 🎲 MICRO-TIMING JITTER (Humanization)
             # Add slight imperfection to cut timing (-0.05s to +0.05s)
