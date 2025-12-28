@@ -225,7 +225,10 @@ print("===VIDEO_BASE64_END===")
             )
             
             if not success:
-                raise RuntimeError(f"Script execution failed: {stderr}")
+                # Include both stdout and stderr in error for debugging
+                error_msg = f"Script execution failed.\nSTDERR: {stderr}\nSTDOUT: {stdout}"
+                print(f"❌ cgpu execution error:\n{error_msg}")
+                raise RuntimeError(error_msg)
             
             return stdout
             

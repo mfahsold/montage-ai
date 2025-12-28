@@ -167,6 +167,8 @@ async function createJob() {
 
 async function generateBroll() {
     const prompt = document.getElementById('genPrompt').value;
+    const statusDiv = document.getElementById('genStatus');
+    
     if (!prompt) {
         alert('Please enter a prompt for generation');
         return;
@@ -174,9 +176,12 @@ async function generateBroll() {
 
     try {
         const btn = document.querySelector('.voxel-btn.secondary');
-        const originalText = btn.innerText;
-        btn.innerText = '⚡ GENERATING...';
+        btn.innerText = '⚡ GENERATING... (PLEASE WAIT)';
         btn.disabled = true;
+        
+        // Show status
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = `> INITIATING_GENERATION_SEQUENCE...<br>> PROMPT: "${prompt}"<br>> STATUS: WAITING_FOR_GPU...`;
 
         const response = await fetch(`${API_BASE}/generate_broll`, {
             method: 'POST',
@@ -185,20 +190,36 @@ async function generateBroll() {
         });
         
         const result = await response.json();
+        
         if (response.ok) {
-            alert(`SUCCESS: Generated ${result.file}`);
+            statusDiv.innerHTML += `<br>> SUCCESS: ASSET_CREATED [${result.file}]`;
+            statusDiv.style.borderColor = 'var(--primary)';
+            statusDiv.style.color = 'var(--primary)';
+            
             refreshFiles(); // Refresh file list to show new clip
             document.getElementById('genPrompt').value = '';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+                statusDiv.style.borderColor = 'var(--text-dim)';
+                statusDiv.style.color = 'var(--accent)';
+            }, 5000);
         } else {
-            alert(`GENERATION_ERROR: ${result.error}\n${result.details || ''}`);
+            statusDiv.innerHTML += `<br>> ERROR: ${result.error}`;
+            if (result.details) statusDiv.innerHTML += `<br>> DETAILS: ${result.details}`;
+            statusDiv.style.borderColor = 'var(--warning)';
+            statusDiv.style.color = 'var(--warning)';
         }
     } catch (error) {
         console.error('Generation error:', error);
-        alert(`NETWORK_ERROR: ${error.message}`);
+        statusDiv.innerHTML += `<br>> CRITICAL_FAILURE: ${error.message}`;
+        statusDiv.style.borderColor = 'var(--warning)';
+        statusDiv.style.color = 'var(--warning)';
     } finally {
         const btn = document.querySelector('.voxel-btn.secondary');
         if (btn) {
-            btn.innerText = '⚡ GENERATE_CLIP';
+            btn.innerText = '⚡ GENERATE_RAW_ASSET';
             btn.disabled = false;
         }
     }
