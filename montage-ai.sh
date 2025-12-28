@@ -72,13 +72,14 @@ cgpu_start() {
     fi
     
     echo "🚀 Starting cgpu serve..."
-    cgpu serve --port 8080 &
+    PORT=${CGPU_PORT:-8080}
+    cgpu serve --port "$PORT" &
     echo $! > "$CGPU_PID_FILE"
     sleep 2
     
     if kill -0 "$(cat "$CGPU_PID_FILE")" 2>/dev/null; then
         echo "✅ cgpu serve started (PID: $(cat "$CGPU_PID_FILE"))"
-        echo "   Gemini API available at http://localhost:8080/v1"
+        echo "   Gemini API available at http://localhost:$PORT/v1"
     else
         echo "❌ Failed to start cgpu serve"
         rm -f "$CGPU_PID_FILE"

@@ -50,25 +50,31 @@ Authenticate with Google Colab:
 cgpu connect
 ```
 
-### 2. Start the LLM Proxy
+> **⚠️ Note:** If `cgpu connect` fails with "Access Denied" (Google verification issue), use **Option B** below.
 
-On your host machine (not inside Docker), start the Gemini proxy:
-```bash
-# This exposes Gemini as an OpenAI-compatible API on port 8080
-./montage-ai.sh cgpu-start
-```
+### Option A: Full Hybrid (LLM + GPU via cgpu)
 
-### 3. Run Montage AI in Hybrid Mode
+1.  **Start the LLM Proxy:**
+    ```bash
+    ./montage-ai.sh cgpu-start
+    ```
 
-Use the following flags to enable the hybrid workflow:
+2.  **Run with Cloud Offloading:**
+    ```bash
+    ./montage-ai.sh run --cgpu --cgpu-gpu --upscale
+    ```
 
-```bash
-# Run with cloud offloading
-./montage-ai.sh run \
-  --cgpu \          # Use Gemini for Creative Director (saves ~8GB RAM vs local Llama)
-  --cgpu-gpu \      # Use Cloud GPU for upscaling (saves local CPU/GPU)
-  --upscale         # Enable upscaling (now runs on cloud)
-```
+### Option B: Direct API (LLM Only) - Recommended Fallback
+
+If `cgpu` is unavailable, you can still offload the LLM to Google's API directly. You lose Cloud GPU upscaling, but you save local RAM for the Creative Director.
+
+1.  **Get a Free API Key:** [Google AI Studio](https://aistudio.google.com/app/apikey)
+2.  **Run with API Key:**
+    ```bash
+    # Export key and run (disable upscaling to save local CPU)
+    export GOOGLE_API_KEY="your_key_here"
+    ./montage-ai.sh run
+    ```
 
 ## Configuration Details
 

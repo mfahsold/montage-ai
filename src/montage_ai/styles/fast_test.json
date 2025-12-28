@@ -1,0 +1,39 @@
+{
+  "id": "fast_test",
+  "name": "Fast Test",
+  "description": "Rapid processing test style (30s limit, no effects)",
+  "params": {
+    "style": {"name": "fast_test", "mood": "energetic"},
+    "pacing": {
+      "speed": "very_fast", 
+      "variation": "high", 
+      "intro_duration_beats": 4, 
+      "climax_intensity": 1.0
+    },
+    "cinematography": {
+      "prefer_wide_shots": false, 
+      "prefer_high_action": true, 
+      "match_cuts_enabled": false, 
+      "invisible_cuts_enabled": false, 
+      "shot_variation_priority": "low"
+    },
+    "transitions": {
+      "type": "hard_cuts"
+    },
+    "energy_mapping": {
+      "sync_to_beats": true, 
+      "energy_amplification": 1.0
+    },
+    "effects": {
+      "color_grading": "none", 
+      "stabilization": false, 
+      "upscale": false, 
+      "sharpness_boost": false
+    },
+    "constraints": {
+      "target_duration_sec": 30, 
+      "min_clip_duration_sec": 0.5, 
+      "max_clip_duration_sec": 2.0
+    }
+  }
+}
