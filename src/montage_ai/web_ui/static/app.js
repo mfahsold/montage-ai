@@ -186,15 +186,15 @@ async function generateBroll() {
         
         const result = await response.json();
         if (response.ok) {
-            refreshJobs();
-            document.querySelector('.job-status-container').scrollIntoView({ behavior: 'smooth' });
+            alert(`SUCCESS: Generated ${result.file}`);
+            refreshFiles(); // Refresh file list to show new clip
             document.getElementById('genPrompt').value = '';
         } else {
-            alert(`ERROR: ${result.error}`);
+            alert(`GENERATION_ERROR: ${result.error}\n${result.details || ''}`);
         }
     } catch (error) {
         console.error('Generation error:', error);
-        alert('Failed to start generation');
+        alert(`NETWORK_ERROR: ${error.message}`);
     } finally {
         const btn = document.querySelector('.voxel-btn.secondary');
         if (btn) {

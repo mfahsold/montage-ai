@@ -55,9 +55,30 @@
             </div>
         </section>
 
+        <!-- AI Generator Section -->
+        <section class="voxel-card">
+            <h2>02 // AI_ASSET_GENERATOR (Wan2.1)</h2>
+            <div class="form-group">
+                <label for="genPrompt">B-ROLL_PROMPT</label>
+                <input type="text" id="genPrompt" class="voxel-input" placeholder="> Describe the clip (e.g. 'Cinematic drone shot of neon city')...">
+            </div>
+            <div class="form-group">
+                <small style="font-family: monospace; color: var(--warning);">
+                    ⚠️ LIMIT: Generation is limited to 3-4 seconds per clip (1.3B model).
+                    <br>
+                    ⚠️ REQUIRES: cgpu connection (Google Colab).
+                </small>
+            </div>
+            <div class="text-center">
+                <button onclick="generateBroll()" class="voxel-btn secondary">
+                    ⚡ GENERATE_CLIP
+                </button>
+            </div>
+        </section>
+
         <!-- Configuration Section -->
         <section class="voxel-card">
-            <h2>02 // EDIT_PARAMETERS</h2>
+            <h2>03 // EDIT_PARAMETERS</h2>
 
             <div class="form-group">
                 <label for="style">EDIT_STYLE_PRESET</label>
@@ -119,27 +140,6 @@
             <div class="text-center mt-4">
                 <button onclick="createJob()" class="voxel-btn primary">
                     ▶ EXECUTE_MONTAGE_SEQUENCE
-                </button>
-            </div>
-        </section>
-
-        <!-- AI Generator Section -->
-        <section class="voxel-card">
-            <h2>03 // AI_GENERATOR (Wan2.1)</h2>
-            <div class="form-group">
-                <label for="genPrompt">B-ROLL_PROMPT</label>
-                <input type="text" id="genPrompt" class="voxel-input" placeholder="> Describe the clip (e.g. 'Cinematic drone shot of neon city')...">
-            </div>
-            <div class="form-group">
-                <small style="font-family: monospace; color: var(--warning);">
-                    ⚠️ LIMIT: Generation is limited to 3-4 seconds per clip (1.3B model).
-                    <br>
-                    ⚠️ REQUIRES: cgpu connection (Google Colab).
-                </small>
-            </div>
-            <div class="text-center">
-                <button onclick="generateBroll()" class="voxel-btn secondary">
-                    ⚡ GENERATE_CLIP
                 </button>
             </div>
         </section>

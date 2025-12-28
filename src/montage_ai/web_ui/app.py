@@ -7,6 +7,7 @@ DRY + KISS: Minimal dependencies, no over-engineering.
 
 import os
 import json
+import shutil
 import subprocess
 import threading
 import psutil
@@ -582,6 +583,49 @@ def api_get_job_decisions(job_id):
         })
     except Exception as e:
         return jsonify({"error": f"Failed to read decisions: {str(e)}"}), 500
+
+
+@app.route('/api/generate_broll', methods=['POST'])
+def api_generate_broll():
+    """Generate a B-roll clip using Wan2.1 via cgpu."""
+    if not WAN_AVAILABLE:
+        return jsonify({"error": "Wan2.1 Service not available (missing dependencies?)"}), 500
+
+    data = request.json
+    prompt = data.get('prompt')
+    
+    if not prompt:
+        return jsonify({"error": "Prompt is required"}), 400
+
+    # Generate unique filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_prompt = secure_filename(prompt)[:30]
+    output_filename = f"gen_{timestamp}_{safe_prompt}.mp4"
+    output_path = INPUT_DIR / output_filename
+
+    try:
+        # Initialize service
+        service = WanVACEService()
+        
+        # Generate (blocking)
+        # Note: generate_broll returns the path to the generated file
+        generated_path = service.generate_broll(
+            prompt=prompt,
+            output_path=str(output_path)
+        )
+
+        return jsonify({
+            "status": "success",
+            "file": output_filename,
+            "path": str(output_path)
+        })
+
+    except Exception as e:
+        print(f"❌ Wan2.1 generation failed: {str(e)}")
+        return jsonify({
+            "error": "Generation failed",
+            "details": str(e)
+        }), 500
 
 
 @app.route('/api/jobs/<job_id>/creative-instructions', methods=['GET'])

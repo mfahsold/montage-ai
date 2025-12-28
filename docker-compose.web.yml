@@ -43,10 +43,10 @@ services:
       # LLM-powered clip selection - enabled by default
       - LLM_CLIP_SELECTION=${LLM_CLIP_SELECTION:-true}
       # cgpu Cloud GPU for upscaling
-      - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-false}
+      - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-true}
       - CGPU_TIMEOUT=${CGPU_TIMEOUT:-1200}
       # cgpu LLM serve (alternative to Google AI)
-      - CGPU_ENABLED=${CGPU_ENABLED:-false}
+      - CGPU_ENABLED=${CGPU_ENABLED:-true}
       # Aspect Ratio Handling
       # false (default): Crop to fill frame (may cut edges)
       # true: Letterbox/pillarbox to preserve full content
