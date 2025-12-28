@@ -17,7 +17,7 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-dev}
     entrypoint: ["python", "-u", "-m", "montage_ai.web_ui.app"]
     ports:
-      - "${WEB_PORT:-8080}:8080"
+      - "${WEB_PORT:-8080}:5000"
     volumes:
       - ./data:/data
       # Source code mount for development (live reload)
@@ -67,10 +67,10 @@ services:
       resources:
         limits:
           memory: ${WEB_MEMORY_LIMIT:-20G}
-          cpus: '${WEB_CPU_LIMIT:-6.0}'
+          cpus: '${WEB_CPU_LIMIT:-4.0}'
         reservations:
           memory: ${WEB_MEMORY_RESERVATION:-4G}
-          cpus: '${WEB_CPU_RESERVATION:-2.0}'
+          cpus: '${WEB_CPU_RESERVATION:-1.0}'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
       interval: 30s

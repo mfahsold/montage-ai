@@ -62,8 +62,8 @@ list_styles() {
 run_web() {
     echo "🚀 Starting Web UI..."
     echo "   Open http://localhost:8080 in your browser"
-    # Use --build only if image doesn't exist or explicitly requested
-    docker compose -f docker-compose.web.yml up
+    # Pass arguments like --build to docker compose
+    docker compose -f docker-compose.web.yml up "$@"
 }
 
 # cgpu management functions
@@ -201,7 +201,8 @@ case "${1:-run}" in
         exit 0
         ;;
     web)
-        run_web
+        shift
+        run_web "$@"
         exit 0
         ;;
     build)

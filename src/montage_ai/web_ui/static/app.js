@@ -119,14 +119,14 @@ async function createJob() {
         cgpu: getCheck('cgpu'),
         llm_clip_selection: getCheck('llm_clip_selection'), // Matches HTML ID
         target_duration: parseFloat(getVal('targetDuration')) || 0,
+        music_start: parseFloat(getVal('musicStart')) || 0,
+        music_end: getVal('musicEnd') ? parseFloat(getVal('musicEnd')) : null,
         
         // Defaults for missing UI elements
         enhance: true,
         export_timeline: false,
         generate_proxies: false,
-        preserve_aspect: false,
-        music_start: 0,
-        music_end: null
+        preserve_aspect: false
     };
 
     try {

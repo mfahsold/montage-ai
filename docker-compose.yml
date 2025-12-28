@@ -16,7 +16,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '6'
+          cpus: '4'
           memory: 8g  # Reduced from 16g to prevent OOM on ARM systems
         reservations:
           memory: 2g   # Reduced from 4g
