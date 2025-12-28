@@ -49,11 +49,11 @@ GOOGLE_AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 # cgpu serve (Gemini via OpenAI Responses API)
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
-CGPU_PORT = os.environ.get("CGPU_PORT", "8080")  # Updated default port
+CGPU_PORT = os.environ.get("CGPU_PORT", "8090")  # Updated default port to match montage-ai.sh
 CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
 
 # Ollama (local fallback)
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 OLLAMA_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # or deepseek-r1:70b
 
 # System prompt for the Creative Director LLM (style list is injected at runtime)
@@ -512,24 +512,20 @@ class CreativeDirector:
         """
         Query cgpu/Gemini for creative direction.
         
-        Uses OpenAI-compatible Chat Completions API provided by `cgpu serve`.
+        Uses OpenAI Responses API provided by `cgpu serve`.
+        Note: cgpu uses /v1/responses endpoint, not /v1/chat/completions.
         """
         try:
-            # Use standard OpenAI Chat Completions API
-            response = self.cgpu_client.chat.completions.create(
+            # cgpu uses the OpenAI Responses API format
+            # Combine system prompt with user prompt as instructions
+            response = self.cgpu_client.responses.create(
                 model=CGPU_MODEL,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.7, # Slightly higher for creativity
-                max_tokens=1024,
-                # Note: cgpu might not support response_format={"type": "json_object"} yet,
-                # so we rely on the system prompt to enforce JSON.
+                instructions=self.system_prompt,
+                input=user_prompt,
             )
             
-            if response.choices and response.choices[0].message.content:
-                content = response.choices[0].message.content
+            if hasattr(response, 'output_text') and response.output_text:
+                content = response.output_text
                 # Clean up response - Gemini sometimes wraps JSON in markdown
                 if content.startswith("```json"):
                     content = content[7:]

@@ -37,7 +37,7 @@ CGPU_TIMEOUT = int(os.environ.get("CGPU_TIMEOUT", "1200"))  # 20 minutes default
 # LLM-related cgpu settings (for cgpu serve)
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
-CGPU_PORT = os.environ.get("CGPU_PORT", "8080")  # Updated default port
+CGPU_PORT = os.environ.get("CGPU_PORT", "8090")  # Updated default port to match montage-ai.sh
 CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
 
 

@@ -86,7 +86,7 @@ job_lock = threading.Lock()
 job_queue = deque()
 active_jobs = 0
 MAX_CONCURRENT_JOBS = int(os.environ.get("MAX_CONCURRENT_JOBS", "2"))
-MIN_MEMORY_GB = 4  # Minimum memory required to start a job
+MIN_MEMORY_GB = 2  # Minimum memory required to start a job
 
 
 def allowed_file(filename: str, allowed_extensions: set) -> bool:

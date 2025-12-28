@@ -72,7 +72,7 @@ cgpu_start() {
     fi
     
     echo "🚀 Starting cgpu serve..."
-    PORT=${CGPU_PORT:-8080}
+    PORT=${CGPU_PORT:-8090}
     cgpu serve --port "$PORT" &
     echo $! > "$CGPU_PID_FILE"
     sleep 2
@@ -158,6 +158,7 @@ run_montage() {
         -e ENHANCE="$ENHANCE" \
         -e NUM_VARIANTS="$VARIANTS" \
         -e CGPU_ENABLED="$CGPU_ENABLED" \
+        -e CGPU_PORT="${CGPU_PORT:-8090}" \
         -e CGPU_GPU_ENABLED="$CGPU_GPU_ENABLED" \
         montage-ai
 }
