@@ -149,6 +149,22 @@ from .scene_analysis import (
     SceneDetector,
 )
 
+# Import video metadata module (extracted for modularity)
+from .video_metadata import (
+    probe_metadata,
+    ffprobe_video_metadata,
+    determine_output_profile as _determine_output_profile_new,
+    build_ffmpeg_params as _build_ffmpeg_params_new,
+    VideoMetadata,
+    OutputProfile,
+    _parse_frame_rate,
+    _weighted_median,
+    _even_int,
+    _snap_aspect_ratio,
+    _snap_resolution,
+    _normalize_codec_name,
+)
+
 # Get runtime FFmpeg config (env vars applied, with GPU auto-detection)
 _ffmpeg_config = get_ffmpeg_config(hwaccel=_settings.gpu.ffmpeg_hwaccel)
 
@@ -487,273 +503,25 @@ def get_files(directory, extensions):
     return [os.path.join(directory, f) for f in os.listdir(directory) if f.lower().endswith(extensions)]
 
 
-def _parse_frame_rate(fps_str: str) -> float:
-    """Parse FFprobe frame rate strings like '30000/1001'."""
-    if not fps_str:
-        return 0.0
-    try:
-        if "/" in fps_str:
-            num, den = fps_str.split("/")
-            den = float(den)
-            return float(num) / den if den else 0.0
-        return float(fps_str)
-    except Exception:
-        return 0.0
+# =============================================================================
+# Video Metadata Functions (delegating to video_metadata module)
+# =============================================================================
 
+# Note: Helper functions (_parse_frame_rate, _weighted_median, _even_int,
+# _snap_aspect_ratio, _snap_resolution, _normalize_codec_name) are now
+# imported directly from video_metadata module for backward compatibility.
 
-def _weighted_median(values: List[float], weights: List[float]) -> float:
-    """Compute weighted median; falls back to simple median on error."""
-    if not values:
-        return 0.0
-    try:
-        ordered = sorted(zip(values, weights), key=lambda v: v[0])
-        cumulative = np.cumsum([w for _, w in ordered])
-        threshold = cumulative[-1] / 2.0
-        for (val, _), total in zip(ordered, cumulative):
-            if total >= threshold:
-                return val
-        return ordered[-1][0]
-    except Exception:
-        return float(np.median(values))
-
-
-def _even_int(value: float) -> int:
-    """Ensure integer is even and >= 2."""
-    rounded = int(round(value))
-    if rounded % 2 != 0:
-        rounded += 1
-    return max(2, rounded)
-
-
-def ffprobe_video_metadata(video_path: str) -> Optional[Dict[str, Any]]:
-    """Lightweight ffprobe wrapper to extract width/height/fps/codec/pix_fmt/duration/bitrate."""
-    try:
-        cmd = [
-            "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,codec_name,pix_fmt,r_frame_rate,avg_frame_rate,bit_rate:format=duration,bit_rate",
-            "-of", "json",
-            video_path
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-        if result.returncode != 0:
-            return None
-
-        data = json.loads(result.stdout)
-        stream = (data.get("streams") or [None])[0] or {}
-        format_info = data.get("format", {})
-
-        width = int(stream.get("width") or 0)
-        height = int(stream.get("height") or 0)
-        fps = _parse_frame_rate(stream.get("r_frame_rate") or stream.get("avg_frame_rate", "0"))
-        duration = float(format_info.get("duration") or 0.0)
-        codec = (stream.get("codec_name") or "unknown").lower()
-        pix_fmt = (stream.get("pix_fmt") or "unknown").lower()
-
-        # Try to get bitrate from stream or format
-        bitrate = int(stream.get("bit_rate") or format_info.get("bit_rate") or 0)
-
-        return {
-            "path": video_path,
-            "width": width,
-            "height": height,
-            "fps": fps,
-            "duration": duration if duration > 0 else 1.0,  # avoid zero weights
-            "codec": codec,
-            "pix_fmt": pix_fmt,
-            "bitrate": bitrate
-        }
-    except Exception as exc:
-        print(f"   ⚠️ ffprobe failed for {os.path.basename(video_path)}: {exc}")
-        return None
-
-
-def _snap_aspect_ratio(ratio: float) -> Tuple[str, float]:
-    """Snap aspect ratio to common presets if within 8%."""
-    common = {
-        "16:9": 16 / 9,
-        "9:16": 9 / 16,
-        "1:1": 1.0,
-        "4:3": 4 / 3,
-        "3:4": 3 / 4,
-    }
-    best_name, best_val = min(common.items(), key=lambda kv: abs(kv[1] - ratio))
-    rel_diff = abs(best_val - ratio) / best_val if best_val else 1.0
-    return (best_name, best_val) if rel_diff <= 0.08 else ("custom", ratio)
-
-
-def _snap_resolution(resolution: Tuple[int, int], orientation: str, max_long_side: int) -> Tuple[int, int]:
-    """Prefer standard resolutions when they are close to the measured median."""
-    presets = {
-        "horizontal": [(3840, 2160), (2560, 1440), (1920, 1080), (1600, 900), (1280, 720)],
-        "vertical": [(2160, 3840), (1440, 2560), (1080, 1920), (720, 1280)],
-        "square": [(1920, 1920), (1080, 1080), (720, 720)]
-    }
-    target_w, target_h = resolution
-    if orientation not in presets:
-        return target_w, target_h
-
-    # Avoid choosing a preset that upscales far beyond available footage
-    candidates = [p for p in presets[orientation] if max(p) <= max_long_side * 1.05]
-    if not candidates:
-        candidates = presets[orientation]
-
-    def _diff(p):
-        return max(abs(p[0] - target_w) / target_w, abs(p[1] - target_h) / target_h)
-
-    best = min(candidates, key=_diff)
-    return best if _diff(best) <= 0.12 else (target_w, target_h)
-
-
-def _normalize_codec_name(codec: str) -> str:
-    c = (codec or "").lower()
-    if "265" in c or "hevc" in c:
-        return "hevc"
-    if "264" in c or "avc" in c:
-        return "h264"
-    return c or "unknown"
+# Note: ffprobe_video_metadata is imported directly from video_metadata module.
 
 
 def determine_output_profile(video_files: List[str]) -> Dict[str, Any]:
-    """Pick output dimensions/fps/codec that match dominant input footage."""
-    default_profile = {
-        "width": STANDARD_WIDTH,
-        "height": STANDARD_HEIGHT,
-        "fps": STANDARD_FPS,
-        "pix_fmt": OUTPUT_PIX_FMT,
-        "codec": OUTPUT_CODEC,
-        "profile": OUTPUT_PROFILE,
-        "level": OUTPUT_LEVEL,
-        "reason": "defaults"
-    }
+    """
+    Pick output dimensions/fps/codec that match dominant input footage.
 
-    if not video_files:
-        return default_profile
-
-    metadata = [ffprobe_video_metadata(v) for v in video_files]
-    metadata = [m for m in metadata if m]
-    if not metadata:
-        return default_profile
-
-    weights = [m["duration"] if m["duration"] > 0 else 1.0 for m in metadata]
-    aspect_ratios = [(m["width"] / m["height"]) if m["height"] > 0 else 1.0 for m in metadata]
-    long_sides = [max(m["width"], m["height"]) for m in metadata]
-    short_sides = [min(m["width"], m["height"]) for m in metadata]
-    max_long_side = max(long_sides) if long_sides else STANDARD_HEIGHT
-
-    # Orientation by weighted duration
-    orientation_weights = {"horizontal": 0.0, "vertical": 0.0, "square": 0.0}
-    for meta, weight in zip(metadata, weights):
-        ratio = (meta["width"] / meta["height"]) if meta["height"] else 1.0
-        if ratio > 1.1:
-            orientation_weights["horizontal"] += weight
-        elif ratio < 0.9:
-            orientation_weights["vertical"] += weight
-        else:
-            orientation_weights["square"] += weight
-    orientation = max(orientation_weights, key=lambda k: orientation_weights[k])
-
-    # Aspect ratio: snap to common ratios if close
-    raw_aspect = _weighted_median(aspect_ratios, weights) or (16 / 9)
-    ratio_name, snapped_ratio = _snap_aspect_ratio(raw_aspect)
-    aspect_for_calc = snapped_ratio
-
-    long_med = _weighted_median(long_sides, weights) or STANDARD_HEIGHT
-    short_med = _weighted_median(short_sides, weights) or STANDARD_WIDTH
-
-    if orientation == "vertical":
-        target_h = _even_int(long_med)
-        target_w = _even_int(target_h * aspect_for_calc)
-    elif orientation == "square":
-        target_w = target_h = _even_int(min(long_med, short_med))
-    else:
-        target_w = _even_int(long_med)
-        target_h = _even_int(target_w / aspect_for_calc)
-
-    target_w, target_h = _snap_resolution((target_w, target_h), orientation, max_long_side)
-
-    # FPS: choose nearest common value to weighted median
-    fps_pairs = [(m["fps"], w) for m, w in zip(metadata, weights) if m.get("fps")]
-    if fps_pairs:
-        fps_values, fps_weights = zip(*fps_pairs)
-        raw_fps = _weighted_median(list(fps_values), list(fps_weights))
-    else:
-        raw_fps = STANDARD_FPS
-    common_fps = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60]
-    target_fps = min(common_fps, key=lambda f: abs(f - raw_fps))
-
-    # Codec selection: honor env override, otherwise follow dominant input
-    env_codec = os.environ.get("OUTPUT_CODEC")
-    codec_map = {"hevc": "libx265", "h265": "libx265", "h264": "libx264", "avc": "libx264"}
-    input_codec_weights: Dict[str, float] = {}
-    for meta, weight in zip(metadata, weights):
-        norm = _normalize_codec_name(meta.get("codec"))
-        input_codec_weights[norm] = input_codec_weights.get(norm, 0.0) + weight
-
-    dominant_input_codec = max(input_codec_weights.items(), key=lambda kv: kv[1])[0] if input_codec_weights else "h264"
-    target_codec = codec_map.get(env_codec.lower(), "libx264") if env_codec else codec_map.get(dominant_input_codec, "libx264")
-
-    # Pixel format selection: honor env override, otherwise use dominant input pix_fmt
-    env_pix_fmt = os.environ.get("OUTPUT_PIX_FMT")
-    if env_pix_fmt:
-        target_pix_fmt = env_pix_fmt
-    else:
-        # Find dominant pixel format by weighted duration
-        pix_fmt_weights: Dict[str, float] = {}
-        for meta, weight in zip(metadata, weights):
-            pf = meta.get("pix_fmt", "yuv420p")
-            pix_fmt_weights[pf] = pix_fmt_weights.get(pf, 0.0) + weight
-
-        dominant_pix_fmt = max(pix_fmt_weights.items(), key=lambda kv: kv[1])[0] if pix_fmt_weights else "yuv420p"
-
-        # Use dominant if it's compatible, otherwise fallback to yuv420p for maximum compatibility
-        compatible_formats = ["yuv420p", "yuv422p", "yuv444p", "yuvj420p", "yuvj422p", "yuvj444p"]
-        target_pix_fmt = dominant_pix_fmt if dominant_pix_fmt in compatible_formats else "yuv420p"
-
-    # Bitrate estimation: use weighted median of input bitrates, or calculate from resolution
-    bitrates = [m["bitrate"] for m in metadata if m.get("bitrate", 0) > 0]
-    if bitrates:
-        bitrate_weights = [weights[i] for i, m in enumerate(metadata) if m.get("bitrate", 0) > 0]
-        target_bitrate = int(_weighted_median(bitrates, bitrate_weights))
-    else:
-        # Fallback heuristic: ~0.1 bits per pixel at 30fps
-        pixels_per_frame = target_w * target_h
-        target_bitrate = int(pixels_per_frame * target_fps * 0.1)
-
-    # Profile/level: keep safe defaults, bump level for 4K/high fps
-    high_res = max_long_side >= 3200 or target_fps > 60
-    if target_codec == "libx265":
-        target_profile = os.environ.get("OUTPUT_PROFILE") or "main"
-        target_level = os.environ.get("OUTPUT_LEVEL") or ("5.1" if high_res else "4.0")
-    else:
-        target_profile = os.environ.get("OUTPUT_PROFILE") or "high"
-        target_level = os.environ.get("OUTPUT_LEVEL") or ("5.1" if high_res else "4.1")
-
-    return {
-        "width": target_w,
-        "height": target_h,
-        "fps": target_fps,
-        "pix_fmt": target_pix_fmt,
-        "codec": target_codec,
-        "profile": target_profile,
-        "level": target_level,
-        "bitrate": target_bitrate,
-        "orientation": orientation,
-        "aspect_ratio": ratio_name,
-        "source_summary": {
-            "orientation_weights": orientation_weights,
-            "median_aspect": raw_aspect,
-            "median_long_side": long_med,
-            "median_short_side": short_med,
-            "dominant_codec": dominant_input_codec,
-            "dominant_pix_fmt": pix_fmt_weights.get(max(pix_fmt_weights, key=lambda k: pix_fmt_weights[k])) if 'pix_fmt_weights' in locals() else "yuv420p",
-            "fps_selected": target_fps,
-            "bitrate_median": target_bitrate,
-            "total_input_files": len(metadata),
-            "total_input_duration": sum(weights)
-        },
-        "reason": f"{orientation} dominant; snapped to {ratio_name} aspect; {dominant_input_codec} codec with {target_pix_fmt}"
-    }
+    Wrapper for backward compatibility - returns Dict instead of OutputProfile.
+    """
+    profile = _determine_output_profile_new(video_files)
+    return profile.to_dict()
 
 
 def apply_output_profile(profile: Dict[str, Any]) -> None:
@@ -782,21 +550,13 @@ def apply_output_profile(profile: Dict[str, Any]) -> None:
 
 
 def build_video_ffmpeg_params(crf: Optional[int] = None) -> List[str]:
-    """ffmpeg params for MoviePy writes that mirror the selected output profile.
-
-    Uses centralized FFmpegConfig for DRY. The config respects env vars
-    like OUTPUT_PROFILE, OUTPUT_LEVEL, OUTPUT_PIX_FMT.
-
-    Automatically uses GPU-appropriate quality parameters when HW accel is active:
-    - NVENC: -cq instead of -crf
-    - VAAPI: -qp instead of -crf
-    - QSV: -global_quality instead of -crf
-    - CPU: -crf (standard)
-
-    Args:
-        crf: Quality value (0-51, lower=better). Uses config default if not specified.
     """
-    return _ffmpeg_config.moviepy_params(crf=crf)
+    FFmpeg params for MoviePy writes that mirror the selected output profile.
+
+    Wrapper for backward compatibility.
+    """
+    return _build_ffmpeg_params_new(crf=crf)
+
 
 def interpret_creative_prompt():
     """
