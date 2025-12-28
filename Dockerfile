@@ -38,32 +38,37 @@ RUN npm install -g cgpu
 
 WORKDIR /app
 
-# Build Real-ESRGAN-ncnn-vulkan from source for ARM64 optimization
-RUN git config --global url."https://github.com/".insteadOf git@github.com: && \
-    git clone https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan.git && \
-    cd Real-ESRGAN-ncnn-vulkan && \
-    git submodule update --init --recursive && \
-    mkdir build && cd build && \
-    cmake ../src && \
-    make -j$(nproc) && \
-    mv realesrgan-ncnn-vulkan /usr/local/bin/ && \
-    cd ../.. && \
-    rm -rf Real-ESRGAN-ncnn-vulkan
-
-# Download Real-ESRGAN models
-# Note: realesr-animevideov3 models are inside the release zip.
-# We download the zip, extract models, and place them in a dedicated directory.
-RUN wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip -O realesrgan.zip && \
-    unzip realesrgan.zip -d realesrgan_temp && \
-    # Create model directory
+# Install Real-ESRGAN-ncnn-vulkan
+# Optimized: Use pre-built binary for x86_64, compile from source only for ARM64
+RUN if [ "$(uname -m)" = "x86_64" ]; then \
+        echo "Detected x86_64, downloading pre-built binary..." && \
+        curl -L -o realesrgan.zip https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip && \
+        echo "Download complete. Extracting..." && \
+        unzip -q realesrgan.zip -d realesrgan_temp && \
+        mv realesrgan_temp/realesrgan-ncnn-vulkan /usr/local/bin/ && \
+        chmod +x /usr/local/bin/realesrgan-ncnn-vulkan; \
+    else \
+        echo "Detected ARM64, building from source..." && \
+        git config --global url."https://github.com/".insteadOf git@github.com: && \
+        git clone https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan.git && \
+        cd Real-ESRGAN-ncnn-vulkan && \
+        git submodule update --init --recursive && \
+        mkdir build && cd build && \
+        cmake ../src && \
+        make -j$(nproc) && \
+        mv realesrgan-ncnn-vulkan /usr/local/bin/ && \
+        cd ../.. && \
+        rm -rf Real-ESRGAN-ncnn-vulkan && \
+        # Download models separately for ARM64 case
+        curl -L -o realesrgan.zip https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip && \
+        unzip -q realesrgan.zip -d realesrgan_temp; \
+    fi && \
+    # Common step: Install models
     mkdir -p /usr/local/share/realesrgan-models && \
-    # Find and move all model files (.param, .bin, .pth) to the model directory
     find realesrgan_temp -name "*.param" -exec mv {} /usr/local/share/realesrgan-models/ \; && \
     find realesrgan_temp -name "*.bin" -exec mv {} /usr/local/share/realesrgan-models/ \; && \
     find realesrgan_temp -name "*.pth" -exec mv {} /usr/local/share/realesrgan-models/ \; && \
-    # Cleanup
     rm -rf realesrgan.zip realesrgan_temp && \
-    # Create symlink so realesrgan-ncnn-vulkan finds models in default location
     ln -s /usr/local/share/realesrgan-models /usr/local/bin/models
 
 # Install librosa and numba from conda-forge (better ARM64 support)
