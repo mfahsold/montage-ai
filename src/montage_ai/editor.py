@@ -1282,13 +1282,16 @@ def calculate_dynamic_cut_length(current_energy, tempo, current_time, total_dura
     elif progress < 0.75:
         if current_energy > 0.8:
             # Hyper-energy peak: Rapid cuts (TikTok style)
-            base_pattern = [1, 1, 1, 2, 1, 1, 3]  # Syncopated
+            # "The Stutter": Rapid fire 1s followed by a breath
+            base_pattern = [1, 1, 1, 0.5, 0.5, 2, 1, 1] 
         elif current_energy > 0.6:
-            # High energy: Fibonacci magic
-            base_pattern = [1, 1, 2, 3, 5]  # Classic Fibonacci
+            # High energy: Fibonacci magic & Syncopation
+            # "The Golden Spiral": 1, 1, 2, 3, 5
+            base_pattern = [1, 1, 2, 3, 5]
         else:
             # Medium energy: Varied but controlled
-            base_pattern = [2, 2, 4, 2]
+            # "The Heartbeat": Short-Short-Long
+            base_pattern = [1.5, 1.5, 5] # Syncopated 3+5=8
 
     # PHASE 4: OUTRO/RESOLUTION (75-100%) - Wind down, return to calm
     else:
@@ -1297,7 +1300,15 @@ def calculate_dynamic_cut_length(current_energy, tempo, current_time, total_dura
             base_pattern = [2, 2, 4, 8]
         else:
             # Calm ending: Long reflective cuts
-            base_pattern = [8, 8, 4, 8]
+            # "The Fade": Progressively longer
+            base_pattern = [4, 8, 12, 16]
+            
+    # 🎲 CHAOS FACTOR: Occasionally inject a random pattern from the pool
+    # This simulates "creative intuition" breaking the rules
+    if random.random() < 0.15: # 15% chance
+        base_pattern = random.choice(pattern_pool)
+        
+    return base_pattern
 
     # TEMPO MODULATION: Adjust for BPM
     # Fast tempos need longer beat counts to avoid seizure-inducing cuts
@@ -1535,6 +1546,37 @@ def create_montage(variant_id=1):
                 "climax_candidates": len(summary.get("narrative_inventory", {}).get("climax_candidates", []))
             })
     
+    # OPTIMIZATION FOR SHORT/LIMITED FOOTAGE
+    # If we have very few scenes, chop them up to create more options
+    if len(all_scenes) < 10 or unique_videos == 1:
+        print(f"   ✨ Optimizing for limited footage ({len(all_scenes)} scenes, {unique_videos} sources)...")
+        new_subscenes = []
+        for scene in all_scenes:
+            # Only chop if scene is long enough (e.g. > 5s)
+            if scene['duration'] > 5.0:
+                # Create 4s chunks with randomized overlap for variety
+                chunk_size = 4.0
+                # Base step size 3.0 (1s overlap), plus random jitter +/- 0.5s
+                step_size = 3.0 + random.uniform(-0.5, 0.5)
+                
+                current_start = scene['start']
+                while current_start + chunk_size <= scene['end']:
+                    # Create new sub-scene
+                    sub = scene.copy()
+                    sub['start'] = current_start
+                    sub['end'] = current_start + chunk_size
+                    sub['duration'] = chunk_size
+                    # Inherit meta
+                    sub['meta'] = scene.get('meta', {}).copy()
+                    sub['meta']['is_subclip'] = True
+                    new_subscenes.append(sub)
+                    
+                    current_start += step_size
+        
+        if new_subscenes:
+            print(f"   ✨ Generated {len(new_subscenes)} sub-clips to increase variety")
+            all_scenes.extend(new_subscenes)
+
     random.shuffle(all_scenes) # Mix it up
 
     # 📚 Initialize Professional Footage Pool Manager
@@ -1669,16 +1711,19 @@ def create_montage(variant_id=1):
     last_shot_type = None
     last_clip_end_time = None  # For match cut detection
 
-    # ADVANCED 2024/2025 PACING: Position-aware patterns with Fibonacci
+    # ADVANCED 2024/2025 PACING: Position-aware patterns with Fibonacci & Cinematic Rhythms
     # Pattern pool for dynamic selection (fallback for non-dynamic modes)
     cut_patterns = [
-        [4, 4, 4, 4],       # Steady pace
-        [2, 2, 4, 8],       # Accelerate then hold (build-up)
-        [8, 4, 2, 2],       # Long shot into fast cuts
-        [2, 2, 2, 2],       # Energetic steady
-        [1, 1, 2, 4],       # Rapid fire start
-        [4, 2, 1, 1, 8],    # Complex phrase
-        [1, 1, 2, 3, 5],    # Fibonacci magic
+        [4, 4, 4, 4],       # Steady pace (The March)
+        [2, 2, 4, 8],       # Accelerate then hold (The Breath)
+        [8, 4, 2, 2],       # Long shot into fast cuts (The Drop)
+        [2, 2, 2, 2],       # Energetic steady (The Pulse)
+        [1, 1, 2, 4],       # Rapid fire start (The Spark)
+        [4, 2, 1, 1, 8],    # Complex phrase (The Jazz)
+        [1, 1, 2, 3, 5],    # Fibonacci magic (The Golden Ratio)
+        [6, 2, 4, 4],       # Syncopated (The Offbeat)
+        [3, 3, 3, 3],       # Triplet feel (The Waltz)
+        [12, 4],            # Establishing -> Detail (The Context)
     ]
     current_pattern = None
     pattern_idx = 0
@@ -1759,6 +1804,14 @@ def create_montage(variant_id=1):
         else:
             cut_duration = beat_times[target_beat_idx] - beat_times[beat_idx]
             
+            # 🎲 MICRO-TIMING JITTER (Humanization)
+            # Add slight imperfection to cut timing (-0.05s to +0.05s)
+            # This prevents the "robotic" feel of perfectly quantized cuts
+            jitter = random.uniform(-0.05, 0.05)
+            # Only apply if it doesn't make the cut too short
+            if cut_duration + jitter > 0.5:
+                cut_duration += jitter
+            
         # Find a scene that fits using Footage Pool Manager
         # Get available clips that haven't been overused
         # Relax min_duration to 50% of cut_duration to handle fast tempos
@@ -1830,7 +1883,12 @@ def create_montage(variant_id=1):
 
             # Rule 2: Avoid jump cuts (same video file back-to-back)
             if scene['path'] == last_used_path:
-                score -= 50
+                if unique_videos > 1:
+                    score -= 50
+                else:
+                    # If we only have 1 source, we MUST jump cut. 
+                    # Small penalty to prefer non-adjacent segments if possible.
+                    score -= 5
 
             # Rule 3: AI Content Matching
             meta = scene.get('meta', {})
@@ -1923,15 +1981,32 @@ def create_montage(variant_id=1):
                 except:
                     pass
 
-            # Randomness factor to keep it fresh
-            score += random.randint(-5, 5)
+            # Randomness factor to keep it fresh (Increased variance)
+            score += random.randint(-15, 15)
 
             # Store score for intelligent selection
             scene['_heuristic_score'] = score
 
-            if score > best_score:
-                best_score = score
-                selected_scene = scene
+        # PROBABILISTIC SELECTION (Variance Injection)
+        # Sort candidates by score descending
+        candidates.sort(key=lambda x: x.get('_heuristic_score', -1000), reverse=True)
+        
+        # Take top 3 (or fewer)
+        top_n = min(3, len(candidates))
+        if top_n > 0:
+            top_candidates = candidates[:top_n]
+            # Weighted random selection: higher score = higher chance
+            min_score = min(c.get('_heuristic_score', 0) for c in top_candidates)
+            # Shift scores to be positive for weighting (min_score + 10 base)
+            weights = [c.get('_heuristic_score', 0) - min_score + 10 for c in top_candidates]
+            
+            selected_scene = random.choices(top_candidates, weights=weights, k=1)[0]
+            best_score = selected_scene.get('_heuristic_score', 0)
+            
+            if VERBOSE:
+                print(f"   🎲 Probabilistic selection: Picked score {best_score} from top {top_n} scores {[c.get('_heuristic_score') for c in top_candidates]}")
+        else:
+            selected_scene = candidates[0] if candidates else None
 
         # 🧠 INTELLIGENT CLIP SELECTION: Use LLM reasoning if available
         selection_reasoning = "Heuristic selection"
