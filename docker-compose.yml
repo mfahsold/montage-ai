@@ -24,6 +24,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      - ./src:/app/src:ro
       - ./data/input:/data/input:ro
       - ./data/music:/data/music:ro
       - ./data/assets:/data/assets:ro

@@ -152,6 +152,9 @@ class MontageContext:
     # Creative Director instructions (JSON from LLM)
     editing_instructions: Optional[Dict[str, Any]] = None
 
+    # Semantic query for clip selection (Phase 2: Semantic Storytelling)
+    semantic_query: Optional[str] = None
+
     # Audio analysis results
     audio_result: Optional[AudioAnalysisResult] = None
 
@@ -584,6 +587,28 @@ class MontageBuilder:
             self.ctx.enhance = effects['sharpness_boost']
         else:
             self.ctx.enhance = env_enhance
+
+        # Extract semantic query for Phase 2: Semantic Storytelling
+        # Priority: explicit semantic_query > content_focus > ENV
+        env_semantic = os.environ.get('SEMANTIC_QUERY', '')
+        if 'semantic_query' in self.ctx.editing_instructions:
+            self.ctx.semantic_query = self.ctx.editing_instructions['semantic_query']
+        elif 'content_focus' in self.ctx.editing_instructions:
+            self.ctx.semantic_query = self.ctx.editing_instructions['content_focus']
+        elif 'style' in self.ctx.editing_instructions:
+            style = self.ctx.editing_instructions['style']
+            # Combine mood, theme, or content hints
+            semantic_parts = []
+            if style.get('mood'):
+                semantic_parts.append(style['mood'])
+            if style.get('theme'):
+                semantic_parts.append(style['theme'])
+            if style.get('content'):
+                semantic_parts.append(style['content'])
+            if semantic_parts:
+                self.ctx.semantic_query = ' '.join(semantic_parts)
+        if env_semantic and not self.ctx.semantic_query:
+            self.ctx.semantic_query = env_semantic
 
     def _init_monitor(self):
         """Initialize monitoring system."""
@@ -1119,6 +1144,18 @@ class MontageBuilder:
                     )
                     if similarity > 0.7:
                         score += 30
+                except Exception:
+                    pass
+
+            # Rule 6: Semantic matching (Phase 2: Semantic Storytelling)
+            if self.ctx.semantic_query and (meta.get('tags') or meta.get('caption')):
+                try:
+                    from ..semantic_matcher import get_semantic_matcher
+                    matcher = get_semantic_matcher()
+                    if matcher.is_available:
+                        sem_result = matcher.match_query_to_clip(self.ctx.semantic_query, meta)
+                        # Up to +40 points for strong semantic match
+                        score += int(sem_result.overall_score * 40)
                 except Exception:
                     pass
 

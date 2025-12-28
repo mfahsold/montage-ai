@@ -112,6 +112,45 @@ def check_cgpu_gpu() -> Tuple[bool, str]:
         return False, str(e)
 
 
+def get_cgpu_metrics() -> Optional[str]:
+    """
+    Get current GPU utilization from cgpu.
+    Returns string like "cgpu: util=45% mem=1234Mi/16384Mi (12.5%)" or None if failed.
+    """
+    # Fast check first
+    if os.environ.get("CGPU_GPU_ENABLED", "false").lower() != "true":
+        return None
+
+    try:
+        # Query utilization
+        # nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits
+        result = subprocess.run(
+            ["cgpu", "run", "nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode != 0:
+            return None
+            
+        # Output format: "45, 1234, 16384"
+        output = result.stdout.strip()
+        if not output:
+            return None
+            
+        parts = output.split(',')
+        if len(parts) >= 3:
+            gpu_util = parts[0].strip()
+            mem_used = int(parts[1].strip())
+            mem_total = int(parts[2].strip())
+            mem_pct = (mem_used / mem_total) * 100 if mem_total > 0 else 0
+            return f"cgpu: util={gpu_util}% mem={mem_used}Mi/{mem_total}Mi ({mem_pct:.1f}%)"
+            
+    except Exception:
+        return None
+    return None
+
+
 def is_cgpu_serve_available() -> bool:
     """
     Check if cgpu serve (LLM endpoint) is running.

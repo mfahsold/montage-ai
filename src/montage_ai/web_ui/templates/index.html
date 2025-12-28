@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage AI - Cyber Deck</title>
+    <title>Montage AI - Creative Console</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +11,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header / Console Top -->
         <header>
             <div class="logo-container">
                 <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -33,160 +32,220 @@
             <div class="version-badge">SYS.READY</div>
         </header>
 
-        <!-- Onboarding / How it Works -->
         <section class="voxel-card info-card">
             <h2>// SYSTEM_OVERVIEW</h2>
             <div class="steps-grid">
                 <div class="step-item">
                     <div class="step-number">01</div>
                     <h3>Upload Media</h3>
-                    <p>Drop your raw video clips and a music track. The system accepts MP4, MOV, and MP3.</p>
+                    <p>Drop your raw video clips and a music track. Accepted: MP4/MOV (video), MP3/WAV (audio).</p>
                 </div>
                 <div class="step-item">
                     <div class="step-number">02</div>
-                    <h3>Select Style</h3>
-                    <p>Choose a cinematic preset (e.g., "Hitchcock", "MTV") or describe your vision in plain text.</p>
+                    <h3>Pick Style</h3>
+                    <p>Select a cinematic preset or write a short prompt. Defaults are tuned for most use cases.</p>
                 </div>
                 <div class="step-item">
                     <div class="step-number">03</div>
-                    <h3>AI Assembly</h3>
-                    <p>The AI analyzes beats and scenes to generate a synchronized montage automatically.</p>
+                    <h3>Review Output</h3>
+                    <p>Monitor progress, then download MP4 (and timeline if enabled). Adjust settings and iterate.</p>
                 </div>
             </div>
         </section>
 
-        <!-- Upload Section -->
-        <section class="voxel-card">
-            <h2>01 // MEDIA_INGEST</h2>
-            <div class="upload-area">
-                <div class="upload-box">
-                    <h3>[ VIDEO_INPUT ]</h3>
-                    <input type="file" id="videoUpload" accept="video/*" multiple class="hidden">
-                    <button onclick="document.getElementById('videoUpload').click()" class="voxel-btn">Select Source Files</button>
-                    <div id="videoList" class="file-list"></div>
+        <div class="layout-grid">
+            <!-- Panel 1: Media Intake -->
+            <section class="voxel-card">
+                <div class="section-heading">
+                    <h2>MEDIA // INPUTS</h2>
+                    <div class="pill">Accepted: mp4 · mov · mp3 · wav</div>
                 </div>
-                <div class="upload-box">
-                    <h3>[ AUDIO_TRACK ]</h3>
-                    <input type="file" id="musicUpload" accept="audio/*" class="hidden">
-                    <button onclick="document.getElementById('musicUpload').click()" class="voxel-btn">Select Audio Track</button>
-                    <div id="musicList" class="file-list"></div>
-                </div>
-            </div>
-            <div class="text-center">
-                <button onclick="refreshFiles()" class="voxel-btn">⟳ REFRESH_STREAMS</button>
-            </div>
-        </section>
-
-        <!-- B-Roll Planning Section -->
-        <section class="voxel-card">
-            <h2>02 // BROLL_PLANNING [ OPTIONAL ]</h2>
-            <p style="color: var(--text-dim); font-size: 0.9em; margin-bottom: 1rem; line-height: 1.4;">
-                <strong style="color: var(--accent);">> FIND THE RIGHT CLIPS</strong><br>
-                Search your footage by description. AI finds matching scenes.
-            </p>
-            <div class="form-group">
-                <label for="brollQuery">SEARCH_QUERY</label>
-                <input type="text" id="brollQuery" class="voxel-input" placeholder="> Describe what you need (e.g. 'energetic action scene')...">
-            </div>
-            <div class="text-center" style="display: flex; gap: 0.5rem; justify-content: center;">
-                <button onclick="analyzeFoootage()" class="voxel-btn">
-                    ⟳ ANALYZE_FOOTAGE
-                </button>
-                <button onclick="searchBroll()" class="voxel-btn secondary">
-                    🔍 SEARCH
-                </button>
-            </div>
-            <!-- Search Results -->
-            <div id="brollResults" class="terminal-output" style="display: none; margin-top: 1rem; padding: 0.5rem; border: 1px dashed var(--text-dim);"></div>
-        </section>
-
-        <!-- Configuration Section -->
-        <section class="voxel-card">
-            <h2>03 // ASSEMBLE_FINAL_CUT [ MAIN PROCESS ]</h2>
-            <p style="color: var(--text-dim); font-size: 0.9em; margin-bottom: 1rem; line-height: 1.4;">
-                <strong style="color: var(--accent);">> READY TO EDIT?</strong><br>
-                This process takes <em>ALL available clips</em> (your uploads + AI generated assets)<br>
-                and edits them to the beat of the music to create the final video.
-            </p>
-
-            <div class="form-group">
-                <label for="style">EDIT_STYLE_PRESET</label>
-                <select id="style" class="voxel-select">
-                    <option value="dynamic">[ DYNAMIC ] - Position-aware pacing</option>
-                    <option value="hitchcock">[ HITCHCOCK ] - Suspense / Slow Build</option>
-                    <option value="mtv">[ MTV ] - Rapid Fire Cuts</option>
-                    <option value="action">[ ACTION ] - High Energy</option>
-                    <option value="documentary">[ DOCU ] - Observational</option>
-                    <option value="minimalist">[ MINIMAL ] - Long Takes</option>
-                    <option value="wes_anderson">[ WES ] - Symmetric / Stylized</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="prompt">CREATIVE_DIRECTOR_PROMPT</label>
-                <input type="text" id="prompt" class="voxel-input" placeholder="> Enter natural language instructions...">
-            </div>
-
-            <div class="form-group">
-                <label>TARGET_DURATION: <span id="durationValue">Auto</span></label>
-                <input type="range" id="targetDuration" min="0" max="300" step="10" value="0">
-                <small style="font-family: monospace; color: var(--primary);">0 = Auto-match music length</small>
-            </div>
-
-            <div class="form-group">
-                <label>MUSIC_TRIM (Seconds)</label>
-                <div style="display: flex; gap: 10px;">
-                    <div style="flex: 1;">
-                        <label for="musicStart" style="font-size: 0.8em;">START</label>
-                        <input type="number" id="musicStart" class="voxel-input" value="0" min="0" step="0.1">
+                <div class="upload-area">
+                    <div class="upload-box">
+                        <h3>Video Clips</h3>
+                        <p class="helper">Drop multiple clips. Longer clips are auto-segmented.</p>
+                        <input type="file" id="videoUpload" accept="video/*" multiple class="hidden">
+                        <button onclick="document.getElementById('videoUpload').click()" class="voxel-btn">Select Videos</button>
+                        <div id="videoList" class="file-list"></div>
                     </div>
-                    <div style="flex: 1;">
-                        <label for="musicEnd" style="font-size: 0.8em;">END (Optional)</label>
-                        <input type="number" id="musicEnd" class="voxel-input" placeholder="Auto" min="0" step="0.1">
+                    <div class="upload-box">
+                        <h3>Music Track</h3>
+                        <p class="helper">One track drives beat sync. MP3/WAV recommended.</p>
+                        <input type="file" id="musicUpload" accept="audio/*" class="hidden">
+                        <button onclick="document.getElementById('musicUpload').click()" class="voxel-btn">Select Music</button>
+                        <div id="musicList" class="file-list"></div>
                     </div>
                 </div>
-            </div>
+                <div class="text-center">
+                    <button onclick="refreshFiles()" class="voxel-btn">⟳ Refresh Library</button>
+                </div>
+            </section>
 
-            <div class="checkbox-group">
-                <label class="checkbox-item">
-                    <input type="checkbox" id="stabilize" {% if defaults.stabilize %}checked{% endif %}>
-                    <span>STABILIZE_FOOTAGE</span>
-                </label>
-                <label class="checkbox-item">
-                    <input type="checkbox" id="upscale" {% if defaults.upscale %}checked{% endif %}>
-                    <span>AI_UPSCALE (4K)</span>
-                </label>
-                <label class="checkbox-item">
-                    <input type="checkbox" id="cgpu" {% if defaults.cgpu %}checked{% endif %}>
-                    <span>CLOUD_GPU_OFFLOAD</span>
-                </label>
-                <label class="checkbox-item">
-                    <input type="checkbox" id="llm_clip_selection" {% if defaults.llm_clip_selection %}checked{% endif %}>
-                    <span>LLM_SCENE_ANALYSIS</span>
-                </label>
-            </div>
+            <!-- Panel 2: Style & Intent -->
+            <section class="voxel-card">
+                <div class="section-heading">
+                    <h2>STYLE // INTENT</h2>
+                    <div class="badge speed">Default: Dynamic</div>
+                </div>
+                <div class="form-group">
+                    <label for="style">Style Preset</label>
+                    <select id="style" class="voxel-select">
+                        <option value="dynamic">Dynamic — Position-aware pacing</option>
+                        <option value="hitchcock">Hitchcock — Suspense / slow build</option>
+                        <option value="mtv">MTV — Rapid fire cuts</option>
+                        <option value="action">Action — High energy</option>
+                        <option value="documentary">Documentary — Observational</option>
+                        <option value="minimalist">Minimalist — Long takes</option>
+                        <option value="wes_anderson">Wes Anderson — Symmetric / stylized</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="prompt">Creative Director Prompt</label>
+                    <input type="text" id="prompt" class="voxel-input" placeholder="e.g., make it feel like a 90s skateboard video">
+                    <div class="helper">Natural language overrides preset pacing/energy.</div>
+                </div>
+                <div class="chips">
+                    <span class="chip">Fast social cut</span>
+                    <span class="chip">Cinematic vlog</span>
+                    <span class="chip">Travel montage</span>
+                    <span class="chip">Product hype</span>
+                </div>
+            </section>
 
-            <div class="text-center mt-4">
-                <button onclick="createJob()" class="voxel-btn primary">
-                    ▶ EXECUTE_MONTAGE_SEQUENCE
-                </button>
-            </div>
-        </section>
+            <!-- Panel 3: Quality & Delivery -->
+            <section class="voxel-card">
+                <div class="section-heading">
+                    <h2>QUALITY // DELIVERY</h2>
+                    <div class="badge quality">Balanced defaults</div>
+                </div>
 
-        <!-- Job Status / Terminal -->
+                <div class="form-group">
+                    <label>Target Duration <span id="durationValue">Auto</span></label>
+                    <input type="range" id="targetDuration" min="0" max="300" step="10" value="0">
+                    <div class="helper">0 = match music length. Adjust to trim or shorten.</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Music Trim (seconds)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex: 1;">
+                            <label for="musicStart" style="font-size: 0.8em;">Start</label>
+                            <input type="number" id="musicStart" class="voxel-input" value="0" min="0" step="0.1">
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="musicEnd" style="font-size: 0.8em;">End (optional)</label>
+                            <input type="number" id="musicEnd" class="voxel-input" placeholder="Auto" min="0" step="0.1">
+                        </div>
+                    </div>
+                    <div class="helper">Auto-calculates end if left blank.</div>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="enhance" {% if defaults.enhance %}checked{% endif %}>
+                        <div>
+                            <strong>Enhance</strong><br>
+                            <span class="helper">Color/sharpness tweak (fast).</span>
+                        </div>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="stabilize" {% if defaults.stabilize %}checked{% endif %}>
+                        <div>
+                            <strong>Stabilize</strong><br>
+                            <span class="helper">Reduce shake. Adds render time.</span>
+                        </div>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="upscale" {% if defaults.upscale %}checked{% endif %}>
+                        <div>
+                            <strong>Upscale</strong><br>
+                            <span class="helper">Higher quality (slower, GPU-friendly).</span>
+                        </div>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="cgpu" {% if defaults.cgpu %}checked{% endif %}>
+                        <div>
+                            <strong>Cloud GPU</strong><br>
+                            <span class="helper">Offload heavy steps if configured.</span>
+                        </div>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="llm_clip_selection" {% if defaults.llm_clip_selection %}checked{% endif %}>
+                        <div>
+                            <strong>LLM Clip Selection</strong><br>
+                            <span class="helper">Semantic scene analysis.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="export_timeline" {% if defaults.export_timeline %}checked{% endif %}>
+                        <div>
+                            <strong>Export Timeline</strong><br>
+                            <span class="helper">OTIO/EDL for Resolve/Premiere.</span>
+                        </div>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="generate_proxies" {% if defaults.generate_proxies %}checked{% endif %}>
+                        <div>
+                            <strong>Generate Proxies</strong><br>
+                            <span class="helper">Faster editing in NLEs.</span>
+                        </div>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="preserve_aspect" {% if defaults.preserve_aspect %}checked{% endif %}>
+                        <div>
+                            <strong>Preserve Aspect</strong><br>
+                            <span class="helper">Letterbox instead of crop.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="text-center mt-4" style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+                    <button onclick="createJob()" class="voxel-btn primary">
+                        ▶ Create Montage
+                    </button>
+                    <button onclick="createJob()" class="voxel-btn">
+                        ⚡ Quick Preview (fast preset)
+                    </button>
+                </div>
+            </section>
+
+            <!-- Panel 4: Advanced & B-Roll -->
+            <section class="voxel-card">
+                <div class="section-heading">
+                    <h2>ADVANCED // B-ROLL</h2>
+                    <div class="badge warning">Optional</div>
+                </div>
+                <p class="helper">Semantic search helps find matching moments in your footage.</p>
+                <div class="form-group">
+                    <label for="brollQuery">Search Query</label>
+                    <input type="text" id="brollQuery" class="voxel-input" placeholder="e.g., energetic action scene, golden hour wide shot">
+                </div>
+                <div class="text-center" style="display: flex; gap: 0.5rem; justify-content: center;">
+                    <button onclick="analyzeFoootage()" class="voxel-btn">
+                        ⟳ Analyze Footage
+                    </button>
+                    <button onclick="searchBroll()" class="voxel-btn secondary">
+                        🔍 Search
+                    </button>
+                </div>
+                <div id="brollResults" class="terminal-output" style="display: none; margin-top: 1rem; padding: 0.5rem; border: 1px dashed var(--muted);"></div>
+            </section>
+        </div>
+
         <section class="job-status-container">
             <div class="job-status-header">
                 <span>> SYSTEM_MONITOR</span>
                 <span id="clock">00:00:00</span>
             </div>
             <div id="jobList" class="job-list">
-                <!-- Jobs injected here -->
                 <div class="job-item">
                     <span>[WAITING]</span>
                     <span>System initialized. Ready for input.</span>
                 </div>
             </div>
-            <!-- The Unusual Element: Timeline Visualizer -->
             <div class="timeline-viz" title="Processing Stream"></div>
         </section>
     </div>

@@ -18,6 +18,7 @@ from src.montage_ai.core.analysis_cache import (
     AnalysisCache,
     AudioAnalysisEntry,
     SceneAnalysisEntry,
+    SemanticAnalysisEntry,
     CacheEntry,
     get_analysis_cache,
     reset_cache,
@@ -474,3 +475,193 @@ class TestCacheRobustness:
         with patch("builtins.open", side_effect=PermissionError("denied")):
             result = cache.save_audio(str(audio_file), beat_info, energy_profile)
             assert result is False
+
+
+class TestSemanticAnalysisEntry:
+    """Tests for SemanticAnalysisEntry dataclass (Phase 2)."""
+
+    def test_create_entry(self):
+        """SemanticAnalysisEntry can be created with all fields."""
+        entry = SemanticAnalysisEntry(
+            version="1.0",
+            file_hash="abc123",
+            computed_at="2024-01-01T12:00:00",
+            time_point=5.0,
+            quality="YES",
+            description="Beach surfing scene",
+            action="high",
+            shot="wide",
+            tags=["beach", "surfing", "ocean"],
+            caption="Person surfing on ocean waves",
+            objects=["person", "surfboard", "wave"],
+            mood="energetic",
+            setting="beach",
+            caption_embedding=None,
+        )
+
+        assert entry.time_point == 5.0
+        assert entry.quality == "YES"
+        assert entry.tags == ["beach", "surfing", "ocean"]
+        assert entry.mood == "energetic"
+        assert entry.setting == "beach"
+
+
+class TestSemanticCache:
+    """Tests for semantic analysis caching (Phase 2)."""
+
+    @pytest.fixture
+    def cache(self):
+        """Create a fresh cache instance."""
+        return AnalysisCache(ttl_hours=24, enabled=True)
+
+    @pytest.fixture
+    def video_file(self, tmp_path):
+        """Create a test video file."""
+        video_path = tmp_path / "test.mp4"
+        video_path.write_bytes(b"fake video content")
+        return str(video_path)
+
+    def test_save_and_load_semantic(self, cache, video_file):
+        """Semantic analysis can be saved and loaded."""
+        # Create mock analysis (similar to SceneAnalysis)
+        analysis = MagicMock()
+        analysis.quality = "YES"
+        analysis.description = "Beach scene"
+        analysis.action = "high"
+        analysis.shot = "wide"
+        analysis.tags = ["beach", "ocean"]
+        analysis.caption = "Person on beach"
+        analysis.objects = ["person", "sand"]
+        analysis.mood = "calm"
+        analysis.setting = "beach"
+        analysis.to_dict = MagicMock(return_value={
+            "quality": "YES",
+            "description": "Beach scene",
+            "action": "high",
+            "shot": "wide",
+            "tags": ["beach", "ocean"],
+            "caption": "Person on beach",
+            "objects": ["person", "sand"],
+            "mood": "calm",
+            "setting": "beach",
+        })
+
+        # Save
+        success = cache.save_semantic(video_file, time_point=5.0, analysis=analysis)
+        assert success is True
+
+        # Load
+        loaded = cache.load_semantic(video_file, time_point=5.0)
+        assert loaded is not None
+        assert loaded.time_point == 5.0
+        assert loaded.quality == "YES"
+        assert loaded.tags == ["beach", "ocean"]
+        assert loaded.mood == "calm"
+
+    def test_save_semantic_with_dict(self, cache, video_file):
+        """save_semantic works with dict analysis."""
+        analysis = {
+            "quality": "YES",
+            "description": "City street",
+            "action": "medium",
+            "shot": "medium",
+            "tags": ["city", "street"],
+            "caption": "Urban scene",
+            "objects": ["building"],
+            "mood": "neutral",
+            "setting": "city",
+        }
+
+        success = cache.save_semantic(video_file, time_point=10.0, analysis=analysis)
+        assert success is True
+
+        loaded = cache.load_semantic(video_file, time_point=10.0)
+        assert loaded is not None
+        assert loaded.setting == "city"
+
+    def test_load_semantic_cache_miss(self, cache, video_file):
+        """load_semantic returns None on cache miss."""
+        result = cache.load_semantic(video_file, time_point=5.0)
+        assert result is None
+
+    def test_semantic_cache_time_tolerance(self, cache, video_file):
+        """Cache validates time_point matches within tolerance."""
+        analysis = {"tags": ["test"], "mood": "neutral"}
+        cache.save_semantic(video_file, time_point=5.0, analysis=analysis)
+
+        # Exact match works
+        result = cache.load_semantic(video_file, time_point=5.0)
+        assert result is not None
+        assert result.time_point == 5.0
+
+        # Note: Cache filename includes time in ms, so different time points
+        # will look for different files. The tolerance check is for verifying
+        # the cached time_point matches the requested one, not file lookup.
+        result2 = cache.load_semantic(video_file, time_point=5.5)
+        assert result2 is None  # Different file, cache miss
+
+    def test_semantic_cache_invalidation_on_file_change(self, cache, video_file):
+        """Semantic cache is invalidated when video file changes."""
+        analysis = {"tags": ["test"], "mood": "neutral"}
+        cache.save_semantic(video_file, time_point=5.0, analysis=analysis)
+
+        # Verify cache hit
+        assert cache.load_semantic(video_file, time_point=5.0) is not None
+
+        # Modify source file
+        with open(video_file, "wb") as f:
+            f.write(b"modified video content")
+
+        # Cache should be invalidated
+        assert cache.load_semantic(video_file, time_point=5.0) is None
+
+    def test_clear_semantic_cache_single(self, cache, video_file):
+        """clear_semantic_cache removes specific time point cache."""
+        analysis = {"tags": ["test"]}
+        cache.save_semantic(video_file, time_point=5.0, analysis=analysis)
+        cache.save_semantic(video_file, time_point=10.0, analysis=analysis)
+
+        # Clear only 5.0s
+        result = cache.clear_semantic_cache(video_file, time_point=5.0)
+        assert result is True
+
+        # 5.0s cleared, 10.0s still exists
+        assert cache.load_semantic(video_file, time_point=5.0) is None
+        assert cache.load_semantic(video_file, time_point=10.0) is not None
+
+    def test_clear_semantic_cache_all(self, cache, video_file):
+        """clear_semantic_cache removes all semantic caches for video."""
+        analysis = {"tags": ["test"]}
+        cache.save_semantic(video_file, time_point=5.0, analysis=analysis)
+        cache.save_semantic(video_file, time_point=10.0, analysis=analysis)
+        cache.save_semantic(video_file, time_point=15.0, analysis=analysis)
+
+        # Clear all
+        result = cache.clear_semantic_cache(video_file, time_point=None)
+        assert result is True
+
+        # All cleared
+        assert cache.load_semantic(video_file, time_point=5.0) is None
+        assert cache.load_semantic(video_file, time_point=10.0) is None
+        assert cache.load_semantic(video_file, time_point=15.0) is None
+
+    def test_semantic_cache_path_format(self, cache, video_file):
+        """Semantic cache path uses correct format."""
+        path = cache._semantic_cache_path(video_file, time_point=5.5)
+        assert str(path).endswith(".semantic_5500.json")
+
+        path2 = cache._semantic_cache_path(video_file, time_point=10.0)
+        assert str(path2).endswith(".semantic_10000.json")
+
+    def test_disabled_semantic_cache(self, video_file):
+        """Disabled cache never saves semantic data."""
+        disabled_cache = AnalysisCache(ttl_hours=24, enabled=False)
+        analysis = {"tags": ["test"]}
+
+        result = disabled_cache.save_semantic(video_file, time_point=5.0, analysis=analysis)
+        assert result is False
+
+        # Cache file should not exist
+        from pathlib import Path
+        cache_path = Path(f"{video_file}.semantic_5000.json")
+        assert not cache_path.exists()

@@ -57,6 +57,22 @@ cp ~/Music/track.mp3 data/music/
 ls data/output/
 ```
 
+## Test Assets
+
+The project includes scripts to download open-source test material.
+
+**Video (Open Movie Project):**
+- `BigBuckBunny.mp4` (151 MB)
+- `Sintel.mp4` (182 MB)
+- `TearsOfSteel.mp4` (178 MB)
+
+**Audio (SoundHelix):**
+- `TestTrack1.mp3`
+- `TestTrack2.mp3`
+- `TestTrack3.mp3`
+
+These files are stored in `data/input/` and `data/music/`.
+
 ---
 
 ## Run Options

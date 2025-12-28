@@ -6,10 +6,12 @@ Nightfly Studio - Persistent caching for expensive analysis operations.
 Caches:
 - Audio analysis (beat detection, energy profile) from librosa
 - Scene boundaries from scenedetect
+- Semantic analysis (tags, captions, mood) from Vision models (Phase 2)
 
 Cache files are stored as JSON sidecars next to source files:
 - music/track.mp3.analysis.json
 - input/video.mp4.scenes.json
+- input/video.mp4.semantic_5000.json (semantic @ 5.0s)
 
 Cache invalidation:
 - Hash-based: file size + mtime (fast, no full-file hash)
@@ -102,6 +104,27 @@ class SceneAnalysisEntry(CacheEntry):
     threshold: float
     scenes: List[Dict[str, float]]  # [{"start": 0.0, "end": 5.2}, ...]
     total_scenes: int
+
+
+@dataclass
+class SemanticAnalysisEntry(CacheEntry):
+    """
+    Cached semantic scene analysis from Vision models.
+
+    Phase 2: Semantic Storytelling - stores AI-generated content tags.
+    Cache key includes time_point to support multiple analyses per video.
+    """
+    time_point: float           # Time in video where frame was sampled
+    quality: str                # "YES" or "NO"
+    description: str            # 5-word scene summary
+    action: str                 # low/medium/high
+    shot: str                   # close/medium/wide
+    tags: List[str]             # Free-form semantic tags
+    caption: str                # Detailed description for embedding
+    objects: List[str]          # Detected objects
+    mood: str                   # calm/energetic/dramatic/playful/tense/peaceful/mysterious
+    setting: str                # indoor/outdoor/beach/city/nature/studio/street/home
+    caption_embedding: Optional[List[float]] = None  # Pre-computed embedding
 
 
 # =============================================================================
@@ -345,6 +368,171 @@ class AnalysisCache:
         return success
 
     # -------------------------------------------------------------------------
+    # Semantic Analysis Cache (Phase 2: Semantic Storytelling)
+    # -------------------------------------------------------------------------
+
+    def _semantic_cache_path(self, video_path: str, time_point: float) -> Path:
+        """
+        Get cache path for semantic analysis at a specific time point.
+
+        Format: video.mp4.semantic_5000.json (time in milliseconds)
+        """
+        time_ms = int(time_point * 1000)
+        return Path(f"{video_path}.semantic_{time_ms}.json")
+
+    def load_semantic(
+        self, video_path: str, time_point: float, tolerance_ms: int = 100
+    ) -> Optional[SemanticAnalysisEntry]:
+        """
+        Load cached semantic analysis if valid.
+
+        Args:
+            video_path: Path to the video file
+            time_point: Time in seconds where frame was sampled
+            tolerance_ms: Time tolerance in milliseconds (default 100ms)
+
+        Returns:
+            SemanticAnalysisEntry if cache hit, None if cache miss
+        """
+        cache_path = self._semantic_cache_path(video_path, time_point)
+
+        if not self._is_valid(cache_path, video_path):
+            return None
+
+        try:
+            with open(cache_path, encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Time point must match within tolerance
+            cached_time = data.get("time_point", 0)
+            if abs(cached_time - time_point) * 1000 > tolerance_ms:
+                logger.debug(f"Time point mismatch: {cached_time} != {time_point}")
+                return None
+
+            logger.debug(f"Cache hit: semantic analysis for {os.path.basename(video_path)} @ {time_point:.1f}s")
+            return SemanticAnalysisEntry(
+                version=data["version"],
+                file_hash=data["file_hash"],
+                computed_at=data["computed_at"],
+                time_point=data["time_point"],
+                quality=data.get("quality", "YES"),
+                description=data.get("description", ""),
+                action=data.get("action", "medium"),
+                shot=data.get("shot", "medium"),
+                tags=data.get("tags", []),
+                caption=data.get("caption", ""),
+                objects=data.get("objects", []),
+                mood=data.get("mood", "neutral"),
+                setting=data.get("setting", "unknown"),
+                caption_embedding=data.get("caption_embedding"),
+            )
+        except (json.JSONDecodeError, KeyError, OSError) as e:
+            logger.debug(f"Failed to load semantic cache: {e}")
+            return None
+
+    def save_semantic(self, video_path: str, time_point: float, analysis) -> bool:
+        """
+        Save semantic analysis to cache.
+
+        Args:
+            video_path: Path to the video file
+            time_point: Time in seconds where frame was sampled
+            analysis: SceneAnalysis dataclass from scene_analysis module
+
+        Returns:
+            True if cache was saved successfully
+        """
+        if not self.enabled:
+            return False
+
+        # Handle both SceneAnalysis object and dict
+        if hasattr(analysis, "to_dict"):
+            data = analysis.to_dict()
+        elif isinstance(analysis, dict):
+            data = analysis
+        else:
+            data = {
+                "quality": getattr(analysis, "quality", "YES"),
+                "description": getattr(analysis, "description", ""),
+                "action": str(getattr(analysis, "action", "medium")),
+                "shot": str(getattr(analysis, "shot", "medium")),
+                "tags": list(getattr(analysis, "tags", [])),
+                "caption": getattr(analysis, "caption", ""),
+                "objects": list(getattr(analysis, "objects", [])),
+                "mood": getattr(analysis, "mood", "neutral"),
+                "setting": getattr(analysis, "setting", "unknown"),
+            }
+
+        # Normalize action/shot to string values
+        action_str = data.get("action", "medium")
+        if hasattr(action_str, "value"):
+            action_str = action_str.value
+        shot_str = data.get("shot", "medium")
+        if hasattr(shot_str, "value"):
+            shot_str = shot_str.value
+
+        entry = SemanticAnalysisEntry(
+            version=CACHE_VERSION,
+            file_hash=CacheEntry.compute_file_hash(video_path),
+            computed_at=datetime.now().isoformat(),
+            time_point=float(time_point),
+            quality=data.get("quality", "YES"),
+            description=data.get("description", ""),
+            action=str(action_str),
+            shot=str(shot_str),
+            tags=list(data.get("tags", [])),
+            caption=data.get("caption", ""),
+            objects=list(data.get("objects", [])),
+            mood=data.get("mood", "neutral"),
+            setting=data.get("setting", "unknown"),
+            caption_embedding=data.get("caption_embedding"),
+        )
+
+        cache_path = self._semantic_cache_path(video_path, time_point)
+        success = self._write_cache(cache_path, asdict(entry))
+
+        if success:
+            logger.debug(f"Cached semantic analysis: {os.path.basename(video_path)} @ {time_point:.1f}s")
+
+        return success
+
+    def clear_semantic_cache(self, video_path: str, time_point: Optional[float] = None) -> bool:
+        """
+        Remove cached semantic analysis.
+
+        Args:
+            video_path: Path to the video file
+            time_point: Specific time point, or None to clear all
+
+        Returns:
+            True if any cache was cleared
+        """
+        if time_point is not None:
+            cache_path = self._semantic_cache_path(video_path, time_point)
+            try:
+                if cache_path.exists():
+                    cache_path.unlink()
+                    return True
+            except OSError:
+                pass
+            return False
+
+        # Clear all semantic caches for this video
+        cleared = False
+        try:
+            video_dir = Path(video_path).parent
+            video_name = Path(video_path).name
+            for cache_file in video_dir.glob(f"{video_name}.semantic_*.json"):
+                try:
+                    cache_file.unlink()
+                    cleared = True
+                except OSError:
+                    pass
+        except OSError:
+            pass
+        return cleared
+
+    # -------------------------------------------------------------------------
     # Cache Management
     # -------------------------------------------------------------------------
 
@@ -408,6 +596,7 @@ __all__ = [
     "AnalysisCache",
     "AudioAnalysisEntry",
     "SceneAnalysisEntry",
+    "SemanticAnalysisEntry",
     "CacheEntry",
     "get_analysis_cache",
     "reset_cache",

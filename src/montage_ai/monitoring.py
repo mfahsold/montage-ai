@@ -87,6 +87,12 @@ class Monitor:
         if self._mem_interval <= 0:
             return
 
+        # Import here to avoid potential circular imports
+        try:
+            from .cgpu_utils import get_cgpu_metrics
+        except ImportError:
+            get_cgpu_metrics = lambda: None
+
         def _loop():
             proc = psutil.Process()
             while True:
@@ -94,10 +100,18 @@ class Monitor:
                     rss = proc.memory_info().rss / (1024 * 1024)
                     vms = proc.memory_info().vms / (1024 * 1024)
                     virt = psutil.virtual_memory()
-                    print(f"[monitor] mem: rss={rss:.1f}Mi vms={vms:.1f}Mi "
-                          f"sys_used={virt.used/1024/1024:.1f}Mi "
-                          f"sys_free={virt.available/1024/1024:.1f}Mi "
-                          f"sys_pct={virt.percent:.1f}%")
+                    
+                    msg = (f"[monitor] mem: rss={rss:.1f}Mi vms={vms:.1f}Mi "
+                           f"sys_used={virt.used/1024/1024:.1f}Mi "
+                           f"sys_free={virt.available/1024/1024:.1f}Mi "
+                           f"sys_pct={virt.percent:.1f}%")
+                    
+                    # Add cgpu metrics if available
+                    cgpu_stats = get_cgpu_metrics()
+                    if cgpu_stats:
+                        msg += f" | {cgpu_stats}"
+                        
+                    print(msg)
                 except Exception:
                     pass
                 time.sleep(self._mem_interval)
