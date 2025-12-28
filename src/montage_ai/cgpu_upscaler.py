@@ -35,6 +35,7 @@ import shutil
 import tempfile
 import time
 import base64
+import uuid
 from typing import Optional, Tuple
 from pathlib import Path
 
@@ -48,7 +49,7 @@ from .cgpu_utils import (
     cgpu_download_base64,
 )
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 
 # Configuration from shared utils
 _cgpu_config = CGPUConfig()
@@ -196,8 +197,13 @@ echo "ENV_READY"
         else:
             print(f"   ♻️ Reusing Colab environment")
         
-        # 2. Upload video directly (much smaller than PNG frames!)
-        remote_video = f"{REMOTE_WORK_DIR}/input.mp4"
+        # 2. Create unique job directory to prevent race conditions
+        job_id = str(uuid.uuid4())[:8]
+        job_dir = f"{REMOTE_WORK_DIR}/{job_id}"
+        _run_cgpu_command(f"mkdir -p {job_dir}")
+        
+        # 3. Upload video directly (much smaller than PNG frames!)
+        remote_video = f"{job_dir}/input.mp4"
         print(f"   ⬆️ Uploading video ({input_size_mb:.1f} MB)...")
 
         # Dynamic timeout: 1 min per 10MB, minimum 10 min
@@ -291,8 +297,8 @@ print("=" * 60)
 start = time.time()
 
 # Create work dirs
-os.makedirs("{REMOTE_WORK_DIR}/frames", exist_ok=True)
-os.makedirs("{REMOTE_WORK_DIR}/upscaled", exist_ok=True)
+os.makedirs("{job_dir}/frames", exist_ok=True)
+os.makedirs("{job_dir}/upscaled", exist_ok=True)
 
 # Get FPS
 fps_cmd = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", 
@@ -306,8 +312,8 @@ print(f"FPS: {{fps}}")
 print("Extracting frames...")
 extract_start = time.time()
 subprocess.run(["ffmpeg", "-y", "-i", "{remote_video}", "-q:v", "2", 
-    "{REMOTE_WORK_DIR}/frames/f%06d.jpg"], check=True, capture_output=True)
-frames = sorted(glob.glob("{REMOTE_WORK_DIR}/frames/*.jpg"))
+    "{job_dir}/frames/f%06d.jpg"], check=True, capture_output=True)
+frames = sorted(glob.glob("{job_dir}/frames/*.jpg"))
 print(f"Frames: {{len(frames)}} (extracted in {{time.time()-extract_start:.1f}}s)")
 
 # Check frame resolution
@@ -364,22 +370,22 @@ print(f"Upscaling complete: {{len(frames)}} frames in {{total_upscale_time:.1f}}
 print("Encoding output...")
 encode_start = time.time()
 subprocess.run(["ffmpeg", "-y", "-framerate", str(fps), 
-    "-i", "{REMOTE_WORK_DIR}/upscaled/f%06d.jpg",
+    "-i", "{job_dir}/upscaled/f%06d.jpg",
     "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
-    "{REMOTE_WORK_DIR}/output.mp4"], check=True, capture_output=True)
+    "{job_dir}/output.mp4"], check=True, capture_output=True)
 print(f"Encoding done in {{time.time()-encode_start:.1f}}s")
 
 # Add audio back if exists
-subprocess.run(["ffmpeg", "-y", "-i", "{REMOTE_WORK_DIR}/output.mp4", "-i", "{remote_video}",
+subprocess.run(["ffmpeg", "-y", "-i", "{job_dir}/output.mp4", "-i", "{remote_video}",
     "-c:v", "copy", "-c:a", "aac", "-map", "0:v", "-map", "1:a?", "-shortest",
-    "{REMOTE_WORK_DIR}/final.mp4"], capture_output=True)
+    "{job_dir}/final.mp4"], capture_output=True)
 
 # Check which output exists
-if os.path.exists("{REMOTE_WORK_DIR}/final.mp4"):
-    os.rename("{REMOTE_WORK_DIR}/final.mp4", "{REMOTE_WORK_DIR}/output.mp4")
+if os.path.exists("{job_dir}/final.mp4"):
+    os.rename("{job_dir}/final.mp4", "{job_dir}/output.mp4")
 
 elapsed = time.time() - start
-size = os.path.getsize("{REMOTE_WORK_DIR}/output.mp4") / 1024 / 1024
+size = os.path.getsize("{job_dir}/output.mp4") / 1024 / 1024
 print("=" * 60)
 print(f"COMPLETE: {{len(frames)}} frames upscaled in {{elapsed:.1f}}s")
 print(f"Output: {{size:.1f}}MB")
@@ -389,7 +395,7 @@ print("PIPELINE_SUCCESS")
 '''
 
         # === IMPROVED: Upload script as file for better reliability ===
-        remote_script_path = f"{REMOTE_WORK_DIR}/upscale_pipeline.py"
+        remote_script_path = f"{job_dir}/upscale_pipeline.py"
 
         # Write script to local temp file
         import tempfile
@@ -492,7 +498,7 @@ print("PIPELINE_SUCCESS")
         
         # Get output size first
         size_success, size_out, _ = _run_cgpu_command(
-            f"stat -c%s {REMOTE_WORK_DIR}/output.mp4",
+            f"stat -c%s {job_dir}/output.mp4",
             timeout=30
         )
         if size_success:
@@ -501,7 +507,7 @@ print("PIPELINE_SUCCESS")
         
         # Download via base64
         dl_success, b64_data, stderr = _run_cgpu_command(
-            f"base64 {REMOTE_WORK_DIR}/output.mp4",
+            f"base64 {job_dir}/output.mp4",
             timeout=600  # 10 min for large files
         )
         
@@ -521,6 +527,10 @@ print("PIPELINE_SUCCESS")
         
         final_size_mb = os.path.getsize(output_path) / (1024 * 1024)
         print(f"   ✅ cgpu upscaling complete: {final_size_mb:.1f} MB")
+        
+        # Cleanup remote job directory
+        _run_cgpu_command(f"rm -rf {job_dir}", timeout=30)
+        
         return output_path
         
     except Exception as e:
@@ -528,6 +538,10 @@ print("PIPELINE_SUCCESS")
         import traceback
         traceback.print_exc()
         return None
+    finally:
+        # Ensure cleanup happens even on error (best effort)
+        if 'job_dir' in locals():
+             _run_cgpu_command(f"rm -rf {job_dir}", timeout=30)
 
 
 def _upscale_via_base64_upload(
