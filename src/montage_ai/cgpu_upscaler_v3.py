@@ -393,7 +393,7 @@ def _download_result(remote_path: str, local_path: str) -> bool:
     
     try:
         file_size = int(size_out.strip().split()[-1])
-    except:
+    except (ValueError, IndexError):
         file_size = 0
     
     file_size_mb = file_size / (1024 * 1024)

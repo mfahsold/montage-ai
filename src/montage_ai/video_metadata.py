@@ -539,30 +539,6 @@ def build_ffmpeg_params(crf: Optional[int] = None) -> List[str]:
 
 
 # =============================================================================
-# Legacy Compatibility Functions
-# =============================================================================
-
-def ffprobe_video_metadata(video_path: str) -> Optional[Dict[str, Any]]:
-    """
-    Legacy function returning dictionary instead of VideoMetadata.
-
-    For backward compatibility with existing code.
-    """
-    metadata = probe_metadata(video_path)
-    return metadata.to_dict() if metadata else None
-
-
-def determine_output_profile_legacy(video_files: List[str]) -> Dict[str, Any]:
-    """
-    Legacy function returning dictionary instead of OutputProfile.
-
-    For backward compatibility with existing code.
-    """
-    profile = determine_output_profile(video_files)
-    return profile.to_dict()
-
-
-# =============================================================================
 # Module Exports
 # =============================================================================
 
@@ -584,7 +560,4 @@ __all__ = [
     "_snap_aspect_ratio",
     "_snap_resolution",
     "_normalize_codec_name",
-    # Legacy compatibility
-    "ffprobe_video_metadata",
-    "determine_output_profile_legacy",
 ]

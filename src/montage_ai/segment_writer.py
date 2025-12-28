@@ -400,8 +400,8 @@ class SegmentWriter:
             for clip in clips:
                 try:
                     clip.close()
-                except:
-                    pass
+                except Exception:
+                    pass  # Ignore cleanup errors during memory release
             
             # Create segment info
             segment_info = SegmentInfo(
@@ -1093,8 +1093,8 @@ class ProgressiveRenderer:
             # Close MoviePy clip to free memory
             try:
                 clip.close()
-            except:
-                pass
+            except Exception:
+                pass  # Ignore cleanup errors during memory release
             
             # Add the file path
             return self.add_clip_path(temp_path)
@@ -1186,8 +1186,8 @@ class ProgressiveRenderer:
                     # Remove original, use normalized
                     try:
                         os.remove(clip_path)
-                    except:
-                        pass
+                    except OSError:
+                        pass  # Ignore file removal errors
                     normalized_paths.append(normalized_path)
                 else:
                     # Keep original on failure

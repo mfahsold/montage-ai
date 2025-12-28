@@ -37,8 +37,8 @@ body {
     padding-bottom: 4rem;
 }
 
-/* Scanline Overlay */
-body::after {
+/* Scanline Overlay - DISABLED for better readability */
+/* body::after {
     content: "";
     position: fixed;
     top: 0;
@@ -55,7 +55,7 @@ body::after {
     background-size: 100% 4px;
     pointer-events: none;
     z-index: 9999;
-}
+} */
 
 .container {
     max-width: 1000px;
@@ -398,3 +398,43 @@ input[type=range]::-webkit-slider-runnable-track {
 .hidden { display: none; }
 .mt-4 { margin-top: 1rem; }
 .text-center { text-align: center; }
+
+/* Onboarding / Steps Grid */
+.steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-top: 1.5rem;
+}
+
+.step-item {
+    background: rgba(0, 0, 0, 0.03);
+    padding: 1.5rem;
+    border: 1px solid var(--muted);
+    position: relative;
+}
+
+.step-number {
+    font-family: 'Inter', sans-serif;
+    font-weight: 900;
+    font-size: 2rem;
+    color: var(--muted);
+    opacity: 0.5;
+    margin-bottom: 0.5rem;
+}
+
+.step-item h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: var(--fg);
+}
+
+.step-item p {
+    font-size: 0.9rem;
+    color: #555;
+    line-height: 1.4;
+}
+
+.info-card {
+    border-left: 4px solid var(--primary);
+}

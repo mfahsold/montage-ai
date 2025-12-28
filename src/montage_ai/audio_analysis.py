@@ -293,30 +293,6 @@ def analyze_audio(audio_path: str, verbose: Optional[bool] = None) -> Tuple[Beat
 
 
 # =============================================================================
-# Legacy Compatibility
-# =============================================================================
-
-def get_beat_times_legacy(audio_path: str) -> Tuple[np.ndarray, float]:
-    """
-    Legacy interface returning (beat_times, tempo) tuple.
-
-    For backward compatibility with existing code.
-    """
-    info = get_beat_times(audio_path)
-    return info.beat_times, info.tempo
-
-
-def analyze_music_energy_legacy(audio_path: str) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Legacy interface returning (times, rms) tuple.
-
-    For backward compatibility with existing code.
-    """
-    profile = analyze_music_energy(audio_path)
-    return profile.times, profile.rms
-
-
-# =============================================================================
 # Module Exports
 # =============================================================================
 
@@ -329,7 +305,4 @@ __all__ = [
     "analyze_music_energy",
     "get_beat_times",
     "calculate_dynamic_cut_length",
-    # Legacy compatibility
-    "get_beat_times_legacy",
-    "analyze_music_energy_legacy",
 ]

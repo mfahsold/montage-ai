@@ -24,6 +24,7 @@ import numpy as np
 from datetime import datetime
 
 from .config import settings
+from .logger import logger
 
 # Disable TQDM progress bars globally - they create chaotic output when mixed with logs
 # This affects librosa, moviepy, and any other library using tqdm
@@ -60,7 +61,7 @@ try:
     from .style_templates import get_style_template, list_available_styles
     CREATIVE_DIRECTOR_AVAILABLE = True
 except ImportError:
-    print("⚠️ Creative Director not available (missing creative_director.py)")
+    logger.warning("Creative Director not available (missing creative_director.py)")
     CREATIVE_DIRECTOR_AVAILABLE = False
 
 # Import Intelligent Clip Selector for ML-enhanced selection
@@ -68,7 +69,7 @@ try:
     from .clip_selector import IntelligentClipSelector, ClipCandidate
     INTELLIGENT_SELECTOR_AVAILABLE = True
 except ImportError:
-    print("⚠️ Intelligent Clip Selector not available")
+    logger.warning("Intelligent Clip Selector not available")
     INTELLIGENT_SELECTOR_AVAILABLE = False
 
 # Import Footage Manager for professional clip management
@@ -82,7 +83,7 @@ try:
     COLOR_MATCHER_AVAILABLE = True
 except ImportError:
     COLOR_MATCHER_AVAILABLE = False
-    print("⚠️ color-matcher not available - shot matching disabled")
+    logger.debug("color-matcher not available - shot matching disabled")
 
 # Import Memory Management modules
 try:
@@ -90,7 +91,7 @@ try:
     MEMORY_MONITOR_AVAILABLE = True
 except ImportError:
     MEMORY_MONITOR_AVAILABLE = False
-    print("⚠️ Memory monitor not available")
+    logger.debug("Memory monitor not available")
 
 # Import Metadata Cache for pre-computed scene analysis
 try:
@@ -98,7 +99,7 @@ try:
     METADATA_CACHE_AVAILABLE = True
 except ImportError:
     METADATA_CACHE_AVAILABLE = False
-    print("⚠️ Metadata cache not available")
+    logger.debug("Metadata cache not available")
 
 # Import Segment Writer for progressive rendering
 try:
@@ -108,7 +109,7 @@ try:
     SEGMENT_WRITER_AVAILABLE = True
 except ImportError:
     SEGMENT_WRITER_AVAILABLE = False
-    print("⚠️ Segment writer not available")
+    logger.debug("Segment writer not available")
 
 # Import centralized FFmpeg config (DRY)
 from .ffmpeg_config import (
@@ -249,14 +250,14 @@ VERSION = "0.2.0"
 def _log_startup_backends():
     """Log GPU encoding and Vision AI backend once at import."""
     if _ffmpeg_config.is_gpu_accelerated:
-        print(f"🎮 GPU Encoding: {OUTPUT_CODEC} ({_ffmpeg_config.gpu_encoder_type})")
+        logger.info(f"🎮 GPU Encoding: {OUTPUT_CODEC} ({_ffmpeg_config.gpu_encoder_type})")
     else:
-        print(f"💻 CPU Encoding: {OUTPUT_CODEC}")
+        logger.info(f"💻 CPU Encoding: {OUTPUT_CODEC}")
 
     if OPENAI_API_BASE and OPENAI_VISION_MODEL:
-        print(f"👁️  Vision AI: {OPENAI_VISION_MODEL} @ {OPENAI_API_BASE}")
+        logger.info(f"👁️  Vision AI: {OPENAI_VISION_MODEL} @ {OPENAI_API_BASE}")
     elif ENABLE_AI_FILTER:
-        print(f"👁️  Vision AI: {OLLAMA_MODEL} (Ollama fallback)")
+        logger.info(f"👁️  Vision AI: {OLLAMA_MODEL} (Ollama fallback)")
 
 # Emit startup logs
 _log_startup_backends()
@@ -352,7 +353,7 @@ try:
     from .timeline_exporter import export_timeline_from_montage
     TIMELINE_EXPORT_AVAILABLE = True
 except ImportError as exc:
-    print(f"⚠️ Timeline Exporter not available (missing timeline_exporter.py): {exc}")
+    logger.debug(f"Timeline Exporter not available: {exc}")
     TIMELINE_EXPORT_AVAILABLE = False
 
 # Import Live Monitoring System
@@ -360,7 +361,7 @@ try:
     from .monitoring import Monitor, init_monitor, get_monitor
     MONITORING_AVAILABLE = True
 except ImportError:
-    print("⚠️ Monitoring not available (missing monitoring.py)")
+    logger.debug("Monitoring not available")
     MONITORING_AVAILABLE = False
     Monitor = None
     get_monitor = lambda: None
@@ -371,7 +372,7 @@ try:
     from .footage_analyzer import DeepFootageAnalyzer, SceneAnalysis
     DEEP_ANALYSIS_AVAILABLE = True
 except ImportError as exc:
-    print(f"⚠️ Deep Footage Analyzer not available (missing footage_analyzer.py): {exc}")
+    logger.debug(f"Deep Footage Analyzer not available: {exc}")
     DEEP_ANALYSIS_AVAILABLE = False
     DeepFootageAnalyzer = None
 
@@ -382,31 +383,31 @@ DEEP_ANALYSIS = _settings.features.deep_analysis
 def detect_gpu_capabilities() -> Dict[str, Any]:
     """
     Detect available GPU/hardware acceleration capabilities.
-    
+
     Checks for:
     - Vulkan video encoding (h264_vulkan, hevc_vulkan)
     - V4L2 mem2mem encoding (ARM hardware encoders)
     - DRM devices (/dev/dri/)
-    
+
     Returns:
         Dict with 'encoder' (best encoder to use) and 'hwaccel' (decode acceleration)
     """
-    print("🔍 Detecting GPU capabilities...")
+    logger.debug("Detecting GPU capabilities...")
     capabilities = {
         'encoder': 'libx264',  # Default: CPU encoding
         'hwaccel': None,
         'available': [],
         'gpu_name': 'CPU only'
     }
-    
+
     # Check for DRI devices
     dri_path = '/dev/dri'
     if os.path.exists(dri_path):
         devices = os.listdir(dri_path)
         if 'renderD128' in devices or 'card0' in devices or 'card1' in devices:
             capabilities['available'].append('drm')
-            print(f"   ✅ DRM device found: {devices}")
-    
+            logger.debug(f"DRM device found: {devices}")
+
     # Test Vulkan encoder (experimental - often crashes on ARM)
     if USE_GPU in ['auto', 'vulkan'] and 'drm' in capabilities['available']:
         try:
@@ -420,10 +421,10 @@ def detect_gpu_capabilities() -> Dict[str, Any]:
                 capabilities['encoder'] = 'h264_vulkan'
                 capabilities['available'].append('vulkan')
                 capabilities['gpu_name'] = 'Vulkan GPU'
-                print("   ✅ Vulkan h264 encoder available")
+                logger.debug("Vulkan h264 encoder available")
         except (subprocess.TimeoutExpired, Exception) as e:
-            print(f"   ⚠️ Vulkan encoder not usable: {e}")
-    
+            logger.debug(f"Vulkan encoder not usable: {e}")
+
     # Test V4L2 encoder (common on Raspberry Pi, some ARM SoCs)
     if USE_GPU in ['auto', 'v4l2']:
         try:
@@ -436,17 +437,17 @@ def detect_gpu_capabilities() -> Dict[str, Any]:
                 capabilities['encoder'] = 'h264_v4l2m2m'
                 capabilities['available'].append('v4l2m2m')
                 capabilities['gpu_name'] = 'V4L2 Hardware Encoder'
-                print("   ✅ V4L2 mem2mem encoder available")
+                logger.debug("V4L2 mem2mem encoder available")
         except (subprocess.TimeoutExpired, Exception) as e:
             pass  # V4L2 not available, use CPU
-    
+
     # Summary
     if capabilities['encoder'] == 'libx264':
-        print(f"   ℹ️ Using CPU encoding (libx264) with {multiprocessing.cpu_count()} cores")
-        print(f"   ℹ️ Parallel enhancement: {MAX_PARALLEL_JOBS} workers")
+        logger.debug(f"Using CPU encoding (libx264) with {multiprocessing.cpu_count()} cores")
+        logger.debug(f"Parallel enhancement: {MAX_PARALLEL_JOBS} workers")
     else:
-        print(f"   ✅ Using hardware encoder: {capabilities['encoder']}")
-    
+        logger.debug(f"Using hardware encoder: {capabilities['encoder']}")
+
     return capabilities
 
 
@@ -483,8 +484,8 @@ def get_video_rotation(video_path: str) -> int:
                         rotation = int(side_data['rotation'])
                         return rotation
     except Exception as e:
-        print(f"   ⚠️ Could not get rotation metadata: {e}")
-    
+        logger.debug(f"Could not get rotation metadata: {e}")
+
     return 0
 
 
