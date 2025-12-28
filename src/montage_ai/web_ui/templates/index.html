@@ -3,253 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage AI - Self-Hosted Video Editing</title>
+    <title>Montage AI - Cyber Deck</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <!-- Header with new Logo -->
+        <!-- Header / Console Top -->
         <header>
             <div class="logo-container">
                 <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <!-- Film reel outer ring -->
-                    <circle cx="32" cy="32" r="28" stroke="url(#gradient1)" stroke-width="3" fill="none"/>
+                    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="none"/>
                     <!-- Inner film holes -->
-                    <circle cx="32" cy="14" r="4" fill="url(#gradient1)"/>
-                    <circle cx="32" cy="50" r="4" fill="url(#gradient1)"/>
-                    <circle cx="14" cy="32" r="4" fill="url(#gradient1)"/>
-                    <circle cx="50" cy="32" r="4" fill="url(#gradient1)"/>
+                    <circle cx="32" cy="14" r="4" fill="currentColor"/>
+                    <circle cx="32" cy="50" r="4" fill="currentColor"/>
+                    <circle cx="14" cy="32" r="4" fill="currentColor"/>
+                    <circle cx="50" cy="32" r="4" fill="currentColor"/>
                     <!-- AI brain/circuit in center -->
-                    <circle cx="32" cy="32" r="12" fill="url(#gradient2)"/>
-                    <path d="M26 32h4m4 0h4M32 26v4m0 4v4" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                    <circle cx="32" cy="32" r="3" fill="white"/>
-                    <!-- Sparkle accents -->
-                    <circle cx="44" cy="20" r="2" fill="#f59e0b"/>
-                    <circle cx="20" cy="44" r="1.5" fill="#8b5cf6"/>
-                    <!-- Gradient definitions -->
-                    <defs>
-                        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#3b82f6"/>
-                            <stop offset="100%" stop-color="#8b5cf6"/>
-                        </linearGradient>
-                        <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#3b82f6"/>
-                            <stop offset="50%" stop-color="#6366f1"/>
-                            <stop offset="100%" stop-color="#8b5cf6"/>
-                        </linearGradient>
-                    </defs>
+                    <rect x="24" y="24" width="16" height="16" fill="currentColor"/>
                 </svg>
                 <div class="logo-text">
                     <h1>Montage<span class="logo-ai">AI</span></h1>
-                    <p class="subtitle">Beat-synchronized video editing powered by AI</p>
+                    <p class="subtitle">// AUTOMATED_EDITING_SYSTEM // v{{ version }}</p>
                 </div>
             </div>
-            <span class="version">v{{ version }}</span>
+            <div class="version-badge">SYS.READY</div>
         </header>
 
         <!-- Upload Section -->
-        <section class="card">
-            <h2><span class="section-icon">📁</span> Upload Media</h2>
+        <section class="voxel-card">
+            <h2>01 // MEDIA_INGEST</h2>
             <div class="upload-area">
                 <div class="upload-box">
-                    <h3>📹 Videos</h3>
-                    <input type="file" id="videoUpload" accept="video/*" multiple>
-                    <label for="videoUpload" class="upload-label">
-                        Choose video files (MP4, MOV)
-                    </label>
+                    <h3>[ VIDEO_INPUT ]</h3>
+                    <input type="file" id="videoUpload" accept="video/*" multiple class="hidden">
+                    <button onclick="document.getElementById('videoUpload').click()" class="voxel-btn">Select Source Files</button>
                     <div id="videoList" class="file-list"></div>
                 </div>
                 <div class="upload-box">
-                    <h3>🎵 Music</h3>
-                    <input type="file" id="musicUpload" accept="audio/*">
-                    <label for="musicUpload" class="upload-label">
-                        Choose audio file (MP3, WAV)
-                    </label>
+                    <h3>[ AUDIO_TRACK ]</h3>
+                    <input type="file" id="musicUpload" accept="audio/*" class="hidden">
+                    <button onclick="document.getElementById('musicUpload').click()" class="voxel-btn">Select Audio Track</button>
                     <div id="musicList" class="file-list"></div>
                 </div>
             </div>
-            <button onclick="refreshFiles()" class="btn-secondary">🔄 Refresh Files</button>
+            <div class="text-center">
+                <button onclick="refreshFiles()" class="voxel-btn">⟳ REFRESH_STREAMS</button>
+            </div>
         </section>
 
         <!-- Configuration Section -->
-        <section class="card">
-            <h2><span class="section-icon">⚙️</span> Configure Montage</h2>
+        <section class="voxel-card">
+            <h2>02 // EDIT_PARAMETERS</h2>
 
             <div class="form-group">
-                <label for="style">Style Preset</label>
-                <select id="style">
-                    <option value="dynamic">🎯 Dynamic (Default)</option>
-                    <option value="hitchcock">🎬 Hitchcock (Suspense)</option>
-                    <option value="mtv">⚡ MTV (Fast Cuts)</option>
-                    <option value="action">💥 Action (Michael Bay)</option>
-                    <option value="documentary">📹 Documentary</option>
-                    <option value="minimalist">🌿 Minimalist</option>
-                    <option value="wes_anderson">🎨 Wes Anderson</option>
+                <label for="style">EDIT_STYLE_PRESET</label>
+                <select id="style" class="voxel-select">
+                    <option value="dynamic">[ DYNAMIC ] - Position-aware pacing</option>
+                    <option value="hitchcock">[ HITCHCOCK ] - Suspense / Slow Build</option>
+                    <option value="mtv">[ MTV ] - Rapid Fire Cuts</option>
+                    <option value="action">[ ACTION ] - High Energy</option>
+                    <option value="documentary">[ DOCU ] - Observational</option>
+                    <option value="minimalist">[ MINIMAL ] - Long Takes</option>
+                    <option value="wes_anderson">[ WES ] - Symmetric / Stylized</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="prompt">Creative Prompt (Optional)</label>
-                <input type="text" id="prompt" placeholder="e.g., 'Edit like a thriller with slow builds'">
-                <small>Natural language instructions for AI Director</small>
+                <label for="prompt">CREATIVE_DIRECTOR_PROMPT</label>
+                <input type="text" id="prompt" class="voxel-input" placeholder="> Enter natural language instructions...">
             </div>
 
-            <!-- Video Length Control with Presets -->
             <div class="form-group">
-                <label>⏱️ Target Video Length</label>
-                <div class="duration-presets">
-                    <button type="button" class="preset-btn" data-duration="15">15s</button>
-                    <button type="button" class="preset-btn" data-duration="30">30s</button>
-                    <button type="button" class="preset-btn active" data-duration="60">60s</button>
-                    <button type="button" class="preset-btn" data-duration="90">90s</button>
-                    <button type="button" class="preset-btn" data-duration="custom">Custom</button>
-                </div>
-                <input type="number" id="targetDuration" placeholder="60" value="60" min="10" max="600" class="duration-input">
-                <small>💡 Montage will use this many seconds of your footage set to music</small>
+                <label>TARGET_DURATION: <span id="durationValue">Auto</span></label>
+                <input type="range" id="targetDuration" min="0" max="300" step="10" value="0">
+                <small style="font-family: monospace; color: var(--primary);">0 = Auto-match music length</small>
             </div>
 
-            <!-- Music Trim Control (Simple) -->
-            <div class="form-group">
-                <label>🎵 Music Track Trimming</label>
-                <div class="music-controls">
-                    <div class="music-control-row">
-                        <label class="checkbox-label music-checkbox">
-                            <input type="checkbox" id="useFullTrack" checked>
-                            <span>Use entire music track</span>
-                        </label>
-                    </div>
-                    <div id="musicTrimSection" class="music-trim-section" style="display: none;">
-                        <div class="music-trim-inputs">
-                            <div class="music-trim-field">
-                                <label for="musicStart">Start at</label>
-                                <input type="number" id="musicStart" value="0" min="0" step="1">
-                                <span class="time-unit">seconds</span>
-                            </div>
-                            <div class="music-trim-field">
-                                <label for="musicDuration">Duration</label>
-                                <input type="number" id="musicDuration" placeholder="Match video" min="5" step="1">
-                                <span class="time-unit">seconds</span>
-                            </div>
-                        </div>
-                        <small>💡 Tip: Start at your favorite part of the song</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="options-grid">
-                <label class="checkbox-label option-card">
-                    <input type="checkbox" id="enhance" {{ 'checked' if defaults.enhance else '' }}>
-                    <span class="option-content">
-                        <span class="option-icon">✨</span>
-                        <span class="option-text">
-                            <span class="option-title">Enhance</span>
-                            <span class="option-desc">Color & Sharpness</span>
-                        </span>
-                    </span>
+            <div class="checkbox-group">
+                <label class="checkbox-item">
+                    <input type="checkbox" id="stabilize" {% if defaults.stabilize %}checked{% endif %}>
+                    <span>STABILIZE_FOOTAGE</span>
                 </label>
-                <label class="checkbox-label option-card">
-                    <input type="checkbox" id="stabilize" {{ 'checked' if defaults.stabilize else '' }}>
-                    <span class="option-content">
-                        <span class="option-icon">⚖️</span>
-                        <span class="option-text">
-                            <span class="option-title">Stabilize</span>
-                            <span class="option-desc">Smooth shaky footage</span>
-                        </span>
-                    </span>
+                <label class="checkbox-item">
+                    <input type="checkbox" id="upscale" {% if defaults.upscale %}checked{% endif %}>
+                    <span>AI_UPSCALE (4K)</span>
                 </label>
-                <label class="checkbox-label option-card">
-                    <input type="checkbox" id="upscale" {{ 'checked' if defaults.upscale else '' }}>
-                    <span class="option-content">
-                        <span class="option-icon">🔍</span>
-                        <span class="option-text">
-                            <span class="option-title">AI Upscale</span>
-                            <span class="option-desc">Higher resolution (slow)</span>
-                        </span>
-                    </span>
+                <label class="checkbox-item">
+                    <input type="checkbox" id="cgpu" {% if defaults.cgpu %}checked{% endif %}>
+                    <span>CLOUD_GPU_OFFLOAD</span>
                 </label>
-                <label class="checkbox-label option-card">
-                    <input type="checkbox" id="cgpu" {{ 'checked' if defaults.cgpu else '' }}>
-                    <span class="option-content">
-                        <span class="option-icon">☁️</span>
-                        <span class="option-text">
-                            <span class="option-title">Cloud GPU</span>
-                            <span class="option-desc">Use cgpu for processing</span>
-                        </span>
-                    </span>
-                </label>
-                <label class="checkbox-label option-card highlight">
-                    <input type="checkbox" id="llmClipSelection" {{ 'checked' if defaults.llm_clip_selection else '' }}>
-                    <span class="option-content">
-                        <span class="option-icon">🧠</span>
-                        <span class="option-text">
-                            <span class="option-title">LLM Selection</span>
-                            <span class="option-desc">AI-powered clip choices</span>
-                        </span>
-                    </span>
-                </label>
-                <label class="checkbox-label option-card">
-                    <input type="checkbox" id="exportTimeline" {{ 'checked' if defaults.export_timeline else '' }}>
-                    <span class="option-content">
-                        <span class="option-icon">📽️</span>
-                        <span class="option-text">
-                            <span class="option-title">Export Timeline</span>
-                            <span class="option-desc">OTIO/EDL for NLE</span>
-                        </span>
-                    </span>
-                </label>
-                <label class="checkbox-label option-card">
-                    <input type="checkbox" id="generateProxies">
-                    <span class="option-content">
-                        <span class="option-icon">🎞️</span>
-                        <span class="option-text">
-                            <span class="option-title">Generate Proxies</span>
-                            <span class="option-desc">Low-res editing copies</span>
-                        </span>
-                    </span>
-                </label>
-                <label class="checkbox-label option-card">
-                    <input type="checkbox" id="preserveAspect" {{ 'checked' if defaults.preserve_aspect else '' }}>
-                    <span class="option-content">
-                        <span class="option-icon">📐</span>
-                        <span class="option-text">
-                            <span class="option-title">Preserve Aspect</span>
-                            <span class="option-desc">Letterbox instead of crop</span>
-                        </span>
-                    </span>
+                <label class="checkbox-item">
+                    <input type="checkbox" id="llm_clip_selection" {% if defaults.llm_clip_selection %}checked{% endif %}>
+                    <span>LLM_SCENE_ANALYSIS</span>
                 </label>
             </div>
 
-            <button onclick="createJob()" class="btn-primary btn-large">
-                <span class="btn-icon">🚀</span>
-                Create Montage
-            </button>
+            <div class="text-center mt-4">
+                <button onclick="createJob()" class="voxel-btn primary">
+                    ▶ EXECUTE_MONTAGE_SEQUENCE
+                </button>
+            </div>
         </section>
 
-        <!-- Jobs Section -->
-        <section class="card">
-            <h2><span class="section-icon">📊</span> Jobs & Output</h2>
-            <button onclick="refreshJobs()" class="btn-secondary btn-refresh">
-                <span class="btn-icon">🔄</span> Refresh
-            </button>
-            <div id="jobsList"></div>
-        </section>
-
-        <!-- Footer -->
-        <footer>
-            <div class="footer-content">
-                <p>
-                    <span class="footer-badge">Open Source</span>
-                    <a href="https://github.com/mfahsold/montage-ai" target="_blank" rel="noopener noreferrer">GitHub</a>
-                    <span class="footer-divider">•</span>
-                    <a href="/api/status">API Status</a>
-                </p>
+        <!-- Job Status / Terminal -->
+        <section class="job-status-container">
+            <div class="job-status-header">
+                <span>> SYSTEM_MONITOR</span>
+                <span id="clock">00:00:00</span>
             </div>
-        </footer>
+            <div id="jobList" class="job-list">
+                <!-- Jobs injected here -->
+                <div class="job-item">
+                    <span>[WAITING]</span>
+                    <span>System initialized. Ready for input.</span>
+                </div>
+            </div>
+            <!-- The Unusual Element: Timeline Visualizer -->
+            <div class="timeline-viz" title="Processing Stream"></div>
+        </section>
     </div>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        // Simple clock for the terminal header
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+        }, 1000);
+    </script>
 </body>
 </html>

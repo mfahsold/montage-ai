@@ -147,6 +147,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Web UI Redesign** (`src/montage_ai/web_ui/`)
+  - Implemented "Poly-Chrome Archive" / "Cyber Deck" design system (Neo-Brutalist/Voxel style)
+  - New color palette: Plinth Grey, Vantablack, Klein Blue, Safety Orange
+  - Added "Timeline Visualizer" animation
+  - Updated all form components to "Voxel" style with hard shadows
+  - Added unit tests for Web UI options normalization and job queue (`tests/test_web_ui_options.py`)
+
 - **Dependencies Updated to Latest Versions**
   - `moviepy>=2.2.1`, `Pillow>=10.0.0,<12.0` (moviepy 2.2.x constraint)
   - `opencv-python-headless>=4.12.0.88`, `scenedetect>=0.6.7.1`
