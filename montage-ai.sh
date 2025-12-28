@@ -199,6 +199,7 @@ run_montage() {
         -e NUM_VARIANTS="$VARIANTS" \
         -e CGPU_ENABLED="$CGPU_ENABLED" \
         -e CGPU_PORT="${CGPU_PORT:-8090}" \
+        -e CGPU_MODEL="${CGPU_MODEL:-gemini-2.0-flash-exp}" \
         -e CGPU_GPU_ENABLED="$CGPU_GPU_ENABLED" \
         montage-ai
 }

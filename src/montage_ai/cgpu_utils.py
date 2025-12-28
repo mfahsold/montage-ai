@@ -12,8 +12,7 @@ Features:
 
 Used by:
 - cgpu_upscaler.py (Real-ESRGAN)
-- wan_vace.py (Wan2.1 video generation)
-- open_sora.py (Open-Sora video generation)
+- transcriber.py (Whisper transcription)
 - video_agent.py (VQA on cloud if needed)
 """
 

@@ -8,6 +8,7 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-dev}
     image: montage-ai:latest
     container_name: montage-ai
+    network_mode: host
     # === RESOURCE LIMITS (IMPORTANT for stability) ===
     # Uncomment and adjust based on your system:
     # - For 32GB RAM system: mem_limit: 24g (leaves 8GB for OS)

@@ -165,63 +165,76 @@ async function createJob() {
     }
 }
 
-async function generateBroll() {
-    const prompt = document.getElementById('genPrompt').value;
-    const statusDiv = document.getElementById('genStatus');
-    
-    if (!prompt) {
-        alert('Please enter a prompt for generation');
+// =============================================================================
+// B-Roll Planning (Semantic Search)
+// =============================================================================
+
+async function analyzeFoootage() {
+    const resultsDiv = document.getElementById('brollResults');
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '> ANALYZING_FOOTAGE...';
+
+    try {
+        const response = await fetch(`${API_BASE}/broll/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            resultsDiv.innerHTML = `> ANALYZED ${result.analyzed} FILES<br>` +
+                `> MEMORY: ${result.memory_stats?.temporal_entries || 0} segments indexed`;
+            resultsDiv.style.color = 'var(--primary)';
+        } else {
+            resultsDiv.innerHTML = `> ERROR: ${result.error}`;
+            resultsDiv.style.color = 'var(--warning)';
+        }
+    } catch (error) {
+        resultsDiv.innerHTML = `> ERROR: ${error.message}`;
+        resultsDiv.style.color = 'var(--warning)';
+    }
+}
+
+async function searchBroll() {
+    const query = document.getElementById('brollQuery').value.trim();
+    const resultsDiv = document.getElementById('brollResults');
+
+    if (!query) {
+        alert('Enter a search query');
         return;
     }
 
-    try {
-        const btn = document.querySelector('.voxel-btn.secondary');
-        btn.innerText = '⚡ GENERATING... (PLEASE WAIT)';
-        btn.disabled = true;
-        
-        // Show status
-        statusDiv.style.display = 'block';
-        statusDiv.innerHTML = `> INITIATING_GENERATION_SEQUENCE...<br>> PROMPT: "${prompt}"<br>> STATUS: WAITING_FOR_GPU...`;
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = `> SEARCHING: "${query}"...`;
 
-        const response = await fetch(`${API_BASE}/generate_broll`, {
+    try {
+        const response = await fetch(`${API_BASE}/broll/suggest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
+            body: JSON.stringify({ query, top_k: 5 })
         });
-        
+
         const result = await response.json();
-        
-        if (response.ok) {
-            statusDiv.innerHTML += `<br>> SUCCESS: ASSET_CREATED [${result.file}]`;
-            statusDiv.style.borderColor = 'var(--primary)';
-            statusDiv.style.color = 'var(--primary)';
-            
-            refreshFiles(); // Refresh file list to show new clip
-            document.getElementById('genPrompt').value = '';
-            
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                statusDiv.style.display = 'none';
-                statusDiv.style.borderColor = 'var(--text-dim)';
-                statusDiv.style.color = 'var(--accent)';
-            }, 5000);
+
+        if (response.ok && result.suggestions?.length > 0) {
+            resultsDiv.innerHTML = `> FOUND ${result.count} MATCHES:<br>` +
+                result.suggestions.map((s, i) =>
+                    `  ${i + 1}. ${s.video_path?.split('/').pop() || 'clip'} ` +
+                    `[${s.start_time?.toFixed(1) || 0}s-${s.end_time?.toFixed(1) || 0}s] ` +
+                    `(${(s.similarity_score * 100).toFixed(0)}%)`
+                ).join('<br>');
+            resultsDiv.style.color = 'var(--primary)';
+        } else if (response.ok) {
+            resultsDiv.innerHTML = '> NO MATCHES FOUND. Try analyzing footage first.';
+            resultsDiv.style.color = 'var(--text-dim)';
         } else {
-            statusDiv.innerHTML += `<br>> ERROR: ${result.error}`;
-            if (result.details) statusDiv.innerHTML += `<br>> DETAILS: ${result.details}`;
-            statusDiv.style.borderColor = 'var(--warning)';
-            statusDiv.style.color = 'var(--warning)';
+            resultsDiv.innerHTML = `> ERROR: ${result.error}`;
+            resultsDiv.style.color = 'var(--warning)';
         }
     } catch (error) {
-        console.error('Generation error:', error);
-        statusDiv.innerHTML += `<br>> CRITICAL_FAILURE: ${error.message}`;
-        statusDiv.style.borderColor = 'var(--warning)';
-        statusDiv.style.color = 'var(--warning)';
-    } finally {
-        const btn = document.querySelector('.voxel-btn.secondary');
-        if (btn) {
-            btn.innerText = '⚡ GENERATE_RAW_ASSET';
-            btn.disabled = false;
-        }
+        resultsDiv.innerHTML = `> ERROR: ${error.message}`;
+        resultsDiv.style.color = 'var(--warning)';
     }
 }
 

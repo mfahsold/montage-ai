@@ -17,13 +17,12 @@ from collections import deque
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
-# Import Wan2.1 Service
+# B-Roll Planning (semantic clip search via video_agent)
 try:
-    from ..wan_vace import WanVACEService
-    WAN_AVAILABLE = True
+    from ..video_agent import create_video_agent
+    VIDEO_AGENT_AVAILABLE = True
 except ImportError:
-    WAN_AVAILABLE = False
-    print("⚠️ Wan2.1 Service not available")
+    VIDEO_AGENT_AVAILABLE = False
 
 
 def get_version() -> str:
@@ -585,47 +584,71 @@ def api_get_job_decisions(job_id):
         return jsonify({"error": f"Failed to read decisions: {str(e)}"}), 500
 
 
-@app.route('/api/generate_broll', methods=['POST'])
-def api_generate_broll():
-    """Generate a B-roll clip using Wan2.1 via cgpu."""
-    if not WAN_AVAILABLE:
-        return jsonify({"error": "Wan2.1 Service not available (missing dependencies?)"}), 500
+@app.route('/api/broll/suggest', methods=['POST'])
+def api_suggest_broll():
+    """Suggest B-roll clips based on script/keywords (semantic search).
+
+    DRY: Reuses video_agent.caption_retrieval() for semantic matching.
+    KISS: Simple query → results, no complex state.
+    """
+    if not VIDEO_AGENT_AVAILABLE:
+        return jsonify({"error": "Video Agent not available"}), 500
 
     data = request.json
-    prompt = data.get('prompt')
-    
-    if not prompt:
-        return jsonify({"error": "Prompt is required"}), 400
+    query = data.get('query', '').strip()
+    top_k = min(int(data.get('top_k', 5)), 20)  # Cap at 20
 
-    # Generate unique filename
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_prompt = secure_filename(prompt)[:30]
-    output_filename = f"gen_{timestamp}_{safe_prompt}.mp4"
-    output_path = INPUT_DIR / output_filename
+    if not query:
+        return jsonify({"error": "Query is required"}), 400
 
     try:
-        # Initialize service
-        service = WanVACEService()
-        
-        # Generate (blocking)
-        # Note: generate_broll returns the path to the generated file
-        generated_path = service.generate_broll(
-            prompt=prompt,
-            output_path=str(output_path)
-        )
+        agent = create_video_agent()
+
+        # Search for matching clips
+        results = agent.caption_retrieval(query, top_k=top_k)
 
         return jsonify({
-            "status": "success",
-            "file": output_filename,
-            "path": str(output_path)
+            "query": query,
+            "suggestions": results,
+            "count": len(results)
         })
 
     except Exception as e:
-        print(f"❌ Wan2.1 generation failed: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/broll/analyze', methods=['POST'])
+def api_analyze_footage():
+    """Analyze footage and build searchable memory (run once per session).
+
+    Processes all clips in INPUT_DIR and stores in video_agent memory.
+    """
+    if not VIDEO_AGENT_AVAILABLE:
+        return jsonify({"error": "Video Agent not available"}), 500
+
+    try:
+        agent = create_video_agent()
+
+        # Find all video files
+        video_files = list(INPUT_DIR.glob('*.mp4')) + list(INPUT_DIR.glob('*.mov'))
+
+        results = []
+        for video_path in video_files:
+            result = agent.analyze_video(str(video_path))
+            results.append({
+                "file": video_path.name,
+                "success": result.get("success", False),
+                "segments": result.get("segments_created", 0)
+            })
+
         return jsonify({
-            "error": "Generation failed",
-            "details": str(e)
-        }), 500
+            "analyzed": len(results),
+            "results": results,
+            "memory_stats": agent.get_memory_stats()
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/jobs/<job_id>/creative-instructions', methods=['GET'])

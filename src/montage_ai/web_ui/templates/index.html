@@ -55,32 +55,27 @@
             </div>
         </section>
 
-        <!-- AI Generator Section -->
+        <!-- B-Roll Planning Section -->
         <section class="voxel-card">
-            <h2>02 // GENERATE_RAW_FOOTAGE [ OPTIONAL ]</h2>
+            <h2>02 // BROLL_PLANNING [ OPTIONAL ]</h2>
             <p style="color: var(--text-dim); font-size: 0.9em; margin-bottom: 1rem; line-height: 1.4;">
-                <strong style="color: var(--accent);">> MISSING CLIPS?</strong><br>
-                Use this tool to create <em>new raw video files</em> (B-Roll).<br>
-                Generated clips are saved to your input folder and become available for the montage step below.
+                <strong style="color: var(--accent);">> FIND THE RIGHT CLIPS</strong><br>
+                Search your footage by description. AI finds matching scenes.
             </p>
             <div class="form-group">
-                <label for="genPrompt">B-ROLL_PROMPT</label>
-                <input type="text" id="genPrompt" class="voxel-input" placeholder="> Describe the clip (e.g. 'Cinematic drone shot of neon city')...">
+                <label for="brollQuery">SEARCH_QUERY</label>
+                <input type="text" id="brollQuery" class="voxel-input" placeholder="> Describe what you need (e.g. 'energetic action scene')...">
             </div>
-            <div class="form-group">
-                <small style="font-family: monospace; color: var(--warning);">
-                    ⚠️ LIMIT: Generation is limited to 3-4 seconds per clip (1.3B model).
-                    <br>
-                    ⚠️ REQUIRES: cgpu connection (Google Colab).
-                </small>
-            </div>
-            <div class="text-center">
-                <button onclick="generateBroll()" class="voxel-btn secondary">
-                    ⚡ GENERATE_RAW_ASSET
+            <div class="text-center" style="display: flex; gap: 0.5rem; justify-content: center;">
+                <button onclick="analyzeFoootage()" class="voxel-btn">
+                    ⟳ ANALYZE_FOOTAGE
+                </button>
+                <button onclick="searchBroll()" class="voxel-btn secondary">
+                    🔍 SEARCH
                 </button>
             </div>
-            <!-- Generator Status Output -->
-            <div id="genStatus" class="terminal-output" style="display: none; margin-top: 1rem; padding: 0.5rem; border: 1px dashed var(--text-dim); color: var(--accent);"></div>
+            <!-- Search Results -->
+            <div id="brollResults" class="terminal-output" style="display: none; margin-top: 1rem; padding: 0.5rem; border: 1px dashed var(--text-dim);"></div>
         </section>
 
         <!-- Configuration Section -->

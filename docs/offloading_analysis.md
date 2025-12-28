@@ -7,7 +7,7 @@ We have successfully integrated `cgpu` for **AI Upscaling (Real-ESRGAN)** and **
 | Task | Status | Implementation | Benefit |
 |------|--------|----------------|---------|
 | **AI Upscaling** | ✅ Implemented | `cgpu_upscaler.py` | Massive speedup (T4 GPU vs CPU), frees local RAM |
-| **GenAI Video** | ✅ Implemented | `wan_vace.py` | Enables 14B param models impossible to run locally |
+| **Transcription** | ✅ Implemented | `transcriber.py` | Offloads Whisper (VRAM heavy) to Cloud GPU |
 | **LLM Director** | ⚠️ Partial | `creative_director.py` | Can use `cgpu serve` for Gemini, but currently defaults to local Ollama |
 
 ## Candidates for Future Offloading

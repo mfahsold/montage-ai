@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Video Generation Features**
+  - Removed `open_sora.py` (Open-Sora integration)
+  - Removed `wan_vace.py` (Wan2.1-VACE integration)
+  - Removed generation-related imports from `__init__.py`
+  - *Reason:* Pivoting project focus to pure AI Post-Production (Editing, Enhancement, Storytelling) rather than generation.
+
 ### Added
+- **Audio Transcription**
+  - Added `src/montage_ai/transcriber.py` for offloading Whisper transcription to cgpu
+  - Supports generating `.srt` and `.vtt` subtitles from audio files
+  - Automatically handles file upload/download and remote environment setup
 - **cgpu Stability & Offloading Analysis**
   - Added `docs/stability_report.md` detailing RAM protection and concurrency fixes
   - Added `docs/offloading_analysis.md` identifying Stabilization and Semantic Analysis as future offloading candidates
@@ -20,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test Suite**
   - Fixed `test_cgpu_integration.py` to correctly mock `wan_vace` and `cgpu_upscaler` internal calls
   - Verified cgpu fallback and error handling paths
+- **Movie Generator CLI** (`scripts/generate_movie.py`)
+  - Removed Open-Sora dependency and now fails fast with a clear deprecation message after generation removal
 
 ### Added
 

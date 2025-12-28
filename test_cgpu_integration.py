@@ -32,7 +32,6 @@ sys.modules['openai'] = MagicMock()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from montage_ai.cgpu_utils import CGPUConfig
-from montage_ai.wan_vace import WanVACEService, WanConfig
 from montage_ai.cgpu_upscaler import upscale_with_cgpu
 
 class TestCGPUIntegration(unittest.TestCase):
@@ -58,46 +57,6 @@ class TestCGPUIntegration(unittest.TestCase):
         self.mock_copy.stop()
         if 'CGPU_GPU_ENABLED' in os.environ:
             del os.environ['CGPU_GPU_ENABLED']
-
-    def test_wan_vace_generation(self):
-        """Test Wan2.1 video generation command construction"""
-        print("\nTesting Wan2.1 Video Generation...")
-        
-        # Force reload module to pick up env var
-        import importlib
-        import montage_ai.wan_vace
-        importlib.reload(montage_ai.wan_vace)
-        from montage_ai.wan_vace import WanVACEService
-        
-        service = WanVACEService()
-        
-        # Mock responses for run_cgpu_command
-        # 1. Setup environment (must return "setup complete")
-        # 2. Generation command (must return base64 output directly)
-        self.run_command.side_effect = [
-            (True, "setup complete", ""), 
-            (True, "===VIDEO_BASE64_START===\nAAAA\n===VIDEO_BASE64_END===", "")
-        ]
-        
-        # Mock cgpu_copy_to_remote (used by _run_cgpu)
-        # We need to patch it where it is imported in wan_vace.py
-        with patch('montage_ai.wan_vace.cgpu_copy_to_remote', return_value=True):
-            with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp:
-                result = service.generate_broll(
-                    prompt="A cinematic drone shot of a futuristic city",
-                    output_path=tmp.name
-                )
-                
-                # Verify commands
-                # Both setup and generation run via _run_cgpu which calls "python /tmp/wan_script.py"
-                # We expect 2 calls to run_cgpu_command
-                self.assertEqual(self.run_command.call_count, 2, "Should call run_cgpu_command twice (setup + generate)")
-                
-                # Verify the command used
-                for args, _ in self.run_command.call_args_list:
-                    self.assertIn("python /tmp/wan_script.py", args[0])
-                
-                print("✓ Wan2.1 generation flow verified")
 
     def test_upscale_with_cgpu(self):
         """Test cgpu upscaling flow"""
