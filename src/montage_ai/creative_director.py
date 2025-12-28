@@ -189,21 +189,23 @@ class CreativeDirector:
         self.ollama_model = model
         self.timeout = timeout
         
-        # Determine backend priority: OpenAI-compatible > Google AI > cgpu > Ollama
+        # Determine backend priority: OpenAI-compatible > cgpu > Google AI > Ollama
         if use_openai_api is None:
             self.use_openai_api = bool(OPENAI_API_BASE and OPENAI_MODEL)
         else:
             self.use_openai_api = use_openai_api
+
+        if use_cgpu is None:
+            # Prioritize cgpu if enabled, even if Google API key is present
+            self.use_cgpu = CGPU_ENABLED and OPENAI_AVAILABLE and not self.use_openai_api
+        else:
+            self.use_cgpu = use_cgpu and OPENAI_AVAILABLE and not self.use_openai_api
             
         if use_google_ai is None:
-            self.use_google_ai = bool(GOOGLE_API_KEY) and not self.use_openai_api
+            # Only use Google AI if cgpu is NOT enabled
+            self.use_google_ai = bool(GOOGLE_API_KEY) and not self.use_openai_api and not self.use_cgpu
         else:
-            self.use_google_ai = use_google_ai and not self.use_openai_api
-            
-        if use_cgpu is None:
-            self.use_cgpu = CGPU_ENABLED and OPENAI_AVAILABLE and not self.use_google_ai and not self.use_openai_api
-        else:
-            self.use_cgpu = use_cgpu and OPENAI_AVAILABLE and not self.use_google_ai and not self.use_openai_api
+            self.use_google_ai = use_google_ai and not self.use_openai_api and not self.use_cgpu
         
         # Log backend selection
         if self.use_openai_api:

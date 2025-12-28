@@ -79,6 +79,20 @@ run_web() {
     docker compose -f docker-compose.web.yml up "$@"
 }
 
+run_script() {
+    local SCRIPT="$1"
+    shift
+    echo "🚀 Running script: $SCRIPT"
+    docker compose run --rm \
+        --entrypoint "" \
+        -v "$(pwd)/scripts:/app/scripts" \
+        -v "$(pwd)/src:/app/src" \
+        -e PYTHONPATH=/app/src \
+        -e CGPU_ENABLED="true" \
+        -e CGPU_GPU_ENABLED="true" \
+        montage-ai python3 "$SCRIPT" "$@"
+}
+
 # cgpu management functions
 cgpu_start() {
     if [ -f "$CGPU_PID_FILE" ] && kill -0 "$(cat "$CGPU_PID_FILE")" 2>/dev/null; then
@@ -95,7 +109,8 @@ cgpu_start() {
     echo "🚀 Starting cgpu serve..."
     PORT=${CGPU_PORT:-8090}
     # Bind to 0.0.0.0 to allow access from Docker containers
-    cgpu serve --host 0.0.0.0 --port "$PORT" &
+    # Unset GOOGLE_API_KEY to avoid conflict with GEMINI_API_KEY in gemini-cli
+    (unset GOOGLE_API_KEY; exec cgpu serve --host 0.0.0.0 --port "$PORT") &
     echo $! > "$CGPU_PID_FILE"
     sleep 2
     
@@ -171,6 +186,9 @@ run_montage() {
     # Auto-start cgpu serve if cgpu is enabled
     if [ "$CGPU_ENABLED" = "true" ]; then
         cgpu_start || echo "⚠️ Continuing without cgpu..."
+        # Unset GOOGLE_API_KEY to avoid conflict with cgpu's GEMINI_API_KEY
+        # gemini-cli throws error if both are present
+        unset GOOGLE_API_KEY
     fi
 
     docker compose run --rm \
@@ -221,6 +239,11 @@ case "${1:-run}" in
         ;;
     build)
         build_image
+        exit 0
+        ;;
+    run-script)
+        shift
+        run_script "$@"
         exit 0
         ;;
     cgpu-start)

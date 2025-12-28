@@ -66,6 +66,8 @@ def is_cgpu_available() -> bool:
     # Re-read env var to ensure we have the latest value
     global CGPU_GPU_ENABLED
     CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
+    
+    print(f"DEBUG: CGPU_GPU_ENABLED={CGPU_GPU_ENABLED}")
 
     if not CGPU_GPU_ENABLED:
         return False
@@ -77,9 +79,13 @@ def is_cgpu_available() -> bool:
             text=True,
             timeout=30
         )
+        print(f"DEBUG: cgpu status returncode={result.returncode}")
+        print(f"DEBUG: cgpu status stdout={result.stdout}")
+        print(f"DEBUG: cgpu status stderr={result.stderr}")
         # Check for "Authenticated" OR if it just returns success (some versions differ)
         return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        print(f"DEBUG: cgpu status failed with {e}")
         return False
 
 

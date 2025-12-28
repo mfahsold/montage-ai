@@ -85,33 +85,41 @@ class OpenSoraConfig:
     
     @property
     def width(self) -> int:
-        """Calculate width based on resolution and aspect ratio."""
+        """Calculate width based on resolution and aspect ratio (must be divisible by 8)."""
         base = 256 if self.resolution == OpenSoraResolution.LOW else 512
         
         if self.aspect_ratio == OpenSoraAspectRatio.SQUARE:
-            return base
+            w = base
         elif self.aspect_ratio == OpenSoraAspectRatio.LANDSCAPE:
-            return int(base * 16 / 9)
+            w = int(base * 16 / 9)
         elif self.aspect_ratio == OpenSoraAspectRatio.PORTRAIT:
-            return int(base * 9 / 16)
+            w = int(base * 9 / 16)
         elif self.aspect_ratio == OpenSoraAspectRatio.WIDE:
-            return int(base * 21 / 9)
-        return base
+            w = int(base * 21 / 9)
+        else:
+            w = base
+            
+        # Ensure divisible by 8
+        return (w // 8) * 8
     
     @property
     def height(self) -> int:
-        """Calculate height based on resolution and aspect ratio."""
+        """Calculate height based on resolution and aspect ratio (must be divisible by 8)."""
         base = 256 if self.resolution == OpenSoraResolution.LOW else 512
         
         if self.aspect_ratio == OpenSoraAspectRatio.SQUARE:
-            return base
+            h = base
         elif self.aspect_ratio == OpenSoraAspectRatio.LANDSCAPE:
-            return base
+            h = base
         elif self.aspect_ratio == OpenSoraAspectRatio.PORTRAIT:
-            return int(base * 16 / 9)
+            h = int(base * 16 / 9)
         elif self.aspect_ratio == OpenSoraAspectRatio.WIDE:
-            return base
-        return base
+            h = base
+        else:
+            h = base
+            
+        # Ensure divisible by 8
+        return (h // 8) * 8
 
 
 class OpenSoraGenerator:
@@ -388,7 +396,7 @@ print("===VIDEO_BASE64_END===")
             )
             
             if not success:
-                raise RuntimeError(f"Script execution failed: {stderr}")
+                raise RuntimeError(f"Script execution failed.\nSTDOUT: {stdout}\nSTDERR: {stderr}")
             
             return stdout
             

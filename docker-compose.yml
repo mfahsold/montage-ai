@@ -17,9 +17,9 @@ services:
       resources:
         limits:
           cpus: '4'
-          memory: 8g  # Reduced from 16g to prevent OOM on ARM systems
+          memory: 12g  # Increased to 12g
         reservations:
-          memory: 2g   # Reduced from 4g
+          memory: 4g   # Increased to 4g
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -117,6 +117,4 @@ services:
     # For AMD/Intel VAAPI, add:
     devices:
       - /dev/dri:/dev/dri  # VAAPI/VA-API access for AMD/Intel GPU
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: "no"
