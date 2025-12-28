@@ -19,6 +19,12 @@ Cloud GPU (Upscaling, Transcription):
     from montage_ai.cgpu_upscaler import upscale_with_cgpu
     from montage_ai.transcriber import Transcriber
 
+Cloud GPU Jobs (Unified Pipeline):
+    from montage_ai.cgpu_jobs import CGPUJobManager, TranscribeJob, UpscaleJob, StabilizeJob
+    manager = CGPUJobManager()
+    manager.submit(StabilizeJob("video.mp4"))
+    manager.process_queue()
+
 Timeline Export:
     from montage_ai.timeline_exporter import TimelineExporter
 """
