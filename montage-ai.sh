@@ -13,6 +13,7 @@ Usage: ./montage-ai.sh [COMMAND] [OPTIONS]
 
 Commands:
   run [STYLE]     Create montage (default: dynamic)
+  web             Start Web UI
   preview         Quick preview (fast preset)
   hq              High quality render
   list            List available styles
@@ -56,6 +57,13 @@ list_styles() {
     echo "  documentary  - Natural pacing, observational"
     echo "  minimalist   - Long takes, contemplative"
     echo "  wes_anderson - Symmetrical, whimsical"
+}
+
+run_web() {
+    echo "🚀 Starting Web UI..."
+    echo "   Open http://localhost:8080 in your browser"
+    # Use --build only if image doesn't exist or explicitly requested
+    docker compose -f docker-compose.web.yml up
 }
 
 # cgpu management functions
@@ -190,6 +198,10 @@ case "${1:-run}" in
         ;;
     list)
         list_styles
+        exit 0
+        ;;
+    web)
+        run_web
         exit 0
         ;;
     build)

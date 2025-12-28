@@ -165,6 +165,45 @@ async function createJob() {
     }
 }
 
+async function generateBroll() {
+    const prompt = document.getElementById('genPrompt').value;
+    if (!prompt) {
+        alert('Please enter a prompt for generation');
+        return;
+    }
+
+    try {
+        const btn = document.querySelector('.voxel-btn.secondary');
+        const originalText = btn.innerText;
+        btn.innerText = '⚡ GENERATING...';
+        btn.disabled = true;
+
+        const response = await fetch(`${API_BASE}/generate_broll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+            refreshJobs();
+            document.querySelector('.job-status-container').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('genPrompt').value = '';
+        } else {
+            alert(`ERROR: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Generation error:', error);
+        alert('Failed to start generation');
+    } finally {
+        const btn = document.querySelector('.voxel-btn.secondary');
+        if (btn) {
+            btn.innerText = '⚡ GENERATE_CLIP';
+            btn.disabled = false;
+        }
+    }
+}
+
 // =============================================================================
 // Job Listing & Monitoring
 // =============================================================================

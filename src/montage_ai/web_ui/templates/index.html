@@ -109,6 +109,27 @@
             </div>
         </section>
 
+        <!-- AI Generator Section -->
+        <section class="voxel-card">
+            <h2>03 // AI_GENERATOR (Wan2.1)</h2>
+            <div class="form-group">
+                <label for="genPrompt">B-ROLL_PROMPT</label>
+                <input type="text" id="genPrompt" class="voxel-input" placeholder="> Describe the clip (e.g. 'Cinematic drone shot of neon city')...">
+            </div>
+            <div class="form-group">
+                <small style="font-family: monospace; color: var(--warning);">
+                    ⚠️ LIMIT: Generation is limited to 3-4 seconds per clip (1.3B model).
+                    <br>
+                    ⚠️ REQUIRES: cgpu connection (Google Colab).
+                </small>
+            </div>
+            <div class="text-center">
+                <button onclick="generateBroll()" class="voxel-btn secondary">
+                    ⚡ GENERATE_CLIP
+                </button>
+            </div>
+        </section>
+
         <!-- Job Status / Terminal -->
         <section class="job-status-container">
             <div class="job-status-header">

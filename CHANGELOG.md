@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **cgpu Stability & Offloading Analysis**
+  - Added `docs/stability_report.md` detailing RAM protection and concurrency fixes
+  - Added `docs/offloading_analysis.md` identifying Stabilization and Semantic Analysis as future offloading candidates
+  - Added `test_cgpu_integration.py` for verifying cgpu workflows with mocked remote environment
+
+### Fixed
+- **cgpu Race Conditions** (`cgpu_upscaler.py`)
+  - Implemented UUID-based remote job directories to prevent file collisions during concurrent upscaling
+  - Added robust cleanup logic for remote temporary files
+- **Test Suite**
+  - Fixed `test_cgpu_integration.py` to correctly mock `wan_vace` and `cgpu_upscaler` internal calls
+  - Verified cgpu fallback and error handling paths
+
+### Added
 
 - **OpenAI-Compatible LLM Backend** (`creative_director.py`, `editor.py`)
   - New backend for KubeAI, vLLM, LocalAI, and other OpenAI-compatible APIs

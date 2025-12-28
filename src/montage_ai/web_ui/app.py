@@ -16,6 +16,14 @@ from collections import deque
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
+# Import Wan2.1 Service
+try:
+    from ..wan_vace import WanVACEService
+    WAN_AVAILABLE = True
+except ImportError:
+    WAN_AVAILABLE = False
+    print("⚠️ Wan2.1 Service not available")
+
 
 def get_version() -> str:
     """Get version from git commit hash (short) or fallback to env/default.
