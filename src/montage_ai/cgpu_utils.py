@@ -38,7 +38,7 @@ CGPU_TIMEOUT = int(os.environ.get("CGPU_TIMEOUT", "1200"))  # 20 minutes default
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
 CGPU_PORT = os.environ.get("CGPU_PORT", "8090")  # Updated default port to match montage-ai.sh
-CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
+CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-flash-latest")
 
 
 @dataclass
@@ -63,6 +63,10 @@ def is_cgpu_available() -> bool:
     Returns:
         True if cgpu is available for cloud GPU tasks
     """
+    # Re-read env var to ensure we have the latest value
+    global CGPU_GPU_ENABLED
+    CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
+
     if not CGPU_GPU_ENABLED:
         return False
     
@@ -73,7 +77,8 @@ def is_cgpu_available() -> bool:
             text=True,
             timeout=30
         )
-        return result.returncode == 0 and "Authenticated" in result.stdout
+        # Check for "Authenticated" OR if it just returns success (some versions differ)
+        return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
 

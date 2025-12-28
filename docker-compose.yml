@@ -60,13 +60,13 @@ services:
       
       # Google AI (direct API)
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - GOOGLE_AI_MODEL=${GOOGLE_AI_MODEL:-gemini-2.0-flash}
+      - GOOGLE_AI_MODEL=${GOOGLE_AI_MODEL:-gemini-flash-latest}
       
       # cgpu Integration (Cloud GPU + Gemini LLM via cgpu serve)
       - CGPU_ENABLED=${CGPU_ENABLED:-false}
       - CGPU_HOST=${CGPU_HOST:-host.docker.internal}
       - CGPU_PORT=${CGPU_PORT:-8090}
-      - CGPU_MODEL=${CGPU_MODEL:-gemini-2.0-flash}
+      - CGPU_MODEL=${CGPU_MODEL:-gemini-flash-latest}
       - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-false}
       - CGPU_TIMEOUT=${CGPU_TIMEOUT:-1800}  # 30 min for large videos (was 600)
       

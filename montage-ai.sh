@@ -2,6 +2,14 @@
 # Montage AI - Simple CLI
 set -e
 
+# Load environment variables from .env if present
+if [ -f .env ]; then
+    # Export variables so they are available to child processes (like cgpu serve)
+    set -a
+    source .env
+    set +a
+fi
+
 # cgpu server PID tracking
 CGPU_PID_FILE="/tmp/cgpu_serve.pid"
 

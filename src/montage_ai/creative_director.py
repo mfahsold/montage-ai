@@ -43,14 +43,14 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "")  # e.g. gemma3-4b, qwen2-5-32b
 
 # Google AI (direct API)
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
-GOOGLE_AI_MODEL = os.environ.get("GOOGLE_AI_MODEL", "gemini-2.0-flash")
+GOOGLE_AI_MODEL = os.environ.get("GOOGLE_AI_MODEL", "gemini-flash-latest")
 GOOGLE_AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 
 # cgpu serve (Gemini via OpenAI Responses API)
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
 CGPU_PORT = os.environ.get("CGPU_PORT", "8090")  # Updated default port to match montage-ai.sh
-CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
+CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-flash-latest")
 
 # Ollama (local fallback)
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
@@ -512,23 +512,18 @@ class CreativeDirector:
         """
         Query cgpu/Gemini for creative direction.
         
-        Uses OpenAI Chat Completions API provided by `cgpu serve`.
+        Uses OpenAI Responses API provided by `cgpu serve`.
         """
         try:
-            # cgpu serve (Gemini) via OpenAI Chat Completions API
-            response = self.cgpu_client.chat.completions.create(
+            # cgpu serve (Gemini) via OpenAI Responses API
+            response = self.cgpu_client.responses.create(
                 model=CGPU_MODEL,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.3,
-                max_tokens=1024,
-                # response_format={"type": "json_object"} # Gemini via cgpu might not support this param yet
+                instructions=self.system_prompt,
+                input=user_prompt,
             )
             
-            if response.choices and response.choices[0].message.content:
-                content = response.choices[0].message.content
+            if hasattr(response, 'output_text') and response.output_text:
+                content = response.output_text
                 # Clean up response - Gemini sometimes wraps JSON in markdown
                 if content.startswith("```json"):
                     content = content[7:]
