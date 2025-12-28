@@ -57,7 +57,12 @@
 
         <!-- AI Generator Section -->
         <section class="voxel-card">
-            <h2>02 // AI_ASSET_GENERATOR (Wan2.1)</h2>
+            <h2>02 // GENERATE_RAW_FOOTAGE [ OPTIONAL ]</h2>
+            <p style="color: var(--text-dim); font-size: 0.9em; margin-bottom: 1rem; line-height: 1.4;">
+                <strong style="color: var(--accent);">> MISSING CLIPS?</strong><br>
+                Use this tool to create <em>new raw video files</em> (B-Roll).<br>
+                Generated clips are saved to your input folder and become available for the montage step below.
+            </p>
             <div class="form-group">
                 <label for="genPrompt">B-ROLL_PROMPT</label>
                 <input type="text" id="genPrompt" class="voxel-input" placeholder="> Describe the clip (e.g. 'Cinematic drone shot of neon city')...">
@@ -71,14 +76,19 @@
             </div>
             <div class="text-center">
                 <button onclick="generateBroll()" class="voxel-btn secondary">
-                    ⚡ GENERATE_CLIP
+                    ⚡ GENERATE_RAW_ASSET
                 </button>
             </div>
         </section>
 
         <!-- Configuration Section -->
         <section class="voxel-card">
-            <h2>03 // EDIT_PARAMETERS</h2>
+            <h2>03 // ASSEMBLE_FINAL_CUT [ MAIN PROCESS ]</h2>
+            <p style="color: var(--text-dim); font-size: 0.9em; margin-bottom: 1rem; line-height: 1.4;">
+                <strong style="color: var(--accent);">> READY TO EDIT?</strong><br>
+                This process takes <em>ALL available clips</em> (your uploads + AI generated assets)<br>
+                and edits them to the beat of the music to create the final video.
+            </p>
 
             <div class="form-group">
                 <label for="style">EDIT_STYLE_PRESET</label>
