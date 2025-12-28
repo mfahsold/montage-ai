@@ -191,9 +191,19 @@ def run_montage(job_id: str, style: str, options: dict):
     # Check memory before starting
     memory_ok, available_gb = check_memory_available()
     if not memory_ok:
+        error_msg = f"Insufficient memory (only {available_gb:.1f}GB available, need {MIN_MEMORY_GB}GB). Please try again later."
+        
+        # Write to log file so it's accessible
+        log_path = OUTPUT_DIR / f"render_{job_id}.log"
+        try:
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(error_msg + "\n")
+        except Exception:
+            pass
+
         with job_lock:
             jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = f"Insufficient memory (only {available_gb:.1f}GB available, need {MIN_MEMORY_GB}GB). Please try again later."
+            jobs[job_id]["error"] = error_msg
             jobs[job_id]["completed_at"] = datetime.now().isoformat()
         active_jobs -= 1
         return
@@ -204,7 +214,8 @@ def run_montage(job_id: str, style: str, options: dict):
 
     try:
         # Build command
-        cmd = ["python", "-m", "montage_ai.editor"]
+        import sys
+        cmd = [sys.executable, "-m", "montage_ai.editor"]
 
         # Set environment variables
         # options dict is already normalized via normalize_options() with DEFAULT_OPTIONS
@@ -229,15 +240,19 @@ def run_montage(job_id: str, style: str, options: dict):
         music_end = options.get("music_end")
         env["MUSIC_END"] = str(music_end) if music_end is not None else ""
         env["VERBOSE"] = "true"
+        env["PYTHONUNBUFFERED"] = "1"
 
         # Run montage
-        result = subprocess.run(
-            cmd,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=3600  # 1 hour max
-        )
+        log_path = OUTPUT_DIR / f"render_{job_id}.log"
+        with open(log_path, "w", encoding="utf-8") as log_file:
+            result = subprocess.run(
+                cmd,
+                env=env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=3600  # 1 hour max
+            )
 
         # Update job status
         with job_lock:
@@ -271,9 +286,15 @@ def run_montage(job_id: str, style: str, options: dict):
                     }
             else:
                 jobs[job_id]["status"] = "failed"
-                jobs[job_id]["error"] = result.stderr[-500:]  # Last 500 chars
-
-            jobs[job_id]["stdout"] = result.stdout[-1000:]  # Last 1000 chars
+                # Read last lines from log file for error message
+                try:
+                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                        f.seek(0, 2)
+                        size = f.tell()
+                        f.seek(max(0, size - 1000))
+                        jobs[job_id]["error"] = f.read()
+                except Exception:
+                    jobs[job_id]["error"] = "Check log file for details"
 
     except subprocess.TimeoutExpired:
         with job_lock:

@@ -133,11 +133,11 @@ _ffmpeg_config = get_ffmpeg_config(hwaccel=_hwaccel_setting)
 # ============================================================================
 
 # Directories
-INPUT_DIR = "/data/input"
-MUSIC_DIR = "/data/music"
-ASSETS_DIR = "/data/assets"
-OUTPUT_DIR = "/data/output"
-TEMP_DIR = "/tmp"
+INPUT_DIR = os.environ.get("INPUT_DIR", "/data/input")
+MUSIC_DIR = os.environ.get("MUSIC_DIR", "/data/music")
+ASSETS_DIR = os.environ.get("ASSETS_DIR", "/data/assets")
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/data/output")
+TEMP_DIR = os.environ.get("TEMP_DIR", "/tmp")
 
 # Job Identification (for parallel runs)
 JOB_ID = os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S"))
