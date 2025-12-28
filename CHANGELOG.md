@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Unified Cloud GPU Job Pipeline** (`src/montage_ai/cgpu_jobs/`)
+  - New `cgpu_jobs` package with abstract job architecture for all cloud GPU operations
+  - `base.py`: `CGPUJob` abstract base class with full lifecycle management
+    - Phases: prepare → setup → upload → run → download → cleanup
+    - `JobStatus` enum (PENDING, PREPARING, UPLOADING, RUNNING, DOWNLOADING, COMPLETED, FAILED)
+    - `JobResult` dataclass with success status, output path, metadata, duration
+  - `manager.py`: `CGPUJobManager` singleton for job orchestration
+    - FIFO queue with sequential processing
+    - Session persistence (setup runs once per session)
+    - Retry logic with exponential backoff
+    - Callbacks for job completion
+  - `transcribe.py`: `TranscribeJob` for Whisper audio transcription
+  - `upscale.py`: `UpscaleJob` for Real-ESRGAN video/image upscaling
+    - CUDA diagnostics and error analysis
+    - Torchvision v0.18+ compatibility patches
+    - Optimized JPEG-based frame extraction (smaller than PNG)
+    - Progress logging with ETA
+    - Session caching for multi-job efficiency
+  - `stabilize.py`: `StabilizeJob` for FFmpeg vidstab two-pass stabilization
+  - Lazy imports via `__getattr__` for minimal startup overhead
+
+- **CGPU API Endpoints** (`src/montage_ai/web_ui/app.py`)
+  - `GET /api/cgpu/status`: Check CGPU availability and GPU info
+  - `POST /api/cgpu/transcribe`: Submit Whisper transcription job
+  - `POST /api/cgpu/upscale`: Submit Real-ESRGAN upscaling job
+  - `POST /api/cgpu/stabilize`: Submit FFmpeg stabilization job
+  - `GET /api/cgpu/jobs`: List job queue status and statistics
+
+- **Market Analysis Documentation** (`docs/market_analysis.md`)
+  - Comprehensive OSS competitive analysis
+  - Comparison with VideoAgent, ShortGPT, DiffusionStudio, auto-editor
+  - Unique value propositions: Beat-sync, Cloud GPU, NLE export, Story arc
+  - Target user segments and use cases
+
+- **Implementation Roadmap** (`docs/roadmap/next_steps_q1_2025.md`)
+  - Detailed Phase 4/5 implementation plan
+  - Priority matrix for remaining tasks
+  - Architecture diagrams for legacy migration
+
+### Changed
+
+- **cgpu_upscaler.py Refactored** (762 → 165 LOC, -78%)
+  - Now a thin wrapper delegating to `UpscaleJob`
+  - Backward-compatible API preserved
+  - KISS CLI interface with clear usage
+
+- **transcriber.py Refactored** (114 → 140 LOC)
+  - Now delegates to `TranscribeJob`
+  - Added `transcribe_audio()` convenience function
+  - KISS CLI interface
+
+- **Test Suite Updated**
+  - `tests/test_cgpu_jobs.py`: 46 comprehensive tests for job module
+  - `tests/test_transcriber.py`: Updated mocks for new architecture
+  - All 64 related tests passing
+
 ### Removed
 - **Video Generation Features**
   - Removed `open_sora.py` (Open-Sora integration)

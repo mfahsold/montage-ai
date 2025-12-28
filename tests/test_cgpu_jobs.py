@@ -228,6 +228,17 @@ class TestUpscaleJob:
                 job = UpscaleJob(input_path=f.name, model=model)
                 assert job.model == model
 
+    def test_model_normalization(self):
+        """Model names are normalized correctly."""
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+            # anime keyword triggers animevideov3
+            job1 = UpscaleJob(input_path=f.name, model="anime")
+            assert job1.model == "realesr-animevideov3"
+
+            # unknown model falls back to x4plus
+            job2 = UpscaleJob(input_path=f.name, model="unknown")
+            assert job2.model == "realesrgan-x4plus"
+
     def test_output_path_auto_generated(self):
         """Output path is auto-generated with _upscaled suffix."""
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:

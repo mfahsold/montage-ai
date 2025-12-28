@@ -671,5 +671,203 @@ def api_get_creative_instructions(job_id):
     })
 
 
+# =============================================================================
+# CGPU JOB ENDPOINTS (Cloud GPU Operations)
+# =============================================================================
+
+# Lazy import to avoid circular imports and startup delays
+_cgpu_manager = None
+
+def get_cgpu_manager():
+    """Get CGPUJobManager singleton (lazy init)."""
+    global _cgpu_manager
+    if _cgpu_manager is None:
+        try:
+            from ..cgpu_jobs import CGPUJobManager
+            _cgpu_manager = CGPUJobManager()
+        except ImportError as e:
+            print(f"⚠️ CGPUJobManager not available: {e}")
+            return None
+    return _cgpu_manager
+
+
+@app.route('/api/cgpu/status', methods=['GET'])
+def api_cgpu_status():
+    """Check CGPU availability and status."""
+    try:
+        from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
+
+        available = is_cgpu_available()
+        gpu_ok, gpu_info = check_cgpu_gpu() if available else (False, "Not available")
+
+        manager = get_cgpu_manager()
+        stats = manager.stats() if manager else {}
+
+        return jsonify({
+            "available": available,
+            "gpu": {"ok": gpu_ok, "info": gpu_info},
+            "queue_size": stats.get("queue_size", 0),
+            "completed": stats.get("completed_count", 0),
+        })
+    except Exception as e:
+        return jsonify({"available": False, "error": str(e)}), 500
+
+
+@app.route('/api/cgpu/transcribe', methods=['POST'])
+def api_cgpu_transcribe():
+    """Submit transcription job to CGPU.
+
+    Request JSON:
+        { "file": "audio.wav", "model": "medium", "format": "srt" }
+    """
+    data = request.json or {}
+
+    filename = data.get('file')
+    if not filename:
+        return jsonify({"error": "Missing 'file' parameter"}), 400
+
+    # Resolve file path
+    filepath = INPUT_DIR / filename
+    if not filepath.exists():
+        return jsonify({"error": f"File not found: {filename}"}), 404
+
+    try:
+        from ..cgpu_jobs import TranscribeJob
+
+        job = TranscribeJob(
+            audio_path=str(filepath),
+            model=data.get('model', 'medium'),
+            output_format=data.get('format', 'srt'),
+            language=data.get('language'),
+        )
+
+        # Run in background thread
+        def run_job():
+            result = job.execute()
+            print(f"   Transcription {'✅' if result.success else '❌'}: {result.output_path or result.error}")
+
+        thread = threading.Thread(target=run_job, daemon=True)
+        thread.start()
+
+        return jsonify({
+            "job_id": job.job_id,
+            "status": "submitted",
+            "input": filename,
+            "model": job.model,
+            "format": job.output_format,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/cgpu/upscale', methods=['POST'])
+def api_cgpu_upscale():
+    """Submit upscaling job to CGPU.
+
+    Request JSON:
+        { "file": "video.mp4", "scale": 4, "model": "realesr-animevideov3" }
+    """
+    data = request.json or {}
+
+    filename = data.get('file')
+    if not filename:
+        return jsonify({"error": "Missing 'file' parameter"}), 400
+
+    filepath = INPUT_DIR / filename
+    if not filepath.exists():
+        return jsonify({"error": f"File not found: {filename}"}), 404
+
+    try:
+        from ..cgpu_jobs import UpscaleJob
+
+        # Output to OUTPUT_DIR
+        output_name = f"{filepath.stem}_upscaled{filepath.suffix}"
+        output_path = OUTPUT_DIR / output_name
+
+        job = UpscaleJob(
+            input_path=str(filepath),
+            output_path=str(output_path),
+            scale=int(data.get('scale', 4)),
+            model=data.get('model', 'realesr-animevideov3'),
+        )
+
+        def run_job():
+            result = job.execute()
+            print(f"   Upscale {'✅' if result.success else '❌'}: {result.output_path or result.error}")
+
+        thread = threading.Thread(target=run_job, daemon=True)
+        thread.start()
+
+        return jsonify({
+            "job_id": job.job_id,
+            "status": "submitted",
+            "input": filename,
+            "output": output_name,
+            "scale": job.scale,
+            "model": job.model,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/cgpu/stabilize', methods=['POST'])
+def api_cgpu_stabilize():
+    """Submit stabilization job to CGPU.
+
+    Request JSON:
+        { "file": "video.mp4", "smoothing": 10, "shakiness": 5 }
+    """
+    data = request.json or {}
+
+    filename = data.get('file')
+    if not filename:
+        return jsonify({"error": "Missing 'file' parameter"}), 400
+
+    filepath = INPUT_DIR / filename
+    if not filepath.exists():
+        return jsonify({"error": f"File not found: {filename}"}), 404
+
+    try:
+        from ..cgpu_jobs import StabilizeJob
+
+        output_name = f"{filepath.stem}_stabilized{filepath.suffix}"
+        output_path = OUTPUT_DIR / output_name
+
+        job = StabilizeJob(
+            video_path=str(filepath),
+            output_path=str(output_path),
+            smoothing=int(data.get('smoothing', 10)),
+            shakiness=int(data.get('shakiness', 5)),
+        )
+
+        def run_job():
+            result = job.execute()
+            print(f"   Stabilize {'✅' if result.success else '❌'}: {result.output_path or result.error}")
+
+        thread = threading.Thread(target=run_job, daemon=True)
+        thread.start()
+
+        return jsonify({
+            "job_id": job.job_id,
+            "status": "submitted",
+            "input": filename,
+            "output": output_name,
+            "smoothing": job.smoothing,
+            "shakiness": job.shakiness,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/cgpu/jobs', methods=['GET'])
+def api_cgpu_jobs():
+    """List CGPU job queue and history."""
+    manager = get_cgpu_manager()
+    if not manager:
+        return jsonify({"error": "CGPUJobManager not available"}), 503
+
+    return jsonify(manager.stats())
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
