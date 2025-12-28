@@ -176,7 +176,8 @@ def normalize_options(data: dict) -> dict:
         "llm_clip_selection": get_bool('llm_clip_selection'),
         "export_timeline": get_bool('export_timeline'),
         "generate_proxies": get_bool('generate_proxies'),
-        "cgpu": get_bool('cgpu'),
+        # Default cgpu to true if env var is set, otherwise use UI value
+        "cgpu": get_bool('cgpu') or os.environ.get("CGPU_ENABLED", "false").lower() == "true",
         "preserve_aspect": get_bool('preserve_aspect'),
         "target_duration": target_duration,
         "music_start": music_start,

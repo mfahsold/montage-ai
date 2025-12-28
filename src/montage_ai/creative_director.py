@@ -211,7 +211,8 @@ class CreativeDirector:
         elif self.use_google_ai:
             print(f"   🌐 Creative Director using Google AI ({GOOGLE_AI_MODEL})")
         elif self.use_cgpu:
-            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}/v1"
+            # cgpu serve exposes OpenAI-compatible API at root, not /v1
+            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}"
             print(f"   🌐 Creative Director using cgpu/Gemini at {cgpu_url}")
         else:
             print(f"   🏠 Creative Director using Ollama ({self.ollama_model})")
@@ -231,7 +232,8 @@ class CreativeDirector:
         # Initialize cgpu client if enabled
         self.cgpu_client = None
         if self.use_cgpu:
-            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}/v1"
+            # cgpu serve exposes OpenAI-compatible API at root, not /v1
+            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}"
             try:
                 self.cgpu_client = OpenAI(
                     base_url=cgpu_url,
