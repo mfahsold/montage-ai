@@ -186,6 +186,19 @@ header {
     color: var(--primary);
 }
 
+.btn-busy {
+    background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent);
+    background-size: 1rem 1rem;
+    animation: progress-stripes 1s linear infinite;
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+@keyframes progress-stripes {
+    from { background-position: 1rem 0; }
+    to { background-position: 0 0; }
+}
+
 .voxel-input, .voxel-select {
     width: 100%;
     padding: 0.75rem;
@@ -288,6 +301,13 @@ header {
 }
 
 .checkbox-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.75rem;
+    margin: 1.25rem 0;
+}
+
+.toggle-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 0.75rem;
@@ -508,4 +528,330 @@ input[type=range]::-webkit-slider-runnable-track {
 
 .info-card {
     border-left: 4px solid var(--primary);
+}
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    z-index: 1000;
+}
+
+.toast {
+    background: var(--card-bg);
+    border: 2px solid var(--fg);
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    animation: slide-in 0.3s ease-out;
+    min-width: 300px;
+    font-family: var(--font-body);
+}
+
+.toast.success { border-color: var(--success); color: var(--success); }
+.toast.error { border-color: var(--danger); color: var(--danger); }
+.toast.info { border-color: var(--primary); color: var(--primary); }
+.toast.warning { border-color: var(--warning); color: var(--warning); }
+
+@keyframes slide-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* =============================================================================
+   Phase 3: Enhanced Progress UI
+   ============================================================================= */
+
+/* Phase Progress Chips */
+.phase-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0.5rem 0;
+    font-size: 0.75rem;
+}
+
+.phase-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #333;
+    color: #666;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+}
+
+.phase-chip.active {
+    background: rgba(0, 255, 255, 0.15);
+    border-color: #0ff;
+    color: #0ff;
+    animation: pulse-glow 1.5s infinite;
+}
+
+.phase-chip.completed {
+    background: rgba(0, 255, 0, 0.15);
+    border-color: #0f0;
+    color: #0f0;
+}
+
+.phase-chip.pending {
+    opacity: 0.5;
+}
+
+.phase-connector {
+    width: 16px;
+    height: 2px;
+    background: #333;
+    transition: background 0.3s ease;
+}
+
+.phase-connector.active {
+    background: linear-gradient(90deg, #0f0, #0ff);
+}
+
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 4px rgba(0, 255, 255, 0.3); }
+    50% { box-shadow: 0 0 12px rgba(0, 255, 255, 0.6); }
+}
+
+/* Completion Card */
+.completion-card {
+    background: linear-gradient(135deg, rgba(0, 255, 0, 0.05), rgba(0, 200, 150, 0.08));
+    border: 2px solid var(--success);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.completion-card .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.completion-card .title {
+    color: var(--success);
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.completion-card .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.completion-card .stat-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+.completion-card .stat-label {
+    color: #888;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+}
+
+.completion-card .stat-value {
+    color: #0f0;
+    font-weight: bold;
+}
+
+.completion-card .actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.completion-card .warning-banner {
+    background: rgba(249, 115, 22, 0.15);
+    border-left: 3px solid var(--warning);
+    padding: 0.5rem 0.75rem;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--warning);
+}
+
+/* Toggle Labels with Cost/Benefit Badges */
+.toggle-badges {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.toggle-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.toggle-badge.quality {
+    background: rgba(13, 148, 136, 0.12);
+    color: var(--primary);
+}
+
+.toggle-badge.cost {
+    background: rgba(249, 115, 22, 0.12);
+    color: var(--warning);
+}
+
+.toggle-badge.info {
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748b;
+}
+
+/* Enhanced checkbox item with badges */
+.checkbox-item-enhanced {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: #f9fafb;
+    transition: all 0.2s ease;
+}
+
+.checkbox-item-enhanced:hover {
+    border-color: var(--primary);
+    background: rgba(13, 148, 136, 0.03);
+}
+
+.checkbox-item-enhanced input[type="checkbox"] {
+    margin-top: 0.15rem;
+}
+
+.checkbox-item-enhanced .toggle-content {
+    flex: 1;
+}
+
+.checkbox-item-enhanced .toggle-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--fg);
+}
+
+.checkbox-item-enhanced .toggle-desc {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.15rem;
+}
+
+/* System Status Banner */
+.system-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.system-banner.info {
+    background: rgba(13, 148, 136, 0.08);
+    border: 1px solid rgba(13, 148, 136, 0.2);
+    color: var(--primary);
+}
+
+.system-banner.warning {
+    background: rgba(249, 115, 22, 0.08);
+    border: 1px solid rgba(249, 115, 22, 0.2);
+    color: var(--warning);
+}
+
+.system-banner .icon {
+    font-size: 1.1rem;
+}
+
+/* File validation states */
+.file-item.uploading {
+    color: var(--primary);
+    animation: pulse 1s infinite;
+}
+
+.file-item.error {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.file-item.warning {
+    color: var(--warning);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* File size indicator */
+.file-size {
+    font-size: 0.75rem;
+    color: #888;
+    margin-left: 0.5rem;
+}
+
+.file-size.large {
+    color: var(--warning);
+}
+
+/* Progress bar for jobs */
+.job-progress {
+    width: 100%;
+    height: 4px;
+    background: #222;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.job-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #0ff);
+    transition: width 0.5s ease;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 640px) {
+    .phase-progress {
+        flex-wrap: wrap;
+    }
+
+    .phase-connector {
+        display: none;
+    }
+
+    .completion-card .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .completion-card .actions {
+        flex-direction: column;
+    }
+
+    .toggle-badges {
+        margin-top: 0.35rem;
+    }
 }

@@ -17,6 +17,9 @@ from collections import deque
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
+from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
+from ..editor import detect_gpu_capabilities
+
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
 
@@ -255,14 +258,37 @@ def run_montage(job_id: str, style: str, options: dict):
         # Run montage
         log_path = OUTPUT_DIR / f"render_{job_id}.log"
         with open(log_path, "w", encoding="utf-8") as log_file:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 cmd,
                 env=env,
-                stdout=log_file,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                timeout=3600  # 1 hour max
+                bufsize=1,
+                universal_newlines=True
             )
+            
+            # Stream output and track phase
+            for line in process.stdout:
+                log_file.write(line)
+                log_file.flush()
+                
+                # Parse phase from logs (e.g., "Phase 1/5: Setup")
+                if "Phase" in line and "/" in line:
+                    try:
+                        # Extract "Phase X/Y: Name"
+                        # Assuming format like: "[INFO] Phase 1/5: Setup..."
+                        parts = line.split("Phase")
+                        if len(parts) > 1:
+                            phase_text = "Phase" + parts[1].split("\n")[0]
+                            # Clean up ANSI codes if any (though text=True should handle most)
+                            with job_lock:
+                                jobs[job_id]["phase"] = phase_text.strip()
+                    except Exception:
+                        pass
+            
+            process.wait()
+            result = process
 
         # Update job status
         with job_lock:
@@ -274,6 +300,7 @@ def run_montage(job_id: str, style: str, options: dict):
             # Python warnings (like RuntimeWarning) can cause non-zero exit even on success
             if result.returncode == 0 or output_files:
                 jobs[job_id]["status"] = "completed"
+                jobs[job_id]["phase"] = "Completed"
                 jobs[job_id]["completed_at"] = datetime.now().isoformat()
 
                 if output_files:
@@ -338,6 +365,13 @@ def api_status():
     mem = psutil.virtual_memory()
     memory_ok, available_gb = check_memory_available()
 
+    # GPU/CGPU stats
+    gpu_info = detect_gpu_capabilities()
+    encoder_status = gpu_info.get("encoder", "cpu")
+    if gpu_info.get("hwaccel") != "none":
+        encoder_status = f"{gpu_info.get('hwaccel')} ({encoder_status})"
+    cgpu_ok = is_cgpu_available()
+
     return jsonify({
         "status": "ok",
         "version": VERSION,
@@ -349,7 +383,22 @@ def api_status():
             "memory_percent": mem.percent,
             "active_jobs": active_jobs,
             "queued_jobs": len(job_queue),
-            "max_concurrent_jobs": MAX_CONCURRENT_JOBS
+            "max_concurrent_jobs": MAX_CONCURRENT_JOBS,
+            # New fields for UI
+            "gpu_encoder": encoder_status,
+            "encoder": gpu_info.get("encoder", "libx264"),
+            "cgpu_available": cgpu_ok,
+            "version": VERSION
+        },
+        "defaults": {
+            "enhance": False,
+            "stabilize": False,
+            "upscale": False,
+            "cgpu": cgpu_ok,
+            "llm_clip_selection": False,
+            "export_timeline": False,
+            "generate_proxies": False,
+            "preserve_aspect": False
         }
     })
 
@@ -407,6 +456,8 @@ def api_upload():
     })
 
 
+
+
 @app.route('/api/jobs', methods=['POST'])
 def api_create_job():
     """Create new montage job with queue management."""
@@ -421,6 +472,16 @@ def api_create_job():
     # Generate job ID
     job_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # Handle Quick Preview override
+    if data.get('preset') == 'fast':
+        data['style'] = 'dynamic' # Force dynamic for speed
+        data['target_duration'] = 30 # Cap at 30s
+        # Disable heavy features
+        data['upscale'] = False
+        data['stabilize'] = False
+        data['enhance'] = False
+        data['cgpu'] = False
+
     # Normalize options (single source of truth for parsing/defaults/derivation)
     normalized_options = normalize_options(data)
     
@@ -430,6 +491,7 @@ def api_create_job():
         "style": data['style'],
         "options": normalized_options,
         "status": "queued",
+        "phase": "Initializing",
         "created_at": datetime.now().isoformat()
     }
 

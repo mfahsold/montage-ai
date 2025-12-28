@@ -1,26 +1,7 @@
-"""
-CGPU Jobs - Unified Cloud GPU Job Architecture
-
-Provides a robust, job-based interface for offloading heavy compute to cgpu.
-Each job follows the lifecycle: prepare → upload → run → download → cleanup.
-
-Usage:
-    from montage_ai.cgpu_jobs import CGPUJobManager, TranscribeJob, UpscaleJob, StabilizeJob
-
-    manager = CGPUJobManager()
-
-    # Submit jobs
-    job = TranscribeJob(audio_path="/data/audio.wav", model="medium")
-    manager.submit(job)
-
-    # Process all queued jobs
-    results = manager.process_queue()
-"""
-
 from .base import CGPUJob, JobStatus, JobResult
 from .manager import CGPUJobManager
 
-# Job implementations (lazy imports to avoid circular deps)
+# Job implementations (lazy imports to avoid heavy deps at import time)
 __all__ = [
     # Core
     "CGPUJob",
@@ -31,6 +12,9 @@ __all__ = [
     "TranscribeJob",
     "UpscaleJob",
     "StabilizeJob",
+    "SceneDetectionJob",
+    "BeatAnalysisJob",
+    "FFmpegRenderJob",
 ]
 
 
@@ -45,4 +29,13 @@ def __getattr__(name):
     elif name == "StabilizeJob":
         from .stabilize import StabilizeJob
         return StabilizeJob
+    elif name == "SceneDetectionJob":
+        from .analysis import SceneDetectionJob
+        return SceneDetectionJob
+    elif name == "BeatAnalysisJob":
+        from .analysis import BeatAnalysisJob
+        return BeatAnalysisJob
+    elif name == "FFmpegRenderJob":
+        from .render import FFmpegRenderJob
+        return FFmpegRenderJob
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

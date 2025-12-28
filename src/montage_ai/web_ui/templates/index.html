@@ -140,73 +140,19 @@
                     <div class="helper">Auto-calculates end if left blank.</div>
                 </div>
 
-                <div class="checkbox-group">
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="enhance" {% if defaults.enhance %}checked{% endif %}>
-                        <div>
-                            <strong>Enhance</strong><br>
-                            <span class="helper">Color/sharpness tweak (fast).</span>
-                        </div>
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="stabilize" {% if defaults.stabilize %}checked{% endif %}>
-                        <div>
-                            <strong>Stabilize</strong><br>
-                            <span class="helper">Reduce shake. Adds render time.</span>
-                        </div>
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="upscale" {% if defaults.upscale %}checked{% endif %}>
-                        <div>
-                            <strong>Upscale</strong><br>
-                            <span class="helper">Higher quality (slower, GPU-friendly).</span>
-                        </div>
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="cgpu" {% if defaults.cgpu %}checked{% endif %}>
-                        <div>
-                            <strong>Cloud GPU</strong><br>
-                            <span class="helper">Offload heavy steps if configured.</span>
-                        </div>
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="llm_clip_selection" {% if defaults.llm_clip_selection %}checked{% endif %}>
-                        <div>
-                            <strong>LLM Clip Selection</strong><br>
-                            <span class="helper">Semantic scene analysis.</span>
-                        </div>
-                    </label>
+                <div id="toggles-container" class="toggle-grid">
+                    <!-- Dynamically rendered by app.js -->
                 </div>
 
-                <div class="checkbox-group">
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="export_timeline" {% if defaults.export_timeline %}checked{% endif %}>
-                        <div>
-                            <strong>Export Timeline</strong><br>
-                            <span class="helper">OTIO/EDL for Resolve/Premiere.</span>
-                        </div>
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="generate_proxies" {% if defaults.generate_proxies %}checked{% endif %}>
-                        <div>
-                            <strong>Generate Proxies</strong><br>
-                            <span class="helper">Faster editing in NLEs.</span>
-                        </div>
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="preserve_aspect" {% if defaults.preserve_aspect %}checked{% endif %}>
-                        <div>
-                            <strong>Preserve Aspect</strong><br>
-                            <span class="helper">Letterbox instead of crop.</span>
-                        </div>
-                    </label>
+                <div id="run-summary" class="run-summary" style="margin-top: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.03); border-radius: 8px; font-size: 0.9rem;">
+                    <!-- Dynamic summary -->
                 </div>
 
                 <div class="text-center mt-4" style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
                     <button onclick="createJob()" class="voxel-btn primary">
                         ▶ Create Montage
                     </button>
-                    <button onclick="createJob()" class="voxel-btn">
+                    <button onclick="createJob(true)" class="voxel-btn">
                         ⚡ Quick Preview (fast preset)
                     </button>
                 </div>

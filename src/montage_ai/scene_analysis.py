@@ -29,6 +29,14 @@ from scenedetect.detectors import ContentDetector
 from .config import get_settings
 from .moviepy_compat import VideoFileClip
 
+# Import cgpu jobs for offloading
+try:
+    from .cgpu_jobs import SceneDetectionJob
+    from .cgpu_utils import is_cgpu_available
+    CGPU_AVAILABLE = True
+except ImportError:
+    CGPU_AVAILABLE = False
+
 _settings = get_settings()
 
 
@@ -194,6 +202,31 @@ class SceneDetector:
             List of Scene objects with start/end times
         """
         print(f"🎬 Detecting scenes in {os.path.basename(video_path)}...")
+
+        # Check for Cloud GPU offloading
+        if CGPU_AVAILABLE and _settings.llm.cgpu_enabled and is_cgpu_available():
+            print("   ☁️ Offloading scene detection to Cloud GPU...")
+            try:
+                job = SceneDetectionJob(input_path=video_path, threshold=self.threshold)
+                result = job.execute()
+                
+                if result.success and result.output_path:
+                    with open(result.output_path, 'r') as f:
+                        scene_data = json.load(f)
+                    
+                    scenes = []
+                    for s in scene_data:
+                        scenes.append(Scene(
+                            start=s['start'],
+                            end=s['end'],
+                            path=video_path
+                        ))
+                    print(f"   ✅ Cloud detection complete: {len(scenes)} scenes found.")
+                    return scenes
+                else:
+                    print(f"   ⚠️ Cloud detection failed: {result.error}. Falling back to local.")
+            except Exception as e:
+                print(f"   ⚠️ Cloud detection error: {e}. Falling back to local.")
 
         video = open_video(video_path)
         scene_manager = SceneManager()

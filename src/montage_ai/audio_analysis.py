@@ -16,10 +16,20 @@ import random
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 
+import json
+from pathlib import Path
 import numpy as np
 import librosa
 
 from .config import get_settings
+
+# Import cgpu jobs for offloading
+try:
+    from .cgpu_jobs import BeatAnalysisJob
+    from .cgpu_utils import is_cgpu_available
+    CGPU_AVAILABLE = True
+except ImportError:
+    CGPU_AVAILABLE = False
 
 _settings = get_settings()
 
@@ -97,6 +107,39 @@ class EnergyProfile:
 # Core Functions
 # =============================================================================
 
+def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
+    """Run audio analysis on Cloud GPU if enabled."""
+    if not (CGPU_AVAILABLE and _settings.llm.cgpu_enabled and is_cgpu_available()):
+        return None
+
+    analysis_path = Path(audio_path).with_suffix('.analysis.json')
+    
+    # Use cached result if available
+    if analysis_path.exists():
+        try:
+            with open(analysis_path, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass  # Re-run if corrupt
+
+    print(f"   ☁️ Offloading audio analysis to Cloud GPU...")
+    try:
+        job = BeatAnalysisJob(input_path=audio_path)
+        result = job.execute()
+        
+        if result.success and result.output_path:
+            with open(result.output_path, 'r') as f:
+                data = json.load(f)
+            print(f"   ✅ Cloud analysis complete.")
+            return data
+        else:
+            print(f"   ⚠️ Cloud analysis failed: {result.error}. Falling back to local.")
+    except Exception as e:
+        print(f"   ⚠️ Cloud analysis error: {e}. Falling back to local.")
+    
+    return None
+
+
 def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> EnergyProfile:
     """
     Analyze the energy envelope of an audio file.
@@ -112,6 +155,31 @@ def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> Ene
         verbose = _settings.features.verbose
 
     print(f"🎵 Analyzing energy levels of {os.path.basename(audio_path)}...")
+
+    # Try Cloud GPU first
+    cloud_data = _run_cloud_analysis(audio_path)
+    if cloud_data:
+        energy_data = cloud_data['energy']
+        rms = np.array(energy_data['rms'])
+        times = np.array(energy_data['times'])
+        
+        # Normalize energy 0-1 (if not already)
+        rms_min = np.min(rms)
+        rms_max = np.max(rms)
+        rms_normalized = (rms - rms_min) / (rms_max - rms_min + 1e-6)
+
+        profile = EnergyProfile(
+            times=times,
+            rms=rms_normalized,
+            sample_rate=cloud_data['sample_rate'],
+            hop_length=512 # Assumed default
+        )
+        
+        if verbose:
+            print(f"   📊 Energy Stats: avg={profile.avg_energy:.2f}, max={profile.max_energy:.2f}, min={profile.min_energy:.2f}")
+            print(f"   📊 High Energy (>70%): {profile.high_energy_pct:.1f}% of track")
+            
+        return profile
 
     y, sr = librosa.load(audio_path)
     hop_length = 512
@@ -152,6 +220,28 @@ def get_beat_times(audio_path: str, verbose: Optional[bool] = None) -> BeatInfo:
         verbose = _settings.features.verbose
 
     print(f"🎵 Analyzing beat structure of {os.path.basename(audio_path)}...")
+
+    # Try Cloud GPU first
+    cloud_data = _run_cloud_analysis(audio_path)
+    if cloud_data:
+        tempo = cloud_data['tempo']
+        beat_times = np.array(cloud_data['beat_times'])
+        duration = cloud_data['duration']
+        sr = cloud_data['sample_rate']
+        
+        print(f"   Tempo: {tempo:.1f} BPM, Detected {len(beat_times)} beats.")
+        
+        if verbose:
+            print(f"   📊 Track Duration: {duration:.1f}s ({duration/60:.1f} min)")
+            print(f"   📊 Sample Rate: {sr} Hz")
+            print(f"   📊 Beat Interval: {60/tempo:.2f}s avg")
+
+        return BeatInfo(
+            tempo=tempo,
+            beat_times=beat_times,
+            duration=duration,
+            sample_rate=sr
+        )
 
     y, sr = librosa.load(audio_path)
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)

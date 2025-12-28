@@ -61,6 +61,9 @@ class FeatureConfig:
     deep_analysis: bool = field(default_factory=lambda: os.environ.get("DEEP_ANALYSIS", "false").lower() == "true")
     verbose: bool = field(default_factory=lambda: os.environ.get("VERBOSE", "true").lower() == "true")
     enable_ai_filter: bool = field(default_factory=lambda: os.environ.get("ENABLE_AI_FILTER", "false").lower() == "true")
+    # Phase 4: Agentic Creative Loop - LLM evaluates and refines cuts iteratively
+    creative_loop: bool = field(default_factory=lambda: os.environ.get("CREATIVE_LOOP", "false").lower() == "true")
+    creative_loop_max_iterations: int = field(default_factory=lambda: int(os.environ.get("CREATIVE_LOOP_MAX_ITERATIONS", "3")))
 
 
 # =============================================================================
