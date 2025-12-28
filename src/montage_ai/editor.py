@@ -1806,6 +1806,9 @@ def create_montage(variant_id=1):
             if idx_int >= len(beat_times) - 1:
                 return beat_times[-1]
             frac = idx - idx_int
+            # Ensure we don't go out of bounds
+            if idx_int + 1 >= len(beat_times):
+                return beat_times[-1]
             return beat_times[idx_int] + (beat_times[idx_int+1] - beat_times[idx_int]) * frac
 
         if target_beat_idx >= len(beat_times):

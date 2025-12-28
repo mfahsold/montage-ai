@@ -20,6 +20,8 @@ services:
           memory: 8g  # Reduced from 16g to prevent OOM on ARM systems
         reservations:
           memory: 2g   # Reduced from 4g
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data/input:/data/input:ro
       - ./data/music:/data/music:ro

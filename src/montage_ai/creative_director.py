@@ -232,8 +232,8 @@ class CreativeDirector:
         # Initialize cgpu client if enabled
         self.cgpu_client = None
         if self.use_cgpu:
-            # cgpu serve exposes OpenAI-compatible API at root, not /v1
-            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}"
+            # cgpu serve exposes OpenAI-compatible API at /v1
+            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}/v1"
             try:
                 self.cgpu_client = OpenAI(
                     base_url=cgpu_url,
@@ -512,20 +512,23 @@ class CreativeDirector:
         """
         Query cgpu/Gemini for creative direction.
         
-        Uses OpenAI Responses API provided by `cgpu serve`.
-        Note: cgpu uses /v1/responses endpoint, not /v1/chat/completions.
+        Uses OpenAI Chat Completions API provided by `cgpu serve`.
         """
         try:
-            # cgpu uses the OpenAI Responses API format
-            # Combine system prompt with user prompt as instructions
-            response = self.cgpu_client.responses.create(
+            # cgpu serve (Gemini) via OpenAI Chat Completions API
+            response = self.cgpu_client.chat.completions.create(
                 model=CGPU_MODEL,
-                instructions=self.system_prompt,
-                input=user_prompt,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1024,
+                # response_format={"type": "json_object"} # Gemini via cgpu might not support this param yet
             )
             
-            if hasattr(response, 'output_text') and response.output_text:
-                content = response.output_text
+            if response.choices and response.choices[0].message.content:
+                content = response.choices[0].message.content
                 # Clean up response - Gemini sometimes wraps JSON in markdown
                 if content.startswith("```json"):
                     content = content[7:]

@@ -61,7 +61,12 @@ list_styles() {
 
 run_web() {
     echo "🚀 Starting Web UI..."
+    
+    # Auto-start cgpu serve (since Web UI defaults to using it)
+    cgpu_start || echo "⚠️ Continuing without cgpu..."
+
     echo "   Open http://localhost:8080 in your browser"
+    echo "   ℹ️  If using Ollama on Linux, run: OLLAMA_HOST=0.0.0.0 ollama serve"
     # Pass arguments like --build to docker compose
     docker compose -f docker-compose.web.yml up "$@"
 }
@@ -81,7 +86,8 @@ cgpu_start() {
     
     echo "🚀 Starting cgpu serve..."
     PORT=${CGPU_PORT:-8090}
-    cgpu serve --port "$PORT" &
+    # Bind to 0.0.0.0 to allow access from Docker containers
+    cgpu serve --host 0.0.0.0 --port "$PORT" &
     echo $! > "$CGPU_PID_FILE"
     sleep 2
     

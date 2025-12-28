@@ -170,14 +170,14 @@ OUTPUT_PATH = "/tmp/wan_output.mp4"
 MODEL_SIZE = "{model_size}"
 
 # Map model size to config key
-config_key = f"t2v-{MODEL_SIZE}"
+config_key = f"t2v-{{MODEL_SIZE}}"
 if config_key not in WAN_CONFIGS:
     print(f"Warning: Config {{config_key}} not found, defaulting to t2v-1.3B")
     config_key = "t2v-1.3B"
 
 print(f"Loading Wan2.1 model ({{config_key}})...")
 config = WAN_CONFIGS[config_key]
-checkpoint_dir = f"Wan2.1-T2V-{MODEL_SIZE}"
+checkpoint_dir = f"Wan2.1-T2V-{{MODEL_SIZE}}"
 
 wan_t2v = WanT2V(
     config=config,
@@ -187,7 +187,7 @@ wan_t2v = WanT2V(
     t5_fsdp=False,
     dit_fsdp=False,
     use_usp=False,
-    t5_cpu=True
+    t5_cpu=False
 )
 
 print(f"Generating video: {{PROMPT[:50]}}...")
@@ -346,6 +346,11 @@ print("===VIDEO_BASE64_END===")
         print(f"Generating B-Roll: '{prompt[:50]}...'")
         print(f"Duration: {duration}s, Resolution: {self.config.resolution}")
         
+        # DEBUG: Print script to verify content
+        print("--- DEBUG: GENERATION SCRIPT START ---")
+        print(script)
+        print("--- DEBUG: GENERATION SCRIPT END ---")
+
         # Run on cgpu
         output = self._run_cgpu(script)
         
