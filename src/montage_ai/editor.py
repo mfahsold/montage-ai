@@ -124,41 +124,65 @@ from .ffmpeg_config import (
     STANDARD_PIX_FMT,
 )
 
+# Import centralized configuration (Single Source of Truth)
+from .config import get_settings
+_settings = get_settings()
+
+# Import audio analysis module (extracted for modularity)
+from .audio_analysis import (
+    analyze_music_energy as _analyze_music_energy_new,
+    get_beat_times as _get_beat_times_new,
+    calculate_dynamic_cut_length,
+    BeatInfo,
+    EnergyProfile,
+)
+
+# Import scene analysis module (extracted for modularity)
+from .scene_analysis import (
+    detect_scenes as _detect_scenes_new,
+    analyze_scene_content as _analyze_scene_content_new,
+    calculate_visual_similarity,
+    detect_motion_blur,
+    find_best_start_point,
+    Scene,
+    SceneAnalysis,
+    SceneDetector,
+)
+
 # Get runtime FFmpeg config (env vars applied, with GPU auto-detection)
-_hwaccel_setting = os.environ.get("FFMPEG_HWACCEL", "auto")
-_ffmpeg_config = get_ffmpeg_config(hwaccel=_hwaccel_setting)
+_ffmpeg_config = get_ffmpeg_config(hwaccel=_settings.gpu.ffmpeg_hwaccel)
 
 # ============================================================================
-# CONFIGURATION
+# CONFIGURATION (from centralized config module - Single Source of Truth)
 # ============================================================================
 
-# Directories
-INPUT_DIR = os.environ.get("INPUT_DIR", "/data/input")
-MUSIC_DIR = os.environ.get("MUSIC_DIR", "/data/music")
-ASSETS_DIR = os.environ.get("ASSETS_DIR", "/data/assets")
-OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "/data/output")
-TEMP_DIR = os.environ.get("TEMP_DIR", "/tmp")
+# Directories (from _settings.paths)
+INPUT_DIR = str(_settings.paths.input_dir)
+MUSIC_DIR = str(_settings.paths.music_dir)
+ASSETS_DIR = str(_settings.paths.assets_dir)
+OUTPUT_DIR = str(_settings.paths.output_dir)
+TEMP_DIR = str(_settings.paths.temp_dir)
 
 # Job Identification (for parallel runs)
-JOB_ID = os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S"))
+JOB_ID = _settings.job_id
 
-# LLM / AI Configuration
+# LLM / AI Configuration (from _settings.llm)
 # Priority: OpenAI-compatible > Google AI > Ollama
-OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE", "")  # e.g. http://kubeai.kubeai-system.svc.cluster.local/openai/v1
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "not-needed")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "")  # Creative Director model (e.g. gemma3-4b)
-OPENAI_VISION_MODEL = os.environ.get("OPENAI_VISION_MODEL", "")  # Vision model (e.g. moondream2)
+OPENAI_API_BASE = _settings.llm.openai_api_base
+OPENAI_API_KEY = _settings.llm.openai_api_key
+OPENAI_MODEL = _settings.llm.openai_model
+OPENAI_VISION_MODEL = _settings.llm.openai_vision_model
 
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llava")  # For scene analysis (fallback)
-DIRECTOR_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # For creative direction (fallback)
-ENABLE_AI_FILTER = os.environ.get("ENABLE_AI_FILTER", "false").lower() == "true"
+OLLAMA_HOST = _settings.llm.ollama_host
+OLLAMA_MODEL = _settings.llm.ollama_model
+DIRECTOR_MODEL = _settings.llm.director_model
+ENABLE_AI_FILTER = _settings.features.enable_ai_filter
 
 # OpenAI Vision Client Cache (initialized on first use)
 _vision_client = None
 
-# Natural Language Control (NEW!)
-CREATIVE_PROMPT = os.environ.get("CREATIVE_PROMPT", "").strip()
+# Natural Language Control (from _settings.creative)
+CREATIVE_PROMPT = _settings.creative.creative_prompt
 # Example prompts:
 #   "Edit this like a Hitchcock thriller"
 #   "Make it fast-paced like an MTV music video"
@@ -166,7 +190,7 @@ CREATIVE_PROMPT = os.environ.get("CREATIVE_PROMPT", "").strip()
 #   "Documentary realism with natural pacing"
 
 # Legacy Cut Style (backwards compatible, overridden by CREATIVE_PROMPT if set)
-CUT_STYLE = os.environ.get("CUT_STYLE", "dynamic").lower()  # fast, hyper, slow, dynamic
+CUT_STYLE = _settings.creative.cut_style
 
 # Output encoding defaults (from centralized config, overridable by heuristics)
 # Use effective_codec to get GPU encoder when HW accel is active
@@ -192,68 +216,65 @@ def _log_startup_backends():
 # Emit startup logs
 _log_startup_backends()
 
-# Visual Enhancement
-STABILIZE = os.environ.get("STABILIZE", "false").lower() == "true"
-UPSCALE = os.environ.get("UPSCALE", "false").lower() == "true"  # AI Upscaling (Slow!)
-ENHANCE = os.environ.get("ENHANCE", "true").lower() == "true"  # Color/Sharpness (Fast)
+# Visual Enhancement (from _settings.features)
+STABILIZE = _settings.features.stabilize
+UPSCALE = _settings.features.upscale
+ENHANCE = _settings.features.enhance
 
 # Aspect Ratio Handling
 # If true: letterbox/pillarbox horizontal clips to preserve full content
 # If false (default): crop to fill frame (may cut content at edges)
-PRESERVE_ASPECT = os.environ.get("PRESERVE_ASPECT", "false").lower() == "true"
+PRESERVE_ASPECT = _settings.features.preserve_aspect
 
 # Logging / Debug
-VERBOSE = os.environ.get("VERBOSE", "true").lower() == "true"  # Show detailed analysis
+VERBOSE = _settings.features.verbose
 
 # Output Control
-NUM_VARIANTS = int(os.environ.get("NUM_VARIANTS", "1"))
+NUM_VARIANTS = _settings.creative.num_variants
 
-# Timeline Export (NEW!)
-EXPORT_TIMELINE = os.environ.get("EXPORT_TIMELINE", "false").lower() == "true"
-GENERATE_PROXIES = os.environ.get("GENERATE_PROXIES", "false").lower() == "true"
+# Timeline Export (from _settings.features)
+EXPORT_TIMELINE = _settings.features.export_timeline
+GENERATE_PROXIES = _settings.features.generate_proxies
 
 # Performance: CPU Threading & Parallelization (from centralized config)
 FFMPEG_THREADS = _ffmpeg_config.threads
 FFMPEG_PRESET = _ffmpeg_config.preset
-PARALLEL_ENHANCE = os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true"  # Parallel clip enhancement
-MAX_PARALLEL_JOBS = int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, multiprocessing.cpu_count() - 2))))  # Leave 2 cores free
+PARALLEL_ENHANCE = _settings.processing.parallel_enhance
+MAX_PARALLEL_JOBS = _settings.processing.max_parallel_jobs
 
 # Quality: CRF for final encoding (18 = visually lossless, 23 = good balance for tests)
-FINAL_CRF = int(os.environ.get("FINAL_CRF", "18"))  # Lower = better quality, higher file size
+FINAL_CRF = _settings.encoding.crf
 
 # Stream normalization: Ensure all clips have identical parameters for concat demuxer
-NORMALIZE_CLIPS = os.environ.get("NORMALIZE_CLIPS", "true").lower() == "true"  # fps/pix_fmt/profile
+NORMALIZE_CLIPS = _settings.encoding.normalize_clips
 
 # Memory Management: Batch processing to prevent OOM
 # Process clips in batches, render each batch to disk, then concatenate
-BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "25"))  # Clips per batch (lower = less RAM, slower)
-FORCE_GC = os.environ.get("FORCE_GC", "true").lower() == "true"  # Force garbage collection after each batch
+BATCH_SIZE = _settings.processing.batch_size
+FORCE_GC = _settings.processing.force_gc
 
 # Crossfade Configuration: Real FFmpeg xfade vs simple fade-to-black
 # xfade creates real overlapping transitions but requires re-encoding (slower)
-ENABLE_XFADE = os.environ.get("ENABLE_XFADE", "")  # "" = auto (from style), "true" = force on, "false" = force off
-XFADE_DURATION = float(os.environ.get("XFADE_DURATION", "0.3"))  # Crossfade duration in seconds
+ENABLE_XFADE = _settings.creative.enable_xfade
+XFADE_DURATION = _settings.creative.xfade_duration
 
 # Clip reuse control
-MAX_SCENE_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
+MAX_SCENE_REUSE = _settings.processing.max_scene_reuse
 
-# Target Duration & Music Trimming (from Web UI)
-# TARGET_DURATION: Override video length (0 or empty = use full music duration)
-# MUSIC_START/MUSIC_END: Trim music track (seconds)
-TARGET_DURATION = float(os.environ.get("TARGET_DURATION", "0") or "0")
-MUSIC_START = float(os.environ.get("MUSIC_START", "0") or "0")
-MUSIC_END_RAW = os.environ.get("MUSIC_END", "")
-MUSIC_END = float(MUSIC_END_RAW) if MUSIC_END_RAW else None
+# Target Duration & Music Trimming (from _settings.creative)
+TARGET_DURATION = _settings.creative.target_duration
+MUSIC_START = _settings.creative.music_start
+MUSIC_END = _settings.creative.music_end
 
-# GPU/Hardware Acceleration (auto-detected)
-USE_GPU = os.environ.get("USE_GPU", "auto").lower()  # auto, vulkan, v4l2, none
+# GPU/Hardware Acceleration (from _settings.gpu)
+USE_GPU = _settings.gpu.use_gpu
 
-# Optional FFmpeg MCP offload
-USE_FFMPEG_MCP = os.environ.get("USE_FFMPEG_MCP", "false").lower() == "true"
-FFMPEG_MCP_ENDPOINT = os.environ.get("FFMPEG_MCP_ENDPOINT", "http://ffmpeg-mcp.montage-ai.svc.cluster.local:8080")
+# Optional FFmpeg MCP offload (from _settings.gpu)
+USE_FFMPEG_MCP = _settings.gpu.use_ffmpeg_mcp
+FFMPEG_MCP_ENDPOINT = _settings.gpu.ffmpeg_mcp_endpoint
 
-# cgpu Cloud GPU Configuration
-CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
+# cgpu Cloud GPU Configuration (from _settings.llm)
+CGPU_GPU_ENABLED = _settings.llm.cgpu_gpu_enabled
 
 # ============================================================================
 # GLOBAL EDITING INSTRUCTIONS (Set by Creative Director)
@@ -263,19 +284,23 @@ EDITING_INSTRUCTIONS = None  # Will be populated by interpret_creative_prompt()
 # GPU/Hardware Capability Detection (set at runtime)
 GPU_CAPABILITY = None  # Will be set by detect_gpu_capabilities()
 
-# Import cgpu Cloud Upscaler if available (v3 with polling)
+# Import cgpu Cloud Upscaler (unified job-based architecture)
 try:
-    from .cgpu_upscaler_v3 import upscale_with_cgpu, is_cgpu_available
+    from .cgpu_upscaler import upscale_with_cgpu, is_cgpu_available
     CGPU_UPSCALER_AVAILABLE = True
 except ImportError:
-    # Fallback to original upscaler
-    try:
-        from .cgpu_upscaler import upscale_with_cgpu, is_cgpu_available
-        CGPU_UPSCALER_AVAILABLE = True
-    except ImportError:
-        CGPU_UPSCALER_AVAILABLE = False
-        is_cgpu_available = lambda: False
-        upscale_with_cgpu = None
+    CGPU_UPSCALER_AVAILABLE = False
+    is_cgpu_available = lambda: False
+    upscale_with_cgpu = None
+
+# Import cgpu StabilizeJob for cloud stabilization
+try:
+    from .cgpu_jobs import StabilizeJob
+    from .cgpu_jobs.stabilize import stabilize_video as cgpu_stabilize_video
+    CGPU_STABILIZE_AVAILABLE = True
+except ImportError:
+    CGPU_STABILIZE_AVAILABLE = False
+    cgpu_stabilize_video = None
 
 # Import Timeline Exporter if available
 try:
@@ -305,8 +330,8 @@ except ImportError as exc:
     DEEP_ANALYSIS_AVAILABLE = False
     DeepFootageAnalyzer = None
 
-# Deep Analysis Configuration
-DEEP_ANALYSIS = os.environ.get("DEEP_ANALYSIS", "false").lower() == "true"
+# Deep Analysis Configuration (from _settings.features)
+DEEP_ANALYSIS = _settings.features.deep_analysis
 
 
 def detect_gpu_capabilities() -> Dict[str, Any]:
@@ -807,11 +832,11 @@ def interpret_creative_prompt():
             else:
                 print(f"   🎮 GPU Encoder:   None (using {OUTPUT_CODEC})")
         print(f"")
-        print(f"📊 ENHANCEMENT SETTINGS (from ENV):")
-        print(f"   STABILIZE:        {os.environ.get('STABILIZE', 'false')}")
-        print(f"   UPSCALE:          {os.environ.get('UPSCALE', 'false')}")
-        print(f"   ENHANCE:          {os.environ.get('ENHANCE', 'true')}")
-        print(f"   PARALLEL_ENHANCE: {os.environ.get('PARALLEL_ENHANCE', 'true')}")
+        print(f"📊 ENHANCEMENT SETTINGS (from config):")
+        print(f"   STABILIZE:        {_settings.features.stabilize}")
+        print(f"   UPSCALE:          {_settings.features.upscale}")
+        print(f"   ENHANCE:          {_settings.features.enhance}")
+        print(f"   PARALLEL_ENHANCE: {_settings.processing.parallel_enhance}")
         print(f"")
 
     if CREATIVE_PROMPT and CREATIVE_DIRECTOR_AVAILABLE:
@@ -857,301 +882,28 @@ def interpret_creative_prompt():
 
     print(f"{'='*60}\n")
 
+# =============================================================================
+# Scene Analysis (delegated to scene_analysis module)
+# =============================================================================
+
 def detect_scenes(video_path, threshold=30.0):
-    """Use PySceneDetect to find cuts in the raw video."""
-    print(f"🎬 Detecting scenes in {os.path.basename(video_path)}...")
-    video = open_video(video_path)
-    scene_manager = SceneManager()
-    scene_manager.add_detector(ContentDetector(threshold=threshold))
-    scene_manager.detect_scenes(video)
-    scene_list = scene_manager.get_scene_list()
-    
-    # Convert to (start, end) in seconds
-    scenes = []
-    for scene in scene_list:
-        start, end = scene
-        scenes.append((start.get_seconds(), end.get_seconds()))
-    print(f"   Found {len(scenes)} scenes.")
-    
-    # If no scenes were detected (single shot), use the whole video
-    if not scenes:
-        try:
-            clip = VideoFileClip(video_path)
-            duration = clip.duration
-            clip.close()
-            print(f"   ⚠️ No cuts detected. Using full video ({duration:.1f}s).")
-            return [(0.0, duration)]
-        except Exception as e:
-            print(f"   ❌ Could not read video duration: {e}")
-            return []
-            
-    return scenes
+    """Use PySceneDetect to find cuts in the raw video.
+
+    Delegated to scene_analysis module. Returns list of (start, end) tuples for backward compatibility.
+    """
+    return _detect_scenes_new(video_path, threshold=threshold)
+
 
 def analyze_scene_content(video_path, time_point):
+    """Extract a frame and ask AI to describe it.
+
+    Delegated to scene_analysis module. Returns dict for backward compatibility.
     """
-    Extract a frame and ask AI to describe it.
+    return _analyze_scene_content_new(video_path, time_point)
 
-    Supports OpenAI-compatible Vision APIs (KubeAI moondream2, llava)
-    with fallback to Ollama.
-    """
-    if not ENABLE_AI_FILTER:
-        return {"quality": "YES", "description": "unknown", "action": "medium", "shot": "medium"}
 
-    try:
-        cap = cv2.VideoCapture(video_path)
-        cap.set(cv2.CAP_PROP_POS_MSEC, time_point * 1000)
-        ret, frame = cap.read()
-        cap.release()
-
-        if not ret:
-            return {"quality": "NO", "description": "read error", "action": "low", "shot": "medium"}
-
-        _, buffer = cv2.imencode('.jpg', frame)
-        b64_img = base64.b64encode(buffer).decode('utf-8')
-
-        prompt = (
-            "Analyze this image for a video editor. Return a JSON object with these keys: "
-            "quality (YES/NO), description (5 words), action (low/medium/high), shot (close/medium/wide). "
-            "Example: {\"quality\": \"YES\", \"description\": \"Man running in park\", \"action\": \"high\", \"shot\": \"wide\"}"
-        )
-
-        # Try OpenAI-compatible Vision API first (KubeAI moondream2, llava, etc.)
-        if OPENAI_API_BASE and OPENAI_VISION_MODEL:
-            try:
-                # Initialize cached client on first use
-                global _vision_client
-                if _vision_client is None:
-                    from openai import OpenAI
-                    _vision_client = OpenAI(base_url=OPENAI_API_BASE, api_key=OPENAI_API_KEY)
-
-                response = _vision_client.chat.completions.create(
-                    model=OPENAI_VISION_MODEL,
-                    messages=[{
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
-                        ]
-                    }],
-                    max_tokens=100,
-                    temperature=0.2,
-                    timeout=30  # Prevent hanging on slow models
-                )
-
-                if response.choices and response.choices[0].message.content:
-                    content = response.choices[0].message.content.strip()
-                    # Clean markdown wrapping if present
-                    if content.startswith("```json"):
-                        content = content[7:]
-                    if content.startswith("```"):
-                        content = content[3:]
-                    if content.endswith("```"):
-                        content = content[:-3]
-
-                    res_json = json.loads(content.strip())
-                    return {
-                        "quality": res_json.get("quality", "YES"),
-                        "description": res_json.get("description", "unknown"),
-                        "action": res_json.get("action", "medium").lower(),
-                        "shot": res_json.get("shot", "medium").lower()
-                    }
-            except Exception as e:
-                print(f"   ⚠️ OpenAI Vision API failed, falling back to Ollama: {e}")
-
-        # Fallback to Ollama
-        payload = {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "images": [b64_img],
-            "stream": False,
-            "format": "json"
-        }
-
-        response = requests.post(f"{OLLAMA_HOST}/api/generate", json=payload)
-        if response.status_code == 200:
-            try:
-                res_json = json.loads(response.json().get("response", "{}"))
-                return {
-                    "quality": res_json.get("quality", "YES"),
-                    "description": res_json.get("description", "unknown"),
-                    "action": res_json.get("action", "medium").lower(),
-                    "shot": res_json.get("shot", "medium").lower()
-                }
-            except:
-                text = response.json().get("response", "")
-                return {"quality": "YES", "description": text[:50], "action": "medium", "shot": "medium"}
-
-    except Exception as e:
-        print(f"   ⚠️ AI Analysis failed: {e}")
-        return {"quality": "YES", "description": "error", "action": "medium", "shot": "medium"}
-
-    return {"quality": "YES", "description": "unknown", "action": "medium", "shot": "medium"}
-
-def calculate_visual_similarity(frame1_path, frame1_time, frame2_path, frame2_time):
-    """
-    Calculate visual similarity between two frames using color histogram comparison.
-    Used for 'Match Cut' detection - finding visually similar moments for seamless transitions.
-
-    Returns:
-        Similarity score 0-1 (1 = identical)
-    """
-    try:
-        cap1 = cv2.VideoCapture(frame1_path)
-        cap1.set(cv2.CAP_PROP_POS_MSEC, frame1_time * 1000)
-        ret1, frame1 = cap1.read()
-        cap1.release()
-
-        cap2 = cv2.VideoCapture(frame2_path)
-        cap2.set(cv2.CAP_PROP_POS_MSEC, frame2_time * 1000)
-        ret2, frame2 = cap2.read()
-        cap2.release()
-
-        if not ret1 or not ret2:
-            return 0.0
-
-        # Convert to HSV for better color similarity
-        hsv1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2HSV)
-        hsv2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2HSV)
-
-        # Calculate histograms
-        hist1 = cv2.calcHist([hsv1], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
-        hist2 = cv2.calcHist([hsv2], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
-
-        # Normalize
-        cv2.normalize(hist1, hist1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-        cv2.normalize(hist2, hist2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-
-        # Compare using correlation
-        similarity = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
-        return max(0.0, similarity)  # Correlation can be negative
-
-    except Exception as e:
-        print(f"   ⚠️ Visual similarity failed: {e}")
-        return 0.0
-
-def detect_motion_blur(video_path, time_point):
-    """
-    Detect motion blur intensity at a specific time point.
-    Used for 'Invisible Cut' placement - cuts work best during motion blur.
-
-    Returns:
-        Blur score 0-1 (1 = heavy blur, good for cuts)
-    """
-    try:
-        cap = cv2.VideoCapture(video_path)
-        cap.set(cv2.CAP_PROP_POS_MSEC, time_point * 1000)
-        ret, frame = cap.read()
-        cap.release()
-
-        if not ret:
-            return 0.0
-
-        # Convert to grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Calculate Laplacian variance (low = blurry)
-        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-
-        # Normalize to 0-1 (invert: high variance = sharp, low = blurry)
-        # Typical sharp video has variance > 500, blurry < 100
-        blur_score = 1.0 - min(1.0, laplacian_var / 500.0)
-        return blur_score
-
-    except Exception as e:
-        print(f"   ⚠️ Motion blur detection failed: {e}")
-        return 0.0
-
-def find_best_start_point(video_path, scene_start, scene_end, target_duration):
-    """
-    Find the most 'interesting' segment within a scene using Optical Flow.
-
-    This is the 'Perfect Cut' optimization - instead of random start points,
-    we find the moment with highest action/motion.
-
-    Args:
-        video_path: Path to video file
-        scene_start: Scene start time in seconds
-        scene_end: Scene end time in seconds
-        target_duration: Desired clip duration
-
-    Returns:
-        Best start timestamp (float)
-    """
-    try:
-        cap = cv2.VideoCapture(video_path)
-
-        # Jump to scene start
-        cap.set(cv2.CAP_PROP_POS_MSEC, scene_start * 1000)
-
-        motion_scores = []
-        timestamps = []
-
-        ret, prev_frame = cap.read()
-        if not ret:
-            cap.release()
-            # Fallback to random
-            max_start = scene_end - target_duration
-            return random.uniform(scene_start, max(scene_start, max_start))
-
-        prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-
-        # Sample every 500ms for performance
-        frame_interval = 0.5
-        current_time = scene_start
-
-        while current_time < scene_end - target_duration:
-            cap.set(cv2.CAP_PROP_POS_MSEC, current_time * 1000)
-            ret, frame = cap.read()
-
-            if not ret:
-                break
-
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-            # Calculate optical flow magnitude (motion intensity)
-            flow = cv2.calcOpticalFlowFarneback(
-                prev_gray, gray, None,
-                pyr_scale=0.5, levels=3, winsize=15,
-                iterations=3, poly_n=5, poly_sigma=1.2, flags=0
-            )
-
-            # Compute motion magnitude
-            magnitude = np.sqrt(flow[..., 0]**2 + flow[..., 1]**2)
-            motion_score = np.mean(magnitude)
-
-            motion_scores.append(motion_score)
-            timestamps.append(current_time)
-
-            prev_gray = gray
-            current_time += frame_interval
-
-        cap.release()
-
-        # Find peak motion (action climax)
-        if motion_scores and len(motion_scores) > 0:
-            # Use 75th percentile to avoid noise spikes
-            threshold = np.percentile(motion_scores, 75)
-            high_motion_indices = [i for i, score in enumerate(motion_scores) if score >= threshold]
-
-            if high_motion_indices:
-                # Pick first high-motion moment (natural story progression)
-                peak_idx = high_motion_indices[0]
-                best_start = timestamps[peak_idx]
-
-                # Ensure we don't exceed scene boundaries
-                if best_start + target_duration > scene_end:
-                    best_start = scene_end - target_duration
-
-                return max(scene_start, best_start)
-
-    except Exception as e:
-        print(f"   ⚠️ Optical Flow analysis failed: {e}")
-
-    # Fallback: Random start (existing behavior)
-    max_start = scene_end - target_duration
-    if max_start <= scene_start:
-        return scene_start
-    return random.uniform(scene_start, max_start)
+# calculate_visual_similarity, detect_motion_blur, find_best_start_point
+# are imported directly from scene_analysis module
 
 
 def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, output_path: str):
@@ -1185,139 +937,29 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
     ]
     subprocess.run(cmd_extract, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+# =============================================================================
+# Audio Analysis (delegated to audio_analysis module)
+# =============================================================================
+
 def analyze_music_energy(audio_path):
-    """Get RMS energy curve."""
-    print(f"🎵 Analyzing energy levels of {os.path.basename(audio_path)}...")
-    y, sr = librosa.load(audio_path)
-    hop_length = 512
-    rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
-    times = librosa.times_like(rms, sr=sr, hop_length=hop_length)
-    # Normalize energy 0-1
-    rms = (rms - np.min(rms)) / (np.max(rms) - np.min(rms) + 1e-6)
-    
-    if VERBOSE:
-        # Show energy statistics
-        avg_energy = np.mean(rms)
-        max_energy = np.max(rms)
-        min_energy = np.min(rms)
-        high_energy_pct = np.sum(rms > 0.7) / len(rms) * 100
-        print(f"   📊 Energy Stats: avg={avg_energy:.2f}, max={max_energy:.2f}, min={min_energy:.2f}")
-        print(f"   📊 High Energy (>70%): {high_energy_pct:.1f}% of track")
-    
-    return times, rms
+    """Get RMS energy curve.
+
+    Delegated to audio_analysis module. Returns (times, rms) for backward compatibility.
+    """
+    profile = _analyze_music_energy_new(audio_path, verbose=VERBOSE)
+    return profile.times, profile.rms
+
 
 def get_beat_times(audio_path):
-    """Use Librosa to find beat times."""
-    print(f"🎵 Analyzing beat structure of {os.path.basename(audio_path)}...")
-    y, sr = librosa.load(audio_path)
-    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+    """Use Librosa to find beat times.
 
-    # Handle tempo being an array (newer librosa versions)
-    if isinstance(tempo, np.ndarray):
-        tempo = tempo.item()
-
-    beat_times = librosa.frames_to_time(beat_frames, sr=sr)
-    
-    # Additional music analysis for verbose output
-    duration = librosa.get_duration(y=y, sr=sr)
-    print(f"   Tempo: {tempo:.1f} BPM, Detected {len(beat_times)} beats.")
-    
-    if VERBOSE:
-        print(f"   📊 Track Duration: {duration:.1f}s ({duration/60:.1f} min)")
-        print(f"   📊 Sample Rate: {sr} Hz")
-        print(f"   📊 Beat Interval: {60/tempo:.2f}s avg")
-        
-        # Detect if tempo is fast/slow
-        if tempo > 140:
-            print(f"   🚀 Fast Tempo (>140 BPM) - will use longer beat groups to avoid seizure cuts")
-        elif tempo < 80:
-            print(f"   🐢 Slow Tempo (<80 BPM) - will use shorter beat groups for variety")
-        else:
-            print(f"   ⚖️ Medium Tempo - balanced pacing")
-    
-    return beat_times, tempo
-    return beat_times, tempo
-
-def calculate_dynamic_cut_length(current_energy, tempo, current_time, total_duration, pattern_pool):
+    Delegated to audio_analysis module. Returns (beat_times, tempo) for backward compatibility.
     """
-    Advanced 2024/2025 pacing algorithm with position-aware intelligence.
+    info = _get_beat_times_new(audio_path, verbose=VERBOSE)
+    return info.beat_times, info.tempo
 
-    Based on research from:
-    - Film Editing Pro 2024: Track-position pacing theory
-    - Premiere Gal: Fibonacci rhythm patterns
-    - Industry standard: Intro/Build/Climax/Outro structure
 
-    Args:
-        current_energy: Audio RMS energy (0-1)
-        tempo: BPM of music
-        current_time: Current position in track (seconds)
-        total_duration: Total track duration (seconds)
-        pattern_pool: List of available cut patterns
-
-    Returns:
-        List of beat counts for next cuts (Fibonacci or custom pattern)
-    """
-    # Calculate track position (0-1)
-    progress = current_time / total_duration
-
-    # PHASE 1: INTRO (0-20%) - Establish atmosphere, longer cuts
-    if progress < 0.2:
-        if current_energy < 0.3:
-            # Calm intro: Very long takes to set mood
-            base_pattern = [8, 8, 8, 4]
-        else:
-            # Energetic intro: Steady rhythm
-            base_pattern = [4, 4, 4, 4]
-
-    # PHASE 2: BUILD-UP (20-40%) - Increasing tension and variation
-    elif progress < 0.4:
-        if current_energy > 0.6:
-            # Energy rising: Fibonacci acceleration
-            base_pattern = [8, 5, 3, 2, 1, 1]  # Fibonacci descent
-        else:
-            # Gentle build: Classic pattern
-            base_pattern = [4, 4, 2, 2]
-
-    # PHASE 3: CLIMAX (40-75%) - Peak energy, maximum variation
-    elif progress < 0.75:
-        if current_energy > 0.8:
-            # Hyper-energy peak: Rapid cuts (TikTok style)
-            # "The Stutter": Rapid fire 1s followed by a breath
-            base_pattern = [1, 1, 1, 0.5, 0.5, 2, 1, 1] 
-        elif current_energy > 0.6:
-            # High energy: Fibonacci magic & Syncopation
-            # "The Golden Spiral": 1, 1, 2, 3, 5
-            base_pattern = [1, 1, 2, 3, 5]
-        else:
-            # Medium energy: Varied but controlled
-            # "The Heartbeat": Short-Short-Long
-            base_pattern = [1.5, 1.5, 5] # Syncopated 3+5=8
-
-    # PHASE 4: OUTRO/RESOLUTION (75-100%) - Wind down, return to calm
-    else:
-        if current_energy > 0.7:
-            # High-energy ending: Sustain excitement then resolve
-            base_pattern = [2, 2, 4, 8]
-        else:
-            # Calm ending: Long reflective cuts
-            # "The Fade": Progressively longer
-            base_pattern = [4, 8, 12, 16]
-            
-    # 🎲 CHAOS FACTOR: Occasionally inject a random pattern from the pool
-    # This simulates "creative intuition" breaking the rules
-    if random.random() < 0.15: # 15% chance
-        base_pattern = random.choice(pattern_pool)
-        
-    return base_pattern
-
-    # TEMPO MODULATION: Adjust for BPM
-    # Fast tempos need longer beat counts to avoid seizure-inducing cuts
-    if tempo > 140:
-        base_pattern = [max(2, b) for b in base_pattern]  # Minimum 2 beats
-    elif tempo < 80:
-        base_pattern = [max(1, b // 2) for b in base_pattern]  # Halve for slow songs
-
-    return base_pattern
+# calculate_dynamic_cut_length is imported directly from audio_analysis module
 
 def create_montage(variant_id=1):
     print(f"\n🎬 Starting Montage Variant #{variant_id}")
@@ -1336,23 +978,23 @@ def create_montage(variant_id=1):
     # IMPORTANT: Environment variables take PRECEDENCE over style templates!
     # This allows users to force STABILIZE=true even if the template says false.
     global STABILIZE, UPSCALE, ENHANCE
-    
-    # Store original ENV values (these have higher priority)
-    env_stabilize = os.environ.get("STABILIZE", "").lower() == "true"
-    env_upscale = os.environ.get("UPSCALE", "").lower() == "true"
-    env_enhance = os.environ.get("ENHANCE", "true").lower() == "true"
-    
-    # Apply style template defaults ONLY if ENV was not explicitly set
+
+    # Get current values from centralized config (_settings.features)
+    env_stabilize = _settings.features.stabilize
+    env_upscale = _settings.features.upscale
+    env_enhance = _settings.features.enhance
+
+    # Apply style template defaults ONLY if settings are false (not explicitly enabled)
     if EDITING_INSTRUCTIONS is not None:
         effects = EDITING_INSTRUCTIONS.get('effects', {})
 
-        # Only use template value if ENV wasn't explicitly set to "true"
+        # Only use template value if not explicitly enabled via settings
         # ENV=true always wins, ENV=false or unset uses template
         if not env_stabilize and 'stabilization' in effects:
             STABILIZE = effects['stabilization']
         else:
             STABILIZE = env_stabilize
-            
+
         if not env_upscale and 'upscale' in effects:
             UPSCALE = effects['upscale']
         else:
@@ -2785,22 +2427,35 @@ def _check_vidstab_available():
 
 def stabilize_clip(input_path, output_path):
     """
-    Stabilize a video clip using professional 2-pass vidstab or fallback to deshake.
-    
+    Stabilize a video clip using the best available method.
+
+    Priority:
+    1. cgpu Cloud GPU (if CGPU_GPU_ENABLED and available)
+    2. Local vidstab 2-pass (professional quality)
+    3. Local deshake (basic fallback)
+
     vidstab (libvidstab) provides superior stabilization:
     - Pass 1: Analyzes motion vectors and stores transform data
     - Pass 2: Applies smooth transformations with configurable smoothing
-    
+
     Parameters tuned for handheld/action footage:
     - shakiness=5: Medium shake detection (1-10, higher = more sensitive)
     - accuracy=15: High accuracy motion detection (1-15)
     - smoothing=30: ~1 second smoothing window (frames)
     - crop=black: Fill borders with black (vs. keep=zoom which loses resolution)
-    
-    Falls back to basic deshake filter if vidstab unavailable.
     """
     print(f"   ⚖️ Stabilizing {os.path.basename(input_path)}...")
-    
+
+    # Try cloud GPU stabilization first if enabled
+    if CGPU_GPU_ENABLED and CGPU_STABILIZE_AVAILABLE and is_cgpu_available():
+        print(f"   ☁️ Attempting cgpu cloud GPU stabilization...")
+        result = cgpu_stabilize_video(input_path, output_path)
+        if result:
+            print(f"   ✅ Cloud stabilization complete")
+            return result
+        print(f"   ⚠️ Cloud stabilization failed, falling back to local...")
+
+    # Local stabilization
     if _check_vidstab_available():
         return _stabilize_vidstab(input_path, output_path)
     else:

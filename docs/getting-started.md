@@ -40,6 +40,9 @@ make web
 5. Click **Create Montage**
 6. Download your video
 
+![Web UI Workflow](images/web-ui-workflow.png)
+<!-- TODO: Add screenshot showing the upload and creation process -->
+
 ### Command Line
 
 ```bash

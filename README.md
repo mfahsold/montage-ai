@@ -6,6 +6,9 @@
 
 > Turn raw footage into beat-synchronized montages — automatically.
 
+![Montage AI Web UI](docs/images/web-ui-hero.png)
+<!-- TODO: Add a hero screenshot of the Web UI or a montage example here -->
+
 Drop your clips and a music track, pick a style, and let the AI do the editing. Cuts land on the beat, pacing matches the energy, and you get a polished video in minutes.
 
 ---
@@ -21,6 +24,9 @@ make web
 ```
 
 Open **http://localhost:5001** → upload videos + music → pick a style → hit Create → done.
+
+![Web UI Dashboard](docs/images/web-ui-dashboard.png)
+<!-- TODO: Add screenshot of the Web UI dashboard with upload and style selection -->
 
 ### Option B: Command Line
 

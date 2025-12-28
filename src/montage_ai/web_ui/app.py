@@ -17,6 +17,9 @@ from collections import deque
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
+# Centralized Configuration (Single Source of Truth)
+from ..config import get_settings, reload_settings
+
 # B-Roll Planning (semantic clip search via video_agent)
 try:
     from ..video_agent import create_video_agent
@@ -26,61 +29,50 @@ except ImportError:
 
 
 def get_version() -> str:
-    """Get version from git commit hash (short) or fallback to env/default.
-    
-    Priority:
-    1. GIT_COMMIT env var (set at build time in Dockerfile)
-    2. Live git rev-parse (if in git repo)
-    3. Fallback to "dev"
-    """
-    # Check env var first (set at Docker build time)
+    """Get version from git commit hash (short) or fallback to env/default."""
     git_commit = os.environ.get("GIT_COMMIT", "").strip()
     if git_commit:
-        return git_commit[:8]  # Short hash
-    
-    # Try live git command (works in dev, not in container usually)
+        return git_commit[:8]
+
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--short=8", "HEAD"],
-            capture_output=True,
-            text=True,
-            timeout=2,
-            cwd=Path(__file__).parent.parent.parent.parent  # repo root
+            capture_output=True, text=True, timeout=2,
+            cwd=Path(__file__).parent.parent.parent.parent
         )
         if result.returncode == 0:
             return result.stdout.strip()
     except Exception:
         pass
-    
+
     return "dev"
 
 
 VERSION = get_version()
 
-# Paths
-INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))
-MUSIC_DIR = Path(os.environ.get("MUSIC_DIR", "/data/music"))
-OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/data/output"))
-ASSETS_DIR = Path(os.environ.get("ASSETS_DIR", "/data/assets"))
-
-# Ensure directories exist
-INPUT_DIR.mkdir(parents=True, exist_ok=True)
-MUSIC_DIR.mkdir(parents=True, exist_ok=True)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-
 # =============================================================================
-# DEFAULT OPTIONS (single source of truth - controlled via environment)
+# CONFIGURATION (from centralized config module)
 # =============================================================================
+_settings = get_settings()
+
+# Path aliases for backward compatibility
+INPUT_DIR = _settings.paths.input_dir
+MUSIC_DIR = _settings.paths.music_dir
+OUTPUT_DIR = _settings.paths.output_dir
+ASSETS_DIR = _settings.paths.assets_dir
+
+# Note: Directories are created lazily on first job to avoid issues in test environments
+
+# Default options derived from settings
 DEFAULT_OPTIONS = {
-    "enhance": os.environ.get("DEFAULT_ENHANCE", "true").lower() == "true",
-    "stabilize": os.environ.get("DEFAULT_STABILIZE", "false").lower() == "true",
-    "upscale": os.environ.get("DEFAULT_UPSCALE", "false").lower() == "true",
-    "cgpu": os.environ.get("DEFAULT_CGPU", "false").lower() == "true",
-    "llm_clip_selection": os.environ.get("LLM_CLIP_SELECTION", "true").lower() == "true",
-    "export_timeline": os.environ.get("DEFAULT_EXPORT_TIMELINE", "false").lower() == "true",
-    "generate_proxies": os.environ.get("DEFAULT_GENERATE_PROXIES", "false").lower() == "true",
-    "preserve_aspect": os.environ.get("PRESERVE_ASPECT", "false").lower() == "true",
+    "enhance": _settings.features.enhance,
+    "stabilize": _settings.features.stabilize,
+    "upscale": _settings.features.upscale,
+    "cgpu": _settings.llm.cgpu_gpu_enabled,
+    "llm_clip_selection": _settings.features.llm_clip_selection,
+    "export_timeline": _settings.features.export_timeline,
+    "generate_proxies": _settings.features.generate_proxies,
+    "preserve_aspect": _settings.features.preserve_aspect,
 }
 
 # Flask app
@@ -93,7 +85,7 @@ jobs = {}
 job_lock = threading.Lock()
 job_queue = deque()
 active_jobs = 0
-MAX_CONCURRENT_JOBS = int(os.environ.get("MAX_CONCURRENT_JOBS", "2"))
+MAX_CONCURRENT_JOBS = _settings.processing.max_concurrent_jobs
 MIN_MEMORY_GB = 2  # Minimum memory required to start a job
 
 
@@ -187,7 +179,7 @@ def normalize_options(data: dict) -> dict:
         "export_timeline": get_bool('export_timeline'),
         "generate_proxies": get_bool('generate_proxies'),
         # Default cgpu to true if env var is set, otherwise use UI value
-        "cgpu": get_bool('cgpu') or os.environ.get("CGPU_ENABLED", "false").lower() == "true",
+        "cgpu": get_bool('cgpu') or _settings.llm.cgpu_enabled,
         "preserve_aspect": get_bool('preserve_aspect'),
         "target_duration": target_duration,
         "music_start": music_start,
@@ -198,6 +190,9 @@ def normalize_options(data: dict) -> dict:
 def run_montage(job_id: str, style: str, options: dict):
     """Run montage creation in background."""
     global active_jobs
+
+    # Ensure directories exist (lazy initialization)
+    _settings.paths.ensure_directories()
 
     # Check memory before starting
     memory_ok, available_gb = check_memory_available()
@@ -385,9 +380,9 @@ def api_upload():
     if file.filename == '':
         return jsonify({"error": "No file selected"}), 400
 
-    # Validate file type
-    video_extensions = {'mp4', 'mov', 'avi', 'mkv'}
-    music_extensions = {'mp3', 'wav', 'flac', 'm4a'}
+    # Validate file type (from centralized config)
+    video_extensions = _settings.file_types.video_extensions
+    music_extensions = _settings.file_types.audio_extensions
 
     if file_type == 'video':
         if not allowed_file(file.filename, video_extensions):

@@ -54,6 +54,9 @@ make web              # or: docker compose -f docker-compose.web.yml up
 # open http://localhost:5001
 ```
 
+![Web UI Features](images/web-ui-features.png)
+<!-- TODO: Add screenshot highlighting Web UI features like style selection and toggles -->
+
 Flow: upload videos + music → pick style or prompt → toggle enhance/stabilize/upscale/cloud GPU → Create Montage → download MP4 (and timeline if enabled).
 
 Useful endpoints (for automation):
@@ -75,6 +78,9 @@ Enable during run:
 
 Outputs in `data/output/`:
 - `*.otio` (preferred), `*.edl`, `*.csv`, metadata JSON, optional proxies folder.
+
+![Timeline Export in DaVinci Resolve](images/timeline-export-davinci.png)
+<!-- TODO: Add screenshot of the exported timeline imported into DaVinci Resolve -->
 
 Import tips:
 - **DaVinci Resolve:** File → Import → Timeline → select `.otio`; relink media if paths differ.
