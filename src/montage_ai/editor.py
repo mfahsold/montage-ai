@@ -755,6 +755,135 @@ def get_beat_times(audio_path):
 # calculate_dynamic_cut_length is imported directly from audio_analysis module
 
 
+# =============================================================================
+# Post-Processing: Captions & Voice Isolation
+# =============================================================================
+
+def _apply_captions(video_path: str, settings) -> str:
+    """
+    Apply burn-in captions to rendered video.
+
+    Pipeline:
+    1. Transcribe audio using Whisper (via cgpu if available)
+    2. Burn captions into video using caption_burner
+
+    Args:
+        video_path: Path to rendered video
+        settings: Settings object with caption config
+
+    Returns:
+        Path to video with captions (or original if failed)
+    """
+    from pathlib import Path
+
+    style = settings.features.captions_style
+    logger.info(f"\n📝 Applying captions ({style} style)...")
+
+    video = Path(video_path)
+    output_path = str(video.parent / f"{video.stem}_captioned.mp4")
+
+    try:
+        # Step 1: Transcribe audio
+        transcript_path = _transcribe_for_captions(video_path)
+        if not transcript_path:
+            logger.warning("   Transcription failed, skipping captions")
+            return video_path
+
+        # Step 2: Burn captions
+        from .caption_burner import burn_captions
+        result = burn_captions(
+            video_path=video_path,
+            caption_path=transcript_path,
+            style=style,
+            output_path=output_path
+        )
+        logger.info(f"   ✅ Captions applied: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"   Caption application failed: {e}")
+        return video_path
+
+
+def _transcribe_for_captions(video_path: str) -> Optional[str]:
+    """
+    Transcribe video audio for caption generation.
+
+    Uses cgpu/Whisper if available, returns JSON with word-level timestamps.
+
+    Args:
+        video_path: Path to video file
+
+    Returns:
+        Path to transcript JSON, or None if failed
+    """
+    from pathlib import Path
+
+    # Check if cgpu is available for transcription
+    try:
+        from .cgpu_utils import is_cgpu_available
+        if is_cgpu_available():
+            from .transcriber import transcribe_audio
+            logger.info("   🎤 Transcribing with Whisper (via cgpu)...")
+            transcript = transcribe_audio(video_path, output_format="json")
+            if transcript:
+                logger.info(f"   Transcript: {transcript}")
+                return transcript
+    except ImportError:
+        pass
+
+    # Fallback: Check for existing transcript
+    video = Path(video_path)
+    for ext in [".json", ".srt", ".vtt"]:
+        transcript = video.with_suffix(ext)
+        if transcript.exists():
+            logger.info(f"   Using existing transcript: {transcript}")
+            return str(transcript)
+
+    logger.warning("   No transcription available (cgpu not enabled, no existing transcript)")
+    return None
+
+
+def _apply_voice_isolation(audio_path: str, settings) -> Optional[str]:
+    """
+    Apply voice isolation to audio before montage creation.
+
+    Args:
+        audio_path: Path to audio/music file
+        settings: Settings object with voice isolation config
+
+    Returns:
+        Path to isolated vocals, or None if failed
+    """
+    model = settings.features.voice_isolation_model
+    logger.info(f"\n🎤 Isolating voice ({model} model)...")
+
+    try:
+        from .cgpu_utils import is_cgpu_available
+        if not is_cgpu_available():
+            logger.warning("   Voice isolation requires cgpu - skipping")
+            return None
+
+        from .cgpu_jobs import VoiceIsolationJob
+        job = VoiceIsolationJob(
+            audio_path=audio_path,
+            model=model,
+            two_stems=True,  # Fast mode: vocals + accompaniment
+        )
+        result = job.execute()
+
+        if result.success:
+            logger.info(f"   ✅ Voice isolated: {result.output_path}")
+            return result.output_path
+        else:
+            logger.error(f"   Voice isolation failed: {result.error}")
+            return None
+
+    except Exception as e:
+        logger.error(f"   Voice isolation error: {e}")
+        return None
+
+
 def create_montage(variant_id: int = 1) -> Optional[str]:
     """
     Create a video montage from input footage and music.
@@ -800,7 +929,13 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
             logger.info(f"   Render time: {result.render_time:.1f}s")
             if result.file_size_mb > 0:
                 logger.info(f"   File size: {result.file_size_mb:.1f} MB")
-            return result.output_path
+
+            # Post-processing: Apply captions if enabled
+            final_output = result.output_path
+            if _settings.features.captions:
+                final_output = _apply_captions(final_output, _settings)
+
+            return final_output
         else:
             logger.error(f"Variant #{variant_id} Failed: {result.error}")
             return None

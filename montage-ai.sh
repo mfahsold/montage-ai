@@ -44,6 +44,8 @@ Options:
   --variants N    Generate N variants
   --cgpu          Enable cgpu/Gemini for Creative Director
   --cgpu-gpu      Enable cgpu cloud GPU for upscaling
+  --captions [STYLE]  Burn-in captions (styles: tiktok, youtube, minimal, karaoke, bold, cinematic)
+  --isolate-voice     Clean audio via voice isolation (requires cgpu)
 
 Examples:
   ./montage-ai.sh run                    # Default dynamic style
@@ -53,6 +55,8 @@ Examples:
   ./montage-ai.sh run --stabilize        # With stabilization
   ./montage-ai.sh run --cgpu             # Use Gemini via cgpu
   ./montage-ai.sh run --cgpu --cgpu-gpu  # Use cloud GPU for upscaling
+  ./montage-ai.sh run --captions tiktok  # With TikTok-style captions
+  ./montage-ai.sh hq --isolate-voice     # HQ with voice isolation
 EOF
 }
 
@@ -174,6 +178,9 @@ run_montage() {
     local VARIANTS="${5:-1}"
     local CGPU_ENABLED="${6:-false}"
     local CGPU_GPU_ENABLED="${7:-false}"
+    local CAPTIONS="${8:-false}"
+    local CAPTIONS_STYLE="${9:-youtube}"
+    local VOICE_ISOLATION="${10:-false}"
 
     echo "🎬 Montage AI"
     echo "   Style: $STYLE"
@@ -181,14 +188,17 @@ run_montage() {
     echo "   Stabilize: $STABILIZE"
     echo "   cgpu LLM: $CGPU_ENABLED"
     echo "   cgpu GPU: $CGPU_GPU_ENABLED"
+    [ "$CAPTIONS" = "true" ] && echo "   Captions: $CAPTIONS_STYLE"
+    [ "$VOICE_ISOLATION" = "true" ] && echo "   Voice Isolation: enabled"
     echo ""
-    
-    # Auto-start cgpu serve if cgpu is enabled
-    if [ "$CGPU_ENABLED" = "true" ]; then
+
+    # Auto-start cgpu serve if cgpu is enabled or features requiring it are enabled
+    if [ "$CGPU_ENABLED" = "true" ] || [ "$CAPTIONS" = "true" ] || [ "$VOICE_ISOLATION" = "true" ]; then
         cgpu_start || echo "⚠️ Continuing without cgpu..."
         # Unset GOOGLE_API_KEY to avoid conflict with cgpu's GEMINI_API_KEY
         # gemini-cli throws error if both are present
         unset GOOGLE_API_KEY
+        CGPU_ENABLED="true"  # Enable cgpu if any feature needs it
     fi
 
     docker compose run --rm \
@@ -201,6 +211,9 @@ run_montage() {
         -e CGPU_PORT="${CGPU_PORT:-8090}" \
         -e CGPU_MODEL="${CGPU_MODEL:-gemini-2.0-flash-exp}" \
         -e CGPU_GPU_ENABLED="$CGPU_GPU_ENABLED" \
+        -e CAPTIONS="$CAPTIONS" \
+        -e CAPTIONS_STYLE="$CAPTIONS_STYLE" \
+        -e VOICE_ISOLATION="$VOICE_ISOLATION" \
         montage-ai
 }
 
@@ -212,6 +225,9 @@ ENHANCE="true"
 VARIANTS="1"
 CGPU_ENABLED="false"
 CGPU_GPU_ENABLED="false"
+CAPTIONS="false"
+CAPTIONS_STYLE="youtube"
+VOICE_ISOLATION="false"
 
 case "${1:-run}" in
     run)
@@ -276,8 +292,16 @@ while [[ $# -gt 0 ]]; do
         --variants) VARIANTS="$2"; shift 2 ;;
         --cgpu) CGPU_ENABLED="true"; shift ;;
         --cgpu-gpu) CGPU_GPU_ENABLED="true"; shift ;;
+        --captions)
+            CAPTIONS="true"
+            # Check if next arg is a style (not another flag)
+            if [[ -n "$2" && "$2" != --* ]]; then
+                CAPTIONS_STYLE="$2"; shift
+            fi
+            shift ;;
+        --isolate-voice) VOICE_ISOLATION="true"; shift ;;
         *) shift ;;
     esac
 done
 
-run_montage "$STYLE" "$PRESET" "$STABILIZE" "$ENHANCE" "$VARIANTS" "$CGPU_ENABLED" "$CGPU_GPU_ENABLED"
+run_montage "$STYLE" "$PRESET" "$STABILIZE" "$ENHANCE" "$VARIANTS" "$CGPU_ENABLED" "$CGPU_GPU_ENABLED" "$CAPTIONS" "$CAPTIONS_STYLE" "$VOICE_ISOLATION"

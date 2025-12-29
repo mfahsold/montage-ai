@@ -70,6 +70,12 @@ class FeatureConfig:
     ai_lut_generation: bool = field(default_factory=lambda: os.environ.get("AI_LUT_GENERATION", "false").lower() == "true")
     episodic_memory: bool = field(default_factory=lambda: os.environ.get("EPISODIC_MEMORY", "false").lower() == "true")
 
+    # 2025 P0/P1: Burn-in captions and voice isolation
+    captions: bool = field(default_factory=lambda: os.environ.get("CAPTIONS", "false").lower() == "true")
+    captions_style: str = field(default_factory=lambda: os.environ.get("CAPTIONS_STYLE", "youtube"))
+    voice_isolation: bool = field(default_factory=lambda: os.environ.get("VOICE_ISOLATION", "false").lower() == "true")
+    voice_isolation_model: str = field(default_factory=lambda: os.environ.get("VOICE_ISOLATION_MODEL", "htdemucs"))
+
     # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)
     low_memory_mode: bool = field(default_factory=lambda: os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true")
 
