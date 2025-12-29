@@ -34,6 +34,13 @@ logs/
 # Local business documentation (not tracked)
 BACKLOG.md
 docs/internal/
+docs/market_analysis.md
+docs/roadmap/
+docs/stability_report.md
+docs/integration_status_report.md
+docs/offloading_analysis.md
+docs/LEGAL_IMPLEMENTATION.md
+docs/archive/
 
 # macOS
 .DS_Store

@@ -23,6 +23,7 @@ import numpy as np
 
 from ..config import get_settings, Settings
 from ..logger import logger
+from ..resource_manager import get_resource_manager, ResourceManager
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 
 
@@ -293,6 +294,7 @@ class MontageBuilder:
         self._memory_manager = None
         self._clip_enhancer = None
         self._intelligent_selector = None
+        self._resource_manager: Optional[ResourceManager] = None
 
     def _create_context(self) -> MontageContext:
         """Create a fresh MontageContext from settings."""
@@ -378,6 +380,7 @@ class MontageBuilder:
         """
         Phase 1: Initialize workspace.
 
+        - Initialize resource manager (detect GPUs, cluster)
         - Apply Creative Director effects overrides
         - Initialize monitoring
         - Initialize intelligent clip selector
@@ -387,6 +390,11 @@ class MontageBuilder:
 
         # Ensure temp directory exists
         os.makedirs(str(self.ctx.temp_dir), exist_ok=True)
+
+        # Initialize resource manager and log status
+        self._resource_manager = get_resource_manager(refresh=True)
+        status_line = self._resource_manager.get_status_line()
+        logger.info(f"   🖥️ Resources: {status_line}")
 
         # Apply Creative Director effects (ENV takes precedence)
         self._apply_creative_director_effects()
@@ -1345,7 +1353,12 @@ class MontageBuilder:
         subprocess.run(cmd, capture_output=True, timeout=30)
 
     def _normalize_clip(self, input_path: str, output_path: str):
-        """Normalize clip for concatenation."""
+        """
+        Normalize clip for concatenation.
+
+        Uses GPU encoder if available (ResourceManager priority:
+        cgpu > local_gpu > cpu).
+        """
         import subprocess
 
         profile = self.ctx.output_profile
@@ -1355,23 +1368,34 @@ class MontageBuilder:
             shutil.copy(input_path, output_path)
             return
 
+        # Get optimal encoder from ResourceManager
+        if self._resource_manager:
+            encoder_config = self._resource_manager.get_encoder(prefer_gpu=True)
+            codec = encoder_config.effective_codec
+            ffmpeg_params = encoder_config.moviepy_params(crf=self.settings.encoding.crf)
+        else:
+            codec = profile.codec
+            ffmpeg_params = [
+                "-pix_fmt", profile.pix_fmt,
+                "-crf", str(self.settings.encoding.crf),
+                "-preset", "fast",
+            ]
+            if profile.profile:
+                ffmpeg_params.extend(["-profile:v", profile.profile])
+            if profile.level:
+                ffmpeg_params.extend(["-level", profile.level])
+
+        # Build FFmpeg command
         cmd = [
             "ffmpeg", "-y",
             "-i", input_path,
             "-vf", f"scale={profile.width}:{profile.height}:force_original_aspect_ratio=decrease,pad={profile.width}:{profile.height}:(ow-iw)/2:(oh-ih)/2",
             "-r", str(profile.fps),
-            "-c:v", profile.codec,
-            "-pix_fmt", profile.pix_fmt,
-            "-crf", str(self.settings.encoding.crf),
-            "-preset", "fast",
+            "-c:v", codec,
+            *ffmpeg_params,
             "-an",  # No audio for individual clips
             output_path
         ]
-
-        if profile.profile:
-            cmd.extend(["-profile:v", profile.profile])
-        if profile.level:
-            cmd.extend(["-level", profile.level])
 
         subprocess.run(cmd, capture_output=True, timeout=60)
 

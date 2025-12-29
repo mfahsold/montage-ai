@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montage AI - Source Available AI Video Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">🎬 Montage AI</div>
+            <nav>
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How it Works</a>
+                <a href="https://github.com/mfahsold/montage-ai" class="github-link"><i class="fab fa-github"></i> GitHub</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="hero">
+                <h1>We do not generate pixels.<br>We <span class="highlight">polish</span> them.</h1>
+                <p class="subtitle">The source-available AI assistant that turns your raw footage into beat-synced montages. Local-first, private, and NLE-ready.</p>
+                <div class="cta-group">
+                    <a href="https://github.com/mfahsold/montage-ai" class="btn primary">Get Started</a>
+                    <a href="#how-it-works" class="btn secondary">See How It Works</a>
+                </div>
+            </section>
+
+            <section id="features" class="features">
+                <div class="feature-card">
+                    <i class="fas fa-music"></i>
+                    <h3>Beat Sync</h3>
+                    <p>Cuts automatically aligned to the rhythm of your music. No manual markers needed.</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-robot"></i>
+                    <h3>Local-First AI</h3>
+                    <p>Runs locally on your hardware. Optional cloud offloading for heavy tasks.</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-file-export"></i>
+                    <h3>NLE Export</h3>
+                    <p>Don't like the cut? Export to DaVinci Resolve or Premiere via OTIO/EDL.</p>
+                </div>
+            </section>
+
+            <section id="how-it-works" class="terminal-section">
+                <h3>How it works</h3>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <div class="terminal-body">
+                        <p><span class="prompt">$</span> cp ./my_vacation/*.mp4 data/input/</p>
+                        <p><span class="prompt">$</span> cp ./cool_song.mp3 data/music/</p>
+                        <p><span class="prompt">$</span> ./montage-ai.sh run dynamic</p>
+                        <p class="output">>> Analyzing audio beat structure...</p>
+                        <p class="output">>> Detecting scenes and stability...</p>
+                        <p class="output">>> Creative Director: "High energy section detected at 0:45"</p>
+                        <p class="output">>> Rendering montage.mp4... Done! (2m 14s)</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Montage AI Project. Source Available under PolyForm Noncommercial License.</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -20,13 +20,48 @@ patches:
       spec:
         template:
           spec:
-            nodeSelector:
-              kubernetes.io/arch: amd64
+            # Remove hard nodeSelector, use affinity for flexible scheduling
+            # Priority: GPU nodes > high-perf CPU > any
+            affinity:
+              nodeAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  # Prefer AMD GPU nodes (VAAPI encoding)
+                  - weight: 100
+                    preference:
+                      matchExpressions:
+                        - key: accelerator
+                          operator: In
+                          values: ["amd-gpu"]
+                  # Prefer Jetson (NVENC encoding)
+                  - weight: 90
+                    preference:
+                      matchExpressions:
+                        - key: accelerator
+                          operator: In
+                          values: ["nvidia-jetson"]
+                  # Prefer render tier
+                  - weight: 50
+                    preference:
+                      matchExpressions:
+                        - key: tier
+                          operator: In
+                          values: ["render", "compute"]
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                    # Must be amd64 for dev environment
+                    - matchExpressions:
+                        - key: kubernetes.io/arch
+                          operator: In
+                          values: ["amd64"]
             containers:
               - name: montage-ai
                 securityContext:
                   privileged: true
                   allowPrivilegeEscalation: true
+                env:
+                  # Enable GPU auto-detection via ResourceManager
+                  - name: FFMPEG_HWACCEL
+                    value: "auto"
                 resources:
                   requests:
                     cpu: "2"
