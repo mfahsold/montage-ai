@@ -844,46 +844,6 @@ def _transcribe_for_captions(video_path: str) -> Optional[str]:
     return None
 
 
-def _apply_voice_isolation(audio_path: str, settings) -> Optional[str]:
-    """
-    Apply voice isolation to audio before montage creation.
-
-    Args:
-        audio_path: Path to audio/music file
-        settings: Settings object with voice isolation config
-
-    Returns:
-        Path to isolated vocals, or None if failed
-    """
-    model = settings.features.voice_isolation_model
-    logger.info(f"\n🎤 Isolating voice ({model} model)...")
-
-    try:
-        from .cgpu_utils import is_cgpu_available
-        if not is_cgpu_available():
-            logger.warning("   Voice isolation requires cgpu - skipping")
-            return None
-
-        from .cgpu_jobs import VoiceIsolationJob
-        job = VoiceIsolationJob(
-            audio_path=audio_path,
-            model=model,
-            two_stems=True,  # Fast mode: vocals + accompaniment
-        )
-        result = job.execute()
-
-        if result.success:
-            logger.info(f"   ✅ Voice isolated: {result.output_path}")
-            return result.output_path
-        else:
-            logger.error(f"   Voice isolation failed: {result.error}")
-            return None
-
-    except Exception as e:
-        logger.error(f"   Voice isolation error: {e}")
-        return None
-
-
 def create_montage(variant_id: int = 1) -> Optional[str]:
     """
     Create a video montage from input footage and music.

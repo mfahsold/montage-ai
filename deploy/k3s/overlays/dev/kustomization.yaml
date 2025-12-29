@@ -4,6 +4,12 @@ kind: Kustomization
 resources:
   - ../../base
 
+# Use local cluster registry
+images:
+  - name: ghcr.io/mfahsold/montage-ai
+    newName: 192.168.1.37:5000/montage-ai
+    newTag: latest
+
 patches:
   - patch: |-
       apiVersion: batch/v1

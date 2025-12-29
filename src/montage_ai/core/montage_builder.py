@@ -651,6 +651,10 @@ class MontageBuilder:
         music_index = (self.variant_id - 1) % len(music_files)
         music_path = music_files[music_index]
 
+        # Apply voice isolation if enabled (cleans audio before analysis)
+        if self.settings.features.voice_isolation:
+            music_path = self._apply_voice_isolation(music_path)
+
         # Try cache first
         cache = get_analysis_cache()
         cached = cache.load_audio(music_path)
@@ -787,6 +791,47 @@ class MontageBuilder:
             self.ctx.all_scenes_dicts,
             strict_once=False,
         )
+
+    def _apply_voice_isolation(self, audio_path: str) -> str:
+        """
+        Apply voice isolation to audio before analysis.
+
+        Uses cgpu/demucs to separate vocals from music, resulting in
+        cleaner beat detection and energy analysis.
+
+        Args:
+            audio_path: Path to original audio file
+
+        Returns:
+            Path to isolated vocals (or original if isolation fails)
+        """
+        model = self.settings.features.voice_isolation_model
+        logger.info(f"\n🎤 Isolating voice ({model} model)...")
+
+        try:
+            from ..cgpu_utils import is_cgpu_available
+            if not is_cgpu_available():
+                logger.warning("   Voice isolation requires cgpu - using original audio")
+                return audio_path
+
+            from ..cgpu_jobs import VoiceIsolationJob
+            job = VoiceIsolationJob(
+                audio_path=audio_path,
+                model=model,
+                two_stems=True,  # Fast mode: vocals + accompaniment
+            )
+            result = job.execute()
+
+            if result.success and result.output_path:
+                logger.info(f"   ✅ Voice isolated: {result.output_path}")
+                return result.output_path
+            else:
+                logger.warning(f"   Voice isolation failed: {result.error}")
+                return audio_path
+
+        except Exception as e:
+            logger.warning(f"   Voice isolation error: {e}")
+            return audio_path
 
     def _get_files(self, directory: Path, extensions: Tuple[str, ...]) -> List[str]:
         """Get files with given extensions from directory."""
