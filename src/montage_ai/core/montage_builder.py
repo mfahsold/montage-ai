@@ -705,9 +705,13 @@ class MontageBuilder:
             )
 
     def _detect_scenes(self):
-        """Detect scenes in all video files with caching support."""
-        from ..scene_analysis import detect_scenes, analyze_scene_content
+        """Detect scenes in all video files with caching and parallel processing."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from ..scene_analysis import detect_scenes, analyze_scene_content, clear_histogram_cache
         from .analysis_cache import get_analysis_cache
+
+        # Clear histogram cache from previous runs
+        clear_histogram_cache()
 
         # Get video files
         video_files = self._get_files(self.ctx.input_dir, ('.mp4', '.mov'))
@@ -722,20 +726,50 @@ class MontageBuilder:
         threshold = 30.0
         cache = get_analysis_cache()
         cache_hits = 0
+        uncached_videos = []
 
-        # Detect scenes in each video
+        # First pass: check cache and collect uncached videos
+        cached_scenes = {}  # path -> scenes list
         for v_path in video_files:
-            # Check cache first
             cached = cache.load_scenes(v_path, threshold)
             if cached:
                 cache_hits += 1
-                scenes = [(s["start"], s["end"]) for s in cached.scenes]
+                cached_scenes[v_path] = [(s["start"], s["end"]) for s in cached.scenes]
             else:
-                # Fresh detection
-                scenes = detect_scenes(v_path, threshold=threshold)
-                # Save to cache (convert to Scene-like objects)
-                cache.save_scenes(v_path, threshold, scenes)
+                uncached_videos.append(v_path)
 
+        # Parallel scene detection for uncached videos
+        detected_scenes = {}  # path -> scenes list
+
+        def detect_video_scenes(v_path: str):
+            """Detect scenes in a single video (thread-safe)."""
+            try:
+                scenes = detect_scenes(v_path, threshold=threshold)
+                return v_path, scenes
+            except Exception as e:
+                logger.warning(f"   ⚠️ Scene detection failed for {v_path}: {e}")
+                return v_path, []
+
+        if uncached_videos:
+            # Use ThreadPoolExecutor for parallel I/O
+            max_workers = min(4, len(uncached_videos))  # Limit to 4 threads
+            logger.info(f"   🚀 Parallel scene detection ({len(uncached_videos)} videos, {max_workers} workers)")
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(detect_video_scenes, v): v for v in uncached_videos}
+
+                for future in as_completed(futures):
+                    v_path, scenes = future.result()
+                    detected_scenes[v_path] = scenes
+                    # Save to cache
+                    cache.save_scenes(v_path, threshold, scenes)
+
+        # Combine cached and detected scenes
+        all_video_scenes = {**cached_scenes, **detected_scenes}
+
+        # Build scene list
+        for v_path in video_files:
+            scenes = all_video_scenes.get(v_path, [])
             for start, end in scenes:
                 duration = end - start
                 if duration > 1.0:  # Ignore tiny clips
@@ -750,12 +784,23 @@ class MontageBuilder:
         if cache_hits > 0:
             logger.info(f"   ⚡ Used cached scene detection for {cache_hits}/{len(video_files)} videos")
 
-        # AI scene analysis (limit to first 20 for speed)
+        # Parallel AI scene analysis (limit to first 20 for speed)
         logger.info("   🤖 AI Director is watching footage...")
         scenes_to_analyze = self.ctx.all_scenes[:20]
-        for scene in scenes_to_analyze:
-            meta = analyze_scene_content(scene.path, scene.midpoint)
-            scene.meta = meta
+
+        def analyze_scene(scene):
+            """Analyze a single scene (thread-safe)."""
+            try:
+                meta = analyze_scene_content(scene.path, scene.midpoint)
+                return scene, meta
+            except Exception:
+                return scene, {}
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(analyze_scene, s) for s in scenes_to_analyze]
+            for future in as_completed(futures):
+                scene, meta = future.result()
+                scene.meta = meta
 
         # Shuffle for variety
         random.shuffle(self.ctx.all_scenes)

@@ -8,7 +8,7 @@ Complete reference for all environment variables and settings.
 
 | Variable          | Default       | Description                                                                         |
 | ----------------- | ------------- | ----------------------------------------------------------------------------------- |
-| `CUT_STYLE`       | `dynamic`     | Editing style: `dynamic`, `hitchcock`, `mtv`, `action`, `documentary`, `minimalist` |
+| `CUT_STYLE`       | `dynamic`     | Editing style: `dynamic`, `hitchcock`, `mtv`, `action`, `documentary`, `minimalist`, `viral`, `wes_anderson` |
 | `CREATIVE_PROMPT` | *(empty)*     | Natural language editing instructions (overrides `CUT_STYLE`)                       |
 | `NUM_VARIANTS`    | `1`           | Number of output variants to generate                                               |
 | `JOB_ID`          | *(timestamp)* | Unique identifier for parallel runs                                                 |

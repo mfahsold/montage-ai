@@ -16,8 +16,17 @@ deploy/k3s/
 ├── overlays/
 │   ├── dev/                 # Fast preview settings
 │   │   └── kustomization.yaml
-│   └── production/          # HQ render + AMD GPU targeting
-│       └── kustomization.yaml
+│   ├── production/          # HQ render + AMD GPU targeting
+│   │   └── kustomization.yaml
+│   ├── amd/                 # AMD GPU (VAAPI) acceleration
+│   │   ├── kustomization.yaml
+│   │   └── patch-job-amd.yaml
+│   ├── jetson/              # NVIDIA Jetson (NVENC) acceleration
+│   │   └── kustomization.yaml
+│   └── gpu/                 # Generic NVIDIA GPU acceleration
+│       ├── kustomization.yaml
+│       ├── patch-job-gpu.yaml
+│       └── patch-web-gpu.yaml
 └── README.md
 ```
 
@@ -126,9 +135,23 @@ kubectl apply -k deploy/k3s/overlays/dev/
 # Production (AMD GPU node, high quality)
 kubectl apply -k deploy/k3s/overlays/production/
 
-# NVIDIA GPU node (device plugin + runtimeclass "nvidia" required)
+# NVIDIA GPU node (generic - device plugin + runtimeclass "nvidia" required)
 kubectl apply -k deploy/k3s/overlays/gpu/
+
+# AMD GPU with VAAPI (codeai-fluxibriserver)
+kubectl apply -k deploy/k3s/overlays/amd/
+
+# NVIDIA Jetson (codeaijetson-desktop)
+kubectl apply -k deploy/k3s/overlays/jetson/
 ```
+
+### GPU Overlay Comparison
+
+| Overlay    | Target Node                | GPU Type     | Encoder | Use Case                    |
+| ---------- | -------------------------- | ------------ | ------- | --------------------------- |
+| `gpu`      | Any NVIDIA GPU node        | NVIDIA CUDA  | NVENC   | Generic NVIDIA acceleration |
+| `amd`      | codeai-fluxibriserver      | AMD Radeon   | VAAPI   | AMD GPU encoding            |
+| `jetson`   | codeaijetson-desktop       | NVIDIA Tegra | NVENC   | Edge device rendering       |
 
 ## Architecture
 
@@ -212,15 +235,32 @@ storageClassName: nfs-client      # NFS provisioner
 
 ## GPU Support
 
-For hardware-accelerated upscaling, uncomment GPU resources in `job.yaml`:
+### Available GPU Resources
 
-```yaml
-resources:
-  limits:
-    nvidia.com/gpu: "1"
+The cluster has the following GPU resources available:
+
+| Node                     | GPU Type            | Resource Key        | Encoder |
+| ------------------------ | ------------------- | ------------------- | ------- |
+| codeaijetson-desktop     | NVIDIA Jetson Tegra | `nvidia.com/gpu: 1` | NVENC   |
+| codeai-fluxibriserver    | AMD Radeon          | `amd.com/gpu: 1`    | VAAPI   |
+
+### Using GPU Overlays
+
+```bash
+# Check available GPU resources
+kubectl get nodes -o custom-columns='NAME:.metadata.name,NVIDIA:.status.allocatable.nvidia\.com/gpu,AMD:.status.allocatable.amd\.com/gpu'
+
+# Deploy to AMD server with VAAPI
+kubectl apply -k deploy/k3s/overlays/amd/
+
+# Deploy to Jetson with NVENC
+kubectl apply -k deploy/k3s/overlays/jetson/
 ```
 
-Requires NVIDIA device plugin installed in cluster.
+### Prerequisites
+
+- **NVIDIA GPU**: Requires nvidia-device-plugin daemonset and `nvidia` RuntimeClass
+- **AMD GPU**: Requires amd-gpu-device-plugin daemonset and `/dev/dri` access
 
 ## Triggering Jobs
 

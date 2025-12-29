@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-render
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      # Target AMD GPU server
+      nodeSelector:
+        kubernetes.io/hostname: codeai-fluxibriserver
+      containers:
+        - name: montage-ai
+          env:
+            # VAAPI for AMD GPU hardware encoding
+            - name: FFMPEG_HWACCEL
+              value: "vaapi"
+            - name: VK_ICD_FILENAMES
+              value: "/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
+            - name: LIBVA_DRIVER_NAME
+              value: "radeonsi"
+            - name: USE_GPU
+              value: "prefer"
+          resources:
+            requests:
+              cpu: "4"
+              memory: "12Gi"
+              amd.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+              amd.com/gpu: "1"
+          volumeMounts:
+            - name: dev-dri
+              mountPath: /dev/dri
+      volumes:
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: DirectoryOrCreate

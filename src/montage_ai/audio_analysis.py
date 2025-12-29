@@ -13,13 +13,29 @@ Usage:
 
 import os
 import random
+import subprocess
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 
 import json
 from pathlib import Path
 import numpy as np
-import librosa
+
+# Try to import librosa (may fail with numba/Python 3.12 compatibility issues)
+LIBROSA_AVAILABLE = False
+librosa = None
+try:
+    import librosa as _librosa
+    # Test that librosa's numba-decorated functions actually work
+    # This catches the 'get_call_template' error at import time
+    _librosa.get_duration(y=_librosa.util.example('brahms')[:1000], sr=22050)
+    librosa = _librosa
+    LIBROSA_AVAILABLE = True
+except Exception as e:
+    # Known issue: librosa/numba incompatibility with Python 3.12
+    # Error: 'function' object has no attribute 'get_call_template'
+    print(f"   ⚠️ librosa unavailable ({type(e).__name__}: {str(e)[:50]}), using FFmpeg fallback")
+    LIBROSA_AVAILABLE = False
 
 from .config import get_settings
 
@@ -113,7 +129,7 @@ def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
         return None
 
     analysis_path = Path(audio_path).with_suffix('.analysis.json')
-    
+
     # Use cached result if available
     if analysis_path.exists():
         try:
@@ -126,7 +142,7 @@ def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
     try:
         job = BeatAnalysisJob(input_path=audio_path)
         result = job.execute()
-        
+
         if result.success and result.output_path:
             with open(result.output_path, 'r') as f:
                 data = json.load(f)
@@ -136,8 +152,405 @@ def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
             print(f"   ⚠️ Cloud analysis failed: {result.error}. Falling back to local.")
     except Exception as e:
         print(f"   ⚠️ Cloud analysis error: {e}. Falling back to local.")
-    
+
     return None
+
+
+# =============================================================================
+# FFmpeg Fallback (bare-metal, no Python dependencies)
+# =============================================================================
+
+def _ffmpeg_get_duration(audio_path: str) -> float:
+    """Get audio duration using ffprobe (bare-metal)."""
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        audio_path
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return float(result.stdout.strip())
+    except Exception:
+        return 0.0
+
+
+def _ffmpeg_detect_onsets(audio_path: str, duration: float) -> List[float]:
+    """
+    Detect audio onsets (transients) using FFmpeg's silencedetect filter.
+
+    This finds moments where audio jumps from silence/quiet to loud,
+    which typically correspond to beat onsets.
+
+    Returns:
+        List of onset times in seconds
+    """
+    # Use silencedetect to find quiet gaps, then infer onsets
+    # Silence threshold: -35dB, minimum duration: 0.05s (50ms)
+    cmd = [
+        "ffmpeg", "-i", audio_path,
+        "-af", "silencedetect=n=-35dB:d=0.05",
+        "-f", "null", "-"
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        stderr = result.stderr
+
+        # Parse silence_end events (these are onset points)
+        onsets = []
+        for line in stderr.split('\n'):
+            if 'silence_end:' in line:
+                try:
+                    # Format: [silencedetect @ 0x...] silence_end: 1.234 | silence_duration: 0.567
+                    time_str = line.split('silence_end:')[1].split('|')[0].strip()
+                    onset_time = float(time_str)
+                    onsets.append(onset_time)
+                except (ValueError, IndexError):
+                    pass
+
+        return onsets
+    except Exception:
+        return []
+
+
+def _ffmpeg_analyze_loudness(audio_path: str, duration: float) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Analyze audio loudness envelope using FFmpeg's ebur128 filter.
+
+    Returns momentary loudness values at ~100ms intervals for peak detection.
+
+    Returns:
+        (times_array, loudness_array) - loudness in LUFS
+    """
+    # Use ebur128 with metadata output for momentary loudness
+    cmd = [
+        "ffmpeg", "-i", audio_path,
+        "-af", "ebur128=metadata=1:peak=true",
+        "-f", "null", "-"
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        stderr = result.stderr
+
+        # Parse momentary loudness (M:) values
+        # Format: [Parsed_ebur128_0 @ ...] M: -23.4 S: -24.5 I: -25.6 LRA: 12.3
+        loudness_values = []
+        for line in stderr.split('\n'):
+            if ' M:' in line and 'S:' in line:
+                try:
+                    m_part = line.split(' M:')[1].split(' S:')[0].strip()
+                    loudness = float(m_part)
+                    loudness_values.append(loudness)
+                except (ValueError, IndexError):
+                    pass
+
+        if loudness_values:
+            # ebur128 outputs at 10Hz (100ms intervals)
+            times = np.linspace(0, duration, len(loudness_values))
+            return times, np.array(loudness_values)
+
+        return np.array([]), np.array([])
+
+    except Exception:
+        return np.array([]), np.array([])
+
+
+def _detect_peaks_in_loudness(times: np.ndarray, loudness: np.ndarray,
+                               threshold_percentile: float = 70) -> List[float]:
+    """
+    Detect beat-like peaks in loudness curve.
+
+    Uses local maxima detection with dynamic thresholding.
+    """
+    if len(loudness) < 10:
+        return []
+
+    # Calculate threshold as percentile of loudness
+    threshold = np.percentile(loudness, threshold_percentile)
+
+    # Find local maxima above threshold
+    peaks = []
+    window = 3  # Look 3 samples on each side
+
+    for i in range(window, len(loudness) - window):
+        # Check if this is a local maximum
+        if loudness[i] >= threshold:
+            is_peak = True
+            for j in range(-window, window + 1):
+                if j != 0 and loudness[i + j] > loudness[i]:
+                    is_peak = False
+                    break
+            if is_peak:
+                # Avoid peaks too close together (minimum 0.15s apart)
+                if not peaks or (times[i] - peaks[-1]) > 0.15:
+                    peaks.append(times[i])
+
+    return peaks
+
+
+def _estimate_tempo_from_peaks(peak_times: List[float]) -> float:
+    """
+    Estimate tempo from inter-onset intervals.
+
+    Uses histogram of intervals to find most common beat spacing.
+    """
+    if len(peak_times) < 4:
+        return 120.0  # Default
+
+    # Calculate intervals between peaks
+    intervals = np.diff(peak_times)
+
+    # Filter reasonable beat intervals (0.25s to 2s = 30-240 BPM)
+    valid_intervals = intervals[(intervals >= 0.25) & (intervals <= 2.0)]
+
+    if len(valid_intervals) < 3:
+        return 120.0
+
+    # Use median interval (robust to outliers)
+    median_interval = np.median(valid_intervals)
+
+    # Convert to BPM
+    tempo = 60.0 / median_interval
+
+    # Clamp to reasonable range
+    tempo = max(60.0, min(200.0, tempo))
+
+    return tempo
+
+
+def _ffmpeg_estimate_tempo(audio_path: str, duration: float) -> Tuple[float, np.ndarray]:
+    """
+    Estimate tempo and beat times using FFmpeg's audio analysis.
+
+    Uses multiple methods for robust beat detection:
+    1. ebur128 loudness metering for energy peaks
+    2. silencedetect for transient onsets
+    3. Heuristic fallback based on average loudness
+
+    Returns:
+        (tempo_bpm, beat_times_array)
+    """
+    print(f"   🔍 Analyzing audio with FFmpeg onset detection...")
+
+    # Method 1: Try onset detection via silencedetect
+    onsets = _ffmpeg_detect_onsets(audio_path, duration)
+
+    # Method 2: Try loudness analysis
+    times, loudness = _ffmpeg_analyze_loudness(audio_path, duration)
+
+    # Method 3: Combine results
+    all_peaks = []
+
+    if len(onsets) >= 5:
+        all_peaks.extend(onsets)
+        print(f"   📊 Detected {len(onsets)} transient onsets")
+
+    if len(loudness) > 0:
+        loudness_peaks = _detect_peaks_in_loudness(times, loudness)
+        if len(loudness_peaks) >= 5:
+            all_peaks.extend(loudness_peaks)
+            print(f"   📊 Detected {len(loudness_peaks)} loudness peaks")
+
+    # Estimate tempo from peaks
+    if len(all_peaks) >= 8:
+        # Sort and deduplicate (peaks within 0.1s are merged)
+        all_peaks = sorted(set(all_peaks))
+        merged_peaks = [all_peaks[0]]
+        for p in all_peaks[1:]:
+            if p - merged_peaks[-1] > 0.1:
+                merged_peaks.append(p)
+
+        tempo = _estimate_tempo_from_peaks(merged_peaks)
+
+        # Generate regular beat grid aligned to detected peaks
+        beat_interval = 60.0 / tempo
+
+        # Find best phase alignment by testing different start offsets
+        best_offset = 0.0
+        best_score = 0
+        for test_offset in np.linspace(0, beat_interval, 10):
+            test_beats = np.arange(test_offset, duration, beat_interval)
+            # Score: how many detected peaks are close to grid beats
+            score = sum(1 for p in merged_peaks
+                       for b in test_beats
+                       if abs(p - b) < beat_interval * 0.25)
+            if score > best_score:
+                best_score = score
+                best_offset = test_offset
+
+        beat_times = np.arange(best_offset, duration, beat_interval)
+
+        print(f"   📊 FFmpeg analysis: {tempo:.1f} BPM ({len(beat_times)} beats)")
+        return tempo, beat_times
+
+    # Fallback: Use volumedetect for basic heuristic
+    print(f"   ⚠️ Insufficient peaks detected, using volumedetect fallback...")
+
+    cmd = [
+        "ffmpeg", "-i", audio_path,
+        "-af", "volumedetect",
+        "-f", "null", "-"
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        stderr = result.stderr
+
+        # Extract mean_volume from volumedetect
+        mean_vol = -20.0
+        for line in stderr.split('\n'):
+            if 'mean_volume:' in line:
+                try:
+                    mean_vol = float(line.split('mean_volume:')[1].split('dB')[0].strip())
+                except (ValueError, IndexError):
+                    pass
+
+        # Heuristic: louder tracks tend to be faster
+        if mean_vol > -10:
+            tempo = 140.0
+        elif mean_vol > -15:
+            tempo = 125.0
+        elif mean_vol > -20:
+            tempo = 110.0
+        else:
+            tempo = 100.0
+
+        beat_interval = 60.0 / tempo
+        beat_times = np.arange(0, duration, beat_interval)
+
+        print(f"   📊 FFmpeg heuristic: {tempo:.0f} BPM (mean vol: {mean_vol:.1f}dB)")
+        return tempo, beat_times
+
+    except Exception as e:
+        print(f"   ⚠️ FFmpeg analysis failed: {e}")
+        beat_times = np.arange(0, duration, 0.5)
+        return 120.0, beat_times
+
+
+def _ffmpeg_analyze_energy(audio_path: str, duration: float) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Analyze audio energy using FFmpeg to extract raw samples + numpy RMS.
+
+    This is a bare-metal approach that extracts audio samples and computes
+    RMS energy in chunks, providing accurate energy profiles without librosa.
+
+    Returns:
+        (times_array, rms_normalized_array)
+    """
+    import tempfile
+    import struct
+
+    # Window size for RMS calculation (0.1s = 100ms)
+    window_sec = 0.1
+    sample_rate = 22050  # Downsample for efficiency
+
+    # Extract raw audio samples as 16-bit PCM
+    with tempfile.NamedTemporaryFile(suffix='.raw', delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        cmd = [
+            "ffmpeg", "-y", "-i", audio_path,
+            "-ar", str(sample_rate),  # Resample
+            "-ac", "1",               # Mono
+            "-f", "s16le",            # 16-bit signed little-endian
+            "-acodec", "pcm_s16le",
+            tmp_path
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg extraction failed: {result.stderr[:200]}")
+
+        # Read raw samples
+        with open(tmp_path, 'rb') as f:
+            raw_data = f.read()
+
+        # Convert to numpy array
+        samples = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32)
+        samples = samples / 32768.0  # Normalize to -1..1
+
+        # Calculate RMS in windows
+        window_samples = int(window_sec * sample_rate)
+        num_windows = len(samples) // window_samples
+
+        if num_windows < 2:
+            # Very short audio, return uniform energy
+            return np.array([0, duration]), np.array([0.5, 0.5])
+
+        rms_values = []
+        for i in range(num_windows):
+            start = i * window_samples
+            end = start + window_samples
+            window = samples[start:end]
+            rms = np.sqrt(np.mean(window ** 2))
+            rms_values.append(rms)
+
+        rms_array = np.array(rms_values)
+
+        # Normalize to 0-1 scale
+        rms_min = np.min(rms_array)
+        rms_max = np.max(rms_array)
+        if rms_max > rms_min:
+            rms_normalized = (rms_array - rms_min) / (rms_max - rms_min)
+        else:
+            rms_normalized = np.ones_like(rms_array) * 0.5
+
+        times = np.linspace(0, duration, len(rms_normalized))
+
+        print(f"   📊 Energy profile: {len(rms_normalized)} samples (RMS computed)")
+        return times, rms_normalized
+
+    except Exception as e:
+        print(f"   ⚠️ FFmpeg energy extraction failed: {e}")
+        # Fallback: synthetic curve based on volumedetect
+        cmd_vol = [
+            "ffmpeg", "-i", audio_path,
+            "-af", "volumedetect",
+            "-f", "null", "-"
+        ]
+        try:
+            result_vol = subprocess.run(cmd_vol, capture_output=True, text=True, timeout=60)
+
+            mean_vol = -20.0
+            max_vol = -10.0
+            for line in result_vol.stderr.split('\n'):
+                if 'mean_volume:' in line:
+                    mean_vol = float(line.split('mean_volume:')[1].split('dB')[0].strip())
+                elif 'max_volume:' in line:
+                    max_vol = float(line.split('max_volume:')[1].split('dB')[0].strip())
+
+            # Generate energy curve based on detected dynamic range
+            num_samples = max(50, int(duration * 10))
+            times = np.linspace(0, duration, num_samples)
+
+            # Base energy from mean volume
+            base = max(0.3, (mean_vol + 40) / 40)
+            dynamic_range = min(0.3, (max_vol - mean_vol) / 40)
+
+            # Create realistic energy curve with dynamics
+            energy = base + dynamic_range * (
+                0.3 * np.sin(2 * np.pi * times / duration) +
+                0.2 * np.sin(4 * np.pi * times / duration) +
+                0.1 * np.sin(8 * np.pi * times / duration)
+            )
+            rms = np.clip(energy, 0, 1)
+            return times, rms
+
+        except Exception:
+            times = np.linspace(0, duration, 100)
+            rms = np.ones(100) * 0.5
+            return times, rms
+
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
 
 def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> EnergyProfile:
@@ -162,7 +575,7 @@ def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> Ene
         energy_data = cloud_data['energy']
         rms = np.array(energy_data['rms'])
         times = np.array(energy_data['times'])
-        
+
         # Normalize energy 0-1 (if not already)
         rms_min = np.min(rms)
         rms_max = np.max(rms)
@@ -172,31 +585,44 @@ def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> Ene
             times=times,
             rms=rms_normalized,
             sample_rate=cloud_data['sample_rate'],
-            hop_length=512 # Assumed default
+            hop_length=512  # Assumed default
         )
-        
+
         if verbose:
             print(f"   📊 Energy Stats: avg={profile.avg_energy:.2f}, max={profile.max_energy:.2f}, min={profile.min_energy:.2f}")
             print(f"   📊 High Energy (>70%): {profile.high_energy_pct:.1f}% of track")
-            
+
         return profile
 
-    y, sr = librosa.load(audio_path)
-    hop_length = 512
-    rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
-    times = librosa.times_like(rms, sr=sr, hop_length=hop_length)
+    # Use librosa if available, otherwise FFmpeg fallback
+    if LIBROSA_AVAILABLE:
+        y, sr = librosa.load(audio_path)
+        hop_length = 512
+        rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
+        times = librosa.times_like(rms, sr=sr, hop_length=hop_length)
 
-    # Normalize energy 0-1
-    rms_min = np.min(rms)
-    rms_max = np.max(rms)
-    rms_normalized = (rms - rms_min) / (rms_max - rms_min + 1e-6)
+        # Normalize energy 0-1
+        rms_min = np.min(rms)
+        rms_max = np.max(rms)
+        rms_normalized = (rms - rms_min) / (rms_max - rms_min + 1e-6)
 
-    profile = EnergyProfile(
-        times=times,
-        rms=rms_normalized,
-        sample_rate=sr,
-        hop_length=hop_length
-    )
+        profile = EnergyProfile(
+            times=times,
+            rms=rms_normalized,
+            sample_rate=sr,
+            hop_length=hop_length
+        )
+    else:
+        # FFmpeg fallback (bare-metal, no Python audio deps)
+        duration = _ffmpeg_get_duration(audio_path)
+        times, rms_normalized = _ffmpeg_analyze_energy(audio_path, duration)
+
+        profile = EnergyProfile(
+            times=times,
+            rms=rms_normalized,
+            sample_rate=44100,  # Assumed
+            hop_length=512
+        )
 
     if verbose:
         print(f"   📊 Energy Stats: avg={profile.avg_energy:.2f}, max={profile.max_energy:.2f}, min={profile.min_energy:.2f}")
@@ -243,17 +669,25 @@ def get_beat_times(audio_path: str, verbose: Optional[bool] = None) -> BeatInfo:
             sample_rate=sr
         )
 
-    y, sr = librosa.load(audio_path)
-    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+    # Use librosa if available, otherwise FFmpeg fallback
+    if LIBROSA_AVAILABLE:
+        y, sr = librosa.load(audio_path)
+        tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
 
-    # Handle tempo being an array (newer librosa versions)
-    if isinstance(tempo, np.ndarray):
-        tempo = float(tempo.item())
+        # Handle tempo being an array (newer librosa versions)
+        if isinstance(tempo, np.ndarray):
+            tempo = float(tempo.item())
+        else:
+            tempo = float(tempo)
+
+        beat_times = librosa.frames_to_time(beat_frames, sr=sr)
+        duration = librosa.get_duration(y=y, sr=sr)
+        sr = int(sr)
     else:
-        tempo = float(tempo)
-
-    beat_times = librosa.frames_to_time(beat_frames, sr=sr)
-    duration = librosa.get_duration(y=y, sr=sr)
+        # FFmpeg fallback (bare-metal, no Python audio deps)
+        duration = _ffmpeg_get_duration(audio_path)
+        tempo, beat_times = _ffmpeg_estimate_tempo(audio_path, duration)
+        sr = 44100  # Assumed
 
     print(f"   Tempo: {tempo:.1f} BPM, Detected {len(beat_times)} beats.")
 

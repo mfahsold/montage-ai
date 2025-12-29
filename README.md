@@ -45,15 +45,16 @@ Your video lands in `data/output/montage.mp4`.
 
 ## Styles
 
-| Style          | Vibe                             |
-| -------------- | -------------------------------- |
-| `dynamic`      | Adapts to music energy (default) |
-| `hitchcock`    | Slow build, dramatic payoff      |
-| `mtv`          | Fast cuts, music video feel      |
-| `action`       | Intense, Michael Bay energy      |
-| `documentary`  | Natural, observational           |
-| `minimalist`   | Calm, long takes                 |
-| `wes_anderson` | Symmetry, warm colors, quirky    |
+| Style          | Vibe                                 |
+| -------------- | ------------------------------------ |
+| `dynamic`      | Adapts to music energy (default)     |
+| `hitchcock`    | Slow build, dramatic payoff          |
+| `mtv`          | Fast cuts, music video feel          |
+| `action`       | Intense, Michael Bay energy          |
+| `documentary`  | Natural, observational               |
+| `minimalist`   | Calm, long takes                     |
+| `wes_anderson` | Symmetry, warm colors, quirky        |
+| `viral`        | Ultra-fast TikTok/Reels, max energy  |
 
 Or just describe what you want:
 

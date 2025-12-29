@@ -239,7 +239,7 @@ class FFmpegConfig:
     fps: int = STANDARD_FPS
     
     # Hardware acceleration
-    hwaccel: str = field(default_factory=lambda: _env_or_default("FFMPEG_HWACCEL", "none"))
+    hwaccel: str = field(default_factory=lambda: _env_or_default("FFMPEG_HWACCEL", "auto"))
     _resolved_hwaccel: Optional[str] = field(default=None, repr=False)
     
     def __post_init__(self):

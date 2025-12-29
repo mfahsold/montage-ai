@@ -22,7 +22,12 @@ patches:
           spec:
             # Target Jetson for NVENC hardware encoding
             nodeSelector:
-              accelerator: nvidia-jetson
+              kubernetes.io/hostname: codeaijetson-desktop
+            runtimeClassName: nvidia
+            tolerations:
+              - key: "nvidia.com/gpu"
+                operator: "Exists"
+                effect: "NoSchedule"
             containers:
               - name: montage-ai
                 securityContext:
@@ -32,18 +37,23 @@ patches:
                   # Force NVENC for Jetson
                   - name: FFMPEG_HWACCEL
                     value: "nvenc"
+                  - name: NVIDIA_VISIBLE_DEVICES
+                    value: "all"
+                  - name: NVIDIA_DRIVER_CAPABILITIES
+                    value: "compute,video,utility"
                 resources:
                   # Jetson has limited resources
                   requests:
                     cpu: "2"
                     memory: "4Gi"
+                    nvidia.com/gpu: "1"
                   limits:
                     cpu: "4"
                     memory: "8Gi"
+                    nvidia.com/gpu: "1"
                 volumeMounts:
                   - name: dev-dri
                     mountPath: /dev/dri
-                    readOnly: true
             volumes:
               - name: dev-dri
                 hostPath:

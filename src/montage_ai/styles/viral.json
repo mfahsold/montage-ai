@@ -1,0 +1,39 @@
+{
+  "id": "viral",
+  "name": "Viral TikTok/Reels",
+  "description": "Ultra-fast cuts, maximum energy, designed for social media virality",
+  "params": {
+    "style": {"name": "viral", "mood": "hypnotic"},
+    "pacing": {
+      "speed": "extreme",
+      "variation": "chaotic",
+      "intro_duration_beats": 1,
+      "climax_intensity": 1.0,
+      "min_cut_beats": 0.5,
+      "max_cut_beats": 2
+    },
+    "cinematography": {
+      "prefer_wide_shots": false,
+      "prefer_high_action": true,
+      "match_cuts_enabled": true,
+      "invisible_cuts_enabled": true,
+      "shot_variation_priority": "maximum"
+    },
+    "transitions": {
+      "type": "hard_cuts",
+      "crossfade_duration_sec": 0.0,
+      "whip_pan_probability": 0.2
+    },
+    "effects": {
+      "color_grading": "high_contrast",
+      "stabilization": false,
+      "sharpness_boost": true,
+      "vignette": true
+    },
+    "energy_mapping": {
+      "sync_to_beats": true,
+      "energy_amplification": 2.0,
+      "beat_reactivity": "aggressive"
+    }
+  }
+}

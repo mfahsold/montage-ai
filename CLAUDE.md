@@ -85,14 +85,17 @@ make logs                         # View job logs
 | `creative_director.py` | LLM interface: translates natural language prompts to editing parameters |
 | `creative_evaluator.py` | Agentic Creative Loop: LLM-powered feedback for iterative refinement |
 | `footage_manager.py` | Clip selection with story arc awareness (INTRO→BUILD→CLIMAX→SUSTAIN→OUTRO) |
+| `audio_analysis.py` | Beat detection (librosa + FFmpeg fallback), tempo, energy profiling |
+| `scene_analysis.py` | Scene detection, visual similarity with LRU cache (91% hit rate) |
 | `video_agent.py` | Semantic clip analysis for B-roll planning and keyword search |
 | `broll_planner.py` | Script-to-clip matching: finds footage for script segments |
 | `transcriber.py` | Audio transcription (Whisper) via cgpu for subtitles |
 | `style_templates.py` | Loads/validates JSON style presets from `styles/` |
 | `segment_writer.py` | Memory-efficient progressive rendering (batches clips to prevent OOM) |
-| `ffmpeg_config.py` | Centralized FFmpeg configuration with GPU encoder detection |
+| `ffmpeg_config.py` | GPU encoder detection (NVENC/VAAPI/QSV), auto-acceleration |
 | `cgpu_upscaler.py` | Cloud GPU offloading for AI upscaling via cgpu |
-| `timeline_exporter.py` | Export to OTIO/XML for DaVinci Resolve, Premiere |
+| `timeline_exporter.py` | Export to OTIO/EDL for DaVinci Resolve, Premiere |
+| `color_harmonizer.py` | Shot-to-shot color consistency, LUT application |
 
 ### LLM Backend Priority
 

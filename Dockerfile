@@ -46,8 +46,15 @@ FROM base AS python-deps
 
 WORKDIR /app
 
-# Force Python 3.10 and install conda packages
-RUN conda install -y -c conda-forge python=3.10 librosa numba numpy scipy wget && \
+# Force Python 3.10 and install conda packages with pinned versions
+# Note: numba>=0.60 + librosa>=0.10.2 have compatible APIs (no get_call_template errors)
+RUN conda install -y -c conda-forge \
+    python=3.10 \
+    librosa=0.10.2 \
+    numba=0.60.0 \
+    numpy=1.26.4 \
+    scipy \
+    wget && \
     conda clean -afy
 
 # Copy requirements first (cache layer)

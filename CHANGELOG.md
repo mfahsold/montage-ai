@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Viral Style Preset** (`src/montage_ai/styles/viral.json`)
+  - Ultra-fast cuts (0.5-2 beats), maximum energy for TikTok/Reels
+  - Chaotic pacing variation, aggressive beat reactivity
+  - High contrast color grading with vignette
+  - Energy amplification 2.0x for hypnotic effect
+
+- **FFmpeg-Based Beat Detection** (`src/montage_ai/audio_analysis.py`)
+  - Multi-method onset detection when librosa unavailable (Python 3.12 compatibility)
+  - `silencedetect` filter for transient onset detection
+  - `ebur128` loudness metering for energy peaks
+  - Raw PCM extraction with numpy RMS calculation for accurate energy profiles
+  - Automatic tempo estimation from inter-onset intervals
+  - Phase-aligned beat grid generation
+
+- **LRU Cache for Visual Similarity** (`src/montage_ai/scene_analysis.py`)
+  - `@lru_cache(maxsize=256)` for frame histogram extraction
+  - Eliminates redundant frame reads during clip selection scoring
+  - **91% cache hit rate** observed in production
+  - `get_histogram_cache_stats()` for performance monitoring
+  - `clear_histogram_cache()` for memory management between runs
+
+- **Parallel Scene Detection** (`src/montage_ai/core/montage_builder.py`)
+  - `ThreadPoolExecutor` with 4 workers for concurrent video analysis
+  - Parallel AI scene analysis for metadata extraction
+  - 3-4x speedup on multi-core systems
+
+- **Auto GPU Encoding** (`src/montage_ai/ffmpeg_config.py`)
+  - Default changed from `"none"` to `"auto"` for automatic GPU detection
+  - Priority: NVENC > VAAPI > QSV > VideoToolbox > CPU
+  - VAAPI tested working on Intel HD 620 (2.6x speedup)
+  - Zero-copy GPU pipeline support for NVENC/VAAPI
+
+### Changed
+
+- **librosa Fallback Handling** (`src/montage_ai/audio_analysis.py`)
+  - Graceful fallback to FFmpeg when librosa/numba fails (Python 3.12 `get_call_template` error)
+  - Test librosa functionality at import time to detect issues early
+  - `LIBROSA_AVAILABLE` flag for runtime detection
+
 - **Burn-in Captions** (`src/montage_ai/caption_burner.py`)
   - Hardcode subtitles into video using FFmpeg drawtext filter
   - 6 predefined styles: TikTok, YouTube, Minimal, Karaoke, Bold, Cinematic
