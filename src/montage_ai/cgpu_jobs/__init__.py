@@ -15,6 +15,8 @@ __all__ = [
     "SceneDetectionJob",
     "BeatAnalysisJob",
     "FFmpegRenderJob",
+    "VoiceIsolationJob",
+    "NoiseReductionJob",
     # Future jobs (skeleton implementations)
     "InterpolationJob",
     "LUTGeneratorJob",
@@ -41,6 +43,13 @@ def __getattr__(name):
     elif name == "FFmpegRenderJob":
         from .render import FFmpegRenderJob
         return FFmpegRenderJob
+    # Voice/Audio jobs
+    elif name == "VoiceIsolationJob":
+        from .voice_isolation import VoiceIsolationJob
+        return VoiceIsolationJob
+    elif name == "NoiseReductionJob":
+        from .voice_isolation import NoiseReductionJob
+        return NoiseReductionJob
     # Future jobs (skeleton implementations)
     elif name == "InterpolationJob":
         from .interpolation import InterpolationJob

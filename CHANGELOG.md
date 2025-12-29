@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Burn-in Captions** (`src/montage_ai/caption_burner.py`)
+  - Hardcode subtitles into video using FFmpeg drawtext filter
+  - 6 predefined styles: TikTok, YouTube, Minimal, Karaoke, Bold, Cinematic
+  - Supports SRT, VTT, and Whisper JSON input formats
+  - `CaptionBurner` class with customizable `StyleConfig`
+  - CLI: `python -m montage_ai.caption_burner video.mp4 subs.srt tiktok`
+
+- **Text-Based Video Editor** (`src/montage_ai/text_editor.py`)
+  - Descript-style editing: delete text → delete video
+  - Load Whisper JSON transcripts with word-level timestamps
+  - Auto-remove filler words ("um", "uh", etc.)
+  - Remove low-confidence transcription segments
+  - Export to video, EDL (for NLE import), or JSON cut list
+  - Interactive mode: edit transcript in `$EDITOR`
+  - CLI: `python -m montage_ai.text_editor video.mp4 transcript.json --remove-fillers`
+
+- **Voice Isolation** (`src/montage_ai/cgpu_jobs/voice_isolation.py`)
+  - `VoiceIsolationJob`: Extract vocals using demucs on cgpu
+  - Models: htdemucs (best), htdemucs_ft, mdx_extra, mdx (fastest)
+  - Two-stem mode for faster vocals-only extraction
+  - `NoiseReductionJob`: DeepFilterNet for noise reduction (faster alternative)
+  - CLI: `python -m montage_ai.cgpu_jobs.voice_isolation audio.wav`
+
 - **Agentic Creative Loop** (`src/montage_ai/creative_evaluator.py`)
   - LLM-powered feedback loop for montage quality refinement
   - `CreativeEvaluator` class evaluates cuts against style, pacing, energy, variety criteria
