@@ -941,6 +941,17 @@ class MontageBuilder:
                 beats_per_cut, beat_times
             )
 
+            # Early exit: prevent overrun beyond target
+            remaining_time = self.ctx.target_duration - self.ctx.current_time
+            if remaining_time < cut_duration * 0.3:
+                # Less than 30% of a cut remaining - stop here
+                logger.info(f"   🛑 Target reached ({self.ctx.current_time:.1f}s / {self.ctx.target_duration:.1f}s)")
+                break
+
+            # Trim last cut if it would significantly overshoot
+            if cut_duration > remaining_time:
+                cut_duration = max(remaining_time, cut_duration * 0.5)
+
             # Get available footage
             min_dur = cut_duration * 0.5
             available_footage = self._footage_pool.get_available_clips(min_duration=min_dur)
