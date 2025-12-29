@@ -10,6 +10,7 @@ Montage AI is an **AI Post-Production Assistant** that enhances, organizes, cuts
 
 **Core Pillars:**
 - **AI Editing & Storytelling**: Intelligent cutting based on beat, mood, and narrative arc
+- **Agentic Creative Loop**: LLM-powered iterative refinement of montage quality
 - **Enhancement & Restoration**: Upscaling, stabilization, color grading via Cloud GPU
 - **Professional Workflow**: Subtitles, B-roll planning, export to NLEs (DaVinci Resolve, Premiere)
 - **Cloud GPU Integration**: Heavy compute (upscaling, transcoding, Whisper) offloaded to `cgpu`
@@ -31,7 +32,7 @@ make shell          # Interactive shell in container
 ./montage-ai.sh run [STYLE]       # Create montage (styles: dynamic, hitchcock, mtv, action, documentary, minimalist, wes_anderson)
 ./montage-ai.sh preview           # Fast preview render
 ./montage-ai.sh hq [STYLE]        # High-quality render with stabilization + upscaling
-./montage-ai.sh web               # Start Web UI (http://localhost:8080)
+./montage-ai.sh web               # Start Web UI (http://localhost:5001)
 ./montage-ai.sh list              # List available styles
 ```
 
@@ -82,6 +83,7 @@ make logs                         # View job logs
 |--------|---------|
 | `editor.py` | Main orchestrator: beat detection, scene detection, clip assembly, rendering |
 | `creative_director.py` | LLM interface: translates natural language prompts to editing parameters |
+| `creative_evaluator.py` | Agentic Creative Loop: LLM-powered feedback for iterative refinement |
 | `footage_manager.py` | Clip selection with story arc awareness (INTRO→BUILD→CLIMAX→SUSTAIN→OUTRO) |
 | `video_agent.py` | Semantic clip analysis for B-roll planning and keyword search |
 | `broll_planner.py` | Script-to-clip matching: finds footage for script segments |
@@ -115,6 +117,7 @@ Key environment variables (see `docs/configuration.md` for full reference):
 ```bash
 CUT_STYLE=dynamic              # Editing style preset
 CREATIVE_PROMPT="..."          # Natural language override
+CREATIVE_LOOP=true             # Enable agentic refinement loop
 CGPU_ENABLED=true              # Enable cloud GPU via cgpu
 FFMPEG_HWACCEL=auto            # GPU encoding: auto, nvenc, vaapi, qsv, none
 STABILIZE=true                 # Enable video stabilization

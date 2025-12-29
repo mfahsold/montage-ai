@@ -434,6 +434,7 @@ def run_creative_loop(
     initial_instructions: Optional[Dict[str, Any]] = None,
     max_iterations: int = 3,
     approval_threshold: float = 0.8,
+    settings: Optional[Any] = None,
 ) -> "MontageResult":
     """
     Run the full agentic creative loop.
@@ -444,6 +445,7 @@ def run_creative_loop(
         initial_instructions: Starting editing instructions
         max_iterations: Maximum refinement iterations
         approval_threshold: Score threshold for approval
+        settings: Optional Settings object to pass to builder
 
     Returns:
         Final MontageResult after refinement
@@ -463,10 +465,13 @@ def run_creative_loop(
         print(f"{'='*60}")
 
         # Build montage
-        builder = builder_class(
-            variant_id=variant_id,
-            editing_instructions=instructions,
-        )
+        builder_kwargs = {
+            "variant_id": variant_id,
+            "editing_instructions": instructions,
+        }
+        if settings is not None:
+            builder_kwargs["settings"] = settings
+        builder = builder_class(**builder_kwargs)
         result = builder.build()
 
         if not result.success:

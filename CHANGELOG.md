@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agentic Creative Loop** (`src/montage_ai/creative_evaluator.py`)
+  - LLM-powered feedback loop for montage quality refinement
+  - `CreativeEvaluator` class evaluates cuts against style, pacing, energy, variety criteria
+  - Dataclasses: `EditingIssue`, `EditingAdjustment`, `MontageEvaluation`
+  - `run_creative_loop()` orchestrates iterative build → evaluate → refine cycles
+  - Auto-approval after configurable max iterations (default: 3)
+  - Enable via `CREATIVE_LOOP=true` environment variable
+  - 21 comprehensive tests in `tests/test_creative_evaluator.py`
+
+- **Web UI: Toggle Badges & Pipeline Phases**
+  - Quality/Cost badges on feature toggles (e.g., "HQ" for upscale, "Slow" for stabilize)
+  - Pipeline phase chips showing progress (Analysis → Creative → Assembly → Render → Finish)
+  - Client-side file validation before upload (type, size, naming)
+  - Completion card with render statistics
+
+### Changed
+
+- **Creative Loop Integration** (`editor.py:create_montage()`)
+  - Now checks `_settings.features.creative_loop` feature flag
+  - When enabled, wraps build with `run_creative_loop()` for iterative refinement
+  - Passes settings to builder for consistent configuration
+
+- **Dockerfile Optimization** - Multi-stage build for faster rebuilds
+  - Stage 1: Base with system dependencies (ffmpeg, vulkan, nodejs)
+  - Stage 2: Python dependencies (cached unless requirements.txt changes)
+  - Stage 3: Real-ESRGAN installation (architecture-specific)
+  - Stage 4: Application code (changes most frequently)
+  - Added `--no-install-recommends` to reduce image size
+  - Added healthcheck for container orchestration
+
+### Fixed
+
+- **Web UI: `/api/status` defaults** - Now uses `Settings` instead of hardcoded values
+- **Web UI: Quick Preview** - Sets `FFMPEG_PRESET=ultrafast` and `FINAL_CRF=28` for faster renders
+- **Web UI: Creative Loop toggle** - Added to `DEFAULT_OPTIONS` and `normalize_options()`
+
+### Documentation
+
+- **Major cleanup** - Removed outdated and non-English content
+  - Deleted `docs/archive/LLM_WORKFLOW.md` (German)
+  - Deleted `docs/LEGAL_IMPLEMENTATION.md` (business-specific)
+  - Deleted `docs/screenshots.md` (placeholder)
+- **Restructured** - Moved completed roadmap docs to archive
+  - `editor_decomposition_plan.md`, `post_production_pivot.md`, `next_steps_q1_2025.md`
+  - `cloud_pipeline_design.md`, `cloud_pipeline_technical_spec.md`
+  - `integration_status_report.md`, `offloading_analysis.md`
+- **Added Creative Loop** to `docs/features.md` with usage examples
+- **Updated `docs/README.md`** - Comprehensive index with all docs organized by category
+- **Updated `CLAUDE.md`** - Added Creative Loop to core pillars and module table
+
 - **Unified Cloud GPU Job Pipeline** (`src/montage_ai/cgpu_jobs/`)
   - New `cgpu_jobs` package with abstract job architecture for all cloud GPU operations
   - `base.py`: `CGPUJob` abstract base class with full lifecycle management

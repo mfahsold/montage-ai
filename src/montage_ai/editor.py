@@ -767,12 +767,24 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
 
     # Build using the new MontageBuilder pipeline
     try:
-        builder = MontageBuilder(
-            variant_id=variant_id,
-            settings=_settings,
-            editing_instructions=EDITING_INSTRUCTIONS,
-        )
-        result = builder.build()
+        # Check if creative loop is enabled
+        if _settings.features.creative_loop:
+            from .creative_evaluator import run_creative_loop
+            logger.info(f"Creative Loop enabled (max {_settings.features.creative_loop_max_iterations} iterations)")
+            result = run_creative_loop(
+                builder_class=MontageBuilder,
+                variant_id=variant_id,
+                initial_instructions=EDITING_INSTRUCTIONS,
+                max_iterations=_settings.features.creative_loop_max_iterations,
+                settings=_settings,
+            )
+        else:
+            builder = MontageBuilder(
+                variant_id=variant_id,
+                settings=_settings,
+                editing_instructions=EDITING_INSTRUCTIONS,
+            )
+            result = builder.build()
 
         if result.success:
             logger.info(f"\n✅ Variant #{variant_id} Done!")

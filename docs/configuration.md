@@ -15,6 +15,30 @@ Complete reference for all environment variables and settings.
 
 ---
 
+## Creative Loop (Agentic Refinement)
+
+The Creative Loop enables iterative LLM-powered refinement of montage quality.
+
+| Variable                       | Default | Description                                        |
+| ------------------------------ | ------- | -------------------------------------------------- |
+| `CREATIVE_LOOP`                | `false` | Enable agentic creative feedback loop              |
+| `CREATIVE_LOOP_MAX_ITERATIONS` | `3`     | Maximum refinement iterations before auto-approval |
+
+**How it works:**
+1. First cut is built with initial editing instructions
+2. LLM evaluates the cut (pacing, variety, energy, transitions)
+3. If score < 0.8, adjustments are suggested and applied
+4. Process repeats until approved or max iterations reached
+
+**Example:**
+```bash
+CREATIVE_LOOP=true \
+CREATIVE_LOOP_MAX_ITERATIONS=3 \
+./montage-ai.sh run hitchcock
+```
+
+---
+
 ## AI / LLM Settings
 
 LLM backends are used in **priority order**: OpenAI-compatible > Google AI > cgpu > Ollama

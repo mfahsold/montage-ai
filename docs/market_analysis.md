@@ -92,12 +92,70 @@ Tools that automate specific editing tasks without full AI orchestration.
 
 ---
 
-### 6. Traditional Video Editors (Different Category)
+### 6. Traditional OSS Video Editors (NLEs)
 
-| Project | Focus | AI Capabilities |
-|---------|-------|-----------------|
-| [Kdenlive](https://kdenlive.org/) | Full NLE | Minimal AI |
-| [Shotcut](https://shotcut.org/) | Full NLE | None |
+These are full-featured manual editors. They are robust but lack automation.
+
+| Project | Tech Stack | AI Capabilities | Relevance to Montage AI |
+|---------|------------|-----------------|-------------------------|
+| [Kdenlive](https://kdenlive.org/) | C++/Qt/MLT | Minimal (Whisper sub-titles) | **High**: Target for OTIO export. Best OSS NLE. |
+| [Shotcut](https://shotcut.org/) | C++/Qt/MLT | None | **Medium**: Good for manual finishing. |
+| [OpenShot](https://www.openshot.org/) | Python/C++ | None | **Low**: Simple, consumer-focused. |
+| [Olive](https://olivevideoeditor.org/) | C++/GL | None | **Low**: Promising but development stalled. |
+| [Blender VSE](https://www.blender.org/) | Python/C++ | None | **Medium**: Scriptable, but complex UI. |
+
+**Strategic Insight**: We do not compete with these. We **feed** them. Montage AI generates the project file that you open in Kdenlive or Resolve to finish.
+
+---
+
+## Commercial Competitors
+
+The commercial space is split between "Pro NLEs with AI features" and "AI-first Creators".
+
+### 1. Pro NLEs (The Incumbents)
+
+| Product | Company | AI Features | Montage AI vs. Them |
+|---------|---------|-------------|---------------------|
+| **DaVinci Resolve** | Blackmagic | Neural Engine (Magic Mask, Voice Iso, Smart Reframe) | **Complementary**. We export OTIO to Resolve. We can't beat their color/masking, so we don't try. |
+| **Premiere Pro** | Adobe | Firefly, Remix, Text-Based Editing | **Complementary**. We offer a free, automated rough-cut alternative for non-pros or bulk workflows. |
+| **Final Cut Pro** | Apple | Smart Conform, Voice Isolation | **Complementary**. Mac-only ecosystem. |
+
+### 2. AI-First Editors (The Disruptors)
+
+| Product | Focus | Pros | Cons |
+|---------|-------|------|------|
+| **CapCut** | Social/Mobile | Massive effect library, viral templates, easy UI | **Walled Garden**. Hard to export project data. Privacy concerns. |
+| **Opus Clip / Munch** | Repurposing | Excellent "viral clip" detection from long video | **Expensive** subscription. Cloud-only. No creative direction (just "find highlights"). |
+| **Descript** | Text-Edit | Edit video by editing text. Great for talking heads. | **Niche**. Less effective for music/montage/action. |
+| **Magisto** | Auto-Creation | The "OG" automated editor. | **Dated**. Template-based, less "intelligent" than LLM agents. |
+
+---
+
+## Strategic Gap Analysis
+
+Where does Montage AI stand in 2025?
+
+### ✅ What we do similarly well (Parity)
+1.  **Beat Synchronization**: Our `librosa`-based detection matches the timing accuracy of CapCut templates.
+2.  **Format Support**: Thanks to FFmpeg, we handle virtually any input format (ProRes, H.265, MKV) just like the pro tools.
+3.  **Basic Color/Luts**: We can apply LUTs and basic corrections effectively.
+
+### 🚀 What we do better (Our Edge)
+1.  **"Polish, Don't Generate" Philosophy**: Unlike Sora/Runway, we respect the source footage. Unlike CapCut, we don't turn it into a slot machine of effects.
+2.  **NLE Interoperability (OTIO)**: This is our "Killer Feature". You are not locked in. Start with AI, finish in Resolve. No other "Auto-Editor" does this well.
+3.  **Privacy & Local Control**: Run offline. Keep your footage on your NAS. No uploading terabytes to the cloud just to get a rough cut.
+4.  **Agentic Direction**: You can talk to the "Creative Director" ("Make it feel like a 90s skate video"). Templates are rigid; LLMs are flexible.
+
+### 🚧 Where we are weak (The Gap)
+1.  **User Interface**: Our Web UI is functional but lacks the "drag-and-drop" polish and real-time preview of CapCut or DaVinci.
+2.  **Fine-Tuning**: Currently, you can't easily "nudge" a cut by 2 frames in our UI. You have to re-run or export to NLE.
+3.  **Asset Library**: We lack the millions of stickers, fonts, and transitions that commercial tools license.
+4.  **Processing Speed**: We are a **batch processor** (render -> view). Commercial tools are **real-time** (view -> render).
+
+### ⛔ Out of Scope
+1.  **Generative Video**: We will not build a text-to-video model. We integrate them (maybe) but don't train them.
+2.  **Real-time Compositing**: We are not building After Effects. No complex 3D tracking or particle systems.
+3.  **Social Hosting**: We are a tool, not a platform. We don't host your videos.
 | [OpenShot](https://openshot.org/) | Simple NLE | None |
 | [Natron](https://natron.fr/) | Compositing | None |
 

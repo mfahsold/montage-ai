@@ -66,13 +66,14 @@ ASSETS_DIR = _settings.paths.assets_dir
 
 # Note: Directories are created lazily on first job to avoid issues in test environments
 
-# Default options derived from settings
+# Default options derived from settings (Single Source of Truth)
 DEFAULT_OPTIONS = {
     "enhance": _settings.features.enhance,
     "stabilize": _settings.features.stabilize,
     "upscale": _settings.features.upscale,
     "cgpu": _settings.llm.cgpu_gpu_enabled,
     "llm_clip_selection": _settings.features.llm_clip_selection,
+    "creative_loop": _settings.features.creative_loop,
     "export_timeline": _settings.features.export_timeline,
     "generate_proxies": _settings.features.generate_proxies,
     "preserve_aspect": _settings.features.preserve_aspect,
@@ -179,6 +180,7 @@ def normalize_options(data: dict) -> dict:
         "upscale": get_bool('upscale'),
         "enhance": get_bool('enhance'),
         "llm_clip_selection": get_bool('llm_clip_selection'),
+        "creative_loop": get_bool('creative_loop'),
         "export_timeline": get_bool('export_timeline'),
         "generate_proxies": get_bool('generate_proxies'),
         # Default cgpu to true if env var is set, otherwise use UI value
@@ -187,6 +189,8 @@ def normalize_options(data: dict) -> dict:
         "target_duration": target_duration,
         "music_start": music_start,
         "music_end": music_end,
+        # Preview mode flag (for FFMPEG_PRESET)
+        "preview": data.get('preset') == 'fast',
     }
 
 
@@ -244,6 +248,12 @@ def run_montage(job_id: str, style: str, options: dict):
         env["GENERATE_PROXIES"] = "true" if options.get("generate_proxies") else "false"
         # Aspect ratio handling: letterbox/pillarbox vs crop
         env["PRESERVE_ASPECT"] = "true" if options.get("preserve_aspect") else "false"
+        # Phase 4: Agentic Creative Loop
+        env["CREATIVE_LOOP"] = "true" if options.get("creative_loop") else "false"
+        # Quick Preview: Use fast FFmpeg preset
+        if options.get("preview"):
+            env["FFMPEG_PRESET"] = "ultrafast"
+            env["FINAL_CRF"] = "28"  # Lower quality for speed
         # cgpu checkbox enables BOTH LLM and GPU upscaling
         env["CGPU_ENABLED"] = "true" if options.get("cgpu") else "false"
         env["CGPU_GPU_ENABLED"] = "true" if options.get("cgpu") else "false"
@@ -391,14 +401,8 @@ def api_status():
             "version": VERSION
         },
         "defaults": {
-            "enhance": False,
-            "stabilize": False,
-            "upscale": False,
-            "cgpu": cgpu_ok,
-            "llm_clip_selection": False,
-            "export_timeline": False,
-            "generate_proxies": False,
-            "preserve_aspect": False
+            **DEFAULT_OPTIONS,
+            "cgpu": DEFAULT_OPTIONS.get("cgpu", False) or cgpu_ok,  # Enable if available
         }
     })
 
@@ -473,14 +477,16 @@ def api_create_job():
     job_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Handle Quick Preview override
-    if data.get('preset') == 'fast':
-        data['style'] = 'dynamic' # Force dynamic for speed
-        data['target_duration'] = 30 # Cap at 30s
+    is_preview = data.get('preset') == 'fast'
+    if is_preview:
+        data['style'] = 'dynamic'  # Force dynamic for speed
+        data['target_duration'] = min(data.get('target_duration', 30) or 30, 30)  # Cap at 30s
         # Disable heavy features
         data['upscale'] = False
         data['stabilize'] = False
         data['enhance'] = False
         data['cgpu'] = False
+        data['creative_loop'] = False
 
     # Normalize options (single source of truth for parsing/defaults/derivation)
     normalized_options = normalize_options(data)

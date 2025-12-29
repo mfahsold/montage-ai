@@ -10,6 +10,7 @@ Everything Montage AI can do for you.
 - Style-aware pacing, transitions, and color looks
 - Story arc shaping (intro → build → climax → outro)
 - LLM-powered "Creative Director" (Ollama local or Gemini via cgpu)
+- **Agentic Creative Loop** for iterative quality refinement
 
 ## Style Templates (Built-in)
 
@@ -54,8 +55,6 @@ make web              # or: docker compose -f docker-compose.web.yml up
 # open http://localhost:5001
 ```
 
-![Web UI Features](images/web-ui-features.png)
-<!-- TODO: Add screenshot highlighting Web UI features like style selection and toggles -->
 
 Flow: upload videos + music → pick style or prompt → toggle enhance/stabilize/upscale/cloud GPU → Create Montage → download MP4 (and timeline if enabled).
 
@@ -79,8 +78,6 @@ Enable during run:
 Outputs in `data/output/`:
 - `*.otio` (preferred), `*.edl`, `*.csv`, metadata JSON, optional proxies folder.
 
-![Timeline Export in DaVinci Resolve](images/timeline-export-davinci.png)
-<!-- TODO: Add screenshot of the exported timeline imported into DaVinci Resolve -->
 
 Import tips:
 - **DaVinci Resolve:** File → Import → Timeline → select `.otio`; relink media if paths differ.
@@ -93,6 +90,28 @@ Import tips:
 - Enable Colab GPU upscaling: `CGPU_GPU_ENABLED=true ./montage-ai.sh run --upscale --cgpu-gpu`
 
 Fallback order for upscaling: cgpu T4/A100 → local Vulkan GPU → FFmpeg Lanczos (CPU).
+
+## Creative Loop (Agentic Refinement)
+
+When enabled, the LLM evaluates each cut and suggests improvements:
+
+```bash
+CREATIVE_LOOP=true ./montage-ai.sh run hitchcock
+```
+
+**How it works:**
+1. First cut is built with initial editing instructions
+2. LLM evaluates pacing, variety, energy, transitions
+3. If satisfaction score < 80%, adjustments are applied
+4. Process repeats until approved or max iterations (default: 3)
+
+**Evaluation criteria:**
+- **Pacing:** Does cut rhythm match the style and music energy?
+- **Variety:** Enough shot variation? No jump cuts or repetition?
+- **Energy:** Fast cuts on high-energy sections, breathing room on calm ones?
+- **Story Arc:** Does the edit follow intro → build → climax → outro?
+
+See [configuration.md](configuration.md#creative-loop-agentic-refinement) for all options.
 
 ## Troubleshooting
 
