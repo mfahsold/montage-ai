@@ -15,6 +15,9 @@ __all__ = [
     "SceneDetectionJob",
     "BeatAnalysisJob",
     "FFmpegRenderJob",
+    # Future jobs (skeleton implementations)
+    "InterpolationJob",
+    "LUTGeneratorJob",
 ]
 
 
@@ -38,4 +41,11 @@ def __getattr__(name):
     elif name == "FFmpegRenderJob":
         from .render import FFmpegRenderJob
         return FFmpegRenderJob
+    # Future jobs (skeleton implementations)
+    elif name == "InterpolationJob":
+        from .interpolation import InterpolationJob
+        return InterpolationJob
+    elif name == "LUTGeneratorJob":
+        from .lut_generator import LUTGeneratorJob
+        return LUTGeneratorJob
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

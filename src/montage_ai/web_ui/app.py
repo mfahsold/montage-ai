@@ -6,6 +6,7 @@ DRY + KISS: Minimal dependencies, no over-engineering.
 """
 
 import os
+import re
 import json
 import shutil
 import subprocess
@@ -22,6 +23,9 @@ from ..editor import detect_gpu_capabilities
 
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
+
+# Job phase tracking models
+from .models import JobPhase, PIPELINE_PHASES
 
 # B-Roll Planning (semantic clip search via video_agent)
 try:
@@ -287,13 +291,21 @@ def run_montage(job_id: str, style: str, options: dict):
                 if "Phase" in line and "/" in line:
                     try:
                         # Extract "Phase X/Y: Name"
-                        # Assuming format like: "[INFO] Phase 1/5: Setup..."
-                        parts = line.split("Phase")
-                        if len(parts) > 1:
-                            phase_text = "Phase" + parts[1].split("\n")[0]
-                            # Clean up ANSI codes if any (though text=True should handle most)
+                        # Format: "[INFO] Phase 1/5: Setup..." or "Phase 2/6: Analysis"
+                        match = re.search(r'Phase\s*(\d+)/(\d+):\s*(\w+)', line)
+                        if match:
+                            phase_num = int(match.group(1))
+                            phase_total = int(match.group(2))
+                            phase_name = match.group(3).lower()
                             with job_lock:
-                                jobs[job_id]["phase"] = phase_text.strip()
+                                jobs[job_id]["phase"] = {
+                                    "name": phase_name,
+                                    "label": f"Phase {phase_num}/{phase_total}: {match.group(3)}",
+                                    "number": phase_num,
+                                    "total": phase_total,
+                                    "started_at": datetime.now().isoformat(),
+                                    "progress_percent": int((phase_num / phase_total) * 100)
+                                }
                     except Exception:
                         pass
             
@@ -310,7 +322,14 @@ def run_montage(job_id: str, style: str, options: dict):
             # Python warnings (like RuntimeWarning) can cause non-zero exit even on success
             if result.returncode == 0 or output_files:
                 jobs[job_id]["status"] = "completed"
-                jobs[job_id]["phase"] = "Completed"
+                jobs[job_id]["phase"] = {
+                    "name": "completed",
+                    "label": "Completed",
+                    "number": len(PIPELINE_PHASES),
+                    "total": len(PIPELINE_PHASES),
+                    "started_at": datetime.now().isoformat(),
+                    "progress_percent": 100
+                }
                 jobs[job_id]["completed_at"] = datetime.now().isoformat()
 
                 if output_files:
@@ -490,14 +509,14 @@ def api_create_job():
 
     # Normalize options (single source of truth for parsing/defaults/derivation)
     normalized_options = normalize_options(data)
-    
-    # Create job with normalized options
+
+    # Create job with normalized options and structured phase tracking
     job = {
         "id": job_id,
         "style": data['style'],
         "options": normalized_options,
         "status": "queued",
-        "phase": "Initializing",
+        "phase": JobPhase.initial().to_dict(),
         "created_at": datetime.now().isoformat()
     }
 

@@ -65,6 +65,14 @@ class FeatureConfig:
     creative_loop: bool = field(default_factory=lambda: os.environ.get("CREATIVE_LOOP", "false").lower() == "true")
     creative_loop_max_iterations: int = field(default_factory=lambda: int(os.environ.get("CREATIVE_LOOP_MAX_ITERATIONS", "3")))
 
+    # 2025 Tech Vision: Future features (infrastructure ready, not yet implemented)
+    frame_interpolation: bool = field(default_factory=lambda: os.environ.get("FRAME_INTERPOLATION", "false").lower() == "true")
+    ai_lut_generation: bool = field(default_factory=lambda: os.environ.get("AI_LUT_GENERATION", "false").lower() == "true")
+    episodic_memory: bool = field(default_factory=lambda: os.environ.get("EPISODIC_MEMORY", "false").lower() == "true")
+
+    # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)
+    low_memory_mode: bool = field(default_factory=lambda: os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true")
+
 
 # =============================================================================
 # GPU Configuration
@@ -151,6 +159,23 @@ class ProcessingConfig:
     max_parallel_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, multiprocessing.cpu_count() - 2)))))
     max_concurrent_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_CONCURRENT_JOBS", "2")))
     max_scene_reuse: int = field(default_factory=lambda: int(os.environ.get("MAX_SCENE_REUSE", "3")))
+
+    # Adaptive settings for low-resource hardware
+    clip_prefetch_count: int = field(default_factory=lambda: int(os.environ.get("CLIP_PREFETCH_COUNT", "3")))
+    analysis_timeout: int = field(default_factory=lambda: int(os.environ.get("ANALYSIS_TIMEOUT", "120")))  # seconds
+    render_timeout: int = field(default_factory=lambda: int(os.environ.get("RENDER_TIMEOUT", "3600")))  # 1 hour default
+
+    def get_adaptive_batch_size(self, low_memory: bool = False) -> int:
+        """Get batch size adjusted for memory constraints."""
+        if low_memory or os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true":
+            return max(1, self.batch_size // 4)  # Quarter batch size in low memory mode
+        return self.batch_size
+
+    def get_adaptive_parallel_jobs(self, low_memory: bool = False) -> int:
+        """Get parallel job count adjusted for memory constraints."""
+        if low_memory or os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true":
+            return 1  # Sequential processing in low memory mode
+        return self.max_parallel_jobs
 
 
 # =============================================================================

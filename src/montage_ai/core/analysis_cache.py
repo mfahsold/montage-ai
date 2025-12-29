@@ -125,6 +125,35 @@ class SemanticAnalysisEntry(CacheEntry):
     mood: str                   # calm/energetic/dramatic/playful/tense/peaceful/mysterious
     setting: str                # indoor/outdoor/beach/city/nature/studio/street/home
     caption_embedding: Optional[List[float]] = None  # Pre-computed embedding
+    # Story phase metadata (2025 Tech Vision: Episodic Memory)
+    story_phase: Optional[str] = None       # intro/build/climax/sustain/outro
+    narrative_role: Optional[str] = None    # establishing/transition/emotional_peak/resolution
+    energy_trajectory: Optional[float] = None  # Expected energy 0.0-1.0 at this story position
+
+
+@dataclass
+class EpisodicMemoryEntry:
+    """
+    Tracks clip usage across montages for variety and learning.
+
+    2025 Tech Vision: Episodic Memory for B-Roll/Story
+    Enables smarter clip selection by tracking:
+    - Which clips were used in which phases
+    - User feedback (like/dislike) for learning
+    - Reuse counts to ensure variety
+    """
+    clip_path: str              # Path to source clip
+    montage_id: str             # ID of montage where clip was used
+    story_phase: str            # Phase where clip was placed (intro/build/climax/sustain/outro)
+    timestamp_used: float       # Timeline position in that montage
+    clip_start: float           # Start time within source clip
+    clip_end: float             # End time within source clip
+    user_feedback: Optional[str] = None  # like/dislike/neutral (future: user ratings)
+    created_at: str = ""        # ISO timestamp when entry was created
+
+    def __post_init__(self):
+        if not self.created_at:
+            self.created_at = datetime.now().isoformat()
 
 
 # =============================================================================
@@ -533,6 +562,166 @@ class AnalysisCache:
         return cleared
 
     # -------------------------------------------------------------------------
+    # Episodic Memory (2025 Tech Vision: B-Roll/Story Memory)
+    # -------------------------------------------------------------------------
+
+    def _episodic_memory_path(self) -> Path:
+        """Get path for episodic memory storage."""
+        cache_dir = Path.home() / ".montage_ai" / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir / "episodic_memory.json"
+
+    def save_episodic_memory(self, entry: EpisodicMemoryEntry) -> bool:
+        """
+        Save a clip usage entry to episodic memory.
+
+        Enables learning from past montage decisions:
+        - Track which clips work well in which story phases
+        - User feedback accumulates for smarter future selection
+
+        Args:
+            entry: EpisodicMemoryEntry with clip usage details
+
+        Returns:
+            True if saved successfully
+        """
+        if not self.enabled:
+            return False
+
+        memory_path = self._episodic_memory_path()
+
+        try:
+            # Load existing entries
+            entries = []
+            if memory_path.exists():
+                with open(memory_path, encoding="utf-8") as f:
+                    data = json.load(f)
+                    entries = data.get("entries", [])
+
+            # Add new entry
+            entries.append(asdict(entry))
+
+            # Write back
+            with open(memory_path, "w", encoding="utf-8") as f:
+                json.dump({"version": CACHE_VERSION, "entries": entries}, f, indent=2)
+
+            logger.debug(f"Saved episodic memory: {os.path.basename(entry.clip_path)} in {entry.story_phase}")
+            return True
+
+        except (json.JSONDecodeError, OSError) as e:
+            logger.debug(f"Failed to save episodic memory: {e}")
+            return False
+
+    def load_episodic_for_clip(self, clip_path: str) -> List[EpisodicMemoryEntry]:
+        """
+        Load all episodic memory entries for a specific clip.
+
+        Args:
+            clip_path: Path to the clip (can be relative or absolute)
+
+        Returns:
+            List of EpisodicMemoryEntry for this clip's usage history
+        """
+        memory_path = self._episodic_memory_path()
+
+        if not memory_path.exists():
+            return []
+
+        try:
+            with open(memory_path, encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Normalize path for comparison
+            clip_name = os.path.basename(clip_path)
+            entries = []
+
+            for entry_data in data.get("entries", []):
+                entry_name = os.path.basename(entry_data.get("clip_path", ""))
+                if entry_name == clip_name or entry_data.get("clip_path") == clip_path:
+                    entries.append(EpisodicMemoryEntry(
+                        clip_path=entry_data["clip_path"],
+                        montage_id=entry_data["montage_id"],
+                        story_phase=entry_data["story_phase"],
+                        timestamp_used=entry_data["timestamp_used"],
+                        clip_start=entry_data.get("clip_start", 0.0),
+                        clip_end=entry_data.get("clip_end", 0.0),
+                        user_feedback=entry_data.get("user_feedback"),
+                        created_at=entry_data.get("created_at", ""),
+                    ))
+
+            return entries
+
+        except (json.JSONDecodeError, KeyError, OSError) as e:
+            logger.debug(f"Failed to load episodic memory: {e}")
+            return []
+
+    def get_clip_reuse_count(self, clip_path: str, phase: Optional[str] = None) -> int:
+        """
+        Count how many times a clip has been used (optionally in a specific phase).
+
+        Useful for ensuring variety - avoid overusing popular clips.
+
+        Args:
+            clip_path: Path to the clip
+            phase: Optional story phase filter (intro/build/climax/sustain/outro)
+
+        Returns:
+            Number of times this clip has been used
+        """
+        entries = self.load_episodic_for_clip(clip_path)
+
+        if phase:
+            return sum(1 for e in entries if e.story_phase == phase)
+
+        return len(entries)
+
+    def clear_episodic_memory(self, clip_path: Optional[str] = None) -> bool:
+        """
+        Clear episodic memory entries.
+
+        Args:
+            clip_path: If provided, only clear entries for this clip.
+                      If None, clear all episodic memory.
+
+        Returns:
+            True if any entries were cleared
+        """
+        memory_path = self._episodic_memory_path()
+
+        if not memory_path.exists():
+            return False
+
+        try:
+            if clip_path is None:
+                # Clear all
+                memory_path.unlink()
+                return True
+
+            # Clear only entries for specific clip
+            with open(memory_path, encoding="utf-8") as f:
+                data = json.load(f)
+
+            clip_name = os.path.basename(clip_path)
+            original_count = len(data.get("entries", []))
+
+            data["entries"] = [
+                e for e in data.get("entries", [])
+                if os.path.basename(e.get("clip_path", "")) != clip_name
+                and e.get("clip_path") != clip_path
+            ]
+
+            if len(data["entries"]) < original_count:
+                with open(memory_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                return True
+
+            return False
+
+        except (json.JSONDecodeError, OSError) as e:
+            logger.debug(f"Failed to clear episodic memory: {e}")
+            return False
+
+    # -------------------------------------------------------------------------
     # Cache Management
     # -------------------------------------------------------------------------
 
@@ -597,6 +786,7 @@ __all__ = [
     "AudioAnalysisEntry",
     "SceneAnalysisEntry",
     "SemanticAnalysisEntry",
+    "EpisodicMemoryEntry",
     "CacheEntry",
     "get_analysis_cache",
     "reset_cache",
