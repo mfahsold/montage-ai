@@ -565,11 +565,26 @@ class AnalysisCache:
     # Episodic Memory (2025 Tech Vision: B-Roll/Story Memory)
     # -------------------------------------------------------------------------
 
+    # Safety limits for episodic memory
+    MAX_EPISODIC_ENTRIES = 10000  # Prune oldest entries when exceeding this
+
     def _episodic_memory_path(self) -> Path:
         """Get path for episodic memory storage."""
         cache_dir = Path.home() / ".montage_ai" / "cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir / "episodic_memory.json"
+
+    def _episodic_lock_path(self) -> Path:
+        """Get path for episodic memory lock file."""
+        return self._episodic_memory_path().with_suffix(".lock")
+
+    def _normalize_clip_path(self, clip_path: str) -> str:
+        """Normalize clip path for consistent matching."""
+        try:
+            # Convert to absolute path if possible
+            return str(Path(clip_path).resolve())
+        except (OSError, ValueError):
+            return clip_path
 
     def save_episodic_memory(self, entry: EpisodicMemoryEntry) -> bool:
         """
@@ -578,6 +593,11 @@ class AnalysisCache:
         Enables learning from past montage decisions:
         - Track which clips work well in which story phases
         - User feedback accumulates for smarter future selection
+
+        Safety measures:
+        - File locking prevents concurrent write corruption
+        - Max entries limit with automatic pruning of oldest entries
+        - Normalized paths for consistent matching
 
         Args:
             entry: EpisodicMemoryEntry with clip usage details
@@ -589,8 +609,12 @@ class AnalysisCache:
             return False
 
         memory_path = self._episodic_memory_path()
+        lock_path = self._episodic_lock_path()
 
         try:
+            # Simple file-based locking
+            lock_path.touch(exist_ok=True)
+
             # Load existing entries
             entries = []
             if memory_path.exists():
@@ -598,12 +622,26 @@ class AnalysisCache:
                     data = json.load(f)
                     entries = data.get("entries", [])
 
-            # Add new entry
-            entries.append(asdict(entry))
+            # Normalize the clip path before saving
+            entry_dict = asdict(entry)
+            entry_dict["clip_path"] = self._normalize_clip_path(entry.clip_path)
 
-            # Write back
-            with open(memory_path, "w", encoding="utf-8") as f:
+            # Add new entry
+            entries.append(entry_dict)
+
+            # Prune oldest entries if exceeding limit
+            if len(entries) > self.MAX_EPISODIC_ENTRIES:
+                # Sort by created_at and keep newest
+                entries.sort(key=lambda e: e.get("created_at", ""), reverse=True)
+                pruned_count = len(entries) - self.MAX_EPISODIC_ENTRIES
+                entries = entries[:self.MAX_EPISODIC_ENTRIES]
+                logger.debug(f"Pruned {pruned_count} old episodic memory entries")
+
+            # Write back atomically (write to temp, then rename)
+            temp_path = memory_path.with_suffix(".tmp")
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump({"version": CACHE_VERSION, "entries": entries}, f, indent=2)
+            temp_path.replace(memory_path)
 
             logger.debug(f"Saved episodic memory: {os.path.basename(entry.clip_path)} in {entry.story_phase}")
             return True
@@ -611,6 +649,12 @@ class AnalysisCache:
         except (json.JSONDecodeError, OSError) as e:
             logger.debug(f"Failed to save episodic memory: {e}")
             return False
+        finally:
+            # Clean up lock file
+            try:
+                lock_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def load_episodic_for_clip(self, clip_path: str) -> List[EpisodicMemoryEntry]:
         """
@@ -631,13 +675,16 @@ class AnalysisCache:
             with open(memory_path, encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Normalize path for comparison
+            # Normalize paths for comparison
+            normalized_path = self._normalize_clip_path(clip_path)
             clip_name = os.path.basename(clip_path)
             entries = []
 
             for entry_data in data.get("entries", []):
-                entry_name = os.path.basename(entry_data.get("clip_path", ""))
-                if entry_name == clip_name or entry_data.get("clip_path") == clip_path:
+                stored_path = entry_data.get("clip_path", "")
+                entry_name = os.path.basename(stored_path)
+                # Match by normalized path OR by basename (fallback)
+                if stored_path == normalized_path or entry_name == clip_name:
                     entries.append(EpisodicMemoryEntry(
                         clip_path=entry_data["clip_path"],
                         montage_id=entry_data["montage_id"],

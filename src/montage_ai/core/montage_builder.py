@@ -23,7 +23,7 @@ import numpy as np
 
 from ..config import get_settings, Settings
 from ..logger import logger
-from .analysis_cache import get_analysis_cache
+from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 
 
 # =============================================================================
@@ -341,7 +341,10 @@ class MontageBuilder:
             # Phase 5: Render
             self._render_output()
 
-            # Phase 6: Cleanup
+            # Phase 6: Save episodic memory (if enabled)
+            self._save_episodic_memory()
+
+            # Phase 7: Cleanup
             self._cleanup()
 
             # Build result
@@ -1315,6 +1318,62 @@ class MontageBuilder:
             cmd.extend(["-level", profile.level])
 
         subprocess.run(cmd, capture_output=True, timeout=60)
+
+    def _save_episodic_memory(self):
+        """
+        Save clip usage to episodic memory for future learning.
+
+        Only runs if EPISODIC_MEMORY feature flag is enabled.
+        Tracks which clips were used in which story phases.
+        """
+        if not self.settings.features.episodic_memory:
+            return
+
+        cache = get_analysis_cache()
+        montage_id = f"{self.ctx.job_id}_v{self.variant_id}"
+        total_duration = self.ctx.current_time or 1.0  # Avoid division by zero
+
+        saved_count = 0
+        for clip in self.ctx.clips_metadata:
+            # Calculate story phase based on timeline position
+            position = clip.timeline_start / total_duration
+            if position < 0.15:
+                phase = "intro"
+            elif position < 0.40:
+                phase = "build"
+            elif position < 0.70:
+                phase = "climax"
+            elif position < 0.90:
+                phase = "sustain"
+            else:
+                phase = "outro"
+
+            entry = EpisodicMemoryEntry(
+                clip_path=clip.source_path,
+                montage_id=montage_id,
+                story_phase=phase,
+                timestamp_used=clip.timeline_start,
+                clip_start=clip.start_time,
+                clip_end=clip.start_time + clip.duration,
+            )
+
+            if cache.save_episodic_memory(entry):
+                saved_count += 1
+
+        if saved_count > 0:
+            logger.info(f"   📝 Episodic memory: saved {saved_count} clip usage records")
+
+    def _get_story_phase_for_position(self, position: float) -> str:
+        """Get story phase for normalized timeline position (0.0-1.0)."""
+        if position < 0.15:
+            return "intro"
+        elif position < 0.40:
+            return "build"
+        elif position < 0.70:
+            return "climax"
+        elif position < 0.90:
+            return "sustain"
+        return "outro"
 
 
 # =============================================================================
