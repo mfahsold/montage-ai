@@ -285,7 +285,10 @@ GENERATE_PROXIES = _settings.features.generate_proxies
 FFMPEG_THREADS = _ffmpeg_config.threads
 FFMPEG_PRESET = _ffmpeg_config.preset
 PARALLEL_ENHANCE = _settings.processing.parallel_enhance
-MAX_PARALLEL_JOBS = _settings.processing.max_parallel_jobs
+
+# Low-memory mode: use adaptive values for constrained hardware
+_LOW_MEMORY_MODE = _settings.features.low_memory_mode
+MAX_PARALLEL_JOBS = _settings.processing.get_adaptive_parallel_jobs(_LOW_MEMORY_MODE)
 
 # Quality: CRF for final encoding (18 = visually lossless, 23 = good balance for tests)
 FINAL_CRF = _settings.encoding.crf
@@ -295,8 +298,11 @@ NORMALIZE_CLIPS = _settings.encoding.normalize_clips
 
 # Memory Management: Batch processing to prevent OOM
 # Process clips in batches, render each batch to disk, then concatenate
-BATCH_SIZE = _settings.processing.batch_size
+BATCH_SIZE = _settings.processing.get_adaptive_batch_size(_LOW_MEMORY_MODE)
 FORCE_GC = _settings.processing.force_gc
+
+if _LOW_MEMORY_MODE:
+    logger.info(f"⚠️ LOW_MEMORY_MODE active: batch={BATCH_SIZE}, parallel={MAX_PARALLEL_JOBS}")
 
 # Crossfade Configuration: Real FFmpeg xfade vs simple fade-to-black
 # xfade creates real overlapping transitions but requires re-encoding (slower)

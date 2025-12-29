@@ -867,8 +867,15 @@ class MontageBuilder:
 
             self._memory_manager = get_memory_manager()
 
+            # Use adaptive batch size for low-memory environments
+            low_memory = self.settings.features.low_memory_mode
+            batch_size = self.settings.processing.get_adaptive_batch_size(low_memory)
+
+            if low_memory:
+                logger.info(f"   ⚠️ LOW_MEMORY_MODE: Batch size reduced to {batch_size}")
+
             self._progressive_renderer = ProgressiveRenderer(
-                batch_size=self.settings.processing.batch_size,
+                batch_size=batch_size,
                 output_dir=os.path.join(str(self.ctx.temp_dir), f"segments_{self.ctx.job_id}"),
                 memory_manager=self._memory_manager,
                 job_id=self.ctx.job_id,
@@ -877,7 +884,7 @@ class MontageBuilder:
                 ffmpeg_crf=self.settings.encoding.crf,
                 normalize_clips=self.settings.encoding.normalize_clips,
             )
-            logger.info(f"   ✅ Progressive Renderer initialized (batch={self.settings.processing.batch_size})")
+            logger.info(f"   ✅ Progressive Renderer initialized (batch={batch_size})")
         except ImportError:
             self._progressive_renderer = None
             self._memory_manager = None

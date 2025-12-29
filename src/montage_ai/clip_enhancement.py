@@ -157,7 +157,11 @@ class ClipEnhancer:
         # Feature flags
         self.cgpu_enabled = self.settings.llm.cgpu_gpu_enabled
         self.parallel_enhance = self.settings.processing.parallel_enhance
-        self.max_parallel_jobs = self.settings.processing.max_parallel_jobs
+        self.low_memory_mode = self.settings.features.low_memory_mode
+        self.max_parallel_jobs = self.settings.processing.get_adaptive_parallel_jobs(self.low_memory_mode)
+
+        if self.low_memory_mode:
+            print("   ⚠️ LOW_MEMORY_MODE: Parallel jobs reduced to 1")
 
         # FFmpeg settings
         self.ffmpeg_threads = self.ffmpeg_config.threads
