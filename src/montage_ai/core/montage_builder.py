@@ -768,6 +768,7 @@ class MontageBuilder:
     def _determine_output_profile(self):
         """Determine output profile from input footage."""
         from ..video_metadata import determine_output_profile as _determine_profile
+        from .. import segment_writer as segment_writer_module
 
         profile = _determine_profile(self.ctx.video_files)
 
@@ -785,6 +786,16 @@ class MontageBuilder:
             aspect_ratio=profile.aspect_ratio,
             reason=getattr(profile, 'reason', 'default'),
         )
+
+        # CRITICAL: Sync output profile to segment_writer globals
+        # This ensures clip normalization uses the correct dimensions
+        segment_writer_module.STANDARD_WIDTH = profile.width
+        segment_writer_module.STANDARD_HEIGHT = profile.height
+        segment_writer_module.STANDARD_FPS = profile.fps
+        segment_writer_module.STANDARD_PIX_FMT = profile.pix_fmt
+        segment_writer_module.TARGET_CODEC = profile.codec
+        segment_writer_module.TARGET_PROFILE = profile.profile
+        segment_writer_module.TARGET_LEVEL = profile.level
 
         if self.settings.features.verbose:
             logger.info(f"\n   🧭 Output profile: {self.ctx.output_profile.width}x{self.ctx.output_profile.height} @ {self.ctx.output_profile.fps:.1f}fps")
@@ -1354,10 +1365,17 @@ class MontageBuilder:
 
     def _normalize_clip(self, input_path: str, output_path: str):
         """
-        Normalize clip for concatenation.
+        Normalize clip for concatenation with color harmonization.
 
-        Uses GPU encoder if available (ResourceManager priority:
-        cgpu > local_gpu > cpu).
+        Includes:
+        - Resolution/FPS normalization with padding
+        - Broadcast-safe color levels (16-235)
+        - Auto color balance for consistency
+        - GPU encoder when available
+
+        Args:
+            input_path: Source clip
+            output_path: Normalized output
         """
         import subprocess
 
@@ -1385,11 +1403,26 @@ class MontageBuilder:
             if profile.level:
                 ffmpeg_params.extend(["-level", profile.level])
 
+        # Build video filter chain:
+        # 1. Scale with aspect ratio preservation + padding
+        # 2. Broadcast-safe levels (16-235 range)
+        # 3. Normalize brightness/contrast for consistency
+        vf_filters = [
+            # Scale and pad to target dimensions
+            f"scale={profile.width}:{profile.height}:force_original_aspect_ratio=decrease",
+            f"pad={profile.width}:{profile.height}:(ow-iw)/2:(oh-ih)/2",
+            # Broadcast-safe color levels (clamp to 16-235)
+            "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:rimax=0.922:gimax=0.922:bimax=0.922",
+            # Normalize for consistent brightness across clips
+            "normalize=blackpt=black:whitept=white:smoothing=10",
+        ]
+        vf_chain = ",".join(vf_filters)
+
         # Build FFmpeg command
         cmd = [
             "ffmpeg", "-y",
             "-i", input_path,
-            "-vf", f"scale={profile.width}:{profile.height}:force_original_aspect_ratio=decrease,pad={profile.width}:{profile.height}:(ow-iw)/2:(oh-ih)/2",
+            "-vf", vf_chain,
             "-r", str(profile.fps),
             "-c:v", codec,
             *ffmpeg_params,
@@ -1397,7 +1430,7 @@ class MontageBuilder:
             output_path
         ]
 
-        subprocess.run(cmd, capture_output=True, timeout=60)
+        subprocess.run(cmd, capture_output=True, timeout=120)
 
     def _save_episodic_memory(self):
         """

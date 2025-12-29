@@ -32,9 +32,13 @@ from .ffmpeg_config import (
     STANDARD_CODEC,
     STANDARD_PROFILE,
     STANDARD_LEVEL,
-    STANDARD_WIDTH_VERTICAL as STANDARD_WIDTH,
-    STANDARD_HEIGHT_VERTICAL as STANDARD_HEIGHT,
+    STANDARD_WIDTH_HORIZONTAL,
+    STANDARD_HEIGHT_HORIZONTAL,
 )
+
+# Default to horizontal (will be overridden by output profile sync)
+STANDARD_WIDTH = STANDARD_WIDTH_HORIZONTAL   # 1920
+STANDARD_HEIGHT = STANDARD_HEIGHT_HORIZONTAL  # 1080
 
 # Get runtime config (env vars applied)
 _ffmpeg_config = get_config()
@@ -141,7 +145,11 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
     """
     Normalize a clip to standard parameters for concat compatibility.
 
-    Only re-encodes if necessary (params don't match).
+    Includes:
+    - Resolution scaling with padding
+    - Broadcast-safe color levels (16-235)
+    - Auto brightness/contrast normalization
+    - Format conversion for concat compatibility
 
     Args:
         input_path: Source video
@@ -155,12 +163,17 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
         True if successful
     """
     try:
-        # Build filter chain: scale to standard resolution, normalize fps and pixel format
-        # scale with force_original_aspect_ratio=decrease ensures no cropping
-        # pad centers the video if aspect ratio doesn't match
+        # Build filter chain:
+        # 1. Scale to standard resolution (no cropping)
+        # 2. Pad to fill frame (letterbox/pillarbox)
+        # 3. Broadcast-safe levels (16-235 range)
+        # 4. Normalize brightness for consistency
+        # 5. Convert fps and pixel format
         vf_chain = (
             f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,"
             f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
+            f"colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:rimax=0.922:gimax=0.922:bimax=0.922,"
+            f"normalize=blackpt=black:whitept=white:smoothing=10,"
             f"fps={target_fps},"
             f"format={target_pix_fmt}"
         )

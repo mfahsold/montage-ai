@@ -515,16 +515,21 @@ class TextEditor:
         output_path: str,
         codec: str = "libx264",
         crf: int = 23,
-        preset: str = "medium"
+        preset: str = "medium",
+        audio_crossfade_ms: int = 50
     ) -> str:
         """
-        Render edited video.
+        Render edited video with smooth audio crossfades.
+
+        Uses micro-crossfades (default 50ms) at cut points to avoid
+        hard audio pops and make edits invisible.
 
         Args:
             output_path: Output file path
             codec: Video codec
             crf: Quality (lower = better)
             preset: Encoding preset
+            audio_crossfade_ms: Audio crossfade duration in milliseconds
 
         Returns:
             Path to output video
@@ -534,29 +539,43 @@ class TextEditor:
             raise ValueError("No content to export (everything removed?)")
 
         print(f"   {len(cut_list)} segments to keep")
+        print(f"   🔊 Using {audio_crossfade_ms}ms audio crossfades for smooth cuts")
 
-        # Create concat file with segments
+        # Extract each segment with audio fade handles
+        segment_files = []
+        fade_ms = audio_crossfade_ms / 2  # Half on each side
+
+        for i, region in enumerate(cut_list):
+            seg_file = tempfile.mktemp(suffix=f"_seg{i}.mp4")
+            segment_files.append(seg_file)
+
+            duration = region.end - region.start
+            fade_in = fade_ms / 1000  # Convert to seconds
+            fade_out = fade_ms / 1000
+
+            # Build audio filter for micro-crossfades
+            # afade in at start, afade out at end
+            af_filter = f"afade=t=in:st=0:d={fade_in},afade=t=out:st={duration - fade_out}:d={fade_out}"
+
+            # Extract segment with audio fades
+            cmd = [
+                "ffmpeg", "-y",
+                "-hide_banner", "-loglevel", "error",
+                "-ss", str(region.start),
+                "-i", str(self.video_path),
+                "-t", str(duration),
+                "-c:v", "copy",  # Copy video (no re-encode)
+                "-af", af_filter,  # Apply audio crossfades
+                "-c:a", "aac",
+                "-b:a", "192k",
+                seg_file
+            ]
+            subprocess.run(cmd, check=True)
+
+        # Create concat file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             concat_file = f.name
-
-            # Extract each segment
-            segment_files = []
-            for i, region in enumerate(cut_list):
-                seg_file = tempfile.mktemp(suffix=f"_seg{i}.mp4")
-                segment_files.append(seg_file)
-
-                # Extract segment
-                duration = region.end - region.start
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-hide_banner", "-loglevel", "error",
-                    "-ss", str(region.start),
-                    "-i", str(self.video_path),
-                    "-t", str(duration),
-                    "-c", "copy",
-                    seg_file
-                ]
-                subprocess.run(cmd, check=True)
+            for seg_file in segment_files:
                 f.write(f"file '{seg_file}'\n")
 
         # Concatenate all segments
@@ -569,7 +588,7 @@ class TextEditor:
             "-c:v", codec,
             "-crf", str(crf),
             "-preset", preset,
-            "-c:a", "aac",
+            "-c:a", "copy",  # Audio already faded
             output_path
         ]
 
