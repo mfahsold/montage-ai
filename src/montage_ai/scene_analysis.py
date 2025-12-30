@@ -295,6 +295,7 @@ class SceneContentAnalyzer:
         self.vision_model = vision_model or _settings.llm.openai_vision_model
         self.ollama_host = ollama_host or _settings.llm.ollama_host
         self.ollama_model = ollama_model or _settings.llm.ollama_model
+        self.request_timeout = _settings.llm.timeout
         self._vision_client = None
 
     def analyze(self, video_path: str, time_point: float, semantic: bool = True) -> SceneAnalysis:
@@ -394,7 +395,7 @@ class SceneContentAnalyzer:
                 }],
                 max_tokens=100,
                 temperature=0.2,
-                timeout=_settings.llm.timeout
+                timeout=self.request_timeout
             )
 
             if response.choices and response.choices[0].message.content:
@@ -437,7 +438,7 @@ class SceneContentAnalyzer:
             response = requests.post(
                 f"{self.ollama_host}/api/generate",
                 json=payload,
-                timeout=_settings.llm.timeout
+                timeout=self.request_timeout
             )
 
             if response.status_code == 200:
@@ -540,7 +541,7 @@ Return ONLY valid JSON, no markdown code blocks.'''
                 }],
                 max_output_tokens=400,
                 temperature=0.3,
-                timeout=45
+                timeout=self.request_timeout
             )
 
             content = getattr(response, "output_text", None)
@@ -586,7 +587,7 @@ Return ONLY valid JSON, no markdown code blocks.'''
                 }],
                 max_tokens=400,
                 temperature=0.3,
-                timeout=45
+                timeout=self.request_timeout
             )
 
             if response.choices and response.choices[0].message.content:
@@ -615,7 +616,7 @@ Return ONLY valid JSON, no markdown code blocks.'''
             response = requests.post(
                 f"{self.ollama_host}/api/generate",
                 json=payload,
-                timeout=60
+                timeout=self.request_timeout
             )
 
             if response.status_code == 200:

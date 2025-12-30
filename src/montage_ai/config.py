@@ -14,6 +14,8 @@ Usage:
 
 import os
 import multiprocessing
+import hashlib
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set
@@ -242,6 +244,10 @@ class ProcessingConfig:
     batch_size: int = field(default_factory=lambda: int(os.environ.get("BATCH_SIZE", "25")))
     force_gc: bool = field(default_factory=lambda: os.environ.get("FORCE_GC", "true").lower() == "true")
     parallel_enhance: bool = field(default_factory=lambda: os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true")
+    skip_existing_outputs: bool = field(default_factory=lambda: os.environ.get("SKIP_EXISTING_OUTPUTS", "true").lower() == "true")
+    force_reprocess: bool = field(default_factory=lambda: os.environ.get("FORCE_REPROCESS", "false").lower() == "true")
+    min_output_bytes: int = field(default_factory=lambda: int(os.environ.get("MIN_OUTPUT_BYTES", "1024")))
+    job_id_strategy: str = field(default_factory=lambda: os.environ.get("JOB_ID_STRATEGY", "timestamp").lower())
     max_parallel_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, _effective_cpu_count() - 2)))))
     max_concurrent_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_CONCURRENT_JOBS", "2")))
     max_scene_reuse: int = field(default_factory=lambda: int(os.environ.get("MAX_SCENE_REUSE", "3")))
@@ -249,7 +255,10 @@ class ProcessingConfig:
     # Adaptive settings for low-resource hardware
     clip_prefetch_count: int = field(default_factory=lambda: int(os.environ.get("CLIP_PREFETCH_COUNT", "3")))
     analysis_timeout: int = field(default_factory=lambda: int(os.environ.get("ANALYSIS_TIMEOUT", "120")))  # seconds
+    ffprobe_timeout: int = field(default_factory=lambda: int(os.environ.get("FFPROBE_TIMEOUT", "10")))
+    ffmpeg_short_timeout: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_SHORT_TIMEOUT", "30")))
     ffmpeg_timeout: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_TIMEOUT", "120")))
+    ffmpeg_long_timeout: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_LONG_TIMEOUT", "600")))
     render_timeout: int = field(default_factory=lambda: int(os.environ.get("RENDER_TIMEOUT", "3600")))  # 1 hour default
 
     def get_adaptive_batch_size(self, low_memory: bool = False) -> int:
@@ -263,6 +272,25 @@ class ProcessingConfig:
         if low_memory or os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true":
             return 1  # Sequential processing in low memory mode
         return self.max_parallel_jobs
+
+    def should_skip_output(self, output_path: Optional[Path]) -> bool:
+        """
+        Check whether an output can be reused for idempotent runs.
+
+        Returns True when SKIP_EXISTING_OUTPUTS=true, FORCE_REPROCESS=false,
+        and the output file exists with at least MIN_OUTPUT_BYTES.
+        """
+        if self.force_reprocess or not self.skip_existing_outputs:
+            return False
+        if not output_path:
+            return False
+        path = output_path if isinstance(output_path, Path) else Path(output_path)
+        if not path.exists() or not path.is_file():
+            return False
+        try:
+            return path.stat().st_size >= self.min_output_bytes
+        except OSError:
+            return False
 
 
 # =============================================================================
@@ -371,7 +399,7 @@ class Settings:
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
 
     # Job ID (generated per run)
-    job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S")))
+    job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", ""))
 
     def __post_init__(self):
         """Validate settings after initialization."""
@@ -380,6 +408,99 @@ class Settings:
             self.paths.input_dir = Path(self.paths.input_dir)
         if isinstance(self.paths.output_dir, str):
             self.paths.output_dir = Path(self.paths.output_dir)
+        if not self.job_id:
+            self.job_id = self._resolve_job_id()
+
+    def _resolve_job_id(self) -> str:
+        """Resolve job id based on configured strategy."""
+        strategy = (self.processing.job_id_strategy or "timestamp").lower()
+        if strategy in ("hash", "stable", "deterministic"):
+            return self._compute_job_id_hash()
+        return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    def _compute_job_id_hash(self) -> str:
+        """
+        Compute a deterministic job id from inputs and key settings.
+
+        Uses file metadata (name/size/mtime) and selected config fields.
+        """
+        hasher = hashlib.sha1()
+        hasher.update(b"montage-ai")
+
+        settings_fingerprint = {
+            "features": {
+                "stabilize": self.features.stabilize,
+                "upscale": self.features.upscale,
+                "enhance": self.features.enhance,
+                "llm_clip_selection": self.features.llm_clip_selection,
+                "deep_analysis": self.features.deep_analysis,
+                "captions": self.features.captions,
+                "voice_isolation": self.features.voice_isolation,
+                "colorlevels": self.features.colorlevels,
+                "luma_normalize": self.features.luma_normalize,
+            },
+            "creative": {
+                "cut_style": self.creative.cut_style,
+                "creative_prompt": self.creative.creative_prompt,
+                "target_duration": self.creative.target_duration,
+                "music_start": self.creative.music_start,
+                "music_end": self.creative.music_end,
+                "num_variants": self.creative.num_variants,
+                "enable_xfade": self.creative.enable_xfade,
+                "xfade_duration": self.creative.xfade_duration,
+            },
+            "encoding": {
+                "quality_profile": self.encoding.quality_profile,
+                "codec": self.encoding.codec,
+                "crf": self.encoding.crf,
+                "preset": self.encoding.preset,
+                "pix_fmt": self.encoding.pix_fmt,
+                "profile": self.encoding.profile,
+                "level": self.encoding.level,
+                "normalize_clips": self.encoding.normalize_clips,
+            },
+            "upscale": {
+                "model": self.upscale.model,
+                "scale": self.upscale.scale,
+                "frame_format": self.upscale.frame_format,
+                "tile_size": self.upscale.tile_size,
+                "crf": self.upscale.crf,
+            },
+            "audio": {
+                "silence_threshold": self.audio.silence_threshold,
+                "min_silence_duration": self.audio.min_silence_duration,
+                "energy_high_threshold": self.audio.energy_high_threshold,
+                "energy_low_threshold": self.audio.energy_low_threshold,
+            },
+        }
+        hasher.update(json.dumps(settings_fingerprint, sort_keys=True).encode("utf-8"))
+
+        for root in (self.paths.input_dir, self.paths.music_dir, self.paths.assets_dir):
+            for path in self._iter_hash_files(root):
+                try:
+                    stat = path.stat()
+                except OSError:
+                    continue
+                try:
+                    rel_path = path.relative_to(root)
+                except ValueError:
+                    rel_path = path.name
+                hasher.update(str(rel_path).encode("utf-8"))
+                hasher.update(str(stat.st_size).encode("utf-8"))
+                hasher.update(str(int(stat.st_mtime)).encode("utf-8"))
+
+        return hasher.hexdigest()[:12]
+
+    def _iter_hash_files(self, root: Path) -> list[Path]:
+        """List files for job id hashing (stable order, best-effort)."""
+        if not root.exists():
+            return []
+        if root.is_file():
+            return [root]
+        try:
+            return sorted([p for p in root.rglob("*") if p.is_file()])
+        except OSError:
+            return []
 
     def reload(self) -> "Settings":
         """Reload settings from environment (useful after env changes)."""
@@ -413,6 +534,15 @@ class Settings:
             "TARGET_DURATION": str(self.creative.target_duration),
             "MUSIC_START": str(self.creative.music_start),
             "MUSIC_END": str(self.creative.music_end or ""),
+            "SKIP_EXISTING_OUTPUTS": str(self.processing.skip_existing_outputs).lower(),
+            "FORCE_REPROCESS": str(self.processing.force_reprocess).lower(),
+            "MIN_OUTPUT_BYTES": str(self.processing.min_output_bytes),
+            "JOB_ID_STRATEGY": self.processing.job_id_strategy,
+            "FFPROBE_TIMEOUT": str(self.processing.ffprobe_timeout),
+            "FFMPEG_SHORT_TIMEOUT": str(self.processing.ffmpeg_short_timeout),
+            "FFMPEG_TIMEOUT": str(self.processing.ffmpeg_timeout),
+            "FFMPEG_LONG_TIMEOUT": str(self.processing.ffmpeg_long_timeout),
+            "RENDER_TIMEOUT": str(self.processing.render_timeout),
             "FINAL_CRF": str(self.encoding.crf),
             "UPSCALE_MODEL": self.upscale.model,
             "UPSCALE_SCALE": str(self.upscale.scale),

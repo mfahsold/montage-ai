@@ -173,7 +173,12 @@ def _ffmpeg_get_duration(audio_path: str) -> float:
         audio_path
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_settings.processing.ffmpeg_timeout)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_settings.processing.ffprobe_timeout,
+        )
         return float(result.stdout.strip())
     except Exception:
         return 0.0
@@ -198,7 +203,12 @@ def _ffmpeg_detect_onsets(audio_path: str, duration: float) -> List[float]:
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_settings.processing.ffmpeg_timeout)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_settings.processing.analysis_timeout,
+        )
         stderr = result.stderr
 
         # Parse silence_end events (these are onset points)
@@ -235,7 +245,12 @@ def _ffmpeg_analyze_loudness(audio_path: str, duration: float) -> Tuple[np.ndarr
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_settings.processing.analysis_timeout,
+        )
         stderr = result.stderr
 
         # Parse momentary loudness (M:) values
@@ -399,7 +414,12 @@ def _ffmpeg_estimate_tempo(audio_path: str, duration: float) -> Tuple[float, np.
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_settings.processing.analysis_timeout,
+        )
         stderr = result.stderr
 
         # Extract mean_volume from volumedetect
@@ -464,7 +484,12 @@ def _ffmpeg_analyze_energy(audio_path: str, duration: float) -> Tuple[np.ndarray
             tmp_path
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_settings.processing.analysis_timeout,
+        )
 
         if result.returncode != 0:
             raise RuntimeError(f"FFmpeg extraction failed: {result.stderr[:200]}")
@@ -517,7 +542,12 @@ def _ffmpeg_analyze_energy(audio_path: str, duration: float) -> Tuple[np.ndarray
             "-f", "null", "-"
         ]
         try:
-            result_vol = subprocess.run(cmd_vol, capture_output=True, text=True, timeout=60)
+            result_vol = subprocess.run(
+                cmd_vol,
+                capture_output=True,
+                text=True,
+                timeout=_settings.processing.analysis_timeout,
+            )
 
             mean_vol = -20.0
             max_vol = -10.0

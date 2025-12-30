@@ -283,7 +283,7 @@ def _normalize_codec_name(codec: str) -> str:
 # Core Functions
 # =============================================================================
 
-def probe_metadata(video_path: str) -> Optional[VideoMetadata]:
+def probe_metadata(video_path: str, timeout: Optional[int] = None) -> Optional[VideoMetadata]:
     """
     Extract video metadata using ffprobe.
 
@@ -301,7 +301,12 @@ def probe_metadata(video_path: str) -> Optional[VideoMetadata]:
             "-of", "json",
             video_path
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout or _settings.processing.ffprobe_timeout,
+        )
         if result.returncode != 0:
             return None
 
@@ -337,22 +342,22 @@ def probe_metadata(video_path: str) -> Optional[VideoMetadata]:
 class MetadataProber:
     """Class-based interface for video metadata extraction."""
 
-    def __init__(self, timeout: int = 10):
+    def __init__(self, timeout: Optional[int] = None):
         """
         Initialize metadata prober.
 
         Args:
             timeout: ffprobe timeout in seconds
         """
-        self.timeout = timeout
+        self.timeout = timeout or _settings.processing.ffprobe_timeout
 
     def probe(self, video_path: str) -> Optional[VideoMetadata]:
         """Extract metadata from video file."""
-        return probe_metadata(video_path)
+        return probe_metadata(video_path, timeout=self.timeout)
 
     def probe_many(self, video_paths: List[str]) -> List[VideoMetadata]:
         """Extract metadata from multiple video files, filtering failures."""
-        results = [probe_metadata(p) for p in video_paths]
+        results = [probe_metadata(p, timeout=self.timeout) for p in video_paths]
         return [m for m in results if m is not None]
 
 

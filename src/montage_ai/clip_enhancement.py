@@ -119,7 +119,7 @@ def _check_vidstab_available() -> bool:
     try:
         result = subprocess.run(
             ["ffmpeg", "-filters"],
-            capture_output=True, text=True, timeout=5
+            capture_output=True, text=True, timeout=_settings.processing.ffmpeg_short_timeout
         )
         _VIDSTAB_AVAILABLE = "vidstabdetect" in result.stdout
         if _VIDSTAB_AVAILABLE:
@@ -176,6 +176,10 @@ class ClipEnhancer:
         self.upscale_frame_format = frame_format if frame_format in ("jpg", "png") else "jpg"
         self.upscale_tile_size = self.settings.upscale.tile_size
         self.upscale_crf = self.settings.upscale.crf
+        self.ffprobe_timeout = self.settings.processing.ffprobe_timeout
+        self.ffmpeg_short_timeout = self.settings.processing.ffmpeg_short_timeout
+        self.ffmpeg_timeout = self.settings.processing.ffmpeg_timeout
+        self.ffmpeg_long_timeout = self.settings.processing.ffmpeg_long_timeout
 
         # Temp directory for intermediate files
         self.temp_dir = str(self.settings.paths.temp_dir)
@@ -184,6 +188,13 @@ class ClipEnhancer:
     # =========================================================================
     # Public API
     # =========================================================================
+
+    def _skip_output_if_present(self, output_path: str, label: str) -> bool:
+        """Skip processing if output exists and idempotency is enabled."""
+        if self.settings.processing.should_skip_output(output_path):
+            print(f"   ♻️ {label} skipped (exists): {os.path.basename(output_path)}")
+            return True
+        return False
 
     def enhance_batch(self, clip_jobs: List[Tuple[str, str]]) -> Dict[str, str]:
         """
@@ -245,6 +256,9 @@ class ClipEnhancer:
         Returns:
             Path to enhanced video (or original on failure)
         """
+        if self._skip_output_if_present(output_path, "Enhance"):
+            return output_path
+
         analysis = self._analyze_brightness(input_path)
 
         # Adaptive parameters based on content
@@ -328,6 +342,8 @@ class ClipEnhancer:
             Path to stabilized video (or original on failure)
         """
         print(f"   Stabilizing {os.path.basename(input_path)}...")
+        if self._skip_output_if_present(output_path, "Stabilize"):
+            return output_path
 
         # Try cloud GPU first if enabled
         if self.cgpu_enabled:
@@ -367,6 +383,8 @@ class ClipEnhancer:
         scale_value = max(2, min(int(scale_value), 4))
         model = self.upscale_model
         print(f"   Upscaling {os.path.basename(input_path)}...")
+        if self._skip_output_if_present(output_path, "Upscale"):
+            return output_path
 
         # Priority 1: cgpu Cloud GPU
         if self.cgpu_enabled:
@@ -485,7 +503,7 @@ class ClipEnhancer:
                         cmd.extend(["-level", self.output_level])
                     cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
-                    subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+                    subprocess.run(cmd, check=True, capture_output=True, timeout=self.ffmpeg_timeout)
                     results[clip_path] = output_path
 
                     # Cleanup temp frame
@@ -527,7 +545,12 @@ class ClipEnhancer:
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 input_path
             ]
-            dur_result = subprocess.run(dur_cmd, capture_output=True, text=True, timeout=5)
+            dur_result = subprocess.run(
+                dur_cmd,
+                capture_output=True,
+                text=True,
+                timeout=self.ffprobe_timeout,
+            )
             duration = float(dur_result.stdout.strip()) if dur_result.stdout.strip() else 2.0
 
             # Analyze mean brightness at 3 points
@@ -541,7 +564,12 @@ class ClipEnhancer:
                     "-vf", "signalstats=stat=tout+vrep+brng,metadata=print:file=-",
                     "-f", "null", "-"
                 ]
-                result = subprocess.run(analyze_cmd, capture_output=True, text=True, timeout=10)
+                result = subprocess.run(
+                    analyze_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.ffmpeg_short_timeout,
+                )
 
                 # Parse YAVG (luma average) from output
                 for line in result.stderr.split('\n'):
@@ -600,7 +628,7 @@ class ClipEnhancer:
                 cmd_detect,
                 capture_output=True,
                 text=True,
-                timeout=300
+                timeout=self.ffmpeg_long_timeout,
             )
 
             if result.returncode != 0 or not os.path.exists(transform_file):
@@ -625,7 +653,12 @@ class ClipEnhancer:
                 cmd_transform.extend(["-level", self.output_level])
             cmd_transform.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
-            subprocess.run(cmd_transform, check=True, capture_output=True, timeout=300)
+            subprocess.run(
+                cmd_transform,
+                check=True,
+                capture_output=True,
+                timeout=self.ffmpeg_long_timeout,
+            )
 
             # Cleanup transform file
             if os.path.exists(transform_file):
@@ -671,7 +704,12 @@ class ClipEnhancer:
         cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
         try:
-            subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                timeout=self.ffmpeg_timeout,
+            )
             print(f"      Stabilization complete (deshake fallback)")
             return output_path
         except subprocess.CalledProcessError:
@@ -686,12 +724,15 @@ class ClipEnhancer:
         try:
             test_result = subprocess.run(
                 ["realesrgan-ncnn-vulkan", "-i", "/dev/null", "-o", "/dev/null"],
-                capture_output=True, timeout=5
+                capture_output=True,
+                timeout=self.ffmpeg_short_timeout,
             )
             if b"invalid gpu" not in test_result.stderr:
                 vulkan_info = subprocess.run(
                     ["vulkaninfo", "--summary"],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True,
+                    text=True,
+                    timeout=self.ffmpeg_short_timeout,
                 )
                 if vulkan_info.returncode == 0:
                     output = vulkan_info.stdout.lower()
@@ -877,7 +918,12 @@ class ClipEnhancer:
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 video_path
             ]
-            result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                probe_cmd,
+                capture_output=True,
+                text=True,
+                timeout=self.ffprobe_timeout,
+            )
             duration = float(result.stdout.strip()) if result.stdout.strip() else 1.0
 
             middle = duration / 2
@@ -889,7 +935,12 @@ class ClipEnhancer:
                 "-q:v", "2",
                 output_path
             ]
-            subprocess.run(extract_cmd, check=True, capture_output=True, timeout=10)
+            subprocess.run(
+                extract_cmd,
+                check=True,
+                capture_output=True,
+                timeout=self.ffmpeg_short_timeout,
+            )
             return os.path.exists(output_path)
 
         except Exception:

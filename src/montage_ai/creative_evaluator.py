@@ -30,6 +30,7 @@ from .creative_director import (
     OLLAMA_HOST,
     OLLAMA_MODEL,
 )
+from .config import get_settings
 
 VERSION = "0.1.0"
 
@@ -177,7 +178,7 @@ class CreativeEvaluator:
         self,
         max_iterations: int = 3,
         approval_threshold: float = 0.8,
-        timeout: int = 60,
+        timeout: Optional[int] = None,
     ):
         """
         Initialize Creative Evaluator.
@@ -185,15 +186,15 @@ class CreativeEvaluator:
         Args:
             max_iterations: Maximum refinement iterations before forced approval
             approval_threshold: Minimum satisfaction score for auto-approval
-            timeout: LLM request timeout in seconds
+            timeout: LLM request timeout in seconds (defaults to LLM_TIMEOUT)
         """
         self.max_iterations = max_iterations
         self.approval_threshold = approval_threshold
-        self.timeout = timeout
+        self.timeout = timeout if timeout is not None else get_settings().llm.timeout
 
         # Initialize CreativeDirector for LLM access (reuses backend detection)
         self._director = CreativeDirector(
-            timeout=timeout,
+            timeout=self.timeout,
             persona="the Creative Evaluator for the Montage AI video editing system"
         )
         self._director.system_prompt = EVALUATOR_SYSTEM_PROMPT

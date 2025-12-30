@@ -147,6 +147,10 @@ class TranscribeJob(CGPUJob):
                 error="Failed to download transcription"
             )
 
+    def expected_output_path(self) -> Optional[Path]:
+        """Expected output path for idempotent reuse."""
+        return self.output_dir / f"{self.audio_path.stem}.{self.output_format}"
+
     @property
     def output_path(self) -> Optional[Path]:
         """Path to output file (available after successful execution)."""

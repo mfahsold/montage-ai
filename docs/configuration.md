@@ -12,6 +12,7 @@ Complete reference for all environment variables and settings.
 | `CREATIVE_PROMPT` | *(empty)*     | Natural language editing instructions (overrides `CUT_STYLE`)                       |
 | `NUM_VARIANTS`    | `1`           | Number of output variants to generate                                               |
 | `JOB_ID`          | *(timestamp)* | Unique identifier for parallel runs                                                 |
+| `JOB_ID_STRATEGY` | `timestamp`   | Job ID mode: `timestamp` (default) or `hash` (deterministic from inputs/settings)   |
 | `TARGET_DURATION` | `0`           | Target video duration in seconds (`0` = use full music length)                      |
 | `MUSIC_START`     | `0`           | Music start time in seconds (trim beginning)                                        |
 | `MUSIC_END`       | `0`           | Music end time in seconds (`0` = use full track, auto-derived from `TARGET_DURATION`) |
@@ -45,6 +46,10 @@ CREATIVE_LOOP_MAX_ITERATIONS=3 \
 ## AI / LLM Settings
 
 LLM backends are used in **priority order**: OpenAI-compatible > Google AI > cgpu > Ollama
+
+| Variable      | Default | Description                         |
+| ------------- | ------- | ----------------------------------- |
+| `LLM_TIMEOUT` | `60`    | Request timeout in seconds for LLMs |
 
 ### OpenAI-Compatible API (Recommended for Kubernetes)
 
@@ -261,6 +266,29 @@ Settings for large projects and constrained hardware.
 - **32GB+ RAM:** `MEMORY_LIMIT_GB=48`, `MAX_CLIPS_IN_RAM=100`
 
 See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
+
+---
+
+## Idempotency & Timeouts
+
+| Variable                | Default | Description                                                      |
+| ----------------------- | ------- | ---------------------------------------------------------------- |
+| `SKIP_EXISTING_OUTPUTS` | `true`  | Reuse existing outputs when present                              |
+| `FORCE_REPROCESS`       | `false` | Ignore cached outputs and recompute                              |
+| `MIN_OUTPUT_BYTES`      | `1024`  | Minimum file size to treat an output as valid                    |
+
+| Variable              | Default | Description                                   |
+| --------------------- | ------- | --------------------------------------------- |
+| `FFPROBE_TIMEOUT`     | `10`    | Timeout for ffprobe metadata calls (seconds)  |
+| `FFMPEG_SHORT_TIMEOUT`| `30`    | Timeout for quick ffmpeg checks (seconds)     |
+| `FFMPEG_TIMEOUT`      | `120`   | Timeout for standard ffmpeg operations        |
+| `FFMPEG_LONG_TIMEOUT` | `600`   | Timeout for long ffmpeg operations (seconds)  |
+| `RENDER_TIMEOUT`      | `3600`  | Timeout for final render/concat (seconds)     |
+| `ANALYSIS_TIMEOUT`    | `120`   | Timeout for audio/analysis pipelines          |
+
+**Notes:**
+- For deterministic reruns, use `JOB_ID_STRATEGY=hash` with `SKIP_EXISTING_OUTPUTS=true`.
+- Set `FORCE_REPROCESS=true` to override cached outputs.
 
 ---
 

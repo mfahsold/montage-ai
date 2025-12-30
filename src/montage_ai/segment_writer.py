@@ -23,6 +23,7 @@ from typing import List, Optional, Dict, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .config import get_settings
 # Import centralized FFmpeg config (DRY)
 from .ffmpeg_config import (
     FFmpegConfig,
@@ -39,6 +40,8 @@ from .ffmpeg_config import (
 # Default to horizontal (will be overridden by output profile sync)
 STANDARD_WIDTH = STANDARD_WIDTH_HORIZONTAL   # 1920
 STANDARD_HEIGHT = STANDARD_HEIGHT_HORIZONTAL  # 1080
+
+_settings = get_settings()
 
 # Get runtime config (env vars applied)
 _ffmpeg_config = get_config()
@@ -153,7 +156,12 @@ def ffprobe_stream_params(video_path: str) -> Optional[StreamParams]:
             "-of", "json",
             video_path
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_settings.processing.ffprobe_timeout,
+        )
         
         if result.returncode != 0:
             return None
@@ -272,7 +280,12 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
             output_path
         ])
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_settings.processing.ffmpeg_long_timeout,
+        )
         return result.returncode == 0
 
     except Exception as e:
@@ -355,7 +368,12 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
             output_path
         ])
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_settings.processing.ffmpeg_long_timeout,
+        )
         
         if result.returncode != 0:
             print(f"   ⚠️ xfade failed: {result.stderr[:200]}")
@@ -593,10 +611,10 @@ class SegmentWriter:
             ]
             
             result = subprocess.run(
-                cmd, 
-                capture_output=True, 
+                cmd,
+                capture_output=True,
                 text=True,
-                timeout=120  # Much faster with -c copy
+                timeout=_settings.processing.ffmpeg_timeout,
             )
             
             # Cleanup concat list
@@ -692,7 +710,12 @@ class SegmentWriter:
                 segment_path
             ])
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=_settings.processing.ffmpeg_long_timeout,
+            )
             
             # Cleanup
             if os.path.exists(concat_list_path):
@@ -913,7 +936,7 @@ class SegmentWriter:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=600  # Much faster with -c copy
+                timeout=_settings.processing.render_timeout,
             )
             
             # Cleanup concat list
@@ -1016,7 +1039,12 @@ class SegmentWriter:
                 output_path
             ])
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=_settings.processing.render_timeout,
+            )
             return result.returncode == 0
             
         except Exception as e:
@@ -1087,7 +1115,12 @@ class SegmentWriter:
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 video_path
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=_settings.processing.ffprobe_timeout,
+            )
             return float(result.stdout.strip()) if result.stdout.strip() else 0.0
         except Exception:
             return 0.0

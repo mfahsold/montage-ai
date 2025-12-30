@@ -420,7 +420,11 @@ def detect_gpu_capabilities() -> Dict[str, Any]:
                 'ffmpeg', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=0.1',
                 '-c:v', 'h264_vulkan', '-f', 'null', '-'
             ]
-            result = subprocess.run(test_cmd, capture_output=True, timeout=10)
+            result = subprocess.run(
+                test_cmd,
+                capture_output=True,
+                timeout=settings.processing.ffmpeg_short_timeout,
+            )
             if result.returncode == 0:
                 capabilities['encoder'] = 'h264_vulkan'
                 capabilities['available'].append('vulkan')
@@ -436,7 +440,11 @@ def detect_gpu_capabilities() -> Dict[str, Any]:
                 'ffmpeg', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=0.1',
                 '-c:v', 'h264_v4l2m2m', '-f', 'null', '-'
             ]
-            result = subprocess.run(test_cmd, capture_output=True, timeout=10)
+            result = subprocess.run(
+                test_cmd,
+                capture_output=True,
+                timeout=settings.processing.ffmpeg_short_timeout,
+            )
             if result.returncode == 0:
                 capabilities['encoder'] = 'h264_v4l2m2m'
                 capabilities['available'].append('v4l2m2m')
@@ -476,7 +484,12 @@ def get_video_rotation(video_path: str) -> int:
             '-of', 'json',
             video_path
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=settings.processing.ffprobe_timeout,
+        )
         
         if result.returncode == 0:
             data = json.loads(result.stdout)
@@ -715,7 +728,7 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
                     "preset": "ultrafast",
                     "copy_audio": True
                 },
-                timeout=120
+                timeout=settings.processing.ffmpeg_timeout
             )
             resp.raise_for_status()
             return

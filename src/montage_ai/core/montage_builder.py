@@ -284,7 +284,11 @@ def process_clip_task(
         "-avoid_negative_ts", "1",
         temp_clip_path
     ]
-    subprocess.run(cmd, capture_output=True, timeout=30)
+    subprocess.run(
+        cmd,
+        capture_output=True,
+        timeout=settings.processing.ffmpeg_short_timeout,
+    )
     
     # 2. Enhance
     current_path = temp_clip_path
@@ -373,7 +377,11 @@ def process_clip_task(
             "-an",
             final_clip_path
         ])
-        subprocess.run(cmd, capture_output=True, timeout=120)
+        subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=settings.processing.ffmpeg_timeout,
+        )
 
     enhancements = {
         'stabilized': stabilize_applied,
@@ -682,6 +690,11 @@ class MontageBuilder:
         - Add logo overlay (if present)
         """
         logger.info("\n   🎬 Rendering output...")
+
+        if self.settings.processing.should_skip_output(self.ctx.output_filename):
+            logger.info(f"   ♻️ Output exists, skipping render: {os.path.basename(self.ctx.output_filename)}")
+            self.ctx.render_duration = 0.0
+            return
 
         render_start_time = time.time()
 

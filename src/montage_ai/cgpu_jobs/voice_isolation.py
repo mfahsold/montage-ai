@@ -205,6 +205,10 @@ class VoiceIsolationJob(CGPUJob):
             }
         )
 
+    def expected_output_path(self) -> Optional[Path]:
+        """Expected vocals output path for idempotent reuse."""
+        return self.output_dir / f"{self.audio_path.stem}_vocals.wav"
+
     @property
     def vocals_path(self) -> Optional[str]:
         """Path to isolated vocals (available after successful execution)."""
@@ -327,6 +331,10 @@ class NoiseReductionJob(CGPUJob):
                 success=False,
                 error="Failed to download cleaned audio"
             )
+
+    def expected_output_path(self) -> Optional[Path]:
+        """Expected output path for idempotent reuse."""
+        return self.output_dir / f"{self.audio_path.stem}_clean.wav"
 
     @property
     def output_path(self) -> Optional[Path]:

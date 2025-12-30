@@ -33,6 +33,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..config import get_settings
 from ..cgpu_utils import (
     is_cgpu_available,
     run_cgpu_command,
@@ -102,6 +103,30 @@ class CGPUJob(ABC):
         self._end_time: Optional[float] = None
         self._error: Optional[str] = None
         self._installed_requirements: bool = False
+
+    def expected_output_path(self) -> Optional[Path]:
+        """Return expected local output path if known before execution."""
+        output_path = getattr(self, "output_path", None)
+        if isinstance(output_path, Path):
+            return output_path
+        if isinstance(output_path, str):
+            return Path(output_path)
+        return None
+
+    def _skip_if_output_exists(self) -> Optional[JobResult]:
+        """Return a success result if output already exists and reuse is enabled."""
+        settings = get_settings()
+        output_path = self.expected_output_path()
+        if settings.processing.should_skip_output(output_path):
+            self.status = JobStatus.COMPLETED
+            self._end_time = time.time()
+            return JobResult(
+                success=True,
+                output_path=str(output_path),
+                metadata={"skipped": True},
+                duration_seconds=self.elapsed_seconds,
+            )
+        return None
 
     @property
     def elapsed_seconds(self) -> float:
@@ -219,6 +244,10 @@ class CGPUJob(ABC):
             JobResult with success status and output.
         """
         self._start_time = time.time()
+
+        skip_result = self._skip_if_output_exists()
+        if skip_result:
+            return skip_result
 
         try:
             # Check cgpu availability

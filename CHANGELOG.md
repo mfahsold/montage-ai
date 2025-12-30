@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `QUALITY_PROFILE` presets for CRF/preset and 10-bit master output
   - `COLORLEVELS` and `LUMA_NORMALIZE` toggles for safer grading
 
+- **Idempotency & Timeout Controls**
+  - `SKIP_EXISTING_OUTPUTS`, `FORCE_REPROCESS`, `MIN_OUTPUT_BYTES` for output reuse
+  - `JOB_ID_STRATEGY=hash` for deterministic job ids across reruns
+  - `FFPROBE_TIMEOUT`, `FFMPEG_SHORT_TIMEOUT`, `FFMPEG_LONG_TIMEOUT` for runtime tuning
+
 - **Timeline Export Post-Processing** (`src/montage_ai/editor.py`)
   - Automatic OTIO/EDL/CSV export after successful renders
   - Exports to `/data/output/` alongside rendered video
@@ -67,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Voice isolation now runs async on cgpu while scene detection runs on local CPU
   - Maximizes utilization of both cloud GPU and local resources
   - Scene detection parallelism uses optimal CPU threads
+
+- **Config-Driven Timeouts**
+  - Creative Director/Evaluator default timeouts now use `LLM_TIMEOUT`
+  - Audio/scene analysis and segment rendering honor processing timeout settings
 
 - **Web UI KISS/DRY Improvements** (`src/montage_ai/web_ui/`)
   - `app.py`: Added `bool_to_env()` helper, reduced 10 repetitive ternary expressions

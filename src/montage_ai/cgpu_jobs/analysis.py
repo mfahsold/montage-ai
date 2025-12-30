@@ -128,6 +128,10 @@ if __name__ == "__main__":
         
         return JobResult(success=False, error="Failed to download results")
 
+    def expected_output_path(self) -> Optional[Path]:
+        """Expected output path for idempotent reuse."""
+        return _pick_local_output_path(self.input_path, ".scenes.json")
+
 
 class BeatAnalysisJob(CGPUJob):
     """
@@ -225,3 +229,7 @@ if __name__ == "__main__":
             return JobResult(success=True, output_path=str(local_output))
         
         return JobResult(success=False, error="Failed to download results")
+
+    def expected_output_path(self) -> Optional[Path]:
+        """Expected output path for idempotent reuse."""
+        return _pick_local_output_path(self.input_path, ".analysis.json")

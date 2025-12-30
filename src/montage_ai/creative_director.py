@@ -21,6 +21,8 @@ import os
 import json
 import requests
 from typing import Dict, Optional, Any
+
+from .config import get_settings
 from .style_templates import get_style_template, list_available_styles
 
 # Try importing OpenAI client for cgpu/Gemini support
@@ -167,7 +169,7 @@ class CreativeDirector:
         self,
         ollama_host: str = OLLAMA_HOST,
         model: str = OLLAMA_MODEL,
-        timeout: int = 60,
+        timeout: Optional[int] = None,
         use_cgpu: bool = None,
         use_google_ai: bool = None,
         use_openai_api: bool = None,
@@ -179,7 +181,7 @@ class CreativeDirector:
         Args:
             ollama_host: Ollama API endpoint
             model: LLM model to use (llama3.1:70b, deepseek-r1:70b, etc.)
-            timeout: Request timeout in seconds
+            timeout: Request timeout in seconds (defaults to LLM_TIMEOUT)
             use_cgpu: Force cgpu backend (None = auto-detect from env)
             use_google_ai: Force Google AI backend (None = auto-detect from env)
             use_openai_api: Force OpenAI-compatible backend (None = auto-detect from env)
@@ -187,7 +189,7 @@ class CreativeDirector:
         """
         self.ollama_host = ollama_host
         self.ollama_model = model
-        self.timeout = timeout
+        self.timeout = timeout if timeout is not None else get_settings().llm.timeout
         
         # Determine backend priority: OpenAI-compatible > cgpu > Google AI > Ollama
         if use_openai_api is None:
