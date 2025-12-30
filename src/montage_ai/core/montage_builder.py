@@ -554,18 +554,50 @@ class MontageBuilder:
         """
         Phase 2: Analyze audio and video assets.
 
-        - Load and analyze music (beats, tempo, energy)
-        - Load videos and detect scenes
-        - Run AI content analysis on scenes
+        OPTIMIZED: Runs cgpu voice isolation in parallel with scene detection
+        to maximize utilization of both cloud GPU and local CPU.
+
+        - Start voice isolation async (cgpu) if enabled
+        - Detect scenes in videos (parallel, local CPU)
+        - Wait for voice isolation to complete
+        - Analyze music with isolated audio
         - Determine output profile
         """
         logger.info("\n   🎵 Analyzing assets...")
 
-        # Analyze music
-        self._analyze_music()
+        # OPTIMIZATION: Start voice isolation in background while doing scene detection
+        voice_isolation_future = None
+        isolated_audio_path = None
 
-        # Detect scenes in videos
+        if self.settings.features.voice_isolation:
+            # Get music file first
+            music_files = self._get_files(self.ctx.music_dir, ('.mp3', '.wav'))
+            if music_files:
+                music_index = (self.variant_id - 1) % len(music_files)
+                music_path = music_files[music_index]
+
+                # Start voice isolation async (runs on cgpu while we do scene detection)
+                logger.info("   🚀 Starting voice isolation async (cgpu)...")
+                voice_isolation_future = self._executor.submit(
+                    self._apply_voice_isolation, music_path
+                )
+
+        # Detect scenes in videos (parallel, local CPU) - runs while cgpu processes
         self._detect_scenes()
+
+        # Wait for voice isolation to complete (if started)
+        if voice_isolation_future is not None:
+            try:
+                # Use configured timeout (default 1200s) instead of hardcoded 300s
+                timeout = self.settings.llm.cgpu_timeout
+                isolated_audio_path = voice_isolation_future.result(timeout=timeout)
+                logger.info(f"   ✅ Voice isolation completed")
+            except Exception as e:
+                logger.warning(f"   ⚠️ Voice isolation async failed: {e}")
+                isolated_audio_path = None
+
+        # Analyze music (use isolated audio if available)
+        self._analyze_music(isolated_audio_path=isolated_audio_path)
 
         # Determine output profile
         self._determine_output_profile()
@@ -793,8 +825,13 @@ class MontageBuilder:
             logger.warning(f"   ⚠️ Failed to initialize Intelligent Clip Selector: {e}")
             self._intelligent_selector = None
 
-    def _analyze_music(self):
-        """Load and analyze music file with caching support."""
+    def _analyze_music(self, isolated_audio_path: Optional[str] = None):
+        """Load and analyze music file with caching support.
+
+        Args:
+            isolated_audio_path: Pre-isolated audio path from async processing.
+                                 If provided, skips voice isolation step.
+        """
         from ..audio_analysis import get_beat_times, analyze_music_energy
 
         # Get music files
@@ -806,8 +843,11 @@ class MontageBuilder:
         music_index = (self.variant_id - 1) % len(music_files)
         music_path = music_files[music_index]
 
-        # Apply voice isolation if enabled (cleans audio before analysis)
-        if self.settings.features.voice_isolation:
+        # Use pre-isolated audio if provided (from async processing)
+        # Otherwise apply voice isolation synchronously if enabled
+        if isolated_audio_path:
+            music_path = isolated_audio_path
+        elif self.settings.features.voice_isolation:
             music_path = self._apply_voice_isolation(music_path)
 
         # Try cache first
@@ -899,7 +939,9 @@ class MontageBuilder:
 
         if uncached_videos:
             # Use ThreadPoolExecutor for parallel I/O
-            max_workers = min(4, len(uncached_videos))  # Limit to 4 threads
+            # Use more workers based on available CPU cores for better cluster utilization
+            optimal_workers = self._resource_manager.get_optimal_threads()
+            max_workers = min(optimal_workers, len(uncached_videos))
             logger.info(f"   🚀 Parallel scene detection ({len(uncached_videos)} videos, {max_workers} workers)")
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -1030,12 +1072,21 @@ class MontageBuilder:
                 audio_path=audio_path,
                 model=model,
                 two_stems=True,  # Fast mode: vocals + accompaniment
+                keep_all_stems=True, # We need no_vocals for better beat detection
             )
             result = job.execute()
 
-            if result.success and result.output_path:
-                logger.info(f"   ✅ Voice isolated: {result.output_path}")
-                return result.output_path
+            if result.success:
+                # Prefer no_vocals (accompaniment) for beat detection as it has clearer drums/bass
+                # without vocal interference
+                stems = result.metadata.get("stems", {})
+                if stems.get("no_vocals"):
+                    logger.info(f"   ✅ Voice isolated: Using accompaniment for analysis: {stems['no_vocals']}")
+                    return stems["no_vocals"]
+                
+                if result.output_path:
+                    logger.info(f"   ✅ Voice isolated: {result.output_path}")
+                    return result.output_path
             else:
                 logger.warning(f"   Voice isolation failed: {result.error}")
                 return audio_path

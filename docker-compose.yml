@@ -41,6 +41,15 @@ services:
       # Color Grading / LUTs
       - LUT_DIR=${LUT_DIR:-/data/luts}
       - COLOR_MATCH=${COLOR_MATCH:-false}
+
+      # Duration Controls
+      - TARGET_DURATION=${TARGET_DURATION:-0}
+      - MUSIC_START=${MUSIC_START:-0}
+      - MUSIC_END=${MUSIC_END:-0}
+
+      # Cloud / Pro Features
+      - MONTAGE_CLOUD_ENABLED=${MONTAGE_CLOUD_ENABLED:-false}
+      - MONTAGE_CLOUD_API_KEY=${MONTAGE_CLOUD_API_KEY:-}
       
       # AI / LLM Configuration
       # Priority: OPENAI_API_BASE > GOOGLE_API_KEY > CGPU > OLLAMA
@@ -106,6 +115,11 @@ services:
       
       # Deep Analysis
       - DEEP_ANALYSIS=${DEEP_ANALYSIS:-false}
+
+      # Duration Control
+      - TARGET_DURATION=${TARGET_DURATION:-0}
+      - MUSIC_START=${MUSIC_START:-0}
+      - MUSIC_END=${MUSIC_END:-0}
     # === GPU ACCESS (for hardware video encoding) ===
     # Uncomment for NVIDIA GPU:
     # deploy:

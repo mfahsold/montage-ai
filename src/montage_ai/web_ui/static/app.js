@@ -374,10 +374,26 @@ async function createJob(isPreview = false) {
 // B-Roll Planning (Semantic Search)
 // =============================================================================
 
-async function analyzeFoootage() {
+/**
+ * DRY helper: Display result in B-roll results div
+ * @param {string} message - Message to display (prefix with "> ")
+ * @param {string} type - 'success' | 'error' | 'info' | 'loading'
+ */
+function showBrollResult(message, type = 'info') {
     const resultsDiv = document.getElementById('brollResults');
     resultsDiv.style.display = 'block';
-    resultsDiv.innerHTML = '> ANALYZING_FOOTAGE...';
+    resultsDiv.innerHTML = message;
+    const colors = {
+        success: 'var(--primary)',
+        error: 'var(--warning)',
+        info: 'var(--text-dim)',
+        loading: 'inherit'
+    };
+    resultsDiv.style.color = colors[type] || 'inherit';
+}
+
+async function analyzeFootage() {
+    showBrollResult('> ANALYZING_FOOTAGE...', 'loading');
 
     try {
         const response = await fetch(`${API_BASE}/broll/analyze`, {
@@ -388,30 +404,28 @@ async function analyzeFoootage() {
         const result = await response.json();
 
         if (response.ok) {
-            resultsDiv.innerHTML = `> ANALYZED ${result.analyzed} FILES<br>` +
-                `> MEMORY: ${result.memory_stats?.temporal_entries || 0} segments indexed`;
-            resultsDiv.style.color = 'var(--primary)';
+            showBrollResult(
+                `> ANALYZED ${result.analyzed} FILES<br>` +
+                `> MEMORY: ${result.memory_stats?.temporal_entries || 0} segments indexed`,
+                'success'
+            );
         } else {
-            resultsDiv.innerHTML = `> ERROR: ${result.error}`;
-            resultsDiv.style.color = 'var(--warning)';
+            showBrollResult(`> ERROR: ${result.error}`, 'error');
         }
     } catch (error) {
-        resultsDiv.innerHTML = `> ERROR: ${error.message}`;
-        resultsDiv.style.color = 'var(--warning)';
+        showBrollResult(`> ERROR: ${error.message}`, 'error');
     }
 }
 
 async function searchBroll() {
     const query = document.getElementById('brollQuery').value.trim();
-    const resultsDiv = document.getElementById('brollResults');
 
     if (!query) {
         showToast('Enter a search query', 'warning');
         return;
     }
 
-    resultsDiv.style.display = 'block';
-    resultsDiv.innerHTML = `> SEARCHING: "${query}"...`;
+    showBrollResult(`> SEARCHING: "${query}"...`, 'loading');
 
     try {
         const response = await fetch(`${API_BASE}/broll/suggest`, {
@@ -423,23 +437,19 @@ async function searchBroll() {
         const result = await response.json();
 
         if (response.ok && result.suggestions?.length > 0) {
-            resultsDiv.innerHTML = `> FOUND ${result.count} MATCHES:<br>` +
-                result.suggestions.map((s, i) =>
-                    `  ${i + 1}. ${s.video_path?.split('/').pop() || 'clip'} ` +
-                    `[${s.start_time?.toFixed(1) || 0}s-${s.end_time?.toFixed(1) || 0}s] ` +
-                    `(${(s.similarity_score * 100).toFixed(0)}%)`
-                ).join('<br>');
-            resultsDiv.style.color = 'var(--primary)';
+            const matches = result.suggestions.map((s, i) =>
+                `  ${i + 1}. ${s.video_path?.split('/').pop() || 'clip'} ` +
+                `[${s.start_time?.toFixed(1) || 0}s-${s.end_time?.toFixed(1) || 0}s] ` +
+                `(${(s.similarity_score * 100).toFixed(0)}%)`
+            ).join('<br>');
+            showBrollResult(`> FOUND ${result.count} MATCHES:<br>${matches}`, 'success');
         } else if (response.ok) {
-            resultsDiv.innerHTML = '> NO MATCHES FOUND. Try analyzing footage first.';
-            resultsDiv.style.color = 'var(--text-dim)';
+            showBrollResult('> NO MATCHES FOUND. Try analyzing footage first.', 'info');
         } else {
-            resultsDiv.innerHTML = `> ERROR: ${result.error}`;
-            resultsDiv.style.color = 'var(--warning)';
+            showBrollResult(`> ERROR: ${result.error}`, 'error');
         }
     } catch (error) {
-        resultsDiv.innerHTML = `> ERROR: ${error.message}`;
-        resultsDiv.style.color = 'var(--warning)';
+        showBrollResult(`> ERROR: ${error.message}`, 'error');
     }
 }
 

@@ -36,18 +36,12 @@ Welcome to Montage AI documentation.
 | [cgpu Setup](cgpu-setup.md) | Google Cloud credentials for cgpu |
 | [Cloud Offloading](cloud_offloading_implementation.md) | cgpu job types and implementation |
 | [Stability Report](stability_report.md) | Memory protection and job admission |
-| [Market Analysis](market_analysis.md) | OSS competitive landscape |
 
 ---
 
 ## Roadmap
 
-Active planning documents:
-
-| Doc | Description |
-|-----|-------------|
-| [2025 Tech Vision](roadmap/2025_tech_vision.md) | Strategic direction and trends |
-| [GPU Cluster](roadmap/gpu-cluster.md) | Distributed GPU processing plans |
+Active planning documents are currently internal. Please check [GitHub Issues](https://github.com/mfahsold/montage-ai/issues) for public roadmap items.
 | [Professional Export](roadmap/professional_export_design.md) | OTIO/EDL/Proxy workflow design |
 
 ---

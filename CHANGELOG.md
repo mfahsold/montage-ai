@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Distributed Rendering Support** (`deploy/k3s/overlays/distributed/`)
+  - NFS-backed PersistentVolumes for multi-node GPU scheduling
+  - Jobs can run on ANY GPU node (AMD, Jetson, or both)
+  - Auto-detection of GPU type via `FFMPEG_HWACCEL=auto`
+  - New files: `nfs-pv.yaml`, `nfs-pvc.yaml`, `patch-job-distributed.yaml`
+  - Usage: `kubectl apply -k deploy/k3s/overlays/distributed/`
+
+- **TARGET_DURATION Support in Docker/Kubernetes**
+  - `docker-compose.yml`: Added `TARGET_DURATION`, `MUSIC_START`, `MUSIC_END` env vars
+  - `montage-ai.sh`: Passes duration controls to Docker container
+  - `deploy/k3s/base/configmap.yaml`: Added duration control for K8s jobs
+  - Example: `TARGET_DURATION=30 ./montage-ai.sh run hitchcock`
+
+- **Timeline Export Post-Processing** (`src/montage_ai/editor.py`)
+  - Automatic OTIO/EDL/CSV export after successful renders
+  - Exports to `/data/output/` alongside rendered video
+  - Contains clip metadata: source paths, timecodes, energy, scene types
+  - Enable via `EXPORT_TIMELINE=true` (default in K8s)
+
+### Changed
+
+- **Parallel cgpu Optimization** (`src/montage_ai/core/montage_builder.py`)
+  - Voice isolation now runs async on cgpu while scene detection runs on local CPU
+  - Maximizes utilization of both cloud GPU and local resources
+  - Scene detection parallelism uses optimal CPU threads
+
+- **Web UI KISS/DRY Improvements** (`src/montage_ai/web_ui/`)
+  - `app.py`: Added `bool_to_env()` helper, reduced 10 repetitive ternary expressions
+  - `app.js`: Fixed typo `analyzeFoootage` → `analyzeFootage`
+  - `app.js`: Added `showBrollResult()` helper for DRY result display
+
+### Fixed
+
+- **cgpu Demucs Exit Code Issue** (`src/montage_ai/cgpu_jobs/voice_isolation.py`)
+  - cgpu sometimes reports exit code failure despite successful execution
+  - Added output file verification as fallback check
+  - Prevents false-negative failures for voice isolation jobs
+
 - **Viral Style Preset** (`src/montage_ai/styles/viral.json`)
   - Ultra-fast cuts (0.5-2 beats), maximum energy for TikTok/Reels
   - Chaotic pacing variation, aggressive beat reactivity

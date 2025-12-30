@@ -135,6 +135,25 @@ class LLMConfig:
 
 
 # =============================================================================
+# Cloud Configuration (Pro / Monetization)
+# =============================================================================
+@dataclass
+class CloudConfig:
+    """
+    Montage Cloud (Pro) configuration.
+    
+    Handles authentication and endpoints for the paid 'Pro' tier services
+    (Cloud GPU offloading, hosted Web UI, etc.).
+    """
+    api_key: str = field(default_factory=lambda: os.environ.get("MONTAGE_CLOUD_API_KEY", ""))
+    endpoint: str = field(default_factory=lambda: os.environ.get("MONTAGE_CLOUD_ENDPOINT", "https://api.montage.ai/v1"))
+    enabled: bool = field(default_factory=lambda: os.environ.get("MONTAGE_CLOUD_ENABLED", "false").lower() == "true")
+    
+    # Billing / Usage tracking
+    track_usage: bool = field(default_factory=lambda: os.environ.get("TRACK_USAGE", "true").lower() == "true")
+
+
+# =============================================================================
 # Encoding Configuration
 # =============================================================================
 @dataclass
@@ -268,6 +287,7 @@ class Settings:
     features: FeatureConfig = field(default_factory=FeatureConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     gpu: GPUConfig = field(default_factory=GPUConfig)
+    cloud: CloudConfig = field(default_factory=CloudConfig)
     encoding: EncodingConfig = field(default_factory=EncodingConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
     creative: CreativeConfig = field(default_factory=CreativeConfig)
@@ -304,6 +324,8 @@ class Settings:
             "LLM_CLIP_SELECTION": str(self.features.llm_clip_selection).lower(),
             "VERBOSE": str(self.features.verbose).lower(),
             "CGPU_ENABLED": str(self.llm.cgpu_enabled).lower(),
+            "MONTAGE_CLOUD_ENABLED": str(self.cloud.enabled).lower(),
+            "MONTAGE_CLOUD_ENDPOINT": self.cloud.endpoint,
             "CGPU_GPU_ENABLED": str(self.llm.cgpu_gpu_enabled).lower(),
             "CUT_STYLE": self.creative.cut_style,
             "CREATIVE_PROMPT": self.creative.creative_prompt,

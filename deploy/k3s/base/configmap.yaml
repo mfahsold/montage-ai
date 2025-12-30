@@ -68,3 +68,8 @@ data:
   
   # Deep Analysis
   DEEP_ANALYSIS: "true"
+
+  # Duration Control
+  TARGET_DURATION: "30"
+  MUSIC_START: "0"
+  MUSIC_END: "0"

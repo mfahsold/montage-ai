@@ -41,6 +41,13 @@ docs/integration_status_report.md
 docs/offloading_analysis.md
 docs/LEGAL_IMPLEMENTATION.md
 docs/archive/
+docs/marketing/monetization_strategy.md
+docs/marketing/social_media_strategy.md
+private/
+secrets/
+*.key
+*.pem
+
 
 # macOS
 .DS_Store

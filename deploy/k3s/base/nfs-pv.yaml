@@ -1,0 +1,82 @@
+---
+# NFS Persistent Volumes for Montage AI
+# Enables multi-node GPU access for distributed rendering
+#
+# Prerequisites:
+#   - NFS server at 192.168.1.16 (codeai-fluxibriserver)
+#   - Exported paths: /mnt/nfs-montage/{input,music,output,assets}
+#
+# To create exports on NFS server:
+#   sudo mkdir -p /mnt/nfs-montage/{input,music,output,assets}
+#   sudo chown -R nobody:nogroup /mnt/nfs-montage
+#   Add to /etc/exports:
+#     /mnt/nfs-montage 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
+#   sudo exportfs -ra
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-ai-input-nfs
+  labels:
+    app.kubernetes.io/name: montage-ai
+    storage-type: nfs
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: 192.168.1.16
+    path: /mnt/nfs-montage/input
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-ai-music-nfs
+  labels:
+    app.kubernetes.io/name: montage-ai
+    storage-type: nfs
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: 192.168.1.16
+    path: /mnt/nfs-montage/music
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-ai-output-nfs
+  labels:
+    app.kubernetes.io/name: montage-ai
+    storage-type: nfs
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: 192.168.1.16
+    path: /mnt/nfs-montage/output
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-ai-assets-nfs
+  labels:
+    app.kubernetes.io/name: montage-ai
+    storage-type: nfs
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: 192.168.1.16
+    path: /mnt/nfs-montage/assets
+  persistentVolumeReclaimPolicy: Retain

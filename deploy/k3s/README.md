@@ -9,7 +9,8 @@ deploy/k3s/
 ├── base/                    # Base manifests
 │   ├── namespace.yaml       # montage-ai namespace
 │   ├── configmap.yaml       # Environment configuration
-│   ├── pvc.yaml             # Storage claims
+│   ├── pvc.yaml             # Storage claims (local-path)
+│   ├── nfs-pv.yaml          # NFS PersistentVolumes (for distributed)
 │   ├── job.yaml             # One-off render job
 │   ├── cronjob.yaml         # Scheduled renders
 │   └── kustomization.yaml   # Base kustomization
@@ -23,6 +24,10 @@ deploy/k3s/
 │   │   └── patch-job-amd.yaml
 │   ├── jetson/              # NVIDIA Jetson (NVENC) acceleration
 │   │   └── kustomization.yaml
+│   ├── distributed/         # Multi-node GPU with NFS storage
+│   │   ├── kustomization.yaml
+│   │   ├── nfs-pvc.yaml     # NFS PersistentVolumeClaims
+│   │   └── patch-job-distributed.yaml
 │   └── gpu/                 # Generic NVIDIA GPU acceleration
 │       ├── kustomization.yaml
 │       ├── patch-job-gpu.yaml
@@ -147,11 +152,12 @@ kubectl apply -k deploy/k3s/overlays/jetson/
 
 ### GPU Overlay Comparison
 
-| Overlay    | Target Node                | GPU Type     | Encoder | Use Case                    |
-| ---------- | -------------------------- | ------------ | ------- | --------------------------- |
-| `gpu`      | Any NVIDIA GPU node        | NVIDIA CUDA  | NVENC   | Generic NVIDIA acceleration |
-| `amd`      | codeai-fluxibriserver      | AMD Radeon   | VAAPI   | AMD GPU encoding            |
-| `jetson`   | codeaijetson-desktop       | NVIDIA Tegra | NVENC   | Edge device rendering       |
+| Overlay       | Target Node                | GPU Type     | Encoder | Use Case                    |
+| ------------- | -------------------------- | ------------ | ------- | --------------------------- |
+| `gpu`         | Any NVIDIA GPU node        | NVIDIA CUDA  | NVENC   | Generic NVIDIA acceleration |
+| `amd`         | codeai-fluxibriserver      | AMD Radeon   | VAAPI   | AMD GPU encoding            |
+| `jetson`      | codeaijetson-desktop       | NVIDIA Tegra | NVENC   | Edge device rendering       |
+| `distributed` | Any GPU node (NFS storage) | Auto-detect  | Auto    | Multi-node GPU scheduling   |
 
 ## Architecture
 
@@ -255,6 +261,65 @@ kubectl apply -k deploy/k3s/overlays/amd/
 
 # Deploy to Jetson with NVENC
 kubectl apply -k deploy/k3s/overlays/jetson/
+
+# Distributed rendering (multi-node GPU)
+kubectl apply -k deploy/k3s/overlays/distributed/
+```
+
+## Distributed Rendering (Multi-Node GPU)
+
+The `distributed` overlay enables jobs to run on **any GPU node** in the cluster using NFS shared storage.
+
+### Setup NFS Storage
+
+1. **Create NFS exports on your NFS server** (e.g., fluxibriserver):
+
+```bash
+# On NFS server
+sudo mkdir -p /mnt/nfs-montage/{input,music,output,assets}
+sudo chown -R nobody:nogroup /mnt/nfs-montage
+
+# Add to /etc/exports
+echo "/mnt/nfs-montage *(rw,sync,no_subtree_check,no_root_squash)" | sudo tee -a /etc/exports
+sudo exportfs -a
+```
+
+2. **Update NFS PV configuration** in `deploy/k3s/base/nfs-pv.yaml`:
+
+```yaml
+nfs:
+  server: 192.168.1.16  # Your NFS server IP
+  path: /mnt/nfs-montage/input
+```
+
+3. **Deploy the distributed overlay**:
+
+```bash
+kubectl apply -k deploy/k3s/overlays/distributed/
+```
+
+### How It Works
+
+- **NFS PVCs** replace local-path PVCs for multi-node access (ReadWriteMany)
+- **Node affinity** prefers GPU nodes (nvidia.com/gpu or amd.com/gpu)
+- **Auto GPU detection**: `FFMPEG_HWACCEL=auto` selects NVENC or VAAPI based on node
+- Jobs can land on Jetson (NVENC), AMD server (VAAPI), or any GPU node
+
+### Cluster Topology
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                 NFS Server (fluxibriserver)                 │
+│                   /mnt/nfs-montage/                         │
+│     input/     music/     output/     assets/               │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ NFS Mount
+       ┌───────────────┼───────────────┐
+       ▼               ▼               ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│   Jetson    │ │  AMD GPU    │ │  CPU Node   │
+│   (NVENC)   │ │  (VAAPI)    │ │  (fallback) │
+└─────────────┘ └─────────────┘ └─────────────┘
 ```
 
 ### Prerequisites

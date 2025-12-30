@@ -1,0 +1,61 @@
+# Distributed Job Patch
+# Removes node affinity and uses NFS storage for multi-node scheduling
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-render
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      # Remove node selector - let scheduler pick best GPU node
+      nodeSelector: null
+      # Prefer GPU nodes
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+            - weight: 90
+              preference:
+                matchExpressions:
+                  - key: amd.com/gpu
+                    operator: Exists
+      containers:
+        - name: montage-ai
+          env:
+            # Auto-detect GPU type
+            - name: FFMPEG_HWACCEL
+              value: "auto"
+            - name: USE_GPU
+              value: "prefer"
+          # Use NFS PVCs instead of local PVCs
+          volumeMounts:
+            - name: input-nfs
+              mountPath: /data/input
+              readOnly: true
+            - name: music-nfs
+              mountPath: /data/music
+              readOnly: true
+            - name: assets-nfs
+              mountPath: /data/assets
+              readOnly: true
+            - name: output-nfs
+              mountPath: /data/output
+      volumes:
+        - name: input-nfs
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music-nfs
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: assets-nfs
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+        - name: output-nfs
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs

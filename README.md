@@ -74,6 +74,19 @@ CREATIVE_PROMPT="make it feel like a 90s skateboard video" ./montage-ai.sh run
 
 ---
 
+## Commercial Use & Cloud
+
+Montage AI is **Source Available** and free for personal, non-commercial use.
+
+**Pro Features (Coming Soon):**
+*   **Montage Cloud**: Offload heavy upscaling and rendering to our H100 clusters.
+*   **Commercial License**: For studios, agencies, and monetized creators.
+*   **Hosted Web UI**: No Docker required.
+
+[Contact us](mailto:sales@montage.ai) for early access.
+
+---
+
 ## Documentation
 
 Everything else lives in [`docs/`](docs/):

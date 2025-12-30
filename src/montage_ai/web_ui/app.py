@@ -102,6 +102,11 @@ def allowed_file(filename: str, allowed_extensions: set) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
 
+def bool_to_env(value: bool) -> str:
+    """Convert boolean to env var string. DRY helper for options -> env vars."""
+    return "true" if value else "false"
+
+
 def process_job_from_queue(job_data: dict):
     """Process a job from the queue in a background thread."""
     global active_jobs
@@ -244,23 +249,21 @@ def run_montage(job_id: str, style: str, options: dict):
         env["JOB_ID"] = job_id
         env["CUT_STYLE"] = style
         env["CREATIVE_PROMPT"] = options.get("prompt", "")
-        env["STABILIZE"] = "true" if options.get("stabilize") else "false"
-        env["UPSCALE"] = "true" if options.get("upscale") else "false"
-        env["ENHANCE"] = "true" if options.get("enhance") else "false"
-        env["LLM_CLIP_SELECTION"] = "true" if options.get("llm_clip_selection") else "false"
-        env["EXPORT_TIMELINE"] = "true" if options.get("export_timeline") else "false"
-        env["GENERATE_PROXIES"] = "true" if options.get("generate_proxies") else "false"
-        # Aspect ratio handling: letterbox/pillarbox vs crop
-        env["PRESERVE_ASPECT"] = "true" if options.get("preserve_aspect") else "false"
-        # Phase 4: Agentic Creative Loop
-        env["CREATIVE_LOOP"] = "true" if options.get("creative_loop") else "false"
+        # Boolean options -> env vars (DRY: use bool_to_env helper)
+        env["STABILIZE"] = bool_to_env(options.get("stabilize"))
+        env["UPSCALE"] = bool_to_env(options.get("upscale"))
+        env["ENHANCE"] = bool_to_env(options.get("enhance"))
+        env["LLM_CLIP_SELECTION"] = bool_to_env(options.get("llm_clip_selection"))
+        env["EXPORT_TIMELINE"] = bool_to_env(options.get("export_timeline"))
+        env["GENERATE_PROXIES"] = bool_to_env(options.get("generate_proxies"))
+        env["PRESERVE_ASPECT"] = bool_to_env(options.get("preserve_aspect"))
+        env["CREATIVE_LOOP"] = bool_to_env(options.get("creative_loop"))
+        env["CGPU_ENABLED"] = bool_to_env(options.get("cgpu"))
+        env["CGPU_GPU_ENABLED"] = bool_to_env(options.get("cgpu"))
         # Quick Preview: Use fast FFmpeg preset
         if options.get("preview"):
             env["FFMPEG_PRESET"] = "ultrafast"
             env["FINAL_CRF"] = "28"  # Lower quality for speed
-        # cgpu checkbox enables BOTH LLM and GPU upscaling
-        env["CGPU_ENABLED"] = "true" if options.get("cgpu") else "false"
-        env["CGPU_GPU_ENABLED"] = "true" if options.get("cgpu") else "false"
         # Video duration & music trimming (already normalized by normalize_options)
         env["TARGET_DURATION"] = str(options.get("target_duration", 0))
         env["MUSIC_START"] = str(options.get("music_start", 0))

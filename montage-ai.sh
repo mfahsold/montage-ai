@@ -214,6 +214,9 @@ run_montage() {
         -e CAPTIONS="$CAPTIONS" \
         -e CAPTIONS_STYLE="$CAPTIONS_STYLE" \
         -e VOICE_ISOLATION="$VOICE_ISOLATION" \
+        -e TARGET_DURATION="${TARGET_DURATION:-0}" \
+        -e MUSIC_START="${MUSIC_START:-0}" \
+        -e MUSIC_END="${MUSIC_END:-0}" \
         montage-ai
 }
 

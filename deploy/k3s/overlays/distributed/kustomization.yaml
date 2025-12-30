@@ -1,0 +1,19 @@
+# Distributed Rendering Overlay
+#
+# Uses NFS storage for multi-node GPU access.
+# Jobs can run on ANY GPU node (AMD, Jetson, or both).
+#
+# Usage:
+#   kubectl apply -k deploy/k3s/overlays/distributed/
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: montage-ai
+
+resources:
+  - ../../base
+  - nfs-pvc.yaml
+
+patches:
+  - path: patch-job-distributed.yaml

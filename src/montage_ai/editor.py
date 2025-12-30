@@ -843,6 +843,60 @@ def _transcribe_for_captions(video_path: str) -> Optional[str]:
     return None
 
 
+def _export_timeline_for_nle(builder, result, settings) -> None:
+    """
+    Export timeline data for professional NLE import.
+
+    Kept as a separate function to avoid bloating MontageBuilder.
+    Called as post-processing step when EXPORT_TIMELINE is enabled.
+
+    Args:
+        builder: MontageBuilder instance with clips_metadata
+        result: MontageResult with output info
+        settings: Settings object
+    """
+    from .timeline_exporter import export_timeline_from_montage
+
+    # Convert ClipMetadata objects to dictionaries for timeline export
+    clips_data = []
+    for clip in builder.ctx.clips_metadata:
+        clips_data.append({
+            "source_path": clip.source_path,
+            "start_time": clip.start_time,
+            "duration": clip.duration,
+            "timeline_start": clip.timeline_position,
+            "metadata": {
+                "energy": getattr(clip, 'energy', None),
+                "scene_type": getattr(clip, 'scene_type', None),
+            }
+        })
+
+    if not clips_data:
+        logger.warning("   No clips metadata for timeline export")
+        return
+
+    # Get audio path from context
+    audio_path = builder.ctx.audio_result.music_path if builder.ctx.audio_result else ""
+
+    # Generate project name from output
+    project_name = Path(result.output_path).stem if result.output_path else "montage_ai"
+
+    logger.info(f"\n📽️ Exporting timeline for NLE...")
+
+    exported = export_timeline_from_montage(
+        clips_data=clips_data,
+        audio_path=audio_path,
+        total_duration=result.duration,
+        output_dir=str(settings.paths.output_dir),
+        project_name=project_name,
+        generate_proxies=settings.features.generate_proxies,
+        fps=builder.ctx.output_profile.fps if builder.ctx.output_profile else 24.0,
+    )
+
+    for fmt, path in exported.items():
+        logger.info(f"   ✅ {fmt.upper()}: {path}")
+
+
 def create_montage(variant_id: int = 1) -> Optional[str]:
     """
     Create a video montage from input footage and music.
@@ -860,6 +914,7 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
     global EDITING_INSTRUCTIONS
 
     # Build using the new MontageBuilder pipeline
+    builder = None  # Will be set for timeline export
     try:
         # Check if creative loop is enabled
         if _settings.features.creative_loop:
@@ -872,6 +927,7 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
                 max_iterations=_settings.features.creative_loop_max_iterations,
                 settings=_settings,
             )
+            # Note: builder not available with creative_loop, timeline export skipped
         else:
             builder = MontageBuilder(
                 variant_id=variant_id,
@@ -893,6 +949,13 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
             final_output = result.output_path
             if _settings.features.captions:
                 final_output = _apply_captions(final_output, _settings)
+
+            # Post-processing: Export timeline for NLE if enabled
+            if EXPORT_TIMELINE and TIMELINE_EXPORT_AVAILABLE and builder is not None:
+                try:
+                    _export_timeline_for_nle(builder, result, _settings)
+                except Exception as e:
+                    logger.warning(f"   ⚠️ Timeline export failed: {e}")
 
             return final_output
         else:

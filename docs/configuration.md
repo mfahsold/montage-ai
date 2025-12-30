@@ -12,6 +12,9 @@ Complete reference for all environment variables and settings.
 | `CREATIVE_PROMPT` | *(empty)*     | Natural language editing instructions (overrides `CUT_STYLE`)                       |
 | `NUM_VARIANTS`    | `1`           | Number of output variants to generate                                               |
 | `JOB_ID`          | *(timestamp)* | Unique identifier for parallel runs                                                 |
+| `TARGET_DURATION` | `0`           | Target video duration in seconds (`0` = use full music length)                      |
+| `MUSIC_START`     | `0`           | Music start time in seconds (trim beginning)                                        |
+| `MUSIC_END`       | `0`           | Music end time in seconds (`0` = use full track, auto-derived from `TARGET_DURATION`) |
 
 ---
 
@@ -94,6 +97,31 @@ OPENAI_VISION_MODEL=moondream2 \
 | `CGPU_MODEL`       | `gemini-2.0-flash`     | Gemini model to use                              |
 | `CGPU_GPU_ENABLED` | `false`                | Enable cloud GPU for upscaling                   |
 | `CGPU_TIMEOUT`     | `1200`                 | Cloud operation timeout (seconds)                |
+
+---
+
+## Cloud & Pro Features (Monetization)
+
+Settings for Montage Cloud integration (Pro tier).
+
+| Variable                 | Default                   | Description                                      |
+| ------------------------ | ------------------------- | ------------------------------------------------ |
+| `MONTAGE_CLOUD_ENABLED`  | `false`                   | Enable Montage Cloud integration                 |
+| `MONTAGE_CLOUD_API_KEY`  | *(empty)*                 | API Key for Pro features                         |
+| `MONTAGE_CLOUD_ENDPOINT` | `https://api.montage.ai`  | API Endpoint                                     |
+| `TRACK_USAGE`            | `true`                    | Enable usage tracking for billing                |
+
+---
+
+## Duration Controls
+
+Fine-tune the length and timing of your montage.
+
+| Variable          | Default | Description                                      |
+| ----------------- | ------- | ------------------------------------------------ |
+| `TARGET_DURATION` | `0`     | Target length in seconds (0 = auto/music length) |
+| `MUSIC_START`     | `0`     | Start time of music track (seconds)              |
+| `MUSIC_END`       | `0`     | End time of music track (0 = end of file)        |
 
 ---
 

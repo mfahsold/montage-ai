@@ -1,0 +1,58 @@
+# NFS PVCs for Distributed Rendering
+# These override the local-path PVCs to enable multi-node access
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-input-nfs
+  namespace: montage-ai
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: montage-ai-input-nfs
+  storageClassName: ""  # Use pre-provisioned PV
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-music-nfs
+  namespace: montage-ai
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: montage-ai-music-nfs
+  storageClassName: ""
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-output-nfs
+  namespace: montage-ai
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: montage-ai-output-nfs
+  storageClassName: ""
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-assets-nfs
+  namespace: montage-ai
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: montage-ai-assets-nfs
+  storageClassName: ""

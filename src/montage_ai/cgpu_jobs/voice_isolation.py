@@ -112,6 +112,7 @@ class VoiceIsolationJob(CGPUJob):
     def run_remote(self) -> bool:
         """Run demucs separation on cgpu."""
         audio_name = self.audio_path.name
+        stem = self.audio_path.stem
 
         # Build demucs command
         cmd_parts = [
@@ -135,7 +136,17 @@ class VoiceIsolationJob(CGPUJob):
 
         success, stdout, stderr = run_cgpu_command(cmd, timeout=self.timeout)
 
+        # cgpu sometimes doesn't report exit code correctly, so verify output exists
         if not success:
+            # Check if output was actually created despite exit code issue
+            expected_output = f"{self.remote_work_dir}/{self.model}/{stem}/vocals.wav"
+            verify_cmd = f"test -f '{expected_output}' && echo 'EXISTS' || echo 'MISSING'"
+            verify_ok, verify_out, _ = run_cgpu_command(verify_cmd, timeout=30)
+
+            if verify_ok and "EXISTS" in verify_out:
+                print(f"   ✅ Output verified despite exit code issue")
+                return True
+
             # Check for common errors
             if "CUDA" in (stderr or ""):
                 self._error = f"GPU error: {stderr}"
