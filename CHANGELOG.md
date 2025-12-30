@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Monetization Infrastructure** (`src/montage_ai/config.py`)
+  - Added `CloudConfig` for Pro features (API keys, endpoints)
+  - Prepared `docker-compose.yml` for Cloud env vars
+  - Created `private/` directory structure for sensitive docs
+
 - **Distributed Rendering Support** (`deploy/k3s/overlays/distributed/`)
   - NFS-backed PersistentVolumes for multi-node GPU scheduling
   - Jobs can run on ANY GPU node (AMD, Jetson, or both)
@@ -22,6 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `deploy/k3s/base/configmap.yaml`: Added duration control for K8s jobs
   - Example: `TARGET_DURATION=30 ./montage-ai.sh run hitchcock`
 
+- **Upscale Quality Controls**
+  - New `UpscaleConfig` with `UPSCALE_MODEL`, `UPSCALE_SCALE`, `UPSCALE_FRAME_FORMAT`, `UPSCALE_TILE_SIZE`, `UPSCALE_CRF`
+  - cgpu upscaling supports PNG frame caches and configurable CRF
+  - ClipEnhancer now respects upscaling model/scale defaults
+
+- **cgpu Parallelism Control**
+  - Added `CGPU_MAX_CONCURRENCY` with a global cgpu slot semaphore
+  - `CGPUJobManager` can process queue with multiple workers
+
+- **Quality Profiles & Color Controls**
+  - `QUALITY_PROFILE` presets for CRF/preset and 10-bit master output
+  - `COLORLEVELS` and `LUMA_NORMALIZE` toggles for safer grading
+
 - **Timeline Export Post-Processing** (`src/montage_ai/editor.py`)
   - Automatic OTIO/EDL/CSV export after successful renders
   - Exports to `/data/output/` alongside rendered video
@@ -29,6 +47,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enable via `EXPORT_TIMELINE=true` (default in K8s)
 
 ### Changed
+
+- **Hardcoded Values to Configuration**
+  - Moved audio analysis thresholds to `AudioConfig` (`SILENCE_THRESHOLD`, `ENERGY_HIGH_THRESHOLD`, etc.)
+  - Centralized timeouts in `ProcessingConfig` and `LLMConfig` (`FFMPEG_TIMEOUT`, `LLM_TIMEOUT`)
+  - Configurable transcription model via `TRANSCRIPTION_MODEL`
+
+- **Voice Isolation Logic** (`src/montage_ai/core/montage_builder.py`)
+  - Now uses instrumental stem (`no_vocals`) for beat detection if available
+  - Increased timeout from 300s to configured `CGPU_TIMEOUT` (default 1200s)
+  - Improved robustness for long audio tracks
+
+- **Documentation & Strategy**
+  - Moved sensitive strategy docs to `private/`
+  - Updated `README.md` and `website/index.html` with "Source Available" and "Pro Features" messaging
+  - Added `USER_CHECKLIST.md` for manual launch tasks
 
 - **Parallel cgpu Optimization** (`src/montage_ai/core/montage_builder.py`)
   - Voice isolation now runs async on cgpu while scene detection runs on local CPU

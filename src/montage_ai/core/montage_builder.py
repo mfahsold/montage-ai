@@ -57,10 +57,11 @@ class AudioAnalysisResult:
     @property
     def energy_profile(self) -> str:
         """Categorize energy as high/mixed/low."""
+        settings = get_settings()
         avg = self.avg_energy
-        if avg > 0.6:
+        if avg > settings.audio.energy_high_threshold:
             return "high"
-        elif avg < 0.4:
+        elif avg < settings.audio.energy_low_threshold:
             return "low"
         return "mixed"
 
@@ -349,9 +350,14 @@ def process_clip_task(
         vf_filters = [
             f"scale={output_profile.width}:{output_profile.height}:force_original_aspect_ratio=decrease",
             f"pad={output_profile.width}:{output_profile.height}:(ow-iw)/2:(oh-ih)/2",
-            "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:rimax=0.922:gimax=0.922:bimax=0.922",
-            "normalize=blackpt=black:whitept=white:smoothing=10",
         ]
+        if getattr(settings.features, "colorlevels", True):
+            vf_filters.append(
+                "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:"
+                "rimax=0.922:gimax=0.922:bimax=0.922"
+            )
+        if getattr(settings.features, "luma_normalize", True):
+            vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
         vf_chain = ",".join(vf_filters)
         if encoder_config and encoder_config.hwupload_filter:
             vf_chain = f"{vf_chain},{encoder_config.hwupload_filter}"

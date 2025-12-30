@@ -394,7 +394,7 @@ class SceneContentAnalyzer:
                 }],
                 max_tokens=100,
                 temperature=0.2,
-                timeout=30
+                timeout=_settings.llm.timeout
             )
 
             if response.choices and response.choices[0].message.content:
@@ -437,7 +437,7 @@ class SceneContentAnalyzer:
             response = requests.post(
                 f"{self.ollama_host}/api/generate",
                 json=payload,
-                timeout=30
+                timeout=_settings.llm.timeout
             )
 
             if response.status_code == 200:

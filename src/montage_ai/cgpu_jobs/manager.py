@@ -17,12 +17,13 @@ Usage:
 
 import time
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Callable
 
 from .base import CGPUJob, JobStatus, JobResult
-from ..cgpu_utils import is_cgpu_available, run_cgpu_command
+from ..cgpu_utils import is_cgpu_available, run_cgpu_command, CGPU_MAX_CONCURRENCY
 
 
 @dataclass
@@ -229,37 +230,75 @@ class CGPUJobManager:
                 return [JobResult(success=False, error="Failed to initialize cgpu session")]
 
             total_jobs = len(self._queue)
-            print(f"🚀 Processing {total_jobs} job(s)...")
+            max_workers = max(1, int(CGPU_MAX_CONCURRENCY))
 
-            job_num = 0
-            while self._queue:
-                job_num += 1
-                entry = self._queue.popleft()
-                job = entry.job
+            if max_workers == 1 or total_jobs <= 1:
+                print(f"🚀 Processing {total_jobs} job(s)...")
 
-                print(f"\n[{job_num}/{total_jobs}] 🔄 {job.job_type}: {job.job_id}")
+                job_num = 0
+                while self._queue:
+                    job_num += 1
+                    entry = self._queue.popleft()
+                    job = entry.job
 
-                # Execute with retry
-                result = self._execute_with_retry(job)
-                entry.result = result
-                results.append(result)
+                    print(f"\n[{job_num}/{total_jobs}] 🔄 {job.job_type}: {job.job_id}")
 
-                # Store in completed
-                self._completed[job.job_id] = entry
+                    # Execute with retry
+                    result = self._execute_with_retry(job)
+                    entry.result = result
+                    results.append(result)
 
-                # Status emoji
-                status_emoji = "✅" if result.success else "❌"
-                print(f"   {status_emoji} {job.job_type} completed in {result.duration_seconds:.1f}s")
+                    # Store in completed
+                    self._completed[job.job_id] = entry
 
-                if result.error:
-                    print(f"   ⚠️ Error: {result.error}")
+                    # Status emoji
+                    status_emoji = "✅" if result.success else "❌"
+                    print(f"   {status_emoji} {job.job_type} completed in {result.duration_seconds:.1f}s")
 
-                # Callback
-                if self._on_job_complete:
-                    try:
-                        self._on_job_complete(job, result)
-                    except Exception as e:
-                        print(f"   ⚠️ Callback error: {e}")
+                    if result.error:
+                        print(f"   ⚠️ Error: {result.error}")
+
+                    # Callback
+                    if self._on_job_complete:
+                        try:
+                            self._on_job_complete(job, result)
+                        except Exception as e:
+                            print(f"   ⚠️ Callback error: {e}")
+            else:
+                entries = list(self._queue)
+                self._queue.clear()
+                print(f"🚀 Processing {total_jobs} job(s) with {max_workers} workers...")
+
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_entry = {}
+                    for entry in entries:
+                        job = entry.job
+                        print(f"📤 Queued {job.job_type}: {job.job_id}")
+                        future = executor.submit(self._execute_with_retry, job)
+                        future_to_entry[future] = entry
+
+                    for future in as_completed(future_to_entry):
+                        entry = future_to_entry[future]
+                        job = entry.job
+                        try:
+                            result = future.result()
+                        except Exception as e:
+                            result = JobResult(success=False, error=str(e))
+
+                        entry.result = result
+                        results.append(result)
+                        self._completed[job.job_id] = entry
+
+                        status_emoji = "✅" if result.success else "❌"
+                        print(f"   {status_emoji} {job.job_type} completed in {result.duration_seconds:.1f}s")
+                        if result.error:
+                            print(f"   ⚠️ Error: {result.error}")
+
+                        if self._on_job_complete:
+                            try:
+                                self._on_job_complete(job, result)
+                            except Exception as e:
+                                print(f"   ⚠️ Callback error: {e}")
 
             print(f"\n📊 Queue complete: {sum(1 for r in results if r.success)}/{len(results)} succeeded")
 

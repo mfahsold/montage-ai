@@ -221,20 +221,31 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
         True if successful
     """
     try:
+        apply_colorlevels = os.environ.get("COLORLEVELS", "true").lower() == "true"
+        apply_normalize = os.environ.get("LUMA_NORMALIZE", "true").lower() == "true"
+
         # Build filter chain:
         # 1. Scale to standard resolution (no cropping)
         # 2. Pad to fill frame (letterbox/pillarbox)
-        # 3. Broadcast-safe levels (16-235 range)
-        # 4. Normalize brightness for consistency
+        # 3. Optional broadcast-safe levels (16-235 range)
+        # 4. Optional normalize brightness for consistency
         # 5. Convert fps and pixel format
-        vf_chain = (
-            f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,"
-            f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
-            f"colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:rimax=0.922:gimax=0.922:bimax=0.922,"
-            f"normalize=blackpt=black:whitept=white:smoothing=10,"
-            f"fps={target_fps},"
-            f"format={target_pix_fmt}"
-        )
+        vf_filters = [
+            f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease",
+            f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2",
+        ]
+        if apply_colorlevels:
+            vf_filters.append(
+                "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:"
+                "rimax=0.922:gimax=0.922:bimax=0.922"
+            )
+        if apply_normalize:
+            vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
+        vf_filters.extend([
+            f"fps={target_fps}",
+            f"format={target_pix_fmt}",
+        ])
+        vf_chain = ",".join(vf_filters)
 
         config = _ffmpeg_config
         vf_chain = _append_hwupload_vf(vf_chain, config)

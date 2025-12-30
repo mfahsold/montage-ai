@@ -170,6 +170,12 @@ class ClipEnhancer:
         self.output_pix_fmt = self.ffmpeg_config.pix_fmt
         self.output_profile = self.ffmpeg_config.profile
         self.output_level = self.ffmpeg_config.level
+        self.upscale_model = self.settings.upscale.model
+        self.upscale_scale = self.settings.upscale.scale
+        frame_format = (self.settings.upscale.frame_format or "jpg").strip().lower()
+        self.upscale_frame_format = frame_format if frame_format in ("jpg", "png") else "jpg"
+        self.upscale_tile_size = self.settings.upscale.tile_size
+        self.upscale_crf = self.settings.upscale.crf
 
         # Temp directory for intermediate files
         self.temp_dir = str(self.settings.paths.temp_dir)
@@ -289,7 +295,7 @@ class ClipEnhancer:
             "-vf", filters,
             "-c:v", self.output_codec,
             "-preset", self.ffmpeg_preset,
-            "-crf", "18",
+            "-crf", str(self.settings.encoding.crf),
             "-threads", threads_per_job,
         ]
 
@@ -340,7 +346,7 @@ class ClipEnhancer:
         else:
             return self._stabilize_deshake(input_path, output_path)
 
-    def upscale(self, input_path: str, output_path: str, scale: int = 2) -> str:
+    def upscale(self, input_path: str, output_path: str, scale: Optional[int] = None) -> str:
         """
         Upscale video using the best available method.
 
@@ -357,6 +363,9 @@ class ClipEnhancer:
         Returns:
             Path to upscaled video (or original on failure)
         """
+        scale_value = scale if scale is not None else self.upscale_scale
+        scale_value = max(2, min(int(scale_value), 4))
+        model = self.upscale_model
         print(f"   Upscaling {os.path.basename(input_path)}...")
 
         # Priority 1: cgpu Cloud GPU
@@ -364,7 +373,15 @@ class ClipEnhancer:
             cgpu_upscale, is_available = _get_cgpu_upscaler()
             if cgpu_upscale and is_available():
                 print(f"   Attempting cgpu cloud GPU upscaling...")
-                result = cgpu_upscale(input_path, output_path, scale=scale)
+                result = cgpu_upscale(
+                    input_path,
+                    output_path,
+                    scale=scale_value,
+                    model=model,
+                    frame_format=self.upscale_frame_format,
+                    crf=self.upscale_crf,
+                    tile_size=self.upscale_tile_size,
+                )
                 if result:
                     return result
                 print(f"   cgpu upscaling failed, falling back to local methods...")
@@ -374,10 +391,10 @@ class ClipEnhancer:
 
         if real_esrgan_available:
             print(f"   Attempting Real-ESRGAN with Vulkan GPU...")
-            return self._upscale_realesrgan(input_path, output_path)
+            return self._upscale_realesrgan(input_path, output_path, model=model, scale=scale_value)
         else:
             print(f"   Using FFmpeg Lanczos upscaling (Vulkan GPU not available)")
-            return self._upscale_ffmpeg(input_path, output_path)
+            return self._upscale_ffmpeg(input_path, output_path, scale=scale_value)
 
     def color_match(
         self,
@@ -691,7 +708,7 @@ class ClipEnhancer:
             pass
         return False
 
-    def _upscale_realesrgan(self, input_path: str, output_path: str) -> str:
+    def _upscale_realesrgan(self, input_path: str, output_path: str, model: str, scale: int) -> str:
         """Upscale using Real-ESRGAN-ncnn-vulkan (requires Vulkan GPU)."""
         frame_dir = os.path.join(self.temp_dir, f"frames_{random.randint(0, 99999)}")
         out_frame_dir = os.path.join(self.temp_dir, f"out_frames_{random.randint(0, 99999)}")
@@ -741,8 +758,8 @@ class ClipEnhancer:
                 "realesrgan-ncnn-vulkan",
                 "-i", frame_dir,
                 "-o", out_frame_dir,
-                "-n", "realesr-animevideov3",
-                "-s", "2",
+                "-n", model,
+                "-s", str(scale),
                 "-g", "0",
                 "-m", "/usr/local/share/realesrgan-models"
             ]
@@ -768,7 +785,7 @@ class ClipEnhancer:
             esrgan_cmd = [
                 "ffmpeg", "-y", "-framerate", fps_arg,
                 "-i", f"{out_frame_dir}/frame_%08d.png",
-                "-c:v", self.output_codec, "-crf", "18"
+                "-c:v", self.output_codec, "-crf", str(self.upscale_crf)
             ]
             if self.output_profile:
                 esrgan_cmd.extend(["-profile:v", self.output_profile])
@@ -791,9 +808,9 @@ class ClipEnhancer:
             if os.path.exists(out_frame_dir):
                 shutil.rmtree(out_frame_dir)
 
-    def _upscale_ffmpeg(self, input_path: str, output_path: str) -> str:
+    def _upscale_ffmpeg(self, input_path: str, output_path: str, scale: int) -> str:
         """
-        High-quality FFmpeg-based 2x upscaling using Lanczos + sharpening.
+        High-quality FFmpeg-based upscaling using Lanczos + sharpening.
         """
         try:
             # Get original dimensions with rotation handling
@@ -818,7 +835,7 @@ class ClipEnhancer:
                 orig_w, orig_h = orig_h, orig_w
                 print(f"   Detected {rotation} rotation, adjusted dimensions")
 
-            new_w, new_h = orig_w * 2, orig_h * 2
+            new_w, new_h = orig_w * scale, orig_h * scale
             print(f"   Upscaling {orig_w}x{orig_h} -> {new_w}x{new_h}")
 
             # Build filter chain
@@ -834,7 +851,7 @@ class ClipEnhancer:
                 "-vf", filter_chain,
                 "-c:v", self.output_codec,
                 "-preset", "slow",
-                "-crf", "18",
+                "-crf", str(self.upscale_crf),
             ]
 
             if self.output_profile:

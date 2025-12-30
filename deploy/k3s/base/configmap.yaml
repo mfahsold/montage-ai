@@ -31,11 +31,14 @@ data:
   CGPU_MODEL: "gemini-2.0-flash"
   CGPU_GPU_ENABLED: "true"
   CGPU_TIMEOUT: "600"
+  CGPU_MAX_CONCURRENCY: "1"
   
   # Enhancement Settings
   STABILIZE: "true"
   UPSCALE: "true"
   ENHANCE: "true"
+  COLORLEVELS: "true"
+  LUMA_NORMALIZE: "true"
   ENABLE_AI_FILTER: "true"
   PRESERVE_ASPECT: "false"  # true=letterbox/pillarbox, false=crop to fill
   CAPTIONS: "true"
@@ -49,6 +52,7 @@ data:
   VERBOSE: "true"
   EXPORT_TIMELINE: "true"  # Export OTIO/EDL/CSV for professional NLE software
   GENERATE_PROXIES: "false"
+  QUALITY_PROFILE: "standard"
   
   # Performance / Hardware Acceleration
   FFMPEG_HWACCEL: "auto"  # auto, nvenc, vaapi, qsv, none

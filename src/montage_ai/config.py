@@ -44,6 +44,14 @@ class PathConfig:
         return self.output_dir / f"render_{job_id}.log"
 
 
+def _effective_cpu_count() -> int:
+    """Best-effort CPU count (respects cgroup affinity when available)."""
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return multiprocessing.cpu_count()
+
+
 # =============================================================================
 # Feature Flags
 # =============================================================================
@@ -73,11 +81,16 @@ class FeatureConfig:
     # 2025 P0/P1: Burn-in captions and voice isolation
     captions: bool = field(default_factory=lambda: os.environ.get("CAPTIONS", "false").lower() == "true")
     captions_style: str = field(default_factory=lambda: os.environ.get("CAPTIONS_STYLE", "youtube"))
+    transcription_model: str = field(default_factory=lambda: os.environ.get("TRANSCRIPTION_MODEL", "medium"))
     voice_isolation: bool = field(default_factory=lambda: os.environ.get("VOICE_ISOLATION", "false").lower() == "true")
     voice_isolation_model: str = field(default_factory=lambda: os.environ.get("VOICE_ISOLATION_MODEL", "htdemucs"))
 
     # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)
     low_memory_mode: bool = field(default_factory=lambda: os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true")
+
+    # Color/levels normalization controls (can be disabled for clean footage)
+    colorlevels: bool = field(default_factory=lambda: os.environ.get("COLORLEVELS", "true").lower() == "true")
+    luma_normalize: bool = field(default_factory=lambda: os.environ.get("LUMA_NORMALIZE", "true").lower() == "true")
 
 
 # =============================================================================
@@ -122,6 +135,10 @@ class LLMConfig:
     cgpu_port: int = field(default_factory=lambda: int(os.environ.get("CGPU_PORT", "5021")))
     cgpu_model: str = field(default_factory=lambda: os.environ.get("CGPU_MODEL", "gemini-2.5-flash"))
     cgpu_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_TIMEOUT", "1200")))
+    cgpu_max_concurrency: int = field(default_factory=lambda: int(os.environ.get("CGPU_MAX_CONCURRENCY", "1")))
+    
+    # General LLM settings
+    timeout: int = field(default_factory=lambda: int(os.environ.get("LLM_TIMEOUT", "60")))
 
     @property
     def has_openai_backend(self) -> bool:
@@ -160,6 +177,7 @@ class CloudConfig:
 class EncodingConfig:
     """FFmpeg and video encoding settings."""
 
+    quality_profile: str = field(default_factory=lambda: os.environ.get("QUALITY_PROFILE", "standard").lower())
     codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_CODEC", "libx264"))
     crf: int = field(default_factory=lambda: int(os.environ.get("FINAL_CRF", "18")))
     preset: str = field(default_factory=lambda: os.environ.get("FFMPEG_PRESET", "medium"))
@@ -169,6 +187,49 @@ class EncodingConfig:
     level: str = field(default_factory=lambda: os.environ.get("OUTPUT_LEVEL", "4.1"))
     threads: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_THREADS", "0")))
     normalize_clips: bool = field(default_factory=lambda: os.environ.get("NORMALIZE_CLIPS", "true").lower() == "true")
+
+    def __post_init__(self) -> None:
+        """Apply quality profile defaults when explicit env overrides are absent."""
+        profile = (self.quality_profile or "standard").lower()
+        preset_map = {
+            "preview": "ultrafast",
+            "standard": "medium",
+            "high": "slow",
+            "master": "slow",
+        }
+        crf_map = {
+            "preview": 28,
+            "standard": 18,
+            "high": 17,
+            "master": 16,
+        }
+
+        if "FFMPEG_PRESET" not in os.environ and profile in preset_map:
+            self.preset = preset_map[profile]
+        if "FINAL_CRF" not in os.environ and profile in crf_map:
+            self.crf = crf_map[profile]
+
+        if profile == "master":
+            if "OUTPUT_CODEC" not in os.environ:
+                self.codec = "libx265"
+            if "OUTPUT_PIX_FMT" not in os.environ:
+                self.pix_fmt = "yuv420p10le"
+            if "OUTPUT_PROFILE" not in os.environ:
+                self.profile = "main10"
+
+
+# =============================================================================
+# Upscaling Configuration
+# =============================================================================
+@dataclass
+class UpscaleConfig:
+    """Upscaling configuration for local and cloud pipelines."""
+
+    model: str = field(default_factory=lambda: os.environ.get("UPSCALE_MODEL", "realesrgan-x4plus"))
+    scale: int = field(default_factory=lambda: int(os.environ.get("UPSCALE_SCALE", "2")))
+    frame_format: str = field(default_factory=lambda: os.environ.get("UPSCALE_FRAME_FORMAT", "jpg"))
+    tile_size: int = field(default_factory=lambda: int(os.environ.get("UPSCALE_TILE_SIZE", "512")))
+    crf: int = field(default_factory=lambda: int(os.environ.get("UPSCALE_CRF", os.environ.get("FINAL_CRF", "18"))))
 
 
 # =============================================================================
@@ -181,13 +242,14 @@ class ProcessingConfig:
     batch_size: int = field(default_factory=lambda: int(os.environ.get("BATCH_SIZE", "25")))
     force_gc: bool = field(default_factory=lambda: os.environ.get("FORCE_GC", "true").lower() == "true")
     parallel_enhance: bool = field(default_factory=lambda: os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true")
-    max_parallel_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, multiprocessing.cpu_count() - 2)))))
+    max_parallel_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, _effective_cpu_count() - 2)))))
     max_concurrent_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_CONCURRENT_JOBS", "2")))
     max_scene_reuse: int = field(default_factory=lambda: int(os.environ.get("MAX_SCENE_REUSE", "3")))
 
     # Adaptive settings for low-resource hardware
     clip_prefetch_count: int = field(default_factory=lambda: int(os.environ.get("CLIP_PREFETCH_COUNT", "3")))
     analysis_timeout: int = field(default_factory=lambda: int(os.environ.get("ANALYSIS_TIMEOUT", "120")))  # seconds
+    ffmpeg_timeout: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_TIMEOUT", "120")))
     render_timeout: int = field(default_factory=lambda: int(os.environ.get("RENDER_TIMEOUT", "3600")))  # 1 hour default
 
     def get_adaptive_batch_size(self, low_memory: bool = False) -> int:
@@ -220,6 +282,19 @@ class CreativeConfig:
     xfade_duration: float = field(default_factory=lambda: float(os.environ.get("XFADE_DURATION", "0.3")))
 
 
+# Audio Configuration
+# =============================================================================
+@dataclass
+class AudioConfig:
+    """Audio analysis and processing settings."""
+    
+    silence_threshold: str = field(default_factory=lambda: os.environ.get("SILENCE_THRESHOLD", "-35dB"))
+    min_silence_duration: float = field(default_factory=lambda: float(os.environ.get("MIN_SILENCE_DURATION", "0.05")))
+    energy_high_threshold: float = field(default_factory=lambda: float(os.environ.get("ENERGY_HIGH_THRESHOLD", "0.6")))
+    energy_low_threshold: float = field(default_factory=lambda: float(os.environ.get("ENERGY_LOW_THRESHOLD", "0.4")))
+
+
+# =============================================================================
 # =============================================================================
 # File Type Configuration
 # =============================================================================
@@ -289,8 +364,10 @@ class Settings:
     gpu: GPUConfig = field(default_factory=GPUConfig)
     cloud: CloudConfig = field(default_factory=CloudConfig)
     encoding: EncodingConfig = field(default_factory=EncodingConfig)
+    upscale: UpscaleConfig = field(default_factory=UpscaleConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
     creative: CreativeConfig = field(default_factory=CreativeConfig)
+    audio: AudioConfig = field(default_factory=AudioConfig)
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
 
     # Job ID (generated per run)
@@ -327,12 +404,21 @@ class Settings:
             "MONTAGE_CLOUD_ENABLED": str(self.cloud.enabled).lower(),
             "MONTAGE_CLOUD_ENDPOINT": self.cloud.endpoint,
             "CGPU_GPU_ENABLED": str(self.llm.cgpu_gpu_enabled).lower(),
+            "CGPU_MAX_CONCURRENCY": str(max(1, self.llm.cgpu_max_concurrency)),
+            "QUALITY_PROFILE": self.encoding.quality_profile,
+            "COLORLEVELS": str(self.features.colorlevels).lower(),
+            "LUMA_NORMALIZE": str(self.features.luma_normalize).lower(),
             "CUT_STYLE": self.creative.cut_style,
             "CREATIVE_PROMPT": self.creative.creative_prompt,
             "TARGET_DURATION": str(self.creative.target_duration),
             "MUSIC_START": str(self.creative.music_start),
             "MUSIC_END": str(self.creative.music_end or ""),
             "FINAL_CRF": str(self.encoding.crf),
+            "UPSCALE_MODEL": self.upscale.model,
+            "UPSCALE_SCALE": str(self.upscale.scale),
+            "UPSCALE_FRAME_FORMAT": self.upscale.frame_format,
+            "UPSCALE_TILE_SIZE": str(self.upscale.tile_size),
+            "UPSCALE_CRF": str(self.upscale.crf),
             "JOB_ID": self.job_id,
         }
 

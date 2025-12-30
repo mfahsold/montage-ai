@@ -21,6 +21,10 @@ import json
 from pathlib import Path
 import numpy as np
 
+from .config import get_settings
+
+_settings = get_settings()
+
 # Try to import librosa (may fail with numba/Python 3.12 compatibility issues)
 LIBROSA_AVAILABLE = False
 librosa = None
@@ -169,7 +173,7 @@ def _ffmpeg_get_duration(audio_path: str) -> float:
         audio_path
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_settings.processing.ffmpeg_timeout)
         return float(result.stdout.strip())
     except Exception:
         return 0.0
@@ -189,12 +193,12 @@ def _ffmpeg_detect_onsets(audio_path: str, duration: float) -> List[float]:
     # Silence threshold: -35dB, minimum duration: 0.05s (50ms)
     cmd = [
         "ffmpeg", "-i", audio_path,
-        "-af", "silencedetect=n=-35dB:d=0.05",
+        "-af", f"silencedetect=n={_settings.audio.silence_threshold}:d={_settings.audio.min_silence_duration}",
         "-f", "null", "-"
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_settings.processing.ffmpeg_timeout)
         stderr = result.stderr
 
         # Parse silence_end events (these are onset points)

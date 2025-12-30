@@ -14,6 +14,7 @@ Usage:
 
 from typing import Optional
 
+from .config import get_settings
 from .cgpu_utils import is_cgpu_available
 from .cgpu_jobs import TranscribeJob
 
@@ -21,14 +22,16 @@ from .cgpu_jobs import TranscribeJob
 class Transcriber:
     """Audio transcription via Whisper on cgpu."""
 
-    def __init__(self, model: str = "medium"):
+    def __init__(self, model: Optional[str] = None):
         """
         Initialize the Transcriber.
 
         Args:
-            model: Whisper model size (tiny, base, small, medium, large)
+            model: Whisper model size (tiny, base, small, medium, large).
+                   If None, uses settings.features.transcription_model.
         """
-        self.model = model
+        self.settings = get_settings()
+        self.model = model or self.settings.features.transcription_model
 
     def is_available(self) -> bool:
         """Check if cgpu is available for transcription."""
@@ -66,7 +69,7 @@ class Transcriber:
 # =============================================================================
 def transcribe_audio(
     audio_path: str,
-    model: str = "medium",
+    model: Optional[str] = None,
     output_format: str = "srt",
     language: Optional[str] = None,
 ) -> Optional[str]:
@@ -75,7 +78,7 @@ def transcribe_audio(
 
     Args:
         audio_path: Path to audio/video file
-        model: Whisper model size
+        model: Whisper model size (optional, uses config default if None)
         output_format: Output format (srt, vtt, txt, json)
         language: Optional language code
 

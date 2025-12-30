@@ -21,6 +21,8 @@ import subprocess
 import base64
 import tempfile
 import time
+import threading
+from contextlib import contextmanager
 from typing import Tuple, Optional
 from pathlib import Path
 from dataclasses import dataclass
@@ -39,6 +41,7 @@ CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
 CGPU_PORT = os.environ.get("CGPU_PORT", "8080")  # Default port for cgpu serve
 CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
+CGPU_MAX_CONCURRENCY = max(1, int(os.environ.get("CGPU_MAX_CONCURRENCY", "1")))
 
 
 @dataclass
@@ -50,6 +53,31 @@ class CGPUConfig:
     host: str = CGPU_HOST
     port: str = CGPU_PORT
     model: str = CGPU_MODEL
+    max_concurrency: int = CGPU_MAX_CONCURRENCY
+
+
+# ============================================================================
+# cgpu Concurrency Control
+# ============================================================================
+
+_CGPU_SEMAPHORE = threading.BoundedSemaphore(CGPU_MAX_CONCURRENCY)
+_CGPU_SLOT_STATE = threading.local()
+
+
+@contextmanager
+def cgpu_slot() -> None:
+    """Acquire a cgpu slot with re-entrant support per thread."""
+    depth = getattr(_CGPU_SLOT_STATE, "depth", 0)
+    if depth == 0:
+        _CGPU_SEMAPHORE.acquire()
+    _CGPU_SLOT_STATE.depth = depth + 1
+    try:
+        yield
+    finally:
+        depth = _CGPU_SLOT_STATE.depth - 1
+        _CGPU_SLOT_STATE.depth = depth
+        if depth == 0:
+            _CGPU_SEMAPHORE.release()
 
 
 # ============================================================================
@@ -82,12 +110,13 @@ def is_cgpu_available() -> bool:
         return False
     
     try:
-        result = subprocess.run(
-            ["cgpu", "status"],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        with cgpu_slot():
+            result = subprocess.run(
+                ["cgpu", "status"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
         print(f"DEBUG: cgpu status returncode={result.returncode}")
         print(f"DEBUG: cgpu status stdout={result.stdout}")
         print(f"DEBUG: cgpu status stderr={result.stderr}")
@@ -113,12 +142,13 @@ def check_cgpu_gpu() -> Tuple[bool, str]:
         (success, gpu_info) tuple
     """
     try:
-        result = subprocess.run(
-            ["cgpu", "run", "nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
+        with cgpu_slot():
+            result = subprocess.run(
+                ["cgpu", "run", "nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
         if result.returncode == 0 and result.stdout.strip():
             # Extract GPU info line
             lines = [l for l in result.stdout.strip().split('\n') 
@@ -141,12 +171,13 @@ def get_cgpu_metrics() -> Optional[str]:
     try:
         # Query utilization
         # nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits
-        result = subprocess.run(
-            ["cgpu", "run", "nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        with cgpu_slot():
+            result = subprocess.run(
+                ["cgpu", "run", "nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
         if result.returncode != 0:
             return None
             
@@ -217,12 +248,13 @@ def run_cgpu_command(
 
     for attempt in range(retries + 1):
         try:
-            result = subprocess.run(
-                ["cgpu", "run", cmd],
-                capture_output=True,
-                text=True,
-                timeout=timeout  # Timeout per attempt, not total
-            )
+            with cgpu_slot():
+                result = subprocess.run(
+                    ["cgpu", "run", cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout  # Timeout per attempt, not total
+                )
 
             # Check for session invalidation errors
             if "session expired" in result.stderr.lower() or "not authenticated" in result.stderr.lower():
@@ -323,12 +355,13 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
                 print(f"   ❌ Failed to create remote directory: {stderr}")
                 return False
 
-        result = subprocess.run(
-            ["cgpu", "copy", local_path, remote_path],
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
+        with cgpu_slot():
+            result = subprocess.run(
+                ["cgpu", "copy", local_path, remote_path],
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
 
         if result.returncode != 0:
             print(f"   ❌ cgpu copy failed (file: {os.path.basename(local_path)}, size: {file_size_mb:.1f}MB)")
@@ -512,6 +545,7 @@ if __name__ == "__main__":
     print(f"  CGPU_PORT: {CGPU_PORT}")
     print(f"  CGPU_MODEL: {CGPU_MODEL}")
     print(f"  CGPU_TIMEOUT: {CGPU_TIMEOUT}s")
+    print(f"  CGPU_MAX_CONCURRENCY: {CGPU_MAX_CONCURRENCY}")
     
     print(f"\nAvailability:")
     

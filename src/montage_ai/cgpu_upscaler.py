@@ -18,6 +18,7 @@ from typing import Optional
 from .cgpu_utils import is_cgpu_available, check_cgpu_gpu
 from .cgpu_jobs import UpscaleJob
 from .cgpu_jobs.upscale import reset_session_cache
+from .config import get_settings
 
 __all__ = [
     "upscale_with_cgpu",
@@ -33,8 +34,11 @@ VERSION = "3.0.0"
 def upscale_with_cgpu(
     input_path: str,
     output_path: str,
-    scale: int = 2,
-    model: str = "realesr-animevideov3"
+    scale: Optional[int] = None,
+    model: Optional[str] = None,
+    frame_format: Optional[str] = None,
+    crf: Optional[int] = None,
+    tile_size: Optional[int] = None,
 ) -> Optional[str]:
     """
     Upscale video using Real-ESRGAN on cgpu cloud GPU.
@@ -48,11 +52,21 @@ def upscale_with_cgpu(
     Returns:
         output_path on success, None on failure
     """
+    settings = get_settings()
+    scale_value = scale if scale is not None else settings.upscale.scale
+    model_value = model if model is not None else settings.upscale.model
+    frame_format_value = frame_format if frame_format is not None else settings.upscale.frame_format
+    crf_value = crf if crf is not None else settings.upscale.crf
+    tile_value = tile_size if tile_size is not None else settings.upscale.tile_size
+
     job = UpscaleJob(
         input_path=input_path,
         output_path=output_path,
-        scale=scale,
-        model=model,
+        scale=scale_value,
+        model=model_value,
+        frame_format=frame_format_value,
+        crf=crf_value,
+        tile_size=tile_value,
     )
     result = job.execute()
     return result.output_path if result.success else None

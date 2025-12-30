@@ -140,8 +140,11 @@ class ResourceManager:
         status.local_gpu_available, status.local_gpu_type, status.local_gpu_info = \
             self._detect_local_gpu()
 
-        # Detect CPU
-        status.cpu_cores = os.cpu_count() or 1
+        # Detect CPU (respect cgroup affinity when available)
+        try:
+            status.cpu_cores = len(os.sched_getaffinity(0))
+        except AttributeError:
+            status.cpu_cores = os.cpu_count() or 1
 
         # Detect K3s cluster
         status.k3s_available, status.k3s_nodes, status.k3s_ready_nodes = \

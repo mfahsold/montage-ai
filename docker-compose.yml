@@ -80,11 +80,14 @@ services:
       - CGPU_MODEL=${CGPU_MODEL:-gemini-flash-latest}
       - CGPU_GPU_ENABLED=${CGPU_GPU_ENABLED:-false}
       - CGPU_TIMEOUT=${CGPU_TIMEOUT:-1800}  # 30 min for large videos (was 600)
+      - CGPU_MAX_CONCURRENCY=${CGPU_MAX_CONCURRENCY:-1}
       
       # Enhancement Settings
       - STABILIZE=${STABILIZE:-false}
       - UPSCALE=${UPSCALE:-false}
       - ENHANCE=${ENHANCE:-true}
+      - COLORLEVELS=${COLORLEVELS:-true}
+      - LUMA_NORMALIZE=${LUMA_NORMALIZE:-true}
       
       # Aspect Ratio Handling
       # false (default): Crop to fill frame (may cut edges)
@@ -96,6 +99,7 @@ services:
       - VERBOSE=${VERBOSE:-true}
       - EXPORT_TIMELINE=${EXPORT_TIMELINE:-false}
       - GENERATE_PROXIES=${GENERATE_PROXIES:-false}
+      - QUALITY_PROFILE=${QUALITY_PROFILE:-standard}
       
       # Performance (optimized for memory constraints)
       - FFMPEG_THREADS=${FFMPEG_THREADS:-0}

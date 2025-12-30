@@ -84,6 +84,8 @@ class UpscaleJob(CGPUJob):
         model: str = "realesr-animevideov3",
         denoise_strength: float = 0.5,
         tile_size: int = 512,
+        frame_format: str = "jpg",
+        crf: int = 18,
     ):
         """
         Initialize upscaling job.
@@ -95,12 +97,17 @@ class UpscaleJob(CGPUJob):
             model: Real-ESRGAN model name
             denoise_strength: Denoise strength 0-1 (for future use)
             tile_size: GPU tile size for memory management (default: 512)
+            frame_format: Frame cache format for video upscaling (jpg or png)
+            crf: CRF value for output encoding (lower = higher quality)
         """
         super().__init__()
         self.input_path = Path(input_path).resolve()
         self.scale = max(2, min(scale, 4))  # Clamp 2-4
         self.denoise_strength = max(0.0, min(denoise_strength, 1.0))
         self.tile_size = tile_size
+        self.crf = max(0, min(int(crf), 51))
+        normalized_format = (frame_format or "jpg").strip().lower()
+        self.frame_format = normalized_format if normalized_format in ("jpg", "png") else "jpg"
 
         # Normalize model name
         if model in self.MODEL_CONFIGS:
@@ -335,7 +342,7 @@ print("UPSCALE_SUCCESS")
         output_name = self.output_path.name
         config = self.MODEL_CONFIGS[self.model]
 
-        # Optimized pipeline script with JPEG frames and progress logging
+        # Optimized pipeline script with frame caching and progress logging
         script = f'''
 import os
 import glob
@@ -356,6 +363,7 @@ input_video = f"{{work_dir}}/{input_name}"
 output_video = f"{{work_dir}}/{output_name}"
 
 start_time = time.time()
+frame_ext = "{self.frame_format}"
 
 # Create directories
 os.makedirs(f"{{work_dir}}/frames", exist_ok=True)
@@ -371,14 +379,15 @@ fps_str = fps_cmd.stdout.strip()
 fps = eval(fps_str) if "/" in fps_str else float(fps_str or 30)
 print(f"FPS: {{fps}}")
 
-# Extract frames (JPEG for smaller size)
+# Extract frames
 print("Extracting frames...")
 extract_start = time.time()
-subprocess.run([
-    "ffmpeg", "-y", "-i", input_video, "-q:v", "2",
-    f"{{work_dir}}/frames/f%06d.jpg"
-], check=True, capture_output=True)
-frames = sorted(glob.glob(f"{{work_dir}}/frames/*.jpg"))
+extract_cmd = ["ffmpeg", "-y", "-i", input_video]
+if frame_ext == "jpg":
+    extract_cmd.extend(["-q:v", "2"])
+extract_cmd.append(f"{{work_dir}}/frames/f%06d.{{frame_ext}}")
+subprocess.run(extract_cmd, check=True, capture_output=True)
+frames = sorted(glob.glob(f"{{work_dir}}/frames/*.{{frame_ext}}"))
 print(f"Frames: {{len(frames)}} ({{time.time()-extract_start:.1f}}s)")
 
 if not frames:
@@ -439,8 +448,8 @@ print("Encoding output...")
 encode_start = time.time()
 subprocess.run([
     "ffmpeg", "-y", "-framerate", str(fps),
-    "-i", f"{{work_dir}}/upscaled/f%06d.jpg",
-    "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+    "-i", f"{{work_dir}}/upscaled/f%06d.{{frame_ext}}",
+    "-c:v", "libx264", "-preset", "fast", "-crf", "{self.crf}", "-pix_fmt", "yuv420p",
     f"{{work_dir}}/temp_output.mp4"
 ], check=True, capture_output=True)
 print(f"Encoding: {{time.time()-encode_start:.1f}}s")
@@ -547,6 +556,8 @@ print("UPSCALE_SUCCESS")
                     "model": self.model,
                     "is_video": self.is_video,
                     "tile_size": self.tile_size,
+                    "frame_format": self.frame_format,
+                    "crf": self.crf,
                 }
             )
         else:

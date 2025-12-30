@@ -97,6 +97,7 @@ OPENAI_VISION_MODEL=moondream2 \
 | `CGPU_MODEL`       | `gemini-2.0-flash`     | Gemini model to use                              |
 | `CGPU_GPU_ENABLED` | `false`                | Enable cloud GPU for upscaling                   |
 | `CGPU_TIMEOUT`     | `1200`                 | Cloud operation timeout (seconds)                |
+| `CGPU_MAX_CONCURRENCY` | `1`               | Max parallel cgpu commands (advanced)            |
 
 ---
 
@@ -134,6 +135,18 @@ Fine-tune the length and timing of your montage.
 | `ENHANCE`         | `true`  | Enable color/sharpness enhancement            |
 | `PRESERVE_ASPECT` | `false` | Letterbox instead of crop when aspect differs |
 | `DEEP_ANALYSIS`   | `false` | Enable deep footage analysis (experimental)   |
+| `COLORLEVELS`     | `true`  | Apply broadcast-safe levels (16-235)          |
+| `LUMA_NORMALIZE`  | `true`  | Normalize luma for consistency across clips   |
+
+### Upscaling Controls
+
+| Variable               | Default               | Description                                                           |
+| ---------------------- | --------------------- | --------------------------------------------------------------------- |
+| `UPSCALE_MODEL`        | `realesrgan-x4plus`    | Real-ESRGAN model (`realesrgan-x4plus`, `realesr-animevideov3`, etc.)  |
+| `UPSCALE_SCALE`        | `2`                   | Upscale factor (2 or 4)                                               |
+| `UPSCALE_FRAME_FORMAT` | `jpg`                 | Frame cache format (`jpg` = faster, `png` = lossless)                 |
+| `UPSCALE_TILE_SIZE`    | `512`                 | Tile size for GPU upscaling (lower = safer, slower)                   |
+| `UPSCALE_CRF`          | `FINAL_CRF` or `18`    | CRF for upscaled encode (lower = better quality, larger files)        |
 
 ### Aspect Ratio Handling
 
@@ -257,11 +270,18 @@ See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
 | ------------------ | ------- | ----------------------------------------------------------------------------------------- |
 | `EXPORT_TIMELINE`  | `false` | Export OTIO/EDL timeline (experimental)                                                   |
 | `GENERATE_PROXIES` | `false` | Generate proxy files for NLE (experimental)                                               |
+| `QUALITY_PROFILE`  | `standard` | Preset defaults for CRF/preset/codec/pix_fmt (`preview`, `standard`, `high`, `master`) |
 | `OUTPUT_CODEC`     | *auto*  | `libx264` by default; switches to `libx265` when most footage is HEVC (override to force) |
 | `OUTPUT_PROFILE`   | *auto*  | FFmpeg profile passed to encoder (usually `high` for H.264, `main` for HEVC)              |
 | `OUTPUT_LEVEL`     | *auto*  | Encoder level; raised automatically for 4K/high‑FPS projects                              |
 
 *Resolution and FPS are inferred from the dominant input footage (orientation, median size, and common framerate) to minimize re-encoding and quality loss.*
+
+**Quality profile notes:**
+- `preview`: ultrafast + CRF 28
+- `standard`: medium + CRF 18
+- `high`: slow + CRF 17
+- `master`: slow + CRF 16, `libx265` + `yuv420p10le` + `main10` (10-bit output)
 
 ---
 
