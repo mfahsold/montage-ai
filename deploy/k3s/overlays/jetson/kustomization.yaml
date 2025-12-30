@@ -7,55 +7,8 @@ resources:
 # Use local cluster registry
 images:
   - name: ghcr.io/mfahsold/montage-ai
-    newName: 192.168.1.37:5000/montage-ai
+    newName: 192.168.1.12:5000/montage-ai
     newTag: latest
 
 patches:
-  - patch: |-
-      apiVersion: batch/v1
-      kind: Job
-      metadata:
-        name: montage-ai-render
-        namespace: montage-ai
-      spec:
-        template:
-          spec:
-            # Target Jetson for NVENC hardware encoding
-            nodeSelector:
-              kubernetes.io/hostname: codeaijetson-desktop
-            runtimeClassName: nvidia
-            tolerations:
-              - key: "nvidia.com/gpu"
-                operator: "Exists"
-                effect: "NoSchedule"
-            containers:
-              - name: montage-ai
-                securityContext:
-                  privileged: true
-                  allowPrivilegeEscalation: true
-                env:
-                  # Force NVENC for Jetson
-                  - name: FFMPEG_HWACCEL
-                    value: "nvenc"
-                  - name: NVIDIA_VISIBLE_DEVICES
-                    value: "all"
-                  - name: NVIDIA_DRIVER_CAPABILITIES
-                    value: "compute,video,utility"
-                resources:
-                  # Jetson has limited resources
-                  requests:
-                    cpu: "2"
-                    memory: "4Gi"
-                    nvidia.com/gpu: "1"
-                  limits:
-                    cpu: "4"
-                    memory: "8Gi"
-                    nvidia.com/gpu: "1"
-                volumeMounts:
-                  - name: dev-dri
-                    mountPath: /dev/dri
-            volumes:
-              - name: dev-dri
-                hostPath:
-                  path: /dev/dri
-                  type: DirectoryOrCreate
+  - path: patch-job-jetson.yaml

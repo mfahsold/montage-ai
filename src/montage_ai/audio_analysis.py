@@ -28,7 +28,7 @@ try:
     import librosa as _librosa
     # Test that librosa's numba-decorated functions actually work
     # This catches the 'get_call_template' error at import time
-    _librosa.get_duration(y=_librosa.util.example('brahms')[:1000], sr=22050)
+    _librosa.get_duration(y=np.zeros(22050, dtype=np.float32), sr=22050)
     librosa = _librosa
     LIBROSA_AVAILABLE = True
 except Exception as e:

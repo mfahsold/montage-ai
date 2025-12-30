@@ -8,9 +8,12 @@ resources:
   - configmap.yaml
   - pvc.yaml
   - job.yaml
+  - cgpu-server.yaml
   - registry.yaml
   - network-policies/networkpolicy-default-deny.yaml
   - network-policies/allow-registry-ingress.yaml
+  - network-policies/allow-renderer-egress.yaml
+  - network-policies/allow-cgpu-egress.yaml
 
 labels:
   - pairs:

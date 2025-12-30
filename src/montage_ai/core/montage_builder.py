@@ -15,6 +15,7 @@ import os
 import gc
 import time
 import random
+from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
@@ -247,6 +248,136 @@ class MontageResult:
     stats: Dict[str, Any] = field(default_factory=dict)
 
 
+
+def process_clip_task(
+    scene_path: str,
+    clip_start: float,
+    cut_duration: float,
+    temp_dir: str,
+    temp_clip_name: str,
+    ctx_stabilize: bool,
+    ctx_upscale: bool,
+    ctx_enhance: bool,
+    enhancer: Any,
+    output_profile: Any,
+    settings: Any,
+    resource_manager: Any
+) -> Tuple[str, Dict[str, bool], List[str]]:
+    """
+    Process a single clip: extract, enhance, normalize.
+    Executed in a thread pool.
+    """
+    import subprocess
+    import shutil
+    
+    temp_clip_path = os.path.join(temp_dir, temp_clip_name)
+    temp_files = [temp_clip_path]
+    
+    # 1. Extract subclip
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", str(clip_start),
+        "-i", scene_path,
+        "-t", str(cut_duration),
+        "-c", "copy",
+        "-avoid_negative_ts", "1",
+        temp_clip_path
+    ]
+    subprocess.run(cmd, capture_output=True, timeout=30)
+    
+    # 2. Enhance
+    current_path = temp_clip_path
+    stabilize_applied = False
+    upscale_applied = False
+    enhance_applied = False
+    
+    if enhancer:
+        if ctx_stabilize:
+            stab_path = os.path.join(temp_dir, f"stab_{temp_clip_name}")
+            result = enhancer.stabilize(current_path, stab_path)
+            if result != current_path:
+                current_path = result
+                temp_files.append(stab_path)
+                stabilize_applied = True
+
+        if ctx_upscale:
+            upscale_path = os.path.join(temp_dir, f"upscale_{temp_clip_name}")
+            result = enhancer.upscale(current_path, upscale_path)
+            if result != current_path:
+                current_path = result
+                temp_files.append(upscale_path)
+                upscale_applied = True
+
+        if ctx_enhance:
+            enhance_path = os.path.join(temp_dir, f"enhance_{temp_clip_name}")
+            result = enhancer.enhance(current_path, enhance_path)
+            if result != current_path:
+                current_path = result
+                temp_files.append(enhance_path)
+                enhance_applied = True
+
+    # 3. Normalize
+    final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
+    
+    if not output_profile:
+        shutil.copy(current_path, final_clip_path)
+    else:
+        # Get optimal encoder
+        encoder_config = None
+        if resource_manager:
+            encoder_config = resource_manager.get_encoder(prefer_gpu=True)
+            ffmpeg_params = encoder_config.video_params(
+                crf=settings.encoding.crf,
+                preset=settings.encoding.preset,
+                codec_override=output_profile.codec,
+                profile_override=output_profile.profile,
+                level_override=output_profile.level,
+                pix_fmt_override=output_profile.pix_fmt,
+            )
+        else:
+            ffmpeg_params = [
+                "-c:v", output_profile.codec,
+                "-pix_fmt", output_profile.pix_fmt,
+                "-crf", str(settings.encoding.crf),
+                "-preset", settings.encoding.preset,
+            ]
+            if output_profile.profile:
+                ffmpeg_params.extend(["-profile:v", output_profile.profile])
+            if output_profile.level:
+                ffmpeg_params.extend(["-level", output_profile.level])
+
+        vf_filters = [
+            f"scale={output_profile.width}:{output_profile.height}:force_original_aspect_ratio=decrease",
+            f"pad={output_profile.width}:{output_profile.height}:(ow-iw)/2:(oh-ih)/2",
+            "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:rimax=0.922:gimax=0.922:bimax=0.922",
+            "normalize=blackpt=black:whitept=white:smoothing=10",
+        ]
+        vf_chain = ",".join(vf_filters)
+        if encoder_config and encoder_config.hwupload_filter:
+            vf_chain = f"{vf_chain},{encoder_config.hwupload_filter}"
+
+        cmd = ["ffmpeg", "-y"]
+        if encoder_config and encoder_config.is_gpu_accelerated:
+            cmd.extend(encoder_config.hwaccel_input_params())
+        cmd.extend([
+            "-i", current_path,
+            "-vf", vf_chain,
+            "-r", str(output_profile.fps),
+            *ffmpeg_params,
+            "-an",
+            final_clip_path
+        ])
+        subprocess.run(cmd, capture_output=True, timeout=120)
+
+    enhancements = {
+        'stabilized': stabilize_applied,
+        'upscaled': upscale_applied,
+        'enhanced': enhance_applied,
+    }
+    
+    return final_clip_path, enhancements, temp_files
+
+
 # =============================================================================
 # MontageBuilder Class
 # =============================================================================
@@ -295,6 +426,10 @@ class MontageBuilder:
         self._clip_enhancer = None
         self._intelligent_selector = None
         self._resource_manager: Optional[ResourceManager] = None
+        
+        # Parallel processing
+        self._executor: Optional[ThreadPoolExecutor] = None
+        self._pending_futures: List[Future] = []
 
     def _create_context(self) -> MontageContext:
         """Create a fresh MontageContext from settings."""
@@ -404,6 +539,14 @@ class MontageBuilder:
 
         # Initialize intelligent clip selector (if available)
         self._init_intelligent_selector()
+
+        # Initialize thread pool for parallel clip processing
+        max_workers = self._resource_manager.status.cpu_cores
+        # Reserve one core for main thread/orchestration if possible
+        if max_workers > 2:
+            max_workers -= 1
+        self._executor = ThreadPoolExecutor(max_workers=max_workers)
+        logger.info(f"   🚀 Initialized parallel processor with {max_workers} workers")
 
         logger.info(f"   🎨 Effects: STABILIZE={self.ctx.stabilize}, UPSCALE={self.ctx.upscale}, ENHANCE={self.ctx.enhance}")
 
@@ -541,6 +684,10 @@ class MontageBuilder:
 
         cleanup_count = 0
         cleanup_size_mb = 0.0
+
+        # Shutdown executor
+        if self._executor:
+            self._executor.shutdown(wait=False)
 
         # Cleanup progressive renderer resources
         if self._progressive_renderer:
@@ -1117,6 +1264,28 @@ class MontageBuilder:
                     "cuts placed"
                 )
 
+        # Flush remaining futures
+        if self._pending_futures:
+            logger.info(f"   ⏳ Waiting for {len(self._pending_futures)} pending clips to finish processing...")
+            while self._pending_futures:
+                fut, meta = self._pending_futures.pop(0)
+                try:
+                    final_path, enhancements, temp_files = fut.result()
+                    meta.enhancements = enhancements
+                    
+                    if self._progressive_renderer:
+                        self._progressive_renderer.add_clip_path(final_path)
+                        
+                        # Cleanup intermediate temp files
+                        for tf in temp_files:
+                            if tf != final_path and os.path.exists(tf):
+                                try:
+                                    os.remove(tf)
+                                except Exception:
+                                    pass
+                except Exception as e:
+                    logger.error(f"Error processing clip {meta.source_path}: {e}")
+
         logger.info(f"   ✅ Assembly complete: {self.ctx.cut_number} cuts, {self.ctx.current_time:.1f}s")
 
     def _get_energy_at_time(
@@ -1313,66 +1482,32 @@ class MontageBuilder:
         current_energy: float,
         selection_score: float
     ):
-        """Process clip (enhance if needed) and add to timeline."""
-        # Track enhancements
-        stabilize_applied = False
-        upscale_applied = False
-        enhance_applied = False
-
+        """Submit clip processing task and track metadata."""
+        
         # Generate temp paths
         temp_clip_name = f"temp_clip_{self.ctx.beat_idx}_{random.randint(0, 9999)}.mp4"
-        temp_clip_path = os.path.join(str(self.ctx.temp_dir), temp_clip_name)
-
-        # Extract subclip
-        self._extract_subclip(scene['path'], clip_start, cut_duration, temp_clip_path)
-
-        # Apply enhancements
-        current_path = temp_clip_path
-        temp_files = [temp_clip_path]
-
-        if self.ctx.stabilize and self._clip_enhancer:
-            stab_path = os.path.join(str(self.ctx.temp_dir), f"stab_{temp_clip_name}")
-            result = self._clip_enhancer.stabilize(current_path, stab_path)
-            if result != current_path:
-                current_path = result
-                temp_files.append(stab_path)
-                stabilize_applied = True
-
-        if self.ctx.upscale and self._clip_enhancer:
-            upscale_path = os.path.join(str(self.ctx.temp_dir), f"upscale_{temp_clip_name}")
-            result = self._clip_enhancer.upscale(current_path, upscale_path)
-            if result != current_path:
-                current_path = result
-                temp_files.append(upscale_path)
-                upscale_applied = True
-
-        if self.ctx.enhance and self._clip_enhancer:
-            enhance_path = os.path.join(str(self.ctx.temp_dir), f"enhance_{temp_clip_name}")
-            result = self._clip_enhancer.enhance(current_path, enhance_path)
-            if result != current_path:
-                current_path = result
-                temp_files.append(enhance_path)
-                enhance_applied = True
-
-        # Add to progressive renderer or legacy clips list
-        if self._progressive_renderer:
-            # Progressive path: write normalized clip and add to renderer
-            final_clip_path = os.path.join(
-                str(self.ctx.temp_dir),
-                f"clip_{self.ctx.job_id}_{self.ctx.cut_number:04d}.mp4"
+        
+        # Submit task
+        if self._executor:
+            future = self._executor.submit(
+                process_clip_task,
+                scene_path=scene['path'],
+                clip_start=clip_start,
+                cut_duration=cut_duration,
+                temp_dir=str(self.ctx.temp_dir),
+                temp_clip_name=temp_clip_name,
+                ctx_stabilize=self.ctx.stabilize,
+                ctx_upscale=self.ctx.upscale,
+                ctx_enhance=self.ctx.enhance,
+                enhancer=self._clip_enhancer,
+                output_profile=self.ctx.output_profile,
+                settings=self.settings,
+                resource_manager=self._resource_manager
             )
-            self._normalize_clip(current_path, final_clip_path)
-            self._progressive_renderer.add_clip_path(final_clip_path)
+        else:
+            raise RuntimeError("Executor not initialized")
 
-            # Cleanup intermediate temp files
-            for tf in temp_files:
-                try:
-                    if os.path.exists(tf):
-                        os.remove(tf)
-                except Exception:
-                    pass
-
-        # Store metadata
+        # Create metadata (enhancements will be updated later)
         clip_meta = ClipMetadata(
             source_path=scene['path'],
             start_time=clip_start,
@@ -1384,98 +1519,34 @@ class MontageBuilder:
             beat_idx=self.ctx.beat_idx,
             beats_per_cut=self.ctx.current_pattern[self.ctx.pattern_idx - 1] if self.ctx.current_pattern else 4,
             selection_score=selection_score,
-            enhancements={
-                'stabilized': stabilize_applied,
-                'upscaled': upscale_applied,
-                'enhanced': enhance_applied,
-            }
+            enhancements={} # Updated on completion
         )
         self.ctx.clips_metadata.append(clip_meta)
+        
+        self._pending_futures.append((future, clip_meta))
+        
+        # Process completed futures in order to keep memory usage in check
+        # and feed the progressive renderer
+        while self._pending_futures and self._pending_futures[0][0].done():
+            fut, meta = self._pending_futures.pop(0)
+            try:
+                final_path, enhancements, temp_files = fut.result()
+                meta.enhancements = enhancements
+                
+                if self._progressive_renderer:
+                    self._progressive_renderer.add_clip_path(final_path)
+                    
+                    # Cleanup intermediate temp files
+                    for tf in temp_files:
+                        if tf != final_path and os.path.exists(tf):
+                            try:
+                                os.remove(tf)
+                            except Exception:
+                                pass
+            except Exception as e:
+                logger.error(f"Error processing clip {meta.source_path}: {e}")
 
-    def _extract_subclip(
-        self, video_path: str, start: float, duration: float, output_path: str
-    ):
-        """Extract a subclip using FFmpeg."""
-        import subprocess
-        cmd = [
-            "ffmpeg", "-y",
-            "-ss", str(start),
-            "-i", video_path,
-            "-t", str(duration),
-            "-c", "copy",
-            "-avoid_negative_ts", "1",
-            output_path
-        ]
-        subprocess.run(cmd, capture_output=True, timeout=30)
 
-    def _normalize_clip(self, input_path: str, output_path: str):
-        """
-        Normalize clip for concatenation with color harmonization.
-
-        Includes:
-        - Resolution/FPS normalization with padding
-        - Broadcast-safe color levels (16-235)
-        - Auto color balance for consistency
-        - GPU encoder when available
-
-        Args:
-            input_path: Source clip
-            output_path: Normalized output
-        """
-        import subprocess
-
-        profile = self.ctx.output_profile
-        if not profile:
-            # Fallback: just copy
-            import shutil
-            shutil.copy(input_path, output_path)
-            return
-
-        # Get optimal encoder from ResourceManager
-        if self._resource_manager:
-            encoder_config = self._resource_manager.get_encoder(prefer_gpu=True)
-            codec = encoder_config.effective_codec
-            ffmpeg_params = encoder_config.moviepy_params(crf=self.settings.encoding.crf)
-        else:
-            codec = profile.codec
-            ffmpeg_params = [
-                "-pix_fmt", profile.pix_fmt,
-                "-crf", str(self.settings.encoding.crf),
-                "-preset", "fast",
-            ]
-            if profile.profile:
-                ffmpeg_params.extend(["-profile:v", profile.profile])
-            if profile.level:
-                ffmpeg_params.extend(["-level", profile.level])
-
-        # Build video filter chain:
-        # 1. Scale with aspect ratio preservation + padding
-        # 2. Broadcast-safe levels (16-235 range)
-        # 3. Normalize brightness/contrast for consistency
-        vf_filters = [
-            # Scale and pad to target dimensions
-            f"scale={profile.width}:{profile.height}:force_original_aspect_ratio=decrease",
-            f"pad={profile.width}:{profile.height}:(ow-iw)/2:(oh-ih)/2",
-            # Broadcast-safe color levels (clamp to 16-235)
-            "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:rimax=0.922:gimax=0.922:bimax=0.922",
-            # Normalize for consistent brightness across clips
-            "normalize=blackpt=black:whitept=white:smoothing=10",
-        ]
-        vf_chain = ",".join(vf_filters)
-
-        # Build FFmpeg command
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", input_path,
-            "-vf", vf_chain,
-            "-r", str(profile.fps),
-            "-c:v", codec,
-            *ffmpeg_params,
-            "-an",  # No audio for individual clips
-            output_path
-        ]
-
-        subprocess.run(cmd, capture_output=True, timeout=120)
 
     def _save_episodic_memory(self):
         """

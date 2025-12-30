@@ -26,11 +26,15 @@ Usage:
     config = FFmpegConfig(hwaccel="vaapi") # Force AMD/Intel Linux
 """
 
+from __future__ import annotations
 import os
 import subprocess
 import shutil
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
+
+if TYPE_CHECKING:
+    from .core import hardware
 
 
 # =============================================================================
@@ -59,139 +63,16 @@ STANDARD_AUDIO_BITRATE = "192k"
 # Hardware Acceleration Detection & Configuration
 # =============================================================================
 
-# GPU encoder mapping: hwaccel_type -> (encoder, decoder, hwaccel_flag, device)
-GPU_ENCODERS = {
-    "nvenc": {
-        "h264": "h264_nvenc",
-        "hevc": "hevc_nvenc",
-        "decoder": "h264_cuvid",
-        "hwaccel": "cuda",
-        "device": None,
-        "preset_map": {
-            # Map standard presets to NVENC presets (p1=fastest, p7=quality)
-            "ultrafast": "p1", "superfast": "p2", "veryfast": "p3",
-            "faster": "p4", "fast": "p5", "medium": "p5",
-            "slow": "p6", "slower": "p7", "veryslow": "p7",
-        },
-        # NVENC uses -cq instead of -crf (similar scale)
-        "quality_param": "-cq",
-    },
-    "vaapi": {
-        "h264": "h264_vaapi",
-        "hevc": "hevc_vaapi",
-        "decoder": None,  # Use generic hwaccel
-        "hwaccel": "vaapi",
-        "device": "/dev/dri/renderD128",
-        "preset_map": {},  # VAAPI doesn't use presets
-        "quality_param": "-qp",  # QP mode for VAAPI
-    },
-    "videotoolbox": {
-        "h264": "h264_videotoolbox",
-        "hevc": "hevc_videotoolbox",
-        "decoder": None,
-        "hwaccel": "videotoolbox",
-        "device": None,
-        "preset_map": {},
-        "quality_param": "-q:v",  # Quality scale 1-100
-    },
-    "qsv": {
-        "h264": "h264_qsv",
-        "hevc": "hevc_qsv",
-        "decoder": "h264_qsv",
-        "hwaccel": "qsv",
-        "device": "/dev/dri/renderD128",
-        "preset_map": {
-            "ultrafast": "veryfast", "superfast": "veryfast",
-            "veryfast": "veryfast", "faster": "faster", "fast": "fast",
-            "medium": "medium", "slow": "slow", "slower": "slower",
-            "veryslow": "veryslow",
-        },
-        "quality_param": "-global_quality",
-    },
-}
-
-# Cache for detected GPU capabilities
-_gpu_cache: Optional[Dict[str, bool]] = None
-
-
-def detect_gpu_encoders() -> Dict[str, bool]:
-    """
-    Detect available GPU encoders by probing FFmpeg.
-    
-    Returns dict like: {"nvenc": True, "vaapi": False, "qsv": False, ...}
-    """
-    global _gpu_cache
-    if _gpu_cache is not None:
-        return _gpu_cache
-    
-    _gpu_cache = {}
-    
-    # Check if ffmpeg exists
-    if not shutil.which("ffmpeg"):
-        return _gpu_cache
-    
-    # Get list of available encoders
-    try:
-        result = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-encoders"],
-            capture_output=True, text=True, timeout=10
-        )
-        encoders_output = result.stdout.lower()
-    except Exception:
-        return _gpu_cache
-    
-    # Check each GPU encoder type with runtime verification
-    for hwaccel_type, config in GPU_ENCODERS.items():
-        encoder = config["h264"].lower()
-        
-        # First check: encoder exists in ffmpeg
-        if encoder not in encoders_output:
-            _gpu_cache[hwaccel_type] = False
-            continue
-
-        # Second check: runtime test - actually try to use the encoder
-        # This catches cases where encoder is compiled in but GPU is unavailable
-        try:
-            test_result = subprocess.run(
-                [
-                    "ffmpeg", "-hide_banner", "-f", "lavfi",
-                    "-i", "color=black:s=64x64:d=0.1",
-                    "-c:v", config["h264"], "-f", "null", "-"
-                ],
-                capture_output=True, text=True, timeout=5
-            )
-            # Encoder works if return code is 0
-            _gpu_cache[hwaccel_type] = (test_result.returncode == 0)
-        except (subprocess.TimeoutExpired, Exception):
-            _gpu_cache[hwaccel_type] = False
-    
-    # Additional VAAPI check: verify device exists
-    if _gpu_cache.get("vaapi"):
-        vaapi_device = GPU_ENCODERS["vaapi"]["device"]
-        if vaapi_device and not os.path.exists(vaapi_device):
-            _gpu_cache["vaapi"] = False
-    
-    return _gpu_cache
-
-
 def get_best_gpu_encoder() -> Optional[str]:
     """
-    Get the best available GPU encoder.
-    
-    Priority: nvenc > vaapi > qsv > videotoolbox
-    (NVENC is fastest, VAAPI is most common on Linux)
-    
-    Returns: "nvenc", "vaapi", "qsv", "videotoolbox", or None
+    Get the best available GPU encoder type.
     """
-    available = detect_gpu_encoders()
-    
-    # Priority order
-    for encoder_type in ["nvenc", "vaapi", "qsv", "videotoolbox"]:
-        if available.get(encoder_type):
-            return encoder_type
-    
+    preferred = _normalize_codec_preference(_env_or_default("OUTPUT_CODEC", STANDARD_CODEC))
+    from .core import hardware
+    config = hardware.get_best_hwaccel(preferred_codec=preferred)
+    if config.is_gpu:
+        return config.type
     return None
-
 
 # =============================================================================
 # Environment variable overrides
@@ -201,6 +82,14 @@ def _env_or_default(key: str, default: Any) -> Any:
     """Get env var, returning default if not set or empty."""
     val = os.environ.get(key, "")
     return val if val else default
+
+
+def _normalize_codec_preference(codec: str) -> str:
+    """Normalize codec preference to 'h264' or 'hevc'."""
+    c = (codec or "").lower()
+    if "265" in c or "hevc" in c or "h265" in c:
+        return "hevc"
+    return "h264"
 
 
 @dataclass
@@ -240,178 +129,163 @@ class FFmpegConfig:
     
     # Hardware acceleration
     hwaccel: str = field(default_factory=lambda: _env_or_default("FFMPEG_HWACCEL", "auto"))
-    _resolved_hwaccel: Optional[str] = field(default=None, repr=False)
+    _hw_config: Optional["hardware.HWConfig"] = field(default=None, repr=False)
     
     def __post_init__(self):
         """Resolve hardware acceleration setting."""
+        preferred = _normalize_codec_preference(self.codec)
+        from .core import hardware  # Lazy import to avoid circular dependency
         if self.hwaccel == "auto":
-            self._resolved_hwaccel = get_best_gpu_encoder()
-        elif self.hwaccel in GPU_ENCODERS:
-            # Verify requested encoder is available
-            available = detect_gpu_encoders()
-            if available.get(self.hwaccel):
-                self._resolved_hwaccel = self.hwaccel
-            else:
-                print(f"⚠️ Requested GPU encoder '{self.hwaccel}' not available, falling back to CPU")
-                self._resolved_hwaccel = None
+            self._hw_config = hardware.get_best_hwaccel(preferred_codec=preferred)
+        elif self.hwaccel == "none":
+            self._hw_config = hardware.HWConfig(
+                type="cpu",
+                encoder=self.codec,
+                decoder_args=[],
+                encoder_args=["-c:v", self.codec],
+                is_gpu=False
+            )
         else:
-            self._resolved_hwaccel = None
-    
+            # Try to force specific HW accel
+            # This is a simplified fallback, ideally we'd check availability
+            self._hw_config = hardware.get_best_hwaccel(preferred_codec=preferred)
+            if self._hw_config.type != self.hwaccel:
+                print(f"⚠️ Requested GPU encoder '{self.hwaccel}' not available/detected, using {self._hw_config.type}")
+        
+        if self._hw_config and self._hw_config.is_gpu:
+            actual = _normalize_codec_preference(self._hw_config.encoder)
+            if actual != preferred:
+                print(f"⚠️ Requested codec '{self.codec}' not supported by {self._hw_config.type}, using {self._hw_config.encoder}")
+
     @property
     def is_gpu_accelerated(self) -> bool:
         """Check if GPU acceleration is active."""
-        return self._resolved_hwaccel is not None
+        return self._hw_config.is_gpu if self._hw_config else False
     
     @property
     def gpu_encoder_type(self) -> Optional[str]:
         """Get the active GPU encoder type (nvenc, vaapi, etc.)."""
-        return self._resolved_hwaccel
+        return self._hw_config.type if self._hw_config and self._hw_config.is_gpu else None
     
     @property
     def effective_codec(self) -> str:
-        """
-        Get the effective video codec to use.
-        
-        Returns GPU encoder (e.g., h264_nvenc) if HW accel is active,
-        otherwise returns the configured CPU codec (e.g., libx264).
-        
-        Use this for MoviePy's codec= parameter.
-        """
-        gpu_config = self._get_gpu_config()
-        if gpu_config:
-            # Determine H.264 vs HEVC based on configured codec
-            if "265" in self.codec or "hevc" in self.codec.lower():
-                return gpu_config["hevc"]
-            return gpu_config["h264"]
-        return self.codec
-    
-    def _get_gpu_config(self) -> Optional[Dict]:
-        """Get GPU encoder configuration if available."""
-        if self._resolved_hwaccel:
-            return GPU_ENCODERS.get(self._resolved_hwaccel)
+        """Get the effective video codec to use."""
+        return self._hw_config.encoder if self._hw_config else self.codec
+
+    @property
+    def hwupload_filter(self) -> Optional[str]:
+        """Return required hwupload filter for the active GPU encoder (if any)."""
+        if self._hw_config and self._hw_config.is_gpu:
+            return self._hw_config.hwupload_filter
         return None
     
     def hwaccel_input_params(self) -> List[str]:
-        """
-        Generate FFmpeg input parameters for hardware-accelerated decoding.
-        
-        These go BEFORE the -i input flag.
-        
-        Example: ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"]
-        """
-        gpu_config = self._get_gpu_config()
-        if not gpu_config:
-            return []
-        
-        params = []
-        
-        # Add hwaccel flag
-        if gpu_config.get("hwaccel"):
-            params.extend(["-hwaccel", gpu_config["hwaccel"]])
-            
-            # Keep frames in GPU memory if possible (NVENC/VAAPI)
-            if self._resolved_hwaccel in ("nvenc", "vaapi"):
-                params.extend(["-hwaccel_output_format", gpu_config["hwaccel"]])
-        
-        # Add device if needed (VAAPI, QSV)
-        if gpu_config.get("device"):
-            if self._resolved_hwaccel == "vaapi":
-                params.extend(["-vaapi_device", gpu_config["device"]])
-            elif self._resolved_hwaccel == "qsv":
-                params.extend(["-init_hw_device", f"qsv=hw:{gpu_config['device']}"])
-        
-        return params
+        """Generate FFmpeg input parameters for hardware-accelerated decoding."""
+        return self._hw_config.decoder_args if self._hw_config else []
     
-    def video_params(self, crf: Optional[int] = None, preset: Optional[str] = None) -> List[str]:
+    def _gpu_quality_args(self, crf_value: int) -> List[str]:
+        """Map CRF-like value to GPU encoder quality flags."""
+        crf_clamped = max(0, min(51, int(crf_value)))
+        if not self._hw_config:
+            return []
+        if self._hw_config.type == "nvenc":
+            return ["-rc", "vbr_hq", "-cq", str(crf_clamped), "-b:v", "0"]
+        if self._hw_config.type == "vaapi":
+            return ["-qp", str(crf_clamped)]
+        if self._hw_config.type == "qsv":
+            return ["-global_quality", str(crf_clamped)]
+        if self._hw_config.type == "videotoolbox":
+            return ["-q:v", str(crf_clamped)]
+        return []
+
+    def _strip_codec_args(self, params: List[str]) -> List[str]:
+        """Remove -c:v and its value from an FFmpeg args list."""
+        stripped: List[str] = []
+        skip_next = False
+        for item in params:
+            if skip_next:
+                skip_next = False
+                continue
+            if item == "-c:v":
+                skip_next = True
+                continue
+            stripped.append(item)
+        return stripped
+
+    def video_params(
+        self,
+        crf: Optional[int] = None,
+        preset: Optional[str] = None,
+        codec_override: Optional[str] = None,
+        profile_override: Optional[str] = None,
+        level_override: Optional[str] = None,
+        pix_fmt_override: Optional[str] = None,
+    ) -> List[str]:
         """
         Generate FFmpeg video encoding parameters.
-        
-        Automatically uses GPU encoder if available and configured.
-        
-        Args:
-            crf: Override CRF (quality). Lower = better quality, bigger file.
-            preset: Override preset (speed vs compression tradeoff).
-        
-        Returns:
-            List of FFmpeg CLI arguments for video encoding.
         """
-        gpu_config = self._get_gpu_config()
-        
-        if gpu_config:
-            return self._gpu_video_params(gpu_config, crf, preset)
-        else:
-            return self._cpu_video_params(crf, preset)
-    
-    def _cpu_video_params(self, crf: Optional[int] = None, preset: Optional[str] = None) -> List[str]:
-        """Generate CPU (software) encoding parameters."""
-        params = [
-            "-c:v", self.codec,
-            "-pix_fmt", self.pix_fmt,
-        ]
-        
-        # Only add profile/level for H.264/H.265
-        if self.codec in ("libx264", "libx265", "h264", "hevc"):
-            if self.profile:
-                params.extend(["-profile:v", self.profile])
-            if self.level:
-                params.extend(["-level:v", self.level])
-        
-        params.extend([
-            "-preset", preset or self.preset,
-            "-crf", str(crf if crf is not None else self.crf),
-        ])
-        
-        if self.threads != "0":
-            params.extend(["-threads", self.threads])
-        
-        return params
-    
-    def _gpu_video_params(
-        self, 
-        gpu_config: Dict, 
-        crf: Optional[int] = None, 
-        preset: Optional[str] = None
+        crf_value = crf if crf is not None else self.crf
+        preset_value = preset or self.preset
+        profile_value = self.profile if profile_override is None else profile_override
+        level_value = self.level if level_override is None else level_override
+        pix_fmt_value = self.pix_fmt if pix_fmt_override is None else pix_fmt_override
+
+        if self._hw_config and self._hw_config.is_gpu:
+            args = list(self._hw_config.encoder_args)
+            if self._hw_config.type in ("nvenc", "qsv") and preset_value:
+                args.extend(["-preset", preset_value])
+            args.extend(self._gpu_quality_args(crf_value))
+            if profile_value:
+                args.extend(["-profile:v", profile_value])
+            if level_value:
+                args.extend(["-level", str(level_value)])
+            if pix_fmt_value and self._hw_config.type != "vaapi":
+                args.extend(["-pix_fmt", pix_fmt_value])
+            return args
+
+        # CPU encoding path
+        codec_value = codec_override or self.codec
+        args = ["-c:v", codec_value]
+        if preset_value:
+            args.extend(["-preset", preset_value])
+        args.extend(["-crf", str(crf_value)])
+        if profile_value:
+            args.extend(["-profile:v", profile_value])
+        if level_value:
+            args.extend(["-level", str(level_value)])
+        if pix_fmt_value:
+            args.extend(["-pix_fmt", pix_fmt_value])
+        return args
+
+    def moviepy_params(
+        self,
+        crf: Optional[int] = None,
+        preset: Optional[str] = None,
+        codec_override: Optional[str] = None,
+        profile_override: Optional[str] = None,
+        level_override: Optional[str] = None,
+        pix_fmt_override: Optional[str] = None,
     ) -> List[str]:
-        """Generate GPU (hardware) encoding parameters."""
-        # Determine codec based on output format
-        # Default to H.264 for compatibility
-        codec_key = "hevc" if "265" in self.codec or "hevc" in self.codec.lower() else "h264"
-        encoder = gpu_config[codec_key]
+        """
+        Get parameters for MoviePy's write_videofile.
+        MoviePy expects a list of strings for 'ffmpeg_params'.
+        """
+        # MoviePy handles codec via 'codec' argument, so we only need extra params
+        # But if we want to use HW accel with MoviePy, we need to pass the encoder as codec
+        # and extra args via ffmpeg_params.
         
-        params = ["-c:v", encoder]
-        
-        # Pixel format - GPU encoders may need different formats
-        if self._resolved_hwaccel == "vaapi":
-            # VAAPI needs frames uploaded to GPU surface
-            params.extend(["-vf", "format=nv12,hwupload"])
-        elif self._resolved_hwaccel == "nvenc":
-            params.extend(["-pix_fmt", self.pix_fmt])
-        else:
-            params.extend(["-pix_fmt", self.pix_fmt])
-        
-        # Profile (most GPU encoders support this)
-        if self.profile and self._resolved_hwaccel != "vaapi":
-            params.extend(["-profile:v", self.profile])
-        
-        # Preset mapping
-        preset_to_use = preset or self.preset
-        if gpu_config.get("preset_map"):
-            mapped_preset = gpu_config["preset_map"].get(preset_to_use, preset_to_use)
-            params.extend(["-preset", mapped_preset])
-        
-        # Quality parameter (different per encoder)
-        quality_param = gpu_config.get("quality_param", "-crf")
-        quality_value = crf if crf is not None else self.crf
-        
-        # VideoToolbox uses 1-100 scale, not CRF
-        if self._resolved_hwaccel == "videotoolbox":
-            # Convert CRF (0-51, lower=better) to VT quality (1-100, higher=better)
-            quality_value = max(1, min(100, 100 - (quality_value * 2)))
-        
-        params.extend([quality_param, str(quality_value)])
-        
-        return params
-    
+        # This is tricky because MoviePy's write_videofile takes 'codec' arg.
+        # We should return the codec name separately.
+        params = self.video_params(
+            crf=crf,
+            preset=preset,
+            codec_override=codec_override,
+            profile_override=profile_override,
+            level_override=level_override,
+            pix_fmt_override=pix_fmt_override,
+        )
+        return self._strip_codec_args(params)
+
     def audio_params(self) -> List[str]:
         """Generate FFmpeg audio encoding parameters."""
         return [
@@ -422,70 +296,6 @@ class FFmpegConfig:
     def full_params(self, crf: Optional[int] = None, preset: Optional[str] = None) -> List[str]:
         """Generate full FFmpeg encoding parameters (video + audio)."""
         return self.video_params(crf, preset) + self.audio_params()
-    
-    def moviepy_params(self, crf: Optional[int] = None) -> List[str]:
-        """
-        Generate parameters suitable for MoviePy's write_videofile().
-
-        MoviePy passes these directly to FFmpeg via ffmpeg_params argument.
-        Note: MoviePy handles codec separately via codec= argument.
-
-        Automatically uses GPU-appropriate quality parameters:
-        - NVENC: -cq instead of -crf
-        - VAAPI: -qp instead of -crf (+ hwupload filter)
-        - QSV: -global_quality instead of -crf
-        - CPU: -crf (standard)
-        """
-        gpu_config = self._get_gpu_config()
-        quality_value = crf if crf is not None else self.crf
-
-        # GPU encoding path
-        if gpu_config:
-            params = []
-
-            # VAAPI needs special handling: hwupload filter for surface upload
-            if self._resolved_hwaccel == "vaapi":
-                # Note: -vf filter added via params, pix_fmt handled by filter chain
-                params.extend(["-vf", "format=nv12,hwupload"])
-            else:
-                params.extend(["-pix_fmt", self.pix_fmt])
-
-            # Profile (most GPU encoders support this, except VAAPI)
-            if self.profile and self._resolved_hwaccel != "vaapi":
-                params.extend(["-profile:v", self.profile])
-
-            # Preset mapping
-            if gpu_config.get("preset_map"):
-                mapped_preset = gpu_config["preset_map"].get(self.preset, self.preset)
-                params.extend(["-preset", mapped_preset])
-
-            # Quality parameter (encoder-specific)
-            quality_param = gpu_config.get("quality_param", "-crf")
-
-            # VideoToolbox uses 1-100 scale instead of CRF (0-51)
-            if self._resolved_hwaccel == "videotoolbox":
-                # Convert CRF (0-51, lower=better) to VT quality (1-100, higher=better)
-                quality_value = max(1, min(100, 100 - (quality_value * 2)))
-
-            params.extend([quality_param, str(quality_value)])
-
-            return params
-
-        # CPU encoding path (standard)
-        params = ["-pix_fmt", self.pix_fmt]
-
-        if self.codec in ("libx264", "libx265", "h264", "hevc"):
-            if self.profile:
-                params.extend(["-profile:v", self.profile])
-            if self.level:
-                params.extend(["-level:v", self.level])
-
-        params.extend([
-            "-preset", self.preset,
-            "-crf", str(quality_value),
-        ])
-
-        return params
 
 
 # =============================================================================
@@ -524,14 +334,14 @@ def get_ffmpeg_video_params(crf: Optional[int] = None, preset: Optional[str] = N
     return get_config().video_params(crf, preset)
 
 
-def get_moviepy_params(crf: Optional[int] = None) -> List[str]:
+def get_moviepy_params(crf: Optional[int] = None, preset: Optional[str] = None) -> List[str]:
     """
     Get FFmpeg parameters for MoviePy's write_videofile().
     
     Example:
         clip.write_videofile(output, ffmpeg_params=get_moviepy_params(crf=18))
     """
-    return get_config().moviepy_params(crf)
+    return get_config().moviepy_params(crf=crf, preset=preset)
 
 
 def print_gpu_status():
@@ -543,20 +353,17 @@ def print_gpu_status():
     print("\n🎮 GPU Encoder Status:")
     print("=" * 50)
     
-    available = detect_gpu_encoders()
+    # Use hardware module to get status
+    from .core import hardware
+    hw_config = hardware.get_best_hwaccel()
     
-    for encoder_type, is_available in available.items():
-        status = "✅ Available" if is_available else "❌ Not available"
-        config = GPU_ENCODERS[encoder_type]
-        encoder = config["h264"]
-        print(f"  {encoder_type.upper():12} ({encoder}): {status}")
-    
-    best = get_best_gpu_encoder()
-    if best:
-        print(f"\n  🏆 Best available: {best.upper()}")
-        print(f"     Use FFMPEG_HWACCEL={best} to enable")
+    if hw_config.is_gpu:
+        print(f"  ✅ GPU Acceleration Detected: {hw_config.type.upper()}")
+        print(f"     Encoder: {hw_config.encoder}")
+        print(f"     Decoder Args: {' '.join(hw_config.decoder_args)}")
     else:
-        print(f"\n  ℹ️  No GPU encoders detected, using CPU (libx264)")
+        print(f"  ❌ No GPU Acceleration Detected (using CPU)")
+        print(f"     Encoder: {hw_config.encoder}")
     
     print("=" * 50)
 
@@ -581,8 +388,6 @@ __all__ = [
     "STANDARD_AUDIO_CODEC",
     "STANDARD_AUDIO_BITRATE",
     # GPU detection
-    "GPU_ENCODERS",
-    "detect_gpu_encoders",
     "get_best_gpu_encoder",
     "print_gpu_status",
     # Config class

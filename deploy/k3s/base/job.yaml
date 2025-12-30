@@ -18,10 +18,30 @@ spec:
       securityContext:
         fsGroup: 992
         supplementalGroups: [44,992]
+      initContainers:
+        - name: cgpu-credentials-init
+          image: ghcr.io/mfahsold/montage-ai:latest
+          command:
+            - bash
+            - -c
+            - |
+              mkdir -p /cgpu/state
+              if [ -f /cgpu-secrets/config.json ]; then
+                cp /cgpu-secrets/config.json /cgpu/config.json
+              fi
+              if [ -f /cgpu-secrets/session.json ]; then
+                cp /cgpu-secrets/session.json /cgpu/state/session.json
+              fi
+          volumeMounts:
+            - name: cgpu-config
+              mountPath: /cgpu
+            - name: cgpu-secrets
+              mountPath: /cgpu-secrets
+              readOnly: true
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: 192.168.1.16:5001/montage-ai:latest
+          image: ghcr.io/mfahsold/montage-ai:latest
           imagePullPolicy: Always
           env:
             - name: USE_GPU
@@ -52,6 +72,8 @@ spec:
               readOnly: true
             - name: output
               mountPath: /data/output
+            - name: cgpu-config
+              mountPath: /root/.config/cgpu
             - name: dev-dri
               mountPath: /dev/dri
               readOnly: true
@@ -68,6 +90,17 @@ spec:
         - name: output
           persistentVolumeClaim:
             claimName: montage-ai-output
+        - name: cgpu-config
+          emptyDir: {}
+        - name: cgpu-secrets
+          secret:
+            secretName: cgpu-credentials
+            optional: true
+            items:
+              - key: config.json
+                path: config.json
+              - key: session.json
+                path: session.json
         - name: dev-dri
           hostPath:
             path: /dev/dri

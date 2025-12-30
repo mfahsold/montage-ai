@@ -20,6 +20,7 @@ import os
 import subprocess
 import base64
 import tempfile
+import time
 from typing import Tuple, Optional
 from pathlib import Path
 from dataclasses import dataclass
@@ -37,7 +38,7 @@ CGPU_TIMEOUT = int(os.environ.get("CGPU_TIMEOUT", "1200"))  # 20 minutes default
 CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
 CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
 CGPU_PORT = os.environ.get("CGPU_PORT", "8080")  # Default port for cgpu serve
-CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-flash-latest")
+CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
 
 
 @dataclass
@@ -55,6 +56,9 @@ class CGPUConfig:
 # cgpu Availability Checks
 # ============================================================================
 
+_CGPU_AVAIL_CACHE = {"ok": None, "checked_at": 0.0}
+_CGPU_AVAIL_TTL = 300  # seconds
+
 def is_cgpu_available() -> bool:
     """
     Check if cgpu is installed and authenticated.
@@ -62,6 +66,11 @@ def is_cgpu_available() -> bool:
     Returns:
         True if cgpu is available for cloud GPU tasks
     """
+    now = time.time()
+    cached = _CGPU_AVAIL_CACHE["ok"]
+    if cached is not None and (now - _CGPU_AVAIL_CACHE["checked_at"]) < _CGPU_AVAIL_TTL:
+        return cached
+
     # Re-read env var to ensure we have the latest value
     global CGPU_GPU_ENABLED
     CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
@@ -69,6 +78,7 @@ def is_cgpu_available() -> bool:
     print(f"DEBUG: CGPU_GPU_ENABLED={CGPU_GPU_ENABLED}")
 
     if not CGPU_GPU_ENABLED:
+        _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
         return False
     
     try:
@@ -82,9 +92,16 @@ def is_cgpu_available() -> bool:
         print(f"DEBUG: cgpu status stdout={result.stdout}")
         print(f"DEBUG: cgpu status stderr={result.stderr}")
         # Check for "Authenticated" OR if it just returns success (some versions differ)
-        return result.returncode == 0
+        if result.returncode != 0:
+            _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
+            return False
+
+        gpu_ok, _ = check_cgpu_gpu()
+        _CGPU_AVAIL_CACHE.update({"ok": gpu_ok, "checked_at": now})
+        return gpu_ok
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
         print(f"DEBUG: cgpu status failed with {e}")
+        _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
         return False
 
 
@@ -216,7 +233,16 @@ def run_cgpu_command(
                     time.sleep(retry_delay)
                     continue  # Retry
 
-            return result.returncode == 0, result.stdout, result.stderr
+            if result.returncode == 0:
+                return True, result.stdout, result.stderr
+
+            if "command finished without reporting an exit code" in result.stderr.lower():
+                if attempt < retries:
+                    print("   ⚠️ cgpu command missing exit code, retrying...")
+                    time.sleep(retry_delay)
+                    continue
+
+            return False, result.stdout, result.stderr
 
         except subprocess.TimeoutExpired:
             last_error = f"Timeout after {timeout}s"
@@ -290,6 +316,12 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
     try:
         # Get file size for logging
         file_size_mb = os.path.getsize(local_path) / (1024 * 1024)
+        remote_dir = os.path.dirname(remote_path)
+        if remote_dir:
+            ok, _, stderr = run_cgpu_command(f"mkdir -p {remote_dir}", timeout=30)
+            if not ok:
+                print(f"   ❌ Failed to create remote directory: {stderr}")
+                return False
 
         result = subprocess.run(
             ["cgpu", "copy", local_path, remote_path],

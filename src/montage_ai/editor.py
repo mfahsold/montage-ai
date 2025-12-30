@@ -116,7 +116,6 @@ from .ffmpeg_config import (
     FFmpegConfig,
     get_config as get_ffmpeg_config,
     get_moviepy_params,
-    detect_gpu_encoders,
     get_best_gpu_encoder,
     print_gpu_status,
     STANDARD_WIDTH_VERTICAL as STANDARD_WIDTH,

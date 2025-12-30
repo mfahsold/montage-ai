@@ -42,6 +42,7 @@ STANDARD_HEIGHT = STANDARD_HEIGHT_HORIZONTAL  # 1080
 
 # Get runtime config (env vars applied)
 _ffmpeg_config = get_config()
+_ffmpeg_cpu_config: Optional[FFmpegConfig] = None
 TARGET_CODEC = _ffmpeg_config.codec
 TARGET_PROFILE = _ffmpeg_config.profile
 TARGET_LEVEL = _ffmpeg_config.level
@@ -51,12 +52,69 @@ TARGET_PIX_FMT = _ffmpeg_config.pix_fmt
 DEFAULT_XFADE_DURATION = 0.3
 
 
-def _moviepy_params() -> List[str]:
+def _get_cpu_config() -> FFmpegConfig:
+    """Lazy init CPU-only config for cases where GPU filters are incompatible."""
+    global _ffmpeg_cpu_config
+    if _ffmpeg_cpu_config is None:
+        _ffmpeg_cpu_config = FFmpegConfig(hwaccel="none")
+    return _ffmpeg_cpu_config
+
+def _moviepy_params(
+    config: Optional[FFmpegConfig] = None,
+    crf: Optional[int] = None,
+    preset: Optional[str] = None,
+    target_profile: Optional[str] = None,
+    target_level: Optional[str] = None,
+    target_pix_fmt: Optional[str] = None,
+) -> List[str]:
     """
     Shared ffmpeg parameters for MoviePy writes to keep video streams aligned.
     Uses centralized FFmpegConfig for DRY.
     """
-    return _ffmpeg_config.moviepy_params()
+    cfg = config or _ffmpeg_config
+    return cfg.moviepy_params(
+        crf=crf,
+        preset=preset,
+        profile_override=target_profile,
+        level_override=target_level,
+        pix_fmt_override=target_pix_fmt,
+    )
+
+def _video_params_for_target(
+    config: FFmpegConfig,
+    crf: int,
+    preset: str,
+    target_codec: Optional[str],
+    target_profile: Optional[str],
+    target_level: Optional[str],
+    target_pix_fmt: Optional[str],
+) -> List[str]:
+    """Build encoder params honoring output overrides when on CPU."""
+    return config.video_params(
+        crf=crf,
+        preset=preset,
+        codec_override=target_codec,
+        profile_override=target_profile,
+        level_override=target_level,
+        pix_fmt_override=target_pix_fmt,
+    )
+
+def _append_hwupload_vf(vf_chain: str, config: FFmpegConfig) -> str:
+    """Append hwupload filter if required by the active encoder."""
+    if config.hwupload_filter:
+        return f"{vf_chain},{config.hwupload_filter}"
+    return vf_chain
+
+def _append_hwupload_filter_complex(
+    filter_complex: str,
+    config: FFmpegConfig,
+    input_label: str,
+    output_label: str,
+) -> Tuple[str, str]:
+    """Append hwupload filter to a filter_complex graph when needed."""
+    if config.hwupload_filter:
+        return f"{filter_complex};{input_label}{config.hwupload_filter}{output_label}", output_label
+    return filter_complex, input_label
 
 
 @dataclass
@@ -178,22 +236,26 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
             f"format={target_pix_fmt}"
         )
 
-        cmd = [
-            "ffmpeg", "-y",
+        config = _ffmpeg_config
+        vf_chain = _append_hwupload_vf(vf_chain, config)
+
+        cmd = ["ffmpeg", "-y"]
+        if config.is_gpu_accelerated:
+            cmd.extend(config.hwaccel_input_params())
+        cmd.extend([
             "-i", input_path,
             "-vf", vf_chain,
-            "-c:v", target_codec,
-        ]
-
-        if target_profile:
-            cmd.extend(["-profile:v", target_profile])
-        if target_level:
-            cmd.extend(["-level", target_level])
-
+        ])
+        cmd.extend(_video_params_for_target(
+            config,
+            crf=crf,
+            preset=preset,
+            target_codec=target_codec,
+            target_profile=target_profile,
+            target_level=target_level,
+            target_pix_fmt=target_pix_fmt,
+        ))
         cmd.extend([
-            "-preset", preset,
-            "-crf", str(crf),
-            "-pix_fmt", target_pix_fmt,
             "-an",  # No audio (added later)
             "-movflags", "+faststart",
             output_path
@@ -245,29 +307,39 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
         
         # Build xfade filter
         # Format: [0:v][1:v]xfade=transition=fade:duration=0.3:offset=2.7[v]
+        config = _ffmpeg_config
         filter_complex = (
             f"[0:v][1:v]xfade=transition={transition}:"
             f"duration={xfade_duration}:offset={offset}[v]"
         )
+        filter_complex, out_label = _append_hwupload_filter_complex(
+            filter_complex,
+            config,
+            "[v]",
+            "[v_hw]"
+        )
         
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = ["ffmpeg", "-y"]
+        if config.is_gpu_accelerated:
+            cmd.extend(config.hwaccel_input_params())
+        cmd.extend([
             "-i", clip1_path,
             "-i", clip2_path,
             "-filter_complex", filter_complex,
-            "-map", "[v]",
-        ]
+            "-map", out_label,
+        ])
 
-        cmd.extend(["-c:v", target_codec])
-        if target_profile:
-            cmd.extend(["-profile:v", target_profile])
-        if target_level:
-            cmd.extend(["-level", target_level])
+        cmd.extend(_video_params_for_target(
+            config,
+            crf=crf,
+            preset=preset,
+            target_codec=target_codec,
+            target_profile=target_profile,
+            target_level=target_level,
+            target_pix_fmt=target_pix_fmt,
+        ))
 
         cmd.extend([
-            "-preset", preset,
-            "-crf", str(crf),
-            "-pix_fmt", target_pix_fmt,
             "-an",  # No audio - handled separately
             output_path
         ])
@@ -391,16 +463,30 @@ class SegmentWriter:
             # Concatenate clips in memory (minimal, just this batch)
             combined = concatenate_videoclips(clips, method="compose")
             
+            moviepy_config = _ffmpeg_config
+            if moviepy_config.is_gpu_accelerated and moviepy_config.hwupload_filter:
+                moviepy_config = _get_cpu_config()
+                codec = TARGET_CODEC
+            else:
+                codec = moviepy_config.effective_codec if moviepy_config.is_gpu_accelerated else TARGET_CODEC
+
             # Write to disk
             combined.write_videofile(
                 segment_path,
-                codec=TARGET_CODEC,
+                codec=codec,
                 preset=self.ffmpeg_preset,
                 audio_codec="aac",
                 fps=STANDARD_FPS,
                 logger=None,  # Suppress MoviePy progress bar
                 threads=4,
-                ffmpeg_params=_moviepy_params()
+                ffmpeg_params=_moviepy_params(
+                    config=moviepy_config,
+                    crf=self.ffmpeg_crf,
+                    preset=self.ffmpeg_preset,
+                    target_profile=TARGET_PROFILE,
+                    target_level=TARGET_LEVEL,
+                    target_pix_fmt=TARGET_PIX_FMT,
+                )
             )
             
             # Get duration before closing
@@ -567,25 +653,30 @@ class SegmentWriter:
                 f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
                 f"fps={STANDARD_FPS},format={TARGET_PIX_FMT}"
             )
+            config = _ffmpeg_config
+            vf_chain = _append_hwupload_vf(vf_chain, config)
 
-            cmd = [
-                "ffmpeg", "-y",
+            cmd = ["ffmpeg", "-y"]
+            if config.is_gpu_accelerated:
+                cmd.extend(config.hwaccel_input_params())
+            cmd.extend([
                 "-f", "concat",
                 "-safe", "0",
                 "-i", concat_list_path,
                 "-vf", vf_chain,
-            ]
+            ])
 
-            cmd.extend(["-c:v", TARGET_CODEC])
-            if TARGET_PROFILE:
-                cmd.extend(["-profile:v", TARGET_PROFILE])
-            if TARGET_LEVEL:
-                cmd.extend(["-level", TARGET_LEVEL])
+            cmd.extend(_video_params_for_target(
+                config,
+                crf=self.ffmpeg_crf,
+                preset=self.ffmpeg_preset,
+                target_codec=TARGET_CODEC,
+                target_profile=TARGET_PROFILE,
+                target_level=TARGET_LEVEL,
+                target_pix_fmt=TARGET_PIX_FMT,
+            ))
 
             cmd.extend([
-                "-preset", self.ffmpeg_preset,
-                "-crf", str(self.ffmpeg_crf),
-                "-pix_fmt", TARGET_PIX_FMT,
                 "-an",  # No audio in segments
                 segment_path
             ])
@@ -877,24 +968,38 @@ class SegmentWriter:
             }
             overlay_pos = positions.get(position, positions["top-right"])
             
-            cmd = [
-                "ffmpeg", "-y",
+            config = _ffmpeg_config
+            filter_complex = f"[1:v]scale=150:-1[logo];[0:v][logo]overlay={overlay_pos}[v]"
+            filter_complex, out_label = _append_hwupload_filter_complex(
+                filter_complex,
+                config,
+                "[v]",
+                "[v_hw]"
+            )
+
+            cmd = ["ffmpeg", "-y"]
+            if config.is_gpu_accelerated:
+                cmd.extend(config.hwaccel_input_params())
+            cmd.extend([
                 "-i", input_path,
                 "-i", logo_path,
-                "-filter_complex", 
-                f"[1:v]scale=150:-1[logo];[0:v][logo]overlay={overlay_pos}",
-            ]
+                "-filter_complex",
+                filter_complex,
+                "-map", out_label,
+                "-map", "0:a?",
+            ])
 
-            cmd.extend(["-c:v", TARGET_CODEC])
-            if TARGET_PROFILE:
-                cmd.extend(["-profile:v", TARGET_PROFILE])
-            if TARGET_LEVEL:
-                cmd.extend(["-level", TARGET_LEVEL])
+            cmd.extend(_video_params_for_target(
+                config,
+                crf=self.ffmpeg_crf,
+                preset=self.ffmpeg_preset,
+                target_codec=TARGET_CODEC,
+                target_profile=TARGET_PROFILE,
+                target_level=TARGET_LEVEL,
+                target_pix_fmt=TARGET_PIX_FMT,
+            ))
 
             cmd.extend([
-                "-preset", self.ffmpeg_preset,
-                "-crf", str(self.ffmpeg_crf),
-                "-pix_fmt", TARGET_PIX_FMT,
                 "-c:a", "copy",  # Audio copy
                 "-movflags", "+faststart",
                 output_path
@@ -1093,14 +1198,27 @@ class ProgressiveRenderer:
         """
         try:
             # Render clip to temp file (with audio preserved)
+            moviepy_config = _ffmpeg_config
+            if moviepy_config.is_gpu_accelerated and moviepy_config.hwupload_filter:
+                moviepy_config = _get_cpu_config()
+                codec = TARGET_CODEC
+            else:
+                codec = moviepy_config.effective_codec if moviepy_config.is_gpu_accelerated else TARGET_CODEC
+
             clip.write_videofile(
                 temp_path,
-                codec=TARGET_CODEC,
+                codec=codec,
                 audio_codec='aac',
                 fps=STANDARD_FPS,
                 preset='fast',
                 logger=None,
-                ffmpeg_params=_moviepy_params()
+                ffmpeg_params=_moviepy_params(
+                    config=moviepy_config,
+                    preset='fast',
+                    target_profile=TARGET_PROFILE,
+                    target_level=TARGET_LEVEL,
+                    target_pix_fmt=TARGET_PIX_FMT,
+                )
             )
             
             # Close MoviePy clip to free memory

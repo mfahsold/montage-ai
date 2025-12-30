@@ -27,6 +27,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mesa-vulkan-drivers \
     vulkan-tools \
     libvulkan-dev \
+    # VAAPI for hardware video encoding (AMD/Intel)
+    libva2 \
+    libva-drm2 \
+    mesa-va-drivers \
+    vainfo \
     # Node.js prerequisites
     curl \
     wget \
@@ -37,7 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/* && \
-    npm install -g cgpu
+    npm install -g cgpu @google/gemini-cli
 
 # -----------------------------------------------------------------------------
 # STAGE 2: Python dependencies (cached unless requirements change)

@@ -225,7 +225,8 @@ class CreativeDirector:
             try:
                 self.openai_client = OpenAI(
                     base_url=OPENAI_API_BASE,
-                    api_key=OPENAI_API_KEY
+                    api_key=OPENAI_API_KEY,
+                    timeout=self.timeout
                 )
             except Exception as e:
                 print(f"   ⚠️ Failed to initialize OpenAI client: {e}")
@@ -239,7 +240,8 @@ class CreativeDirector:
             try:
                 self.cgpu_client = OpenAI(
                     base_url=cgpu_url,
-                    api_key="unused"  # cgpu ignores API key
+                    api_key="unused",  # cgpu ignores API key
+                    timeout=self.timeout
                 )
             except Exception as e:
                 print(f"   ⚠️ Failed to initialize cgpu client: {e}")

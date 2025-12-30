@@ -6,7 +6,7 @@ resources:
 
 images:
   - name: ghcr.io/mfahsold/montage-ai
-    newName: 192.168.1.16:5001/montage-ai
+    newName: 192.168.1.12:5000/montage-ai
     newTag: latest
 
 patches:

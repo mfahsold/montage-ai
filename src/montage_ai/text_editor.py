@@ -30,6 +30,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple
 
+from .ffmpeg_config import get_config
+
 
 @dataclass
 class Word:
@@ -523,10 +525,15 @@ class TextEditor:
 
         Uses micro-crossfades (default 50ms) at cut points to avoid
         hard audio pops and make edits invisible.
+        
+        Optimized for performance:
+        - Uses FFmpeg filter_complex for single-pass rendering
+        - Uses hardware acceleration if available (via FFmpegConfig)
+        - Uses input seeking (-ss) to avoid decoding unnecessary frames
 
         Args:
             output_path: Output file path
-            codec: Video codec
+            codec: Video codec (default: libx264, but will use GPU if available)
             crf: Quality (lower = better)
             preset: Encoding preset
             audio_crossfade_ms: Audio crossfade duration in milliseconds
@@ -541,6 +548,114 @@ class TextEditor:
         print(f"   {len(cut_list)} segments to keep")
         print(f"   🔊 Using {audio_crossfade_ms}ms audio crossfades for smooth cuts")
 
+        # Get hardware optimized config
+        # If codec is default libx264, allow auto-detection of GPU
+        use_hw_accel = (codec == "libx264")
+        config = get_config("auto" if use_hw_accel else "none")
+        
+        if use_hw_accel and config.is_gpu_accelerated:
+            print(f"   🚀 Using GPU acceleration: {config.gpu_encoder_type}")
+        
+        # Prepare inputs and filters
+        inputs = []
+        filter_parts = []
+        concat_v = []
+        concat_a = []
+        
+        fade_sec = audio_crossfade_ms / 1000.0
+        half_fade = fade_sec / 2.0
+        
+        for i, region in enumerate(cut_list):
+            duration = region.end - region.start
+            
+            # Input args: Fast seek to start, limit duration
+            # Note: We use string conversion for path to handle Path objects
+            inputs.extend([
+                "-ss", f"{region.start:.3f}",
+                "-t", f"{duration:.3f}",
+                "-i", str(self.video_path)
+            ])
+            
+            # Video filter: Reset PTS
+            # We don't fade video, just audio
+            filter_parts.append(f"[{i}:v]setpts=PTS-STARTPTS[v{i}]")
+            concat_v.append(f"[v{i}]")
+            
+            # Audio filter: Reset PTS + Crossfade
+            # Fade in start, fade out end
+            afade = f"afade=t=in:st=0:d={half_fade},afade=t=out:st={duration-half_fade}:d={half_fade}"
+            filter_parts.append(f"[{i}:a]asetpts=PTS-STARTPTS,{afade}[a{i}]")
+            concat_a.append(f"[a{i}]")
+
+        # Concat filter
+        n_segments = len(cut_list)
+        concat_filter = f"{''.join(concat_v)}{''.join(concat_a)}concat=n={n_segments}:v=1:a=1[outv][outa]"
+        filter_parts.append(concat_filter)
+        
+        full_filter = ";".join(filter_parts)
+        output_video_label = "[outv]"
+        if config.hwupload_filter:
+            full_filter = f"{full_filter};[outv]{config.hwupload_filter}[outv_hw]"
+            output_video_label = "[outv_hw]"
+        
+        # Build command
+        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+        
+        # Add hardware decoding args if applicable
+        if config.is_gpu_accelerated:
+            cmd.extend(config.hwaccel_input_params())
+            
+        # Add all inputs
+        cmd.extend(inputs)
+        
+        # Add filter complex
+        cmd.extend(["-filter_complex", full_filter])
+        
+        # Map output
+        cmd.extend(["-map", output_video_label, "-map", "[outa]"])
+        
+        # Encoding parameters
+        if use_hw_accel:
+            # Use config's optimized params
+            cmd.extend(config.video_params(crf=crf, preset=preset))
+        else:
+            # Use manual params
+            cmd.extend(["-c:v", codec, "-crf", str(crf), "-preset", preset])
+            
+        # Audio encoding
+        cmd.extend(["-c:a", "aac", "-b:a", "192k"])
+        
+        # Output path
+        cmd.append(output_path)
+
+        print(f"   Rendering...")
+        # print(" ".join(cmd)) # Debug
+        
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            # Fallback for "Argument list too long" or other errors
+            print(f"   ⚠️ Render failed: {e}")
+            print("   Falling back to segment-based rendering...")
+            return self._export_fallback(output_path, codec, crf, preset, audio_crossfade_ms)
+
+        stats = self.get_stats()
+        print(f"   Removed {stats['removed_duration']:.1f}s ({stats['removal_percentage']:.1f}%)")
+        print(f"   Output: {output_path}")
+
+        return output_path
+
+    def _export_fallback(
+        self,
+        output_path: str,
+        codec: str = "libx264",
+        crf: int = 23,
+        preset: str = "medium",
+        audio_crossfade_ms: int = 50
+    ) -> str:
+        """Fallback method using intermediate files (original implementation)."""
+        cut_list = self.get_cut_list()
+        
         # Extract each segment with audio fade handles
         segment_files = []
         fade_ms = audio_crossfade_ms / 2  # Half on each side
@@ -592,7 +707,7 @@ class TextEditor:
             output_path
         ]
 
-        print(f"   Rendering...")
+        print(f"   Rendering (fallback)...")
         subprocess.run(cmd, check=True)
 
         # Cleanup temp files
@@ -605,6 +720,7 @@ class TextEditor:
         print(f"   Output: {output_path}")
 
         return output_path
+
 
     def export_edl(self, output_path: str) -> str:
         """

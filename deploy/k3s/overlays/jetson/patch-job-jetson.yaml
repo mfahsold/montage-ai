@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-render
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: cgpu-credentials-init
+          image: 192.168.1.12:5000/montage-ai:arm64
+      # Target Jetson for NVENC/NVMPI hardware encoding
+      nodeSelector:
+        kubernetes.io/hostname: codeaijetson-desktop
+      runtimeClassName: nvidia
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: montage-ai
+          image: 192.168.1.12:5000/montage-ai:arm64
+          # Wait for data upload before starting
+          command: ["/bin/bash", "-c", "echo 'Waiting for data...' && sleep 60 && python -u -m montage_ai.editor"]
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+          env:
+            # Force NVMPI for Jetson (bypass auto-detection)
+            - name: OUTPUT_CODEC
+              value: "h264_nvmpi"
+            - name: FFMPEG_HWACCEL
+              value: "none"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,video,utility"
+          resources:
+            # Jetson has limited resources
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: dev-dri
+              mountPath: /dev/dri
+            # Override read-only mounts to allow data population
+            - name: input
+              mountPath: /data/input
+              readOnly: false
+            - name: music
+              mountPath: /data/music
+              readOnly: false
+            - name: assets
+              mountPath: /data/assets
+              readOnly: false
+      volumes:
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: DirectoryOrCreate

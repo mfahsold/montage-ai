@@ -28,15 +28,12 @@ import os
 import subprocess
 import shutil
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 
-from .ffmpeg_config import (
-    FFmpegConfig,
-    detect_gpu_encoders,
-    get_best_gpu_encoder,
-    GPU_ENCODERS,
-)
+if TYPE_CHECKING:
+    from .ffmpeg_config import FFmpegConfig
+
 
 
 # =============================================================================
@@ -119,7 +116,7 @@ class ResourceManager:
             refresh: If True, immediately detect available resources
         """
         self._status: Optional[ResourceStatus] = None
-        self._ffmpeg_config_cache: Dict[str, FFmpegConfig] = {}
+        self._ffmpeg_config_cache: Dict[str, "FFmpegConfig"] = {}
 
         if refresh:
             self.refresh()
@@ -171,43 +168,18 @@ class ResourceManager:
         Returns:
             (available, gpu_info) tuple
         """
-        # Check if cgpu GPU features are enabled
-        if os.environ.get("CGPU_GPU_ENABLED", "false").lower() != "true":
-            return False, None
-
-        # Check if cgpu is installed
-        if not shutil.which("cgpu"):
-            return False, None
-
         try:
-            # Check cgpu status
-            result = subprocess.run(
-                ["cgpu", "status"],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-
-            if result.returncode != 0:
-                return False, None
-
-            # Try to get GPU info
-            gpu_result = subprocess.run(
-                ["cgpu", "run", "nvidia-smi", "--query-gpu=name,memory.total",
-                 "--format=csv,noheader"],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-
-            if gpu_result.returncode == 0 and gpu_result.stdout.strip():
-                gpu_info = gpu_result.stdout.strip().split('\n')[0]
-                return True, gpu_info
-
-            return True, "GPU available (details unknown)"
-
-        except (subprocess.TimeoutExpired, Exception):
+            from .cgpu_utils import is_cgpu_available, check_cgpu_gpu
+        except Exception:
             return False, None
+
+        if not is_cgpu_available():
+            return False, None
+
+        gpu_ok, gpu_info = check_cgpu_gpu()
+        if gpu_ok:
+            return True, gpu_info
+        return True, "GPU available (details unknown)"
 
     def _detect_cgpu_serve(self) -> bool:
         """Check if cgpu serve (LLM endpoint) is available."""
@@ -234,20 +206,16 @@ class ResourceManager:
         Returns:
             (available, type, info) tuple
         """
-        best = get_best_gpu_encoder()
+        from .core import hardware
+        hw_config = hardware.get_best_hwaccel()
 
-        if not best:
+        if not hw_config.is_gpu:
             return False, None, None
 
-        # Get encoder info
-        gpu_config = GPU_ENCODERS.get(best, {})
-        encoder_name = gpu_config.get("h264", "unknown")
-
-        # Try to get more specific info
-        info = f"{best.upper()} ({encoder_name})"
+        info = f"{hw_config.type.upper()} ({hw_config.encoder})"
 
         # For NVIDIA, try to get device name
-        if best == "nvenc":
+        if hw_config.type == "nvenc":
             try:
                 result = subprocess.run(
                     ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
@@ -261,7 +229,7 @@ class ResourceManager:
                 pass
 
         # For VAAPI, try to get device info
-        elif best == "vaapi":
+        elif hw_config.type == "vaapi":
             try:
                 result = subprocess.run(
                     ["vainfo"],
@@ -277,7 +245,7 @@ class ResourceManager:
             except Exception:
                 pass
 
-        return True, best, info
+        return True, hw_config.type, info
 
     def _detect_k3s(self) -> Tuple[bool, List[str], int]:
         """
@@ -365,7 +333,7 @@ class ResourceManager:
 
     def get_encoder(self,
                     prefer_gpu: bool = True,
-                    cache_key: str = "default") -> FFmpegConfig:
+                    cache_key: str = "default") -> "FFmpegConfig":
         """
         Get FFmpeg encoder configuration with optimal settings.
 
@@ -391,6 +359,7 @@ class ResourceManager:
         else:
             hwaccel = "none"
 
+        from .ffmpeg_config import FFmpegConfig
         config = FFmpegConfig(hwaccel=hwaccel)
         self._ffmpeg_config_cache[cache_key] = config
 

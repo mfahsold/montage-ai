@@ -9,11 +9,29 @@ Includes:
 import json
 import tempfile
 import os
+import hashlib
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
+
+
+def _pick_local_output_path(input_path: Path, suffix: str) -> Path:
+    """Choose a writable local output path for cgpu job results."""
+    safe_suffix = suffix if suffix.startswith(".") else f".{suffix}"
+    candidate = input_path.with_suffix(safe_suffix)
+    if os.access(candidate.parent, os.W_OK):
+        return candidate
+
+    cache_root = os.environ.get("CGPU_OUTPUT_DIR")
+    for root in [cache_root, "/data/output", "/tmp"]:
+        if root and os.path.isdir(root) and os.access(root, os.W_OK):
+            path_hash = hashlib.sha1(str(input_path).encode("utf-8")).hexdigest()[:8]
+            filename = f"{input_path.stem}.{path_hash}{safe_suffix}"
+            return Path(root) / "cgpu" / filename
+
+    return candidate
 
 
 class SceneDetectionJob(CGPUJob):
@@ -99,9 +117,10 @@ if __name__ == "__main__":
 
     def download(self) -> JobResult:
         print("Downloading results...")
-        local_output = self.input_path.with_suffix('.scenes.json')
+        local_output = _pick_local_output_path(self.input_path, ".scenes.json")
         remote_path = f"{self.remote_work_dir}/{self.output_filename}"
         
+        local_output.parent.mkdir(parents=True, exist_ok=True)
         if download_via_base64(remote_path, str(local_output)):
             with open(local_output, 'r') as f:
                 data = json.load(f)
@@ -183,7 +202,8 @@ if __name__ == "__main__":
             tmp_path = tmp.name
         
         print("Uploading analysis script...")
-        success = copy_to_remote(tmp_path, self.remote_work_dir, remote_filename="analyze_audio.py")
+        remote_script = f"{self.remote_work_dir}/analyze_audio.py"
+        success = copy_to_remote(tmp_path, remote_script)
         os.unlink(tmp_path)
         return success
 
@@ -197,9 +217,10 @@ if __name__ == "__main__":
 
     def download(self) -> JobResult:
         print("Downloading results...")
-        local_output = self.input_path.with_suffix('.analysis.json')
+        local_output = _pick_local_output_path(self.input_path, ".analysis.json")
         remote_path = f"{self.remote_work_dir}/{self.output_filename}"
         
+        local_output.parent.mkdir(parents=True, exist_ok=True)
         if download_via_base64(remote_path, str(local_output)):
             return JobResult(success=True, output_path=str(local_output))
         

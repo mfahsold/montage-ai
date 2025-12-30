@@ -417,6 +417,8 @@ class SceneContentAnalyzer:
 
     def _analyze_ollama(self, frame_b64: str) -> Optional[SceneAnalysis]:
         """Analyze frame using Ollama."""
+        if not self.ollama_host:
+            return None
         try:
             prompt = (
                 "Analyze this image for a video editor. Return a JSON object with these keys: "
@@ -511,32 +513,49 @@ Return ONLY valid JSON, no markdown code blocks.'''
 
             if not CGPU_ENABLED:
                 return None
+            if not (
+                os.environ.get("GEMINI_API_KEY")
+                or os.environ.get("GOOGLE_API_KEY")
+                or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI")
+                or os.environ.get("GOOGLE_GENAI_USE_GCA")
+            ):
+                return None
 
             from openai import OpenAI
 
-            # cgpu serve exposes OpenAI-compatible API at /v1
+            # cgpu serve exposes OpenAI-compatible Responses API at /v1
             client = OpenAI(
                 base_url=f"http://{CGPU_HOST}:{CGPU_PORT}/v1",
                 api_key="unused"
             )
 
-            response = client.chat.completions.create(
+            response = client.responses.create(
                 model=CGPU_MODEL,
-                messages=[{
+                input=[{
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": self._build_semantic_prompt()},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame_b64}"}}
+                        {"type": "input_text", "text": self._build_semantic_prompt()},
+                        {"type": "input_image", "image_url": f"data:image/jpeg;base64,{frame_b64}"}
                     ]
                 }],
-                max_tokens=400,
+                max_output_tokens=400,
                 temperature=0.3,
                 timeout=45
             )
 
-            if response.choices and response.choices[0].message.content:
-                content = self._clean_json_response(response.choices[0].message.content)
-                res_json = json.loads(content)
+            content = getattr(response, "output_text", None)
+            if not content and getattr(response, "output", None):
+                for item in response.output:
+                    for part in getattr(item, "content", []) or []:
+                        if getattr(part, "type", "") == "output_text" and getattr(part, "text", None):
+                            content = part.text
+                            break
+                    if content:
+                        break
+
+            if content:
+                cleaned = self._clean_json_response(content)
+                res_json = json.loads(cleaned)
                 return SceneAnalysis.from_dict(res_json)
 
         except ImportError:
@@ -582,6 +601,8 @@ Return ONLY valid JSON, no markdown code blocks.'''
 
     def _analyze_ollama_semantic(self, frame_b64: str) -> Optional[SceneAnalysis]:
         """Analyze frame using Ollama with semantic prompt."""
+        if not self.ollama_host:
+            return None
         try:
             payload = {
                 "model": self.ollama_model,
