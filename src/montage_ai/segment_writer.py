@@ -1081,11 +1081,12 @@ class SegmentWriter:
             )
             
             # Cleanup concat list
-            if os.path.exists(concat_list_path):
-                os.remove(concat_list_path)
+            # if os.path.exists(concat_list_path):
+            #     os.remove(concat_list_path)
             
             if result.returncode != 0:
-                logger.error(f"   ❌ Final concatenation failed: {result.stderr[:300]}")
+                logger.error(f"   ❌ Final concatenation failed. Command: {' '.join(cmd)}")
+                logger.error(f"   ❌ Stderr: {result.stderr}")
                 if os.path.exists(actual_output):
                     os.remove(actual_output)
                 return False

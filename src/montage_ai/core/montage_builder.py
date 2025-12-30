@@ -718,10 +718,19 @@ class MontageBuilder:
         style_name = "dynamic"
         if self.ctx.editing_instructions is not None:
             style_name = self.ctx.editing_instructions.get('style', {}).get('name', 'dynamic')
+        
+        logger.info(f"DEBUG: style_name raw: {repr(style_name)}")
+        # Sanitize style name to prevent invalid characters in filename
+        style_name = "".join(c for c in style_name if c.isalnum() or c in ('-', '_')).strip()
+        if not style_name:
+            style_name = "dynamic"
+        logger.info(f"DEBUG: style_name sanitized: {repr(style_name)}")
+
         self.ctx.output_filename = os.path.join(
             str(self.ctx.output_dir),
             f"gallery_montage_{self.ctx.job_id}_v{self.variant_id}_{style_name}.mp4"
         )
+        logger.info(f"DEBUG: output_filename: {repr(self.ctx.output_filename)}")
 
         # Check for logo
         logo_files = self._get_files(self.ctx.assets_dir, ('.png', '.jpg'))

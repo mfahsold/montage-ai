@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: data-helper
+  namespace: montage-ai
+spec:
+  containers:
+    - name: helper
+      image: alpine
+      command: ["/bin/sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: input-nfs
+          mountPath: /data/input
+        - name: output-nfs
+          mountPath: /data/output
+  volumes:
+    - name: input-nfs
+      persistentVolumeClaim:
+        claimName: montage-ai-input-nfs
+    - name: output-nfs
+      persistentVolumeClaim:
+        claimName: montage-ai-output-nfs

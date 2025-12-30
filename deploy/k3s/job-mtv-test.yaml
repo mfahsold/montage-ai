@@ -1,0 +1,121 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-mtv-test
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: renderer
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: renderer
+    spec:
+      securityContext:
+        fsGroup: 992
+        supplementalGroups: [44,992]
+      initContainers:
+        - name: cgpu-credentials-init
+          image: 192.168.1.12:5000/montage-ai:latest
+          command:
+            - bash
+            - -c
+            - |
+              mkdir -p /cgpu/state
+              if [ -f /cgpu-secrets/config.json ]; then
+                cp /cgpu-secrets/config.json /cgpu/config.json
+              fi
+              if [ -f /cgpu-secrets/session.json ]; then
+                cp /cgpu-secrets/session.json /cgpu/state/session.json
+              fi
+          volumeMounts:
+            - name: cgpu-config
+              mountPath: /cgpu
+            - name: cgpu-secrets
+              mountPath: /cgpu-secrets
+              readOnly: true
+      restartPolicy: Never
+      containers:
+        - name: montage-ai
+          image: 192.168.1.12:5000/montage-ai:latest
+          imagePullPolicy: Always
+          env:
+            - name: CUT_STYLE
+              value: "mtv"
+            - name: STABILIZE
+              value: "true"
+            - name: UPSCALE
+              value: "true"
+            - name: ENHANCE
+              value: "true"
+            - name: CGPU_ENABLED
+              value: "true"
+            - name: CGPU_GPU_ENABLED
+              value: "true"
+            - name: USE_GPU
+              value: "prefer"
+            - name: VK_ICD_FILENAMES
+              value: "/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
+            - name: XDG_RUNTIME_DIR
+              value: "/tmp"
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "6"
+              memory: "24Gi"
+          envFrom:
+            - configMapRef:
+                name: montage-ai-config
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+            - name: assets
+              mountPath: /data/assets
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+            - name: cgpu-config
+              mountPath: /root/.config/cgpu
+            - name: dev-dri
+              mountPath: /dev/dri
+              readOnly: true
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+        - name: cgpu-config
+          emptyDir: {}
+        - name: cgpu-secrets
+          secret:
+            secretName: cgpu-credentials
+            optional: true
+            items:
+              - key: config.json
+                path: config.json
+              - key: session.json
+                path: session.json
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: DirectoryOrCreate
+      nodeSelector:
+        kubernetes.io/hostname: codeai-fluxibriserver
