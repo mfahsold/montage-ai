@@ -463,6 +463,73 @@ class SegmentWriter:
     def get_segment_path(self, index: int) -> str:
         """Get path for segment file at given index."""
         return str(self.output_dir / f"{self.segment_prefix}_{index:04d}.mp4")
+
+    def _write_ffmpeg_log(self,
+                          step: str,
+                          segment_index: int,
+                          cmd: List[str],
+                          result: subprocess.CompletedProcess,
+                          concat_list_path: Optional[str] = None) -> str:
+        """Write full FFmpeg stdout/stderr to a log file for debugging."""
+        log_path = self.output_dir / f"ffmpeg_{step}_{segment_index:04d}.log"
+        try:
+            with open(log_path, "w") as f:
+                f.write(f"command: {' '.join(cmd)}\n")
+                f.write(f"returncode: {result.returncode}\n")
+                if concat_list_path and os.path.exists(concat_list_path):
+                    f.write("\nconcat_list:\n")
+                    with open(concat_list_path, "r") as concat_file:
+                        f.write(concat_file.read())
+                if result.stdout:
+                    f.write("\nstdout:\n")
+                    f.write(result.stdout)
+                if result.stderr:
+                    f.write("\nstderr:\n")
+                    f.write(result.stderr)
+        except Exception as e:
+            print(f"   ⚠️ Failed to write FFmpeg log: {e}")
+            return ""
+
+        return str(log_path)
+
+    def _build_reencode_cmd(self,
+                            concat_list_path: str,
+                            segment_path: str,
+                            config: FFmpegConfig) -> List[str]:
+        """Build FFmpeg command for segment re-encode."""
+        vf_chain = (
+            f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,"
+            f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
+            f"fps={STANDARD_FPS},format={TARGET_PIX_FMT}"
+        )
+        vf_chain = _append_hwupload_vf(vf_chain, config)
+
+        cmd = ["ffmpeg", "-y"]
+        if config.is_gpu_accelerated:
+            cmd.extend(config.hwaccel_input_params())
+        cmd.extend([
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concat_list_path,
+            "-vf", vf_chain,
+        ])
+
+        cmd.extend(_video_params_for_target(
+            config,
+            crf=self.ffmpeg_crf,
+            preset=self.ffmpeg_preset,
+            target_codec=TARGET_CODEC,
+            target_profile=TARGET_PROFILE,
+            target_level=TARGET_LEVEL,
+            target_pix_fmt=TARGET_PIX_FMT,
+        ))
+
+        cmd.extend([
+            "-an",  # No audio in segments
+            segment_path
+        ])
+
+        return cmd
     
     def write_segment(self, 
                       clips: List,  # MoviePy VideoFileClip objects
@@ -573,6 +640,13 @@ class SegmentWriter:
         """
         if not clip_paths:
             return None
+
+        missing_paths = [path for path in clip_paths if not os.path.exists(path)]
+        if missing_paths:
+            print(f"   ❌ Missing clip files for segment {segment_index}:")
+            for path in missing_paths:
+                print(f"      - {path}")
+            return None
         
         segment_path = self.get_segment_path(segment_index)
         concat_list_path = str(self.output_dir / f"concat_{segment_index}.txt")
@@ -616,15 +690,25 @@ class SegmentWriter:
                 text=True,
                 timeout=_settings.processing.ffmpeg_timeout,
             )
+
+            if result.returncode != 0:
+                log_path = self._write_ffmpeg_log(
+                    "concat_copy",
+                    segment_index,
+                    cmd,
+                    result,
+                    concat_list_path=concat_list_path,
+                )
+                log_hint = f" (log: {log_path})" if log_path else ""
+                stderr_preview = (result.stderr or "").strip().splitlines()
+                preview = stderr_preview[-1] if stderr_preview else "unknown error"
+                print(f"   ⚠️ Concat copy failed, trying re-encode: {preview}{log_hint}")
+                return self._write_segment_ffmpeg_reencode(clip_paths, segment_index, concat_list_path)
             
             # Cleanup concat list
             if os.path.exists(concat_list_path):
                 os.remove(concat_list_path)
-            
-            if result.returncode != 0:
-                print(f"   ⚠️ Concat copy failed, trying re-encode: {result.stderr[:100]}")
-                return self._write_segment_ffmpeg_reencode(clip_paths, segment_index, concat_list_path)
-            
+
             # Get duration from output file
             duration = self._get_video_duration(segment_path)
             
@@ -673,58 +757,50 @@ class SegmentWriter:
                     for path in clip_paths:
                         escaped_path = path.replace("'", "'\\''")
                         f.write(f"file '{escaped_path}'\n")
-            
-            # Re-encode with normalized parameters
-            # CRITICAL: Also scale to standard resolution to handle dimension mismatches
-            # This ensures all clips have identical dimensions before concat
-            vf_chain = (
-                f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,"
-                f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
-                f"fps={STANDARD_FPS},format={TARGET_PIX_FMT}"
-            )
+
             config = _ffmpeg_config
-            vf_chain = _append_hwupload_vf(vf_chain, config)
-
-            cmd = ["ffmpeg", "-y"]
-            if config.is_gpu_accelerated:
-                cmd.extend(config.hwaccel_input_params())
-            cmd.extend([
-                "-f", "concat",
-                "-safe", "0",
-                "-i", concat_list_path,
-                "-vf", vf_chain,
-            ])
-
-            cmd.extend(_video_params_for_target(
-                config,
-                crf=self.ffmpeg_crf,
-                preset=self.ffmpeg_preset,
-                target_codec=TARGET_CODEC,
-                target_profile=TARGET_PROFILE,
-                target_level=TARGET_LEVEL,
-                target_pix_fmt=TARGET_PIX_FMT,
-            ))
-
-            cmd.extend([
-                "-an",  # No audio in segments
-                segment_path
-            ])
-            
+            cmd = self._build_reencode_cmd(concat_list_path, segment_path, config)
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=_settings.processing.ffmpeg_long_timeout,
             )
-            
-            # Cleanup
-            if os.path.exists(concat_list_path):
-                os.remove(concat_list_path)
-            
+
             if result.returncode != 0:
-                print(f"   ❌ Re-encode failed: {result.stderr[:200]}")
-                return None
-            
+                log_path = self._write_ffmpeg_log(
+                    "reencode_gpu" if config.is_gpu_accelerated else "reencode_cpu",
+                    segment_index,
+                    cmd,
+                    result,
+                    concat_list_path=concat_list_path,
+                )
+                log_hint = f" (log: {log_path})" if log_path else ""
+                print(f"   ❌ Re-encode failed{log_hint}")
+                if config.is_gpu_accelerated:
+                    cpu_config = _get_cpu_config()
+                    cmd_cpu = self._build_reencode_cmd(concat_list_path, segment_path, cpu_config)
+                    print("   ↪️  Retrying re-encode on CPU...")
+                    result_cpu = subprocess.run(
+                        cmd_cpu,
+                        capture_output=True,
+                        text=True,
+                        timeout=_settings.processing.ffmpeg_long_timeout,
+                    )
+                    if result_cpu.returncode != 0:
+                        cpu_log_path = self._write_ffmpeg_log(
+                            "reencode_cpu",
+                            segment_index,
+                            cmd_cpu,
+                            result_cpu,
+                            concat_list_path=concat_list_path,
+                        )
+                        cpu_log_hint = f" (log: {cpu_log_path})" if cpu_log_path else ""
+                        print(f"   ❌ CPU re-encode failed{cpu_log_hint}")
+                        return None
+                else:
+                    return None
+
             duration = self._get_video_duration(segment_path)
             
             segment_info = SegmentInfo(
@@ -746,6 +822,9 @@ class SegmentWriter:
         except Exception as e:
             print(f"   ❌ Re-encode failed: {e}")
             return None
+        finally:
+            if os.path.exists(concat_list_path):
+                os.remove(concat_list_path)
     
     def write_segment_with_xfade(self,
                                   clip_paths: List[str],

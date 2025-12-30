@@ -1,0 +1,686 @@
+apiVersion: v1
+data:
+  editor.py: "\"\"\"\nMontage AI - AI-Powered Video Montage Creator\n\nFeatures:\n-
+    Advanced 2024/2025 cutting techniques (Fibonacci pacing, match cuts, invisible
+    cuts)\n- Natural language control via Creative Director LLM\n- Energy-aware beat-synced
+    editing\n- Cinematic style templates (Hitchcock, Wes Anderson, MTV, Documentary,
+    etc.)\n\nArchitecture:\n  Natural Language → Creative Director (LLM) → JSON Instructions
+    →\n  Editing Engine (This) → FFmpeg/MoviePy → Final Video\n\nVersion: 0.2.0 (Natural
+    Language Control)\n\"\"\"\n\nimport os\nimport random\nimport json\nimport time\nimport
+    gc\nimport requests\nimport numpy as np\nfrom datetime import datetime\n\nfrom
+    .config import settings\nfrom .logger import logger\n\n# Disable TQDM progress
+    bars globally - they create chaotic output when mixed with logs\n# This affects
+    librosa, moviepy, and any other library using tqdm\nif not settings.features.verbose:\n
+    \   os.environ[\"TQDM_DISABLE\"] = \"true\"\n\nimport librosa\nimport cv2\nimport
+    base64\nimport subprocess\nimport multiprocessing\nfrom concurrent.futures import
+    ThreadPoolExecutor, as_completed\nfrom typing import Dict, Optional, Any, List,
+    Tuple\n\n# MoviePy 1.x/2.x compatibility layer\nfrom .moviepy_compat import (\n
+    \   VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, TextClip,\n    concatenate_videoclips,\n
+    \   subclip, set_audio, set_duration, set_position, resize, crop, rotate,\n    crossfadein,
+    crossfadeout,\n    enforce_dimensions, log_clip_info, ensure_even_dimensions,
+    pad_to_target,\n)\nfrom scenedetect import open_video, SceneManager\nfrom scenedetect.detectors
+    import ContentDetector\nfrom tqdm import tqdm\n\n# Alias for backward compatibility\nsubclip_compat
+    = subclip\n\n\n# Import Creative Director for natural language control\ntry:\n
+    \   from .creative_director import CreativeDirector, interpret_natural_language\n
+    \   from .style_templates import get_style_template, list_available_styles\n    CREATIVE_DIRECTOR_AVAILABLE
+    = True\nexcept ImportError:\n    logger.warning(\"Creative Director not available
+    (missing creative_director.py)\")\n    CREATIVE_DIRECTOR_AVAILABLE = False\n\n#
+    Import Intelligent Clip Selector for ML-enhanced selection\ntry:\n    from .clip_selector
+    import IntelligentClipSelector, ClipCandidate\n    INTELLIGENT_SELECTOR_AVAILABLE
+    = True\nexcept ImportError:\n    logger.warning(\"Intelligent Clip Selector not
+    available\")\n    INTELLIGENT_SELECTOR_AVAILABLE = False\n\n# Import Footage Manager
+    for professional clip management\nfrom .footage_manager import integrate_footage_manager,
+    select_next_clip\nfrom . import segment_writer as segment_writer_module\n\n# Import
+    color-matcher for shot-to-shot color consistency\ntry:\n    from color_matcher
+    import ColorMatcher\n    from color_matcher.io_handler import load_img_file, save_img_file\n
+    \   COLOR_MATCHER_AVAILABLE = True\nexcept ImportError:\n    COLOR_MATCHER_AVAILABLE
+    = False\n    logger.debug(\"color-matcher not available - shot matching disabled\")\n\n#
+    Import Memory Management modules\ntry:\n    from .memory_monitor import AdaptiveMemoryManager,
+    MemoryMonitorContext, get_memory_manager\n    MEMORY_MONITOR_AVAILABLE = True\nexcept
+    ImportError:\n    MEMORY_MONITOR_AVAILABLE = False\n    logger.debug(\"Memory
+    monitor not available\")\n\n# Import Metadata Cache for pre-computed scene analysis\ntry:\n
+    \   from .metadata_cache import MetadataCache, get_metadata_cache\n    METADATA_CACHE_AVAILABLE
+    = True\nexcept ImportError:\n    METADATA_CACHE_AVAILABLE = False\n    logger.debug(\"Metadata
+    cache not available\")\n\n# Import Segment Writer for progressive rendering\ntry:\n
+    \   from .segment_writer import (\n        SegmentWriter, ProgressiveRenderer,\n
+    \   )\n    SEGMENT_WRITER_AVAILABLE = True\nexcept ImportError:\n    SEGMENT_WRITER_AVAILABLE
+    = False\n    logger.debug(\"Segment writer not available\")\n\n# Import centralized
+    FFmpeg config (DRY)\nfrom .ffmpeg_config import (\n    FFmpegConfig,\n    get_config
+    as get_ffmpeg_config,\n    get_moviepy_params,\n    get_best_gpu_encoder,\n    print_gpu_status,\n
+    \   STANDARD_WIDTH_VERTICAL as STANDARD_WIDTH,\n    STANDARD_HEIGHT_VERTICAL as
+    STANDARD_HEIGHT,\n    STANDARD_FPS,\n    STANDARD_CODEC,\n    STANDARD_PROFILE,\n
+    \   STANDARD_LEVEL,\n    STANDARD_PIX_FMT,\n)\n\n# Import centralized configuration
+    (Single Source of Truth)\nfrom .config import get_settings\n_settings = get_settings()\n\nfrom
+    .core.montage_builder import MontageBuilder\n\n# Import audio analysis module
+    (extracted for modularity)\nfrom .audio_analysis import (\n    analyze_music_energy
+    as _analyze_music_energy_new,\n    get_beat_times as _get_beat_times_new,\n    calculate_dynamic_cut_length,\n
+    \   BeatInfo,\n    EnergyProfile,\n)\n# Re-export for backward compatibility\nanalyze_music_energy
+    = _analyze_music_energy_new\nget_beat_times = _get_beat_times_new\n\n# Import
+    scene analysis module (extracted for modularity)\nfrom .scene_analysis import
+    (\n    detect_scenes as _detect_scenes_new,\n    analyze_scene_content as _analyze_scene_content_new,\n
+    \   calculate_visual_similarity,\n    detect_motion_blur,\n    find_best_start_point,\n
+    \   Scene,\n    SceneAnalysis,\n    SceneDetector,\n)\n# Re-export for backward
+    compatibility\ndetect_scenes = _detect_scenes_new\nanalyze_scene_content = _analyze_scene_content_new\n\n#
+    Import video metadata module (extracted for modularity)\nfrom .video_metadata
+    import (\n    probe_metadata,\n    determine_output_profile as _determine_output_profile_new,\n
+    \   build_ffmpeg_params as _build_ffmpeg_params_new,\n    VideoMetadata,\n    OutputProfile,\n
+    \   _parse_frame_rate,\n    _weighted_median,\n    _even_int,\n    _snap_aspect_ratio,\n
+    \   _snap_resolution,\n    _normalize_codec_name,\n)\n# Re-export for backward
+    compatibility\ndetermine_output_profile = _determine_output_profile_new\nbuild_video_ffmpeg_params
+    = _build_ffmpeg_params_new\n\n# Import clip enhancement module (extracted for
+    modularity)\nfrom .clip_enhancement import (\n    ClipEnhancer,\n    BrightnessAnalysis,\n
+    \   stabilize_clip,\n    enhance_clip,\n    upscale_clip,\n    enhance_clips_parallel,\n
+    \   color_match_clips,\n    _check_vidstab_available,\n)\n\n# Import MontageBuilder
+    for new pipeline architecture\nfrom .core import MontageBuilder, MontageResult\n\n#
+    Get runtime FFmpeg config (env vars applied, with GPU auto-detection)\n_ffmpeg_config
+    = get_ffmpeg_config(hwaccel=_settings.gpu.ffmpeg_hwaccel)\n\n# ============================================================================\n#
+    CONFIGURATION (from centralized config module - Single Source of Truth)\n# ============================================================================\n\n#
+    Directories (from _settings.paths)\nINPUT_DIR = str(_settings.paths.input_dir)\nMUSIC_DIR
+    = str(_settings.paths.music_dir)\nASSETS_DIR = str(_settings.paths.assets_dir)\nOUTPUT_DIR
+    = str(_settings.paths.output_dir)\nTEMP_DIR = str(_settings.paths.temp_dir)\n\n#
+    Job Identification (for parallel runs)\nJOB_ID = _settings.job_id\n\n# LLM / AI
+    Configuration (from _settings.llm)\n# Priority: OpenAI-compatible > Google AI
+    > Ollama\nOPENAI_API_BASE = _settings.llm.openai_api_base\nOPENAI_API_KEY = _settings.llm.openai_api_key\nOPENAI_MODEL
+    = _settings.llm.openai_model\nOPENAI_VISION_MODEL = _settings.llm.openai_vision_model\n\nOLLAMA_HOST
+    = _settings.llm.ollama_host\nOLLAMA_MODEL = _settings.llm.ollama_model\nDIRECTOR_MODEL
+    = _settings.llm.director_model\nENABLE_AI_FILTER = _settings.features.enable_ai_filter\n\n#
+    OpenAI Vision Client Cache (initialized on first use)\n_vision_client = None\n\n#
+    Natural Language Control (from _settings.creative)\nCREATIVE_PROMPT = _settings.creative.creative_prompt\n#
+    Example prompts:\n#   \"Edit this like a Hitchcock thriller\"\n#   \"Make it fast-paced
+    like an MTV music video\"\n#   \"Calm and meditative with long shots\"\n#   \"Documentary
+    realism with natural pacing\"\n\n# Legacy Cut Style (backwards compatible, overridden
+    by CREATIVE_PROMPT if set)\nCUT_STYLE = _settings.creative.cut_style\n\n# Output
+    encoding defaults (from centralized config, overridable by heuristics)\n# Use
+    effective_codec to get GPU encoder when HW accel is active\nOUTPUT_CODEC = _ffmpeg_config.effective_codec\nOUTPUT_PIX_FMT
+    = _ffmpeg_config.pix_fmt\nOUTPUT_PROFILE = _ffmpeg_config.profile\nOUTPUT_LEVEL
+    = _ffmpeg_config.level\n\nVERSION = \"0.2.0\"\n\ndef _log_startup_backends():\n
+    \   \"\"\"Log GPU encoding and Vision AI backend once at import.\"\"\"\n    if
+    _ffmpeg_config.is_gpu_accelerated:\n        logger.info(f\"\U0001F3AE GPU Encoding:
+    {OUTPUT_CODEC} ({_ffmpeg_config.gpu_encoder_type})\")\n    else:\n        logger.info(f\"\U0001F4BB
+    CPU Encoding: {OUTPUT_CODEC}\")\n\n    if OPENAI_API_BASE and OPENAI_VISION_MODEL:\n
+    \       logger.info(f\"\U0001F441️  Vision AI: {OPENAI_VISION_MODEL} @ {OPENAI_API_BASE}\")\n
+    \   elif ENABLE_AI_FILTER:\n        logger.info(f\"\U0001F441️  Vision AI: {OLLAMA_MODEL}
+    (Ollama fallback)\")\n\n# Emit startup logs\n_log_startup_backends()\n\n# Visual
+    Enhancement (from _settings.features)\nSTABILIZE = _settings.features.stabilize\nUPSCALE
+    = _settings.features.upscale\nENHANCE = _settings.features.enhance\n\n# Aspect
+    Ratio Handling\n# If true: letterbox/pillarbox horizontal clips to preserve full
+    content\n# If false (default): crop to fill frame (may cut content at edges)\nPRESERVE_ASPECT
+    = _settings.features.preserve_aspect\n\n# Logging / Debug\nVERBOSE = _settings.features.verbose\n\n#
+    Output Control\nNUM_VARIANTS = _settings.creative.num_variants\n\n# Timeline Export
+    (from _settings.features)\nEXPORT_TIMELINE = _settings.features.export_timeline\nGENERATE_PROXIES
+    = _settings.features.generate_proxies\n\n# Performance: CPU Threading & Parallelization
+    (from centralized config)\nFFMPEG_THREADS = _ffmpeg_config.threads\nFFMPEG_PRESET
+    = _ffmpeg_config.preset\nPARALLEL_ENHANCE = _settings.processing.parallel_enhance\n\n#
+    Low-memory mode: use adaptive values for constrained hardware\n_LOW_MEMORY_MODE
+    = _settings.features.low_memory_mode\nMAX_PARALLEL_JOBS = _settings.processing.get_adaptive_parallel_jobs(_LOW_MEMORY_MODE)\n\n#
+    Quality: CRF for final encoding (18 = visually lossless, 23 = good balance for
+    tests)\nFINAL_CRF = _settings.encoding.crf\n\n# Stream normalization: Ensure all
+    clips have identical parameters for concat demuxer\nNORMALIZE_CLIPS = _settings.encoding.normalize_clips\n\n#
+    Memory Management: Batch processing to prevent OOM\n# Process clips in batches,
+    render each batch to disk, then concatenate\nBATCH_SIZE = _settings.processing.get_adaptive_batch_size(_LOW_MEMORY_MODE)\nFORCE_GC
+    = _settings.processing.force_gc\n\nif _LOW_MEMORY_MODE:\n    logger.info(f\"⚠️
+    LOW_MEMORY_MODE active: batch={BATCH_SIZE}, parallel={MAX_PARALLEL_JOBS}\")\n\n#
+    Crossfade Configuration: Real FFmpeg xfade vs simple fade-to-black\n# xfade creates
+    real overlapping transitions but requires re-encoding (slower)\nENABLE_XFADE =
+    _settings.creative.enable_xfade\nXFADE_DURATION = _settings.creative.xfade_duration\n\n#
+    Clip reuse control\nMAX_SCENE_REUSE = _settings.processing.max_scene_reuse\n\n#
+    Target Duration & Music Trimming (from _settings.creative)\nTARGET_DURATION =
+    _settings.creative.target_duration\nMUSIC_START = _settings.creative.music_start\nMUSIC_END
+    = _settings.creative.music_end\n\n# GPU/Hardware Acceleration (from _settings.gpu)\nUSE_GPU
+    = _settings.gpu.use_gpu\n\n# Optional FFmpeg MCP offload (from _settings.gpu)\nUSE_FFMPEG_MCP
+    = _settings.gpu.use_ffmpeg_mcp\nFFMPEG_MCP_ENDPOINT = _settings.gpu.ffmpeg_mcp_endpoint\n\n#
+    cgpu Cloud GPU Configuration (from _settings.llm)\nCGPU_GPU_ENABLED = _settings.llm.cgpu_gpu_enabled\n\n#
+    ============================================================================\n#
+    GLOBAL EDITING INSTRUCTIONS (Set by Creative Director)\n# ============================================================================\nEDITING_INSTRUCTIONS
+    = None  # Will be populated by interpret_creative_prompt()\n\n# GPU/Hardware Capability
+    Detection (set at runtime)\nGPU_CAPABILITY = None  # Will be set by detect_gpu_capabilities()\n\n#
+    Import cgpu Cloud Upscaler (unified job-based architecture)\ntry:\n    from .cgpu_upscaler
+    import upscale_with_cgpu, is_cgpu_available\n    CGPU_UPSCALER_AVAILABLE = True\nexcept
+    ImportError:\n    CGPU_UPSCALER_AVAILABLE = False\n    is_cgpu_available = lambda:
+    False\n    upscale_with_cgpu = None\n\n# Import cgpu StabilizeJob for cloud stabilization\ntry:\n
+    \   from .cgpu_jobs import StabilizeJob\n    from .cgpu_jobs.stabilize import
+    stabilize_video as cgpu_stabilize_video\n    CGPU_STABILIZE_AVAILABLE = True\nexcept
+    ImportError:\n    CGPU_STABILIZE_AVAILABLE = False\n    cgpu_stabilize_video =
+    None\n\n# Import Timeline Exporter if available\ntry:\n    from .timeline_exporter
+    import export_timeline_from_montage\n    TIMELINE_EXPORT_AVAILABLE = True\nexcept
+    ImportError as exc:\n    logger.debug(f\"Timeline Exporter not available: {exc}\")\n
+    \   TIMELINE_EXPORT_AVAILABLE = False\n\n# Import Live Monitoring System\ntry:\n
+    \   from .monitoring import Monitor, init_monitor, get_monitor\n    MONITORING_AVAILABLE
+    = True\nexcept ImportError:\n    logger.debug(\"Monitoring not available\")\n
+    \   MONITORING_AVAILABLE = False\n    Monitor = None\n    get_monitor = lambda:
+    None\n    init_monitor = lambda *args, **kwargs: None\n\n# Import Deep Footage
+    Analyzer\ntry:\n    from .footage_analyzer import DeepFootageAnalyzer, SceneAnalysis\n
+    \   DEEP_ANALYSIS_AVAILABLE = True\nexcept ImportError as exc:\n    logger.debug(f\"Deep
+    Footage Analyzer not available: {exc}\")\n    DEEP_ANALYSIS_AVAILABLE = False\n
+    \   DeepFootageAnalyzer = None\n\n# Deep Analysis Configuration (from _settings.features)\nDEEP_ANALYSIS
+    = _settings.features.deep_analysis\n\n\ndef detect_gpu_capabilities() -> Dict[str,
+    Any]:\n    \"\"\"\n    Detect available GPU/hardware acceleration capabilities.\n\n
+    \   Checks for:\n    - Vulkan video encoding (h264_vulkan, hevc_vulkan)\n    -
+    V4L2 mem2mem encoding (ARM hardware encoders)\n    - DRM devices (/dev/dri/)\n\n
+    \   Returns:\n        Dict with 'encoder' (best encoder to use) and 'hwaccel'
+    (decode acceleration)\n    \"\"\"\n    logger.debug(\"Detecting GPU capabilities...\")\n
+    \   capabilities = {\n        'encoder': 'libx264',  # Default: CPU encoding\n
+    \       'hwaccel': None,\n        'available': [],\n        'gpu_name': 'CPU only'\n
+    \   }\n\n    # Check for DRI devices\n    dri_path = '/dev/dri'\n    if os.path.exists(dri_path):\n
+    \       devices = os.listdir(dri_path)\n        if 'renderD128' in devices or
+    'card0' in devices or 'card1' in devices:\n            capabilities['available'].append('drm')\n
+    \           logger.debug(f\"DRM device found: {devices}\")\n\n    # Test Vulkan
+    encoder (experimental - often crashes on ARM)\n    if USE_GPU in ['auto', 'vulkan']
+    and 'drm' in capabilities['available']:\n        try:\n            # Quick test:
+    Try to initialize Vulkan encoder\n            test_cmd = [\n                'ffmpeg',
+    '-y', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=0.1',\n                '-c:v',
+    'h264_vulkan', '-f', 'null', '-'\n            ]\n            result = subprocess.run(\n
+    \               test_cmd,\n                capture_output=True,\n                timeout=settings.processing.ffmpeg_short_timeout,\n
+    \           )\n            if result.returncode == 0:\n                capabilities['encoder']
+    = 'h264_vulkan'\n                capabilities['available'].append('vulkan')\n
+    \               capabilities['gpu_name'] = 'Vulkan GPU'\n                logger.debug(\"Vulkan
+    h264 encoder available\")\n        except (subprocess.TimeoutExpired, Exception)
+    as e:\n            logger.debug(f\"Vulkan encoder not usable: {e}\")\n\n    #
+    Test V4L2 encoder (common on Raspberry Pi, some ARM SoCs)\n    if USE_GPU in ['auto',
+    'v4l2']:\n        try:\n            test_cmd = [\n                'ffmpeg', '-y',
+    '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=0.1',\n                '-c:v', 'h264_v4l2m2m',
+    '-f', 'null', '-'\n            ]\n            result = subprocess.run(\n                test_cmd,\n
+    \               capture_output=True,\n                timeout=settings.processing.ffmpeg_short_timeout,\n
+    \           )\n            if result.returncode == 0:\n                capabilities['encoder']
+    = 'h264_v4l2m2m'\n                capabilities['available'].append('v4l2m2m')\n
+    \               capabilities['gpu_name'] = 'V4L2 Hardware Encoder'\n                logger.debug(\"V4L2
+    mem2mem encoder available\")\n        except (subprocess.TimeoutExpired, Exception)
+    as e:\n            pass  # V4L2 not available, use CPU\n\n    # Summary\n    if
+    capabilities['encoder'] == 'libx264':\n        logger.debug(f\"Using CPU encoding
+    (libx264) with {multiprocessing.cpu_count()} cores\")\n        logger.debug(f\"Parallel
+    enhancement: {MAX_PARALLEL_JOBS} workers\")\n    else:\n        logger.debug(f\"Using
+    hardware encoder: {capabilities['encoder']}\")\n\n    return capabilities\n\n\ndef
+    get_video_rotation(video_path: str) -> int:\n    \"\"\"\n    Get video rotation
+    metadata using ffprobe.\n    \n    Many phone videos are stored with rotation
+    metadata (e.g., -90° for portrait).\n    MoviePy doesn't automatically apply this
+    rotation, so we need to handle it manually.\n    \n    Args:\n        video_path:
+    Path to the video file\n        \n    Returns:\n        Rotation angle in degrees
+    (0, 90, 180, 270, or -90, -180, -270)\n    \"\"\"\n    try:\n        cmd = [\n
+    \           'ffprobe', '-v', 'error',\n            '-select_streams', 'v:0',\n
+    \           '-show_entries', 'stream_side_data=rotation',\n            '-of',
+    'json',\n            video_path\n        ]\n        result = subprocess.run(\n
+    \           cmd,\n            capture_output=True,\n            text=True,\n            timeout=settings.processing.ffprobe_timeout,\n
+    \       )\n        \n        if result.returncode == 0:\n            data = json.loads(result.stdout)\n
+    \           streams = data.get('streams', [])\n            if streams:\n                side_data_list
+    = streams[0].get('side_data_list', [])\n                for side_data in side_data_list:\n
+    \                   if 'rotation' in side_data:\n                        rotation
+    = int(side_data['rotation'])\n                        return rotation\n    except
+    Exception as e:\n        logger.debug(f\"Could not get rotation metadata: {e}\")\n\n
+    \   return 0\n\n\ndef get_ffmpeg_encoder_params() -> List[str]:\n    \"\"\"\n
+    \   Get optimized FFmpeg encoder parameters based on detected capabilities.\n
+    \   \n    Returns:\n        List of FFmpeg parameters for video encoding\n    \"\"\"\n
+    \   global GPU_CAPABILITY\n    if GPU_CAPABILITY is None:\n        GPU_CAPABILITY
+    = detect_gpu_capabilities()\n    \n    encoder = GPU_CAPABILITY.get('encoder',
+    'libx264')\n    \n    if encoder == 'h264_vulkan':\n        # Vulkan GPU encoding
+    - let GPU handle quality\n        return [\n            '-c:v', 'h264_vulkan',\n
+    \           '-qp', '20',  # Quality parameter for Vulkan\n        ]\n    \n    elif
+    encoder == 'h264_v4l2m2m':\n        # V4L2 hardware encoding (Raspberry Pi, etc.)\n
+    \       return [\n            '-c:v', 'h264_v4l2m2m',\n            '-b:v', '8M',
+    \ # Target bitrate\n        ]\n    \n    else:\n        # CPU encoding with NEON
+    optimization (ARM64)\n        # FFmpeg automatically uses NEON SIMD on ARM64\n
+    \       return [\n            '-c:v', 'libx264',\n            '-preset', FFMPEG_PRESET,\n
+    \           '-crf', '20',\n            '-tune', 'film',\n            '-profile:v',
+    'high',\n            '-level', '4.1',\n        ]\n\n\ndef get_files(directory,
+    extensions):\n    return [os.path.join(directory, f) for f in os.listdir(directory)
+    if f.lower().endswith(extensions)]\n\n\n# =============================================================================\n#
+    Video Metadata Functions (delegating to video_metadata module)\n# =============================================================================\n\n#
+    Note: Helper functions (_parse_frame_rate, _weighted_median, _even_int,\n# _snap_aspect_ratio,
+    _snap_resolution, _normalize_codec_name) are now\n# imported directly from video_metadata
+    module for backward compatibility.\n\n\ndef determine_output_profile(video_files:
+    List[str]) -> Dict[str, Any]:\n    \"\"\"\n    Pick output dimensions/fps/codec
+    that match dominant input footage.\n\n    Wrapper for backward compatibility -
+    returns Dict instead of OutputProfile.\n    \"\"\"\n    profile = _determine_output_profile_new(video_files)\n
+    \   return profile.to_dict()\n\n\ndef apply_output_profile(profile: Dict[str,
+    Any]) -> None:\n    \"\"\"Propagate chosen output format into module-level constants.\"\"\"\n
+    \   global STANDARD_WIDTH, STANDARD_HEIGHT, STANDARD_FPS\n    global OUTPUT_CODEC,
+    OUTPUT_PIX_FMT, OUTPUT_PROFILE, OUTPUT_LEVEL\n\n    STANDARD_WIDTH = int(profile.get(\"width\",
+    STANDARD_WIDTH))\n    STANDARD_HEIGHT = int(profile.get(\"height\", STANDARD_HEIGHT))\n
+    \   STANDARD_FPS = float(profile.get(\"fps\", STANDARD_FPS))\n\n    OUTPUT_CODEC
+    = profile.get(\"codec\", OUTPUT_CODEC)\n    OUTPUT_PIX_FMT = profile.get(\"pix_fmt\",
+    OUTPUT_PIX_FMT)\n    OUTPUT_PROFILE = profile.get(\"profile\", OUTPUT_PROFILE)\n
+    \   OUTPUT_LEVEL = profile.get(\"level\", OUTPUT_LEVEL)\n\n    # Update segment_writer
+    defaults so normalization/xfade stay in sync\n    segment_writer_module.STANDARD_WIDTH
+    = STANDARD_WIDTH\n    segment_writer_module.STANDARD_HEIGHT = STANDARD_HEIGHT\n
+    \   segment_writer_module.STANDARD_FPS = STANDARD_FPS\n    segment_writer_module.STANDARD_PIX_FMT
+    = OUTPUT_PIX_FMT\n    segment_writer_module.TARGET_PIX_FMT = OUTPUT_PIX_FMT\n
+    \   segment_writer_module.TARGET_CODEC = OUTPUT_CODEC\n    segment_writer_module.TARGET_PROFILE
+    = OUTPUT_PROFILE\n    segment_writer_module.TARGET_LEVEL = OUTPUT_LEVEL\n\n\ndef
+    build_video_ffmpeg_params(crf: Optional[int] = None) -> List[str]:\n    \"\"\"\n
+    \   FFmpeg params for MoviePy writes that mirror the selected output profile.\n\n
+    \   Wrapper for backward compatibility.\n    \"\"\"\n    return _build_ffmpeg_params_new(crf=crf)\n\n\ndef
+    interpret_creative_prompt():\n    \"\"\"\n    Interpret CREATIVE_PROMPT environment
+    variable and set global EDITING_INSTRUCTIONS.\n\n    Called once at startup to
+    configure editing style from natural language.\n    Falls back to legacy CUT_STYLE
+    if no prompt provided.\n    \"\"\"\n    global EDITING_INSTRUCTIONS\n\n    logger.info(f\"\\n{'='*60}\")\n
+    \   logger.info(f\"\U0001F3AC Montage AI v{VERSION}\")\n    logger.info(f\"{'='*60}\")\n\n
+    \   # Show system configuration\n    if VERBOSE:\n        logger.info(f\"\\n\U0001F4CA
+    SYSTEM CONFIGURATION:\")\n        logger.info(f\"   CPU Cores:        {multiprocessing.cpu_count()}\")\n
+    \       logger.info(f\"   Parallel Jobs:    {MAX_PARALLEL_JOBS}\")\n        logger.info(f\"
+    \  FFmpeg Preset:    {FFMPEG_PRESET}\")\n        logger.info(f\"   FFmpeg Threads:
+    \  {FFMPEG_THREADS}\")\n        logger.info(f\"   Variants:         {NUM_VARIANTS}\")\n\n
+    \       # GPU Encoder Status\n        if _ffmpeg_config.is_gpu_accelerated:\n
+    \           gpu_type = _ffmpeg_config.gpu_encoder_type.upper()\n            effective
+    = _ffmpeg_config.effective_codec\n            logger.info(f\"   \U0001F3AE GPU
+    Encoder:   {gpu_type} → {effective}\")\n        else:\n            best_gpu =
+    get_best_gpu_encoder()\n            if best_gpu:\n                logger.info(f\"
+    \  \U0001F3AE GPU Available: {best_gpu.upper()} (use FFMPEG_HWACCEL=auto to enable)\")\n
+    \           else:\n                logger.info(f\"   \U0001F3AE GPU Encoder:   None
+    (using {OUTPUT_CODEC})\")\n        logger.info(\"\")\n        logger.info(f\"\U0001F4CA
+    ENHANCEMENT SETTINGS (from config):\")\n        logger.info(f\"   STABILIZE:        {_settings.features.stabilize}\")\n
+    \       logger.info(f\"   UPSCALE:          {_settings.features.upscale}\")\n
+    \       logger.info(f\"   ENHANCE:          {_settings.features.enhance}\")\n
+    \       logger.info(f\"   PARALLEL_ENHANCE: {_settings.processing.parallel_enhance}\")\n
+    \       logger.info(\"\")\n\n    if CREATIVE_PROMPT and CREATIVE_DIRECTOR_AVAILABLE:\n
+    \       logger.info(f\"\\n\U0001F3AF Creative Prompt: '{CREATIVE_PROMPT}'\")\n
+    \       EDITING_INSTRUCTIONS = interpret_natural_language(CREATIVE_PROMPT)\n\n
+    \       if EDITING_INSTRUCTIONS:\n            style_name = EDITING_INSTRUCTIONS['style']['name']\n
+    \           logger.info(f\"   ✅ Style Applied: {style_name}\")\n\n            #
+    Show full style details in verbose mode\n            if VERBOSE:\n                logger.info(f\"\\n\U0001F4CB
+    STYLE TEMPLATE DETAILS:\")\n                style = EDITING_INSTRUCTIONS.get('style',
+    {})\n                pacing = EDITING_INSTRUCTIONS.get('pacing', {})\n                effects
+    = EDITING_INSTRUCTIONS.get('effects', {})\n                transitions = EDITING_INSTRUCTIONS.get('transitions',
+    {})\n\n                logger.info(f\"   Style Name:       {style.get('name',
+    'unknown')}\")\n                logger.info(f\"   Description:      {style.get('description',
+    'N/A')[:60]}...\")\n                logger.info(f\"   Pacing Speed:     {pacing.get('speed',
+    'N/A')}\")\n                logger.info(f\"   Cut Duration:     {pacing.get('min_cut_duration',
+    'N/A')}-{pacing.get('max_cut_duration', 'N/A')}s\")\n                logger.info(f\"
+    \  Beat Sync:        {pacing.get('beat_sync', 'N/A')}\")\n                logger.info(f\"
+    \  Transition Style: {transitions.get('preferred', ['N/A'])}\")\n                logger.info(f\"
+    \  Template Effects:\")\n                logger.info(f\"      - Stabilization:
+    {effects.get('stabilization', 'N/A')}\")\n                logger.info(f\"      -
+    Upscale:       {effects.get('upscale', 'N/A')}\")\n                logger.info(f\"
+    \     - Sharpness:     {effects.get('sharpness_boost', 'N/A')}\")\n                logger.info(f\"
+    \     - Contrast:      {effects.get('contrast_boost', 'N/A')}\")\n                logger.info(f\"
+    \     - Color Grade:   {effects.get('color_grade', 'N/A')}\")\n        else:\n
+    \           logger.warning(f\"Falling back to legacy CUT_STYLE={CUT_STYLE}\")\n
+    \           EDITING_INSTRUCTIONS = None\n\n    elif CREATIVE_PROMPT and not CREATIVE_DIRECTOR_AVAILABLE:\n
+    \       logger.warning(f\"Creative Prompt ignored (Creative Director not available)\")\n
+    \       logger.info(f\"   Using legacy CUT_STYLE={CUT_STYLE}\")\n        EDITING_INSTRUCTIONS
+    = None\n\n    else:\n        logger.info(f\"   ℹ️ Using legacy CUT_STYLE={CUT_STYLE}\")\n
+    \       EDITING_INSTRUCTIONS = None\n\n    logger.info(f\"{'='*60}\\n\")\n\n#
+    =============================================================================\n#
+    Scene Analysis (delegated to scene_analysis module)\n# =============================================================================\n\ndef
+    detect_scenes(video_path, threshold=30.0):\n    \"\"\"Use PySceneDetect to find
+    cuts in the raw video.\n\n    Delegated to scene_analysis module. Returns list
+    of (start, end) tuples for backward compatibility.\n    \"\"\"\n    return _detect_scenes_new(video_path,
+    threshold=threshold)\n\n\ndef analyze_scene_content(video_path, time_point):\n
+    \   \"\"\"Extract a frame and ask AI to describe it.\n\n    Delegated to scene_analysis
+    module. Returns dict for backward compatibility.\n    \"\"\"\n    return _analyze_scene_content_new(video_path,
+    time_point)\n\n\n# calculate_visual_similarity, detect_motion_blur, find_best_start_point\n#
+    are imported directly from scene_analysis module\n\n\ndef extract_subclip_ffmpeg(input_path:
+    str, start: float, duration: float, output_path: str):\n    \"\"\"\n    Extract
+    a subclip via FFmpeg MCP (if enabled) with fallback to local ffmpeg.\n    \"\"\"\n
+    \   if USE_FFMPEG_MCP:\n        try:\n            resp = requests.post(\n                f\"{FFMPEG_MCP_ENDPOINT}/clip\",\n
+    \               json={\n                    \"input\": input_path,\n                    \"start\":
+    start,\n                    \"duration\": duration,\n                    \"output\":
+    output_path,\n                    \"video_codec\": OUTPUT_CODEC,\n                    \"preset\":
+    \"ultrafast\",\n                    \"copy_audio\": True\n                },\n
+    \               timeout=settings.processing.ffmpeg_timeout\n            )\n            resp.raise_for_status()\n
+    \           return\n        except Exception as exc:\n            logger.warning(f\"MCP
+    clip failed, falling back to local ffmpeg: {exc}\")\n\n    cmd_extract = [\n        \"ffmpeg\",
+    \"-y\", \"-ss\", str(start), \"-i\", input_path,\n        \"-t\", str(duration),
+    \"-c:v\", OUTPUT_CODEC, \"-preset\", \"ultrafast\",\n        \"-c:a\", \"copy\",
+    output_path\n    ]\n    subprocess.run(cmd_extract, stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL)\n\n# =============================================================================\n#
+    Audio Analysis (delegated to audio_analysis module)\n# =============================================================================\n\ndef
+    analyze_music_energy(audio_path):\n    \"\"\"Get RMS energy curve.\n\n    Delegated
+    to audio_analysis module. Returns (times, rms) for backward compatibility.\n    \"\"\"\n
+    \   profile = _analyze_music_energy_new(audio_path, verbose=VERBOSE)\n    return
+    profile.times, profile.rms\n\n\ndef get_beat_times(audio_path):\n    \"\"\"Use
+    Librosa to find beat times.\n\n    Delegated to audio_analysis module. Returns
+    (beat_times, tempo) for backward compatibility.\n    \"\"\"\n    info = _get_beat_times_new(audio_path,
+    verbose=VERBOSE)\n    return info.beat_times, info.tempo\n\n\n# calculate_dynamic_cut_length
+    is imported directly from audio_analysis module\n\n\n# =============================================================================\n#
+    Post-Processing: Captions & Voice Isolation\n# =============================================================================\n\ndef
+    _apply_captions(video_path: str, settings) -> str:\n    \"\"\"\n    Apply burn-in
+    captions to rendered video.\n\n    Pipeline:\n    1. Transcribe audio using Whisper
+    (via cgpu if available)\n    2. Burn captions into video using caption_burner\n\n
+    \   Args:\n        video_path: Path to rendered video\n        settings: Settings
+    object with caption config\n\n    Returns:\n        Path to video with captions
+    (or original if failed)\n    \"\"\"\n    from pathlib import Path\n\n    style
+    = settings.features.captions_style\n    logger.info(f\"\\n\U0001F4DD Applying
+    captions ({style} style)...\")\n\n    video = Path(video_path)\n    output_path
+    = str(video.parent / f\"{video.stem}_captioned.mp4\")\n\n    try:\n        # Step
+    1: Transcribe audio\n        transcript_path = _transcribe_for_captions(video_path)\n
+    \       if not transcript_path:\n            logger.warning(\"   Transcription
+    failed, skipping captions\")\n            return video_path\n\n        # Step
+    2: Burn captions\n        from .caption_burner import burn_captions\n        result
+    = burn_captions(\n            video_path=video_path,\n            caption_path=transcript_path,\n
+    \           style=style,\n            output_path=output_path\n        )\n        logger.info(f\"
+    \  ✅ Captions applied: {result}\")\n        return result\n\n    except Exception
+    as e:\n        logger.error(f\"   Caption application failed: {e}\")\n        return
+    video_path\n\n\ndef _transcribe_for_captions(video_path: str) -> Optional[str]:\n
+    \   \"\"\"\n    Transcribe video audio for caption generation.\n\n    Uses cgpu/Whisper
+    if available, returns JSON with word-level timestamps.\n\n    Args:\n        video_path:
+    Path to video file\n\n    Returns:\n        Path to transcript JSON, or None if
+    failed\n    \"\"\"\n    from pathlib import Path\n\n    # Check if cgpu is available
+    for transcription\n    try:\n        from .cgpu_utils import is_cgpu_available\n
+    \       if is_cgpu_available():\n            from .transcriber import transcribe_audio\n
+    \           logger.info(\"   \U0001F3A4 Transcribing with Whisper (via cgpu)...\")\n
+    \           transcript = transcribe_audio(video_path, output_format=\"json\")\n
+    \           if transcript:\n                logger.info(f\"   Transcript: {transcript}\")\n
+    \               return transcript\n    except ImportError:\n        pass\n\n    #
+    Fallback: Check for existing transcript\n    video = Path(video_path)\n    for
+    ext in [\".json\", \".srt\", \".vtt\"]:\n        transcript = video.with_suffix(ext)\n
+    \       if transcript.exists():\n            logger.info(f\"   Using existing
+    transcript: {transcript}\")\n            return str(transcript)\n\n    logger.warning(\"
+    \  No transcription available (cgpu not enabled, no existing transcript)\")\n
+    \   return None\n\n\ndef _export_timeline_for_nle(builder, result, settings) ->
+    None:\n    \"\"\"\n    Export timeline data for professional NLE import.\n\n    Kept
+    as a separate function to avoid bloating MontageBuilder.\n    Called as post-processing
+    step when EXPORT_TIMELINE is enabled.\n\n    Args:\n        builder: MontageBuilder
+    instance with clips_metadata\n        result: MontageResult with output info\n
+    \       settings: Settings object\n    \"\"\"\n    from .timeline_exporter import
+    export_timeline_from_montage\n\n    # Convert ClipMetadata objects to dictionaries
+    for timeline export\n    clips_data = []\n    for clip in builder.ctx.clips_metadata:\n
+    \       clips_data.append({\n            \"source_path\": clip.source_path,\n
+    \           \"start_time\": clip.start_time,\n            \"duration\": clip.duration,\n
+    \           \"timeline_start\": clip.timeline_position,\n            \"metadata\":
+    {\n                \"energy\": getattr(clip, 'energy', None),\n                \"scene_type\":
+    getattr(clip, 'scene_type', None),\n            }\n        })\n\n    if not clips_data:\n
+    \       logger.warning(\"   No clips metadata for timeline export\")\n        return\n\n
+    \   # Get audio path from context\n    audio_path = builder.ctx.audio_result.music_path
+    if builder.ctx.audio_result else \"\"\n\n    # Generate project name from output\n
+    \   project_name = Path(result.output_path).stem if result.output_path else \"montage_ai\"\n\n
+    \   logger.info(f\"\\n\U0001F4FD️ Exporting timeline for NLE...\")\n\n    exported
+    = export_timeline_from_montage(\n        clips_data=clips_data,\n        audio_path=audio_path,\n
+    \       total_duration=result.duration,\n        output_dir=str(settings.paths.output_dir),\n
+    \       project_name=project_name,\n        generate_proxies=settings.features.generate_proxies,\n
+    \       fps=builder.ctx.output_profile.fps if builder.ctx.output_profile else
+    24.0,\n    )\n\n    for fmt, path in exported.items():\n        logger.info(f\"
+    \  ✅ {fmt.upper()}: {path}\")\n\n\ndef create_montage(variant_id: int = 1) ->
+    Optional[str]:\n    \"\"\"\n    Create a video montage from input footage and
+    music.\n\n    This is the main entry point for montage creation. It serves as
+    a facade\n    that delegates to MontageBuilder while maintaining backward compatibility\n
+    \   with the legacy procedural API.\n\n    Args:\n        variant_id: Variant
+    number (1-based) for this montage\n\n    Returns:\n        Output path on success,
+    None on failure\n    \"\"\"\n    global EDITING_INSTRUCTIONS\n\n    # Build using
+    the new MontageBuilder pipeline\n    builder = None  # Will be set for timeline
+    export\n    try:\n        # Check if creative loop is enabled\n        if _settings.features.creative_loop:\n
+    \           from .creative_evaluator import run_creative_loop\n            logger.info(f\"Creative
+    Loop enabled (max {_settings.features.creative_loop_max_iterations} iterations)\")\n
+    \           result = run_creative_loop(\n                builder_class=MontageBuilder,\n
+    \               variant_id=variant_id,\n                initial_instructions=EDITING_INSTRUCTIONS,\n
+    \               max_iterations=_settings.features.creative_loop_max_iterations,\n
+    \               settings=_settings,\n            )\n            # Note: builder
+    not available with creative_loop, timeline export skipped\n        else:\n            builder
+    = MontageBuilder(\n                variant_id=variant_id,\n                settings=_settings,\n
+    \               editing_instructions=EDITING_INSTRUCTIONS,\n            )\n            result
+    = builder.build()\n\n        if result.success:\n            logger.info(f\"\\n✅
+    Variant #{variant_id} Done!\")\n            logger.info(f\"   Output: {result.output_path}\")\n
+    \           logger.info(f\"   Duration: {result.duration:.1f}s\")\n            logger.info(f\"
+    \  Cuts: {result.cut_count}\")\n            logger.info(f\"   Render time: {result.render_time:.1f}s\")\n
+    \           if result.file_size_mb > 0:\n                logger.info(f\"   File
+    size: {result.file_size_mb:.1f} MB\")\n\n            # Post-processing: Apply
+    captions if enabled\n            final_output = result.output_path\n            if
+    _settings.features.captions:\n                final_output = _apply_captions(final_output,
+    _settings)\n\n            # Post-processing: Export timeline for NLE if enabled\n
+    \           if EXPORT_TIMELINE and TIMELINE_EXPORT_AVAILABLE and builder is not
+    None:\n                try:\n                    _export_timeline_for_nle(builder,
+    result, _settings)\n                except Exception as e:\n                    logger.warning(f\"
+    \  ⚠️ Timeline export failed: {e}\")\n\n            return final_output\n        else:\n
+    \           logger.error(f\"Variant #{variant_id} Failed: {result.error}\")\n
+    \           return None\n\n    except Exception as e:\n        logger.error(f\"Variant
+    #{variant_id} Failed with exception: {e}\")\n        import traceback\n        traceback.print_exc()\n
+    \       return None\n\n\nif __name__ == \"__main__\":\n    # Initialize monitoring\n
+    \   monitor = None\n    if MONITORING_AVAILABLE:\n        monitor = init_monitor(JOB_ID,
+    VERBOSE)\n        monitor.start_phase(\"initialization\")\n    \n    # Interpret
+    creative prompt (if provided)\n    interpret_creative_prompt()\n    \n    if monitor:\n
+    \       monitor.end_phase({\"style\": EDITING_INSTRUCTIONS.get('style', {}).get('name',
+    CUT_STYLE) if EDITING_INSTRUCTIONS else CUT_STYLE})\n\n    # Generate variants\n
+    \   for i in range(1, NUM_VARIANTS + 1):\n        if monitor:\n            monitor.start_phase(f\"variant_{i}\")\n
+    \       create_montage(i)\n        if monitor:\n            monitor.end_phase()\n
+    \   \n    # Print final summary\n    if monitor:\n        monitor.log_resources()\n
+    \       monitor.print_summary()\n        # Export monitoring data as JSON\n        monitor.export_json(os.path.join(OUTPUT_DIR,
+    f\"monitoring_{JOB_ID}.json\"))\n"
+  timeline_exporter.py: "\"\"\"\nTimeline Exporter: Export Montage AI edits to professional
+    NLE formats\n\n# STATUS: Work in Progress - Not yet fully tested\n\nSupports:\n-
+    OpenTimelineIO (.otio) - Industry standard for DaVinci, Premiere, FCP, Avid\n-
+    CMX 3600 EDL (.edl) - Universal fallback for all NLEs\n- Proxy generation (H.264
+    low-res) for smooth editing workflow\n\nBased on 2024/2025 research:\n- OpenTimelineIO
+    is Academy Software Foundation standard (Oscar-winning tech)\n- CMX EDL is oldest
+    but most compatible (1970s, still works everywhere)\n- Modern workflow: Generate
+    proxies, edit with them, relink to originals for export\n\nArchitecture:\n  Fluxibri
+    Montage Metadata → Timeline Builder → OTIO/EDL Export →\n  Import into DaVinci/Premiere/FCP
+    → Professional color/finishing\n\"\"\"\n\nimport os\nimport json\nimport subprocess\nfrom
+    dataclasses import dataclass\nfrom typing import List, Dict, Tuple, Optional,
+    Any\nfrom pathlib import Path\n\nprint(f\"DEBUG: Loading timeline_exporter.py
+    from {__file__}\")\n\nVERSION = \"0.1.0\"\n\n# Try importing OpenTimelineIO (optional
+    dependency)\ntry:\n    import opentimelineio as otio\n    OTIO_AVAILABLE = True\nexcept
+    ImportError:\n    print(\"⚠️ OpenTimelineIO not installed. OTIO export disabled.\")\n
+    \   print(\"   Install: pip install OpenTimelineIO\")\n    OTIO_AVAILABLE = False\n\n\n@dataclass\nclass
+    Clip:\n    \"\"\"Represents a single video clip in the timeline.\"\"\"\n    source_path:
+    str  # Original video file\n    start_time: float  # Start time in source (seconds)\n
+    \   duration: float  # Duration of clip (seconds)\n    timeline_start: float  #
+    Where this clip starts in final timeline (seconds)\n    proxy_path: Optional[str]
+    = None  # Path to proxy file (if generated)\n    metadata: Dict = None  # Additional
+    metadata (energy, motion score, etc.)\n\n\n@dataclass\nclass Timeline:\n    \"\"\"Represents
+    a complete edited timeline.\"\"\"\n    clips: List[Clip]\n    audio_path: str\n
+    \   total_duration: float\n    fps: float = 30.0\n    resolution: Tuple[int, int]
+    = (1080, 1920)  # 9:16 vertical\n    project_name: str = \"fluxibri_montage\"\n\n\nclass
+    TimelineExporter:\n    \"\"\"\n    Export Fluxibri montages to professional NLE
+    formats.\n\n    Workflow:\n    1. Collect edit metadata during montage creation\n
+    \   2. Generate proxies (optional, for large files)\n    3. Export to OTIO + EDL\n
+    \   4. Package as NLE project folder\n    \"\"\"\n\n    def __init__(self, output_dir:
+    str = \"/data/output\"):\n        self.output_dir = output_dir\n        self.proxy_dir
+    = os.path.join(output_dir, \"proxies\")\n        os.makedirs(self.proxy_dir, exist_ok=True)\n\n
+    \   def _sanitize_metadata(self, data: Any) -> Any:\n        \"\"\"Recursively
+    convert numpy types to python types for JSON/OTIO serialization.\"\"\"\n        if
+    isinstance(data, dict):\n            return {k: self._sanitize_metadata(v) for
+    k, v in data.items()}\n        elif isinstance(data, (list, tuple)):\n            return
+    [self._sanitize_metadata(v) for v in data]\n        elif hasattr(data, 'item'):
+    \ # numpy scalar\n            try:\n                return data.item()\n            except
+    (ValueError, TypeError):\n                pass\n        \n        if hasattr(data,
+    'tolist'):  # numpy array\n            return data.tolist()\n            \n        return
+    data\n\n    def export_timeline(\n        self,\n        timeline: Timeline,\n
+    \       generate_proxies: bool = False,\n        export_otio: bool = True,\n        export_edl:
+    bool = True,\n        export_csv: bool = True\n    ) -> Dict[str, str]:\n        \"\"\"\n
+    \       Export timeline to NLE-compatible formats.\n\n        Args:\n            timeline:
+    Timeline object with clips and metadata\n            generate_proxies: Create
+    H.264 proxies for editing\n            export_otio: Export OpenTimelineIO file\n
+    \           export_edl: Export CMX 3600 EDL file\n            export_csv: Export
+    CSV spreadsheet\n\n        Returns:\n            Dictionary of exported file paths\n
+    \       \"\"\"\n        print(f\"\\n\U0001F4FD️ Timeline Exporter v{VERSION}\")\n
+    \       print(f\"   Project: {timeline.project_name}\")\n        print(f\"   Clips:
+    {len(timeline.clips)}\")\n        print(f\"   Duration: {timeline.total_duration:.1f}s\")\n\n
+    \       exported_files = {}\n\n        # Generate proxies first (if requested)\n
+    \       if generate_proxies:\n            print(\"\\n\U0001F39E️ Generating proxies...\")\n
+    \           for clip in timeline.clips:\n                proxy_path = self._generate_proxy(clip.source_path)\n
+    \               if proxy_path:\n                    clip.proxy_path = proxy_path\n
+    \                   print(f\"   ✅ {os.path.basename(clip.source_path)}\")\n\n
+    \       # Export OpenTimelineIO\n        if export_otio and OTIO_AVAILABLE:\n
+    \           otio_path = self._export_otio(timeline)\n            if otio_path:\n
+    \               exported_files['otio'] = otio_path\n                print(f\"\\n✅
+    OTIO exported: {otio_path}\")\n\n        # Export CMX EDL\n        if export_edl:\n
+    \           edl_path = self._export_edl(timeline)\n            if edl_path:\n
+    \               exported_files['edl'] = edl_path\n                print(f\"✅ EDL
+    exported: {edl_path}\")\n\n        # Export CSV\n        if export_csv:\n            csv_path
+    = self._export_csv(timeline)\n            if csv_path:\n                exported_files['csv']
+    = csv_path\n                print(f\"✅ CSV exported: {csv_path}\")\n\n        #
+    Export metadata JSON\n        metadata_path = self._export_metadata(timeline)\n
+    \       exported_files['metadata'] = metadata_path\n        print(f\"✅ Metadata
+    exported: {metadata_path}\")\n\n        # Create project package\n        package_path
+    = self._create_project_package(timeline, exported_files)\n        exported_files['package']
+    = package_path\n        print(f\"\\n\U0001F4E6 Project package: {package_path}\")\n\n
+    \       return exported_files\n\n    def _generate_proxy(self, source_path: str)
+    -> Optional[str]:\n        \"\"\"\n        Generate H.264 proxy file for smooth
+    editing.\n\n        Proxy settings:\n        - Resolution: 960x540 (half-res for
+    9:16 1080x1920)\n        - Codec: H.264 (libx264)\n        - Bitrate: 5Mbps (balance
+    of quality/size)\n        - Preset: fast (quick encoding)\n\n        Args:\n            source_path:
+    Path to original video file\n\n        Returns:\n            Path to proxy file,
+    or None if failed\n        \"\"\"\n        source_name = os.path.basename(source_path)\n
+    \       proxy_name = f\"proxy_{source_name}\"\n        proxy_path = os.path.join(self.proxy_dir,
+    proxy_name)\n\n        # Skip if proxy already exists\n        if os.path.exists(proxy_path):\n
+    \           return proxy_path\n\n        cmd = [\n            \"ffmpeg\", \"-y\",\n
+    \           \"-i\", source_path,\n            \"-vf\", \"scale=960:540\",  # Half-res\n
+    \           \"-c:v\", \"libx264\",\n            \"-preset\", \"fast\",\n            \"-b:v\",
+    \"5M\",\n            \"-c:a\", \"aac\",\n            \"-b:a\", \"128k\",\n            proxy_path\n
+    \       ]\n\n        try:\n            subprocess.run(\n                cmd,\n
+    \               check=True,\n                stdout=subprocess.DEVNULL,\n                stderr=subprocess.DEVNULL\n
+    \           )\n            return proxy_path\n        except subprocess.CalledProcessError:\n
+    \           print(f\"   ⚠️ Proxy generation failed: {source_name}\")\n            return
+    None\n\n    def _export_otio(self, timeline: Timeline) -> Optional[str]:\n        \"\"\"\n
+    \       Export OpenTimelineIO file.\n\n        OTIO is the industry standard (Academy
+    Software Foundation).\n        Supports: DaVinci Resolve, Premiere Pro, FCP, Avid,
+    Nuke, etc.\n\n        Args:\n            timeline: Timeline object\n\n        Returns:\n
+    \           Path to .otio file\n        \"\"\"\n        if not OTIO_AVAILABLE:\n
+    \           return None\n\n        # Create OTIO timeline\n        otio_timeline
+    = otio.schema.Timeline(name=timeline.project_name)\n        video_track = otio.schema.Track(name=\"Video
+    1\", kind=otio.schema.TrackKind.Video)\n        audio_track = otio.schema.Track(name=\"Audio
+    1\", kind=otio.schema.TrackKind.Audio)\n\n        # Add video clips\n        for
+    clip_data in timeline.clips:\n            # Use proxy if available, otherwise
+    original\n            media_path = clip_data.proxy_path or clip_data.source_path\n\n
+    \           # Create media reference\n            media_ref = otio.schema.ExternalReference(target_url=f\"file://{media_path}\")\n\n
+    \           # Create source range (what part of the source file to use)\n            source_range
+    = otio.opentime.TimeRange(\n                start_time=otio.opentime.RationalTime(\n
+    \                   clip_data.start_time * timeline.fps,\n                    timeline.fps\n
+    \               ),\n                duration=otio.opentime.RationalTime(\n                    clip_data.duration
+    * timeline.fps,\n                    timeline.fps\n                )\n            )\n\n
+    \           # Create clip\n            otio_clip = otio.schema.Clip(\n                name=os.path.basename(clip_data.source_path),\n
+    \               media_reference=media_ref,\n                source_range=source_range\n
+    \           )\n\n            # Add metadata\n            if clip_data.metadata:\n
+    \               # Sanitize metadata (convert numpy types to python types)\n                sanitized_metadata
+    = self._sanitize_metadata(clip_data.metadata)\n                otio_clip.metadata.update(sanitized_metadata)\n\n
+    \           video_track.append(otio_clip)\n\n        # Add audio track\n        audio_ref
+    = otio.schema.ExternalReference(target_url=f\"file://{timeline.audio_path}\")\n
+    \       audio_clip = otio.schema.Clip(\n            name=os.path.basename(timeline.audio_path),\n
+    \           media_reference=audio_ref,\n            source_range=otio.opentime.TimeRange(\n
+    \               start_time=otio.opentime.RationalTime(0, timeline.fps),\n                duration=otio.opentime.RationalTime(\n
+    \                   timeline.total_duration * timeline.fps,\n                    timeline.fps\n
+    \               )\n            )\n        )\n        audio_track.append(audio_clip)\n\n
+    \       # Add tracks to timeline\n        otio_timeline.tracks.append(video_track)\n
+    \       otio_timeline.tracks.append(audio_track)\n\n        # Write to file\n
+    \       otio_path = os.path.join(\n            self.output_dir,\n            f\"{timeline.project_name}.otio\"\n
+    \       )\n        otio.adapters.write_to_file(otio_timeline, otio_path)\n\n        return
+    otio_path\n\n    def _export_edl(self, timeline: Timeline) -> str:\n        \"\"\"\n
+    \       Export CMX 3600 EDL file.\n\n        EDL is the oldest standard (1970s)
+    but works in every NLE.\n        Format: Plain text with timecodes and cut points.\n\n
+    \       Args:\n            timeline: Timeline object\n\n        Returns:\n            Path
+    to .edl file\n        \"\"\"\n        edl_path = os.path.join(\n            self.output_dir,\n
+    \           f\"{timeline.project_name}.edl\"\n        )\n\n        with open(edl_path,
+    'w') as f:\n            # EDL Header\n            f.write(f\"TITLE: {timeline.project_name}\\n\")\n
+    \           f.write(f\"FCM: NON-DROP FRAME\\n\\n\")\n\n            # EDL Events
+    (one per clip)\n            for i, clip in enumerate(timeline.clips, start=1):\n
+    \               # Timecode format: HH:MM:SS:FF (frames at 30fps)\n                src_in
+    = self._seconds_to_timecode(clip.start_time, timeline.fps)\n                src_out
+    = self._seconds_to_timecode(\n                    clip.start_time + clip.duration,\n
+    \                   timeline.fps\n                )\n                rec_in =
+    self._seconds_to_timecode(clip.timeline_start, timeline.fps)\n                rec_out
+    = self._seconds_to_timecode(\n                    clip.timeline_start + clip.duration,\n
+    \                   timeline.fps\n                )\n\n                # EDL line
+    format:\n                # {event#} {reel} {track} {type} {src_in} {src_out} {rec_in}
+    {rec_out}\n                reel_name = os.path.splitext(os.path.basename(clip.source_path))[0][:8]\n
+    \               f.write(f\"{i:03d}  {reel_name:<8} V     C        \")\n                f.write(f\"{src_in}
+    {src_out} {rec_in} {rec_out}\\n\")\n\n                # Source file comment\n
+    \               f.write(f\"* FROM CLIP NAME: {os.path.basename(clip.source_path)}\\n\")\n
+    \               f.write(f\"* SOURCE FILE: {clip.source_path}\\n\\n\")\n\n        return
+    edl_path\n\n    def _export_csv(self, timeline: Timeline) -> str:\n        \"\"\"\n
+    \       Export timeline as CSV spreadsheet.\n\n        CSV format is universal
+    and can be opened in Excel, Google Sheets,\n        or imported into custom tools.
+    Useful for manual review and logging.\n\n        Args:\n            timeline:
+    Timeline object\n\n        Returns:\n            Path to .csv file\n        \"\"\"\n
+    \       import csv\n\n        csv_path = os.path.join(\n            self.output_dir,\n
+    \           f\"{timeline.project_name}.csv\"\n        )\n\n        with open(csv_path,
+    'w', newline='') as f:\n            writer = csv.writer(f)\n\n            # CSV
+    Header\n            writer.writerow([\n                \"Clip #\",\n                \"Source
+    File\",\n                \"Source In (sec)\",\n                \"Source Out (sec)\",\n
+    \               \"Timeline In (sec)\",\n                \"Timeline Out (sec)\",\n
+    \               \"Duration (sec)\",\n                \"Source In (TC)\",\n                \"Source
+    Out (TC)\",\n                \"Timeline In (TC)\",\n                \"Timeline
+    Out (TC)\",\n                \"Energy\",\n                \"Action\",\n                \"Shot
+    Type\",\n                \"Notes\"\n            ])\n\n            # CSV Rows (one
+    per clip)\n            for i, clip in enumerate(timeline.clips, start=1):\n                #
+    Get metadata\n                meta = clip.metadata or {}\n                energy
+    = meta.get('energy', 0.5)\n                action = meta.get('action', 'medium')\n
+    \               shot = meta.get('shot', 'medium')\n                notes = meta.get('notes',
+    '')\n\n                # Timecodes\n                src_in_tc = self._seconds_to_timecode(clip.start_time,
+    timeline.fps)\n                src_out_tc = self._seconds_to_timecode(clip.start_time
+    + clip.duration, timeline.fps)\n                tl_in_tc = self._seconds_to_timecode(clip.timeline_start,
+    timeline.fps)\n                tl_out_tc = self._seconds_to_timecode(clip.timeline_start
+    + clip.duration, timeline.fps)\n\n                writer.writerow([\n                    i,
+    \ # Clip #\n                    clip.source_path,\n                    f\"{clip.start_time:.2f}\",\n
+    \                   f\"{clip.start_time + clip.duration:.2f}\",\n                    f\"{clip.timeline_start:.2f}\",\n
+    \                   f\"{clip.timeline_start + clip.duration:.2f}\",\n                    f\"{clip.duration:.2f}\",\n
+    \                   src_in_tc,\n                    src_out_tc,\n                    tl_in_tc,\n
+    \                   tl_out_tc,\n                    f\"{energy:.2f}\",\n                    action,\n
+    \                   shot,\n                    notes\n                ])\n\n        return
+    csv_path\n\n    def _export_metadata(self, timeline: Timeline) -> str:\n        \"\"\"\n
+    \       Export timeline metadata as JSON.\n\n        Includes:\n        - Clip
+    list with timecodes\n        - Edit decisions (cut points, energy levels)\n        -
+    Fluxibri-specific metadata (motion scores, match cuts, etc.)\n\n        Args:\n
+    \           timeline: Timeline object\n\n        Returns:\n            Path to
+    metadata JSON file\n        \"\"\"\n        metadata = {\n            \"project_name\":
+    timeline.project_name,\n            \"duration_sec\": timeline.total_duration,\n
+    \           \"fps\": timeline.fps,\n            \"resolution\": timeline.resolution,\n
+    \           \"audio_file\": timeline.audio_path,\n            \"clips\": [\n                {\n
+    \                   \"index\": i,\n                    \"source_file\": clip.source_path,\n
+    \                   \"proxy_file\": clip.proxy_path,\n                    \"source_in\":
+    clip.start_time,\n                    \"source_out\": clip.start_time + clip.duration,\n
+    \                   \"timeline_in\": clip.timeline_start,\n                    \"timeline_out\":
+    clip.timeline_start + clip.duration,\n                    \"duration\": clip.duration,\n
+    \                   \"metadata\": clip.metadata or {}\n                }\n                for
+    i, clip in enumerate(timeline.clips, start=1)\n            ],\n            \"exporter_version\":
+    VERSION\n        }\n\n        json_path = os.path.join(\n            self.output_dir,\n
+    \           f\"{timeline.project_name}_metadata.json\"\n        )\n\n        with
+    open(json_path, 'w') as f:\n            json.dump(metadata, f, indent=2)\n\n        return
+    json_path\n\n    def _create_project_package(\n        self,\n        timeline:
+    Timeline,\n        exported_files: Dict[str, str]\n    ) -> str:\n        \"\"\"\n
+    \       Create a complete project package for NLE import.\n\n        Structure:\n
+    \       {project_name}/\n          ├── media/          # Original videos + audio\n
+    \         ├── proxies/        # Proxy files (if generated)\n          ├── {project}.otio
+    \ # OTIO timeline\n          ├── {project}.edl   # CMX EDL\n          ├── metadata.json
+    \  # Full edit metadata\n          └── README.txt      # Instructions\n\n        Args:\n
+    \           timeline: Timeline object\n            exported_files: Paths to exported
+    timeline files\n\n        Returns:\n            Path to project package directory\n
+    \       \"\"\"\n        package_dir = os.path.join(self.output_dir, f\"{timeline.project_name}_PROJECT\")\n
+    \       os.makedirs(package_dir, exist_ok=True)\n\n        # Create README\n        readme_path
+    = os.path.join(package_dir, \"README.txt\")\n        with open(readme_path, 'w')
+    as f:\n            f.write(f\"Fluxibri Timeline Export - {timeline.project_name}\\n\")\n
+    \           f.write(\"=\" * 60 + \"\\n\\n\")\n            f.write(\"This package
+    contains everything needed to import this edit\\n\")\n            f.write(\"into
+    professional NLE software (DaVinci, Premiere, FCP, etc.)\\n\\n\")\n            f.write(\"Files:\\n\")\n
+    \           f.write(f\"- {timeline.project_name}.otio: OpenTimelineIO (recommended)\\n\")\n
+    \           f.write(f\"- {timeline.project_name}.edl: CMX EDL (universal fallback)\\n\")\n
+    \           f.write(f\"- metadata.json: Full edit metadata from Fluxibri\\n\\n\")\n
+    \           f.write(\"Import Instructions:\\n\")\n            f.write(\"1. DaVinci
+    Resolve: File > Import > Timeline > .otio\\n\")\n            f.write(\"2. Adobe
+    Premiere: File > Import > .edl\\n\")\n            f.write(\"3. Final Cut Pro:
+    File > Import > XML (use .otio)\\n\\n\")\n            f.write(f\"Generated by
+    Montage AI v{VERSION}\\n\")\n\n        return package_dir\n\n    @staticmethod\n
+    \   def _seconds_to_timecode(seconds: float, fps: float) -> str:\n        \"\"\"\n
+    \       Convert seconds to SMPTE timecode (HH:MM:SS:FF).\n\n        Args:\n            seconds:
+    Time in seconds\n            fps: Frames per second\n\n        Returns:\n            Timecode
+    string (e.g., \"00:01:30:15\")\n        \"\"\"\n        hours = int(seconds //
+    3600)\n        minutes = int((seconds % 3600) // 60)\n        secs = int(seconds
+    % 60)\n        frames = int((seconds % 1) * fps)\n\n        return f\"{hours:02d}:{minutes:02d}:{secs:02d}:{frames:02d}\"\n\n\n#
+    Convenience function for use in smart_worker.py\ndef export_timeline_from_montage(\n
+    \   clips_data: List[Dict],\n    audio_path: str,\n    total_duration: float,\n
+    \   output_dir: str = \"/data/output\",\n    project_name: str = \"montage_ai\",\n
+    \   generate_proxies: bool = False,\n    resolution: Optional[Tuple[int, int]]
+    = None,\n    fps: Optional[float] = None\n) -> Dict[str, str]:\n    \"\"\"\n    Convenience
+    function to export timeline from montage data.\n\n    Args:\n        clips_data:
+    List of clip dictionaries from create_montage()\n        audio_path: Path to audio
+    file\n        total_duration: Total duration of montage\n        output_dir: Where
+    to save exports\n        project_name: Name of the project\n        generate_proxies:
+    Whether to generate proxy files\n        resolution: Optional (width, height)
+    for the target project\n        fps: Optional frame rate for the target project\n\n
+    \   Returns:\n        Dictionary of exported file paths\n\n    Example usage in
+    smart_worker.py:\n        >>> clips_metadata = []  # Collect during montage creation\n
+    \       >>> export_timeline_from_montage(\n        ...     clips_metadata,\n        ...
+    \    music_path,\n        ...     final_video.duration,\n        ...     project_name=\"gallery_montage_v1\"\n
+    \       ... )\n    \"\"\"\n    # Convert dictionaries to Clip objects\n    clips
+    = [\n        Clip(\n            source_path=c['source_path'],\n            start_time=c['start_time'],\n
+    \           duration=c['duration'],\n            timeline_start=c['timeline_start'],\n
+    \           metadata=c.get('metadata', {})\n        )\n        for c in clips_data\n
+    \   ]\n\n    # Create Timeline object\n    timeline = Timeline(\n        clips=clips,\n
+    \       audio_path=audio_path,\n        total_duration=total_duration,\n        project_name=project_name,\n
+    \       fps=fps if fps else 30.0,\n        resolution=resolution if resolution
+    else (1080, 1920)\n    )\n\n    # Export\n    exporter = TimelineExporter(output_dir=output_dir)\n
+    \   return exporter.export_timeline(\n        timeline,\n        generate_proxies=generate_proxies,\n
+    \       export_otio=True,\n        export_edl=True\n    )\n\n\nif __name__ ==
+    \"__main__\":\n    # Test/demo\n    print(f\"Timeline Exporter v{VERSION}\")\n
+    \   print(\"OpenTimelineIO available:\", OTIO_AVAILABLE)\n"
+kind: ConfigMap
+metadata:
+  name: montage-ai-patch
+  namespace: montage-ai

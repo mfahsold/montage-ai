@@ -284,11 +284,16 @@ def process_clip_task(
         "-avoid_negative_ts", "1",
         temp_clip_path
     ]
-    subprocess.run(
+    result = subprocess.run(
         cmd,
         capture_output=True,
+        text=True,
         timeout=settings.processing.ffmpeg_short_timeout,
     )
+    if result.returncode != 0 or not os.path.exists(temp_clip_path) or os.path.getsize(temp_clip_path) == 0:
+        err_lines = (result.stderr or "").strip().splitlines()
+        err = err_lines[-1] if err_lines else "unknown error"
+        raise RuntimeError(f"ffmpeg extract failed: {err}")
     
     # 2. Enhance
     current_path = temp_clip_path
@@ -321,12 +326,24 @@ def process_clip_task(
                 temp_files.append(enhance_path)
                 enhance_applied = True
 
-    # 3. Normalize
-    final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
-    
-    if not output_profile:
+    # 3. Normalize (optional)
+    final_clip_path = current_path
+
+    def output_ok(path: str) -> bool:
+        return os.path.exists(path) and os.path.getsize(path) > 0
+
+    if not settings.encoding.normalize_clips:
+        if not output_ok(final_clip_path):
+            raise RuntimeError("source clip missing before normalize")
+    elif not output_profile:
+        final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
+        if not output_ok(current_path):
+            raise RuntimeError("source clip missing before normalize")
         shutil.copy(current_path, final_clip_path)
+        if not output_ok(final_clip_path):
+            raise RuntimeError("failed to write normalized clip")
     else:
+        final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
         # Get optimal encoder
         encoder_config = None
         if resource_manager:
@@ -363,25 +380,61 @@ def process_clip_task(
         if getattr(settings.features, "luma_normalize", True):
             vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
         vf_chain = ",".join(vf_filters)
-        if encoder_config and encoder_config.hwupload_filter:
-            vf_chain = f"{vf_chain},{encoder_config.hwupload_filter}"
 
-        cmd = ["ffmpeg", "-y"]
-        if encoder_config and encoder_config.is_gpu_accelerated:
-            cmd.extend(encoder_config.hwaccel_input_params())
-        cmd.extend([
-            "-i", current_path,
-            "-vf", vf_chain,
-            "-r", str(output_profile.fps),
-            *ffmpeg_params,
-            "-an",
-            final_clip_path
-        ])
-        subprocess.run(
-            cmd,
-            capture_output=True,
-            timeout=settings.processing.ffmpeg_timeout,
-        )
+        def run_normalize(cfg, params, label: str) -> bool:
+            vf = vf_chain
+            if cfg and cfg.hwupload_filter:
+                vf = f"{vf_chain},{cfg.hwupload_filter}"
+            cmd = ["ffmpeg", "-y"]
+            if cfg and cfg.is_gpu_accelerated:
+                cmd.extend(cfg.hwaccel_input_params())
+            cmd.extend([
+                "-i", current_path,
+                "-vf", vf,
+                "-r", str(output_profile.fps),
+                *params,
+                "-an",
+                final_clip_path
+            ])
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=settings.processing.ffmpeg_timeout,
+            )
+            if result.returncode == 0 and output_ok(final_clip_path):
+                return True
+            err_lines = (result.stderr or "").strip().splitlines()
+            err = err_lines[-1] if err_lines else "unknown error"
+            print(f"   ⚠️ Normalize ({label}) failed: {err}")
+            if os.path.exists(final_clip_path):
+                try:
+                    os.remove(final_clip_path)
+                except OSError:
+                    pass
+            return False
+
+        label = "gpu" if encoder_config and encoder_config.is_gpu_accelerated else "cpu"
+        success = run_normalize(encoder_config, ffmpeg_params, label)
+
+        if not success and resource_manager:
+            cpu_config = resource_manager.get_encoder(prefer_gpu=False, cache_key="cpu_normalize")
+            cpu_params = cpu_config.video_params(
+                crf=settings.encoding.crf,
+                preset=settings.encoding.preset,
+                codec_override=output_profile.codec,
+                profile_override=output_profile.profile,
+                level_override=output_profile.level,
+                pix_fmt_override=output_profile.pix_fmt,
+            )
+            success = run_normalize(cpu_config, cpu_params, "cpu_fallback")
+
+        if not success:
+            if output_ok(current_path):
+                print("   ⚠️ Normalization failed; using unnormalized clip")
+                final_clip_path = current_path
+            else:
+                raise RuntimeError("Normalization failed and source clip missing")
 
     enhancements = {
         'stabilized': stabilize_applied,

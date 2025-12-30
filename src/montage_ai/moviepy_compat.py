@@ -15,15 +15,28 @@ MoviePy 2.x changes (from 1.x):
 - write_videofile(): 'verbose' parameter REMOVED (use logger=None instead)
 """
 
-from moviepy import (
-    VideoFileClip,
-    AudioFileClip,
-    ImageClip,
-    ColorClip,
-    TextClip,
-    CompositeVideoClip,
-    concatenate_videoclips,
-)
+try:
+    # MoviePy 2.x
+    from moviepy import (
+        VideoFileClip,
+        AudioFileClip,
+        ImageClip,
+        ColorClip,
+        TextClip,
+        CompositeVideoClip,
+        concatenate_videoclips,
+    )
+except ImportError:
+    # MoviePy 1.x
+    from moviepy.editor import (
+        VideoFileClip,
+        AudioFileClip,
+        ImageClip,
+        ColorClip,
+        TextClip,
+        CompositeVideoClip,
+        concatenate_videoclips,
+    )
 
 __all__ = [
     # Re-exports
@@ -117,14 +130,16 @@ def resize(clip, **kwargs):
     
     Accepts any of these and normalizes for the installed version.
     """
-    # Normalize newsize -> new_size for MoviePy 2.x compatibility
-    if 'newsize' in kwargs:
-        kwargs['new_size'] = kwargs.pop('newsize')
-    
-    # For MoviePy 2.x: new_size works for exact dimensions
     if hasattr(clip, 'resized'):
+        # MoviePy 2.x prefers new_size
+        if 'newsize' in kwargs:
+            kwargs['new_size'] = kwargs.pop('newsize')
         return clip.resized(**kwargs)
-    return clip.resize(**kwargs)
+    else:
+        # MoviePy 1.x prefers newsize
+        if 'new_size' in kwargs:
+            kwargs['newsize'] = kwargs.pop('new_size')
+        return clip.resize(**kwargs)
 
 
 def crop(clip, **kwargs):

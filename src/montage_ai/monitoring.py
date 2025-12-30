@@ -73,6 +73,9 @@ class Monitor:
         self._tee_enabled = False
         self._mem_thread = None
         self._mem_interval = float(os.environ.get("MONITOR_MEM_INTERVAL", "5.0"))
+        self._stop_event = threading.Event()
+        self._orig_stdout = sys.stdout
+        self._orig_stderr = sys.stderr
         
         # Performance tracking
         self.phase_times: Dict[str, float] = {}
@@ -95,7 +98,7 @@ class Monitor:
 
         def _loop():
             proc = psutil.Process()
-            while True:
+            while not self._stop_event.is_set():
                 try:
                     rss = proc.memory_info().rss / (1024 * 1024)
                     vms = proc.memory_info().vms / (1024 * 1024)
@@ -114,7 +117,8 @@ class Monitor:
                     print(msg)
                 except Exception:
                     pass
-                time.sleep(self._mem_interval)
+                if self._stop_event.wait(self._mem_interval):
+                    break
 
         self._mem_thread = threading.Thread(target=_loop, daemon=True)
         self._mem_thread.start()
@@ -133,16 +137,28 @@ class Monitor:
 
             class _Tee(io.TextIOBase):
                 def __init__(self, *streams):
-                    self.streams = streams
+                    self.streams = list(streams)
 
                 def write(self, data):
-                    for s in self.streams:
-                        s.write(data)
+                    for s in list(self.streams):
+                        try:
+                            s.write(data)
+                        except Exception:
+                            try:
+                                self.streams.remove(s)
+                            except ValueError:
+                                pass
                     return len(data)
 
                 def flush(self):
-                    for s in self.streams:
-                        s.flush()
+                    for s in list(self.streams):
+                        try:
+                            s.flush()
+                        except Exception:
+                            try:
+                                self.streams.remove(s)
+                            except ValueError:
+                                pass
 
             sys.stdout = _Tee(sys.stdout, self._log_file)
             sys.stderr = _Tee(sys.stderr, self._log_file)
@@ -150,6 +166,18 @@ class Monitor:
             print(f"[monitor] tee logging enabled → {log_path}")
 
             def _cleanup():
+                try:
+                    self._stop_event.set()
+                    if self._mem_thread and self._mem_thread.is_alive():
+                        self._mem_thread.join(timeout=1)
+                except Exception:
+                    pass
+                try:
+                    if self._tee_enabled:
+                        sys.stdout = self._orig_stdout
+                        sys.stderr = self._orig_stderr
+                except Exception:
+                    pass
                 try:
                     if self._log_file:
                         self._log_file.flush()

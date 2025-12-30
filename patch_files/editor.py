@@ -22,7 +22,6 @@ import gc
 import requests
 import numpy as np
 from datetime import datetime
-from pathlib import Path
 
 from .config import settings
 from .logger import logger
@@ -878,7 +877,7 @@ def _export_timeline_for_nle(builder, result, settings) -> None:
             "source_path": clip.source_path,
             "start_time": clip.start_time,
             "duration": clip.duration,
-            "timeline_start": clip.timeline_start,
+            "timeline_start": clip.timeline_position,
             "metadata": {
                 "energy": getattr(clip, 'energy', None),
                 "scene_type": getattr(clip, 'scene_type', None),
