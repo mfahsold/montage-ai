@@ -22,7 +22,7 @@ import os
 import json
 import subprocess
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
 
 VERSION = "0.1.0"
@@ -74,6 +74,19 @@ class TimelineExporter:
         self.output_dir = output_dir
         self.proxy_dir = os.path.join(output_dir, "proxies")
         os.makedirs(self.proxy_dir, exist_ok=True)
+
+    def _sanitize_metadata(self, data: Any) -> Any:
+        """Recursively convert numpy types to python types for JSON/OTIO serialization."""
+        if isinstance(data, dict):
+            return {k: self._sanitize_metadata(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._sanitize_metadata(v) for v in data]
+        elif hasattr(data, 'item'):  # numpy scalar
+            return data.item()
+        elif hasattr(data, 'tolist'):  # numpy array
+            return data.tolist()
+        else:
+            return data
 
     def export_timeline(
         self,
@@ -243,7 +256,9 @@ class TimelineExporter:
 
             # Add metadata
             if clip_data.metadata:
-                otio_clip.metadata.update(clip_data.metadata)
+                # Sanitize metadata (convert numpy types to python types)
+                sanitized_metadata = self._sanitize_metadata(clip_data.metadata)
+                otio_clip.metadata.update(sanitized_metadata)
 
             video_track.append(otio_clip)
 

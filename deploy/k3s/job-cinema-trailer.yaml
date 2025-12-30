@@ -35,8 +35,6 @@ spec:
               value: "cinema_trailer"
             - name: EXPORT_TIMELINE
               value: "true"
-            - name: CREATIVE_PROMPT
-              value: "Create a cinematic trailer with a dramatic build-up using B-roll footage."
             - name: LOG_LEVEL
               value: "DEBUG"
             - name: CGPU_ENABLED
