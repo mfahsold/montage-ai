@@ -11,9 +11,77 @@ kind: Kustomization
 
 namespace: montage-ai
 
+# Use local registry instead of ghcr.io
+images:
+  - name: ghcr.io/mfahsold/montage-ai
+    newName: localhost:5000/montage-ai
+    newTag: latest
+
 resources:
   - ../../base
   - nfs-pvc.yaml
 
 patches:
-  - path: patch-job-distributed.yaml
+  # Use JSON 6902 patch to REPLACE volumes (not add)
+  - target:
+      kind: Job
+      name: montage-ai-render
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/nodeSelector
+        value: null
+      - op: replace
+        path: /spec/template/spec/affinity
+        value:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                    - key: nvidia.com/gpu
+                      operator: Exists
+              - weight: 90
+                preference:
+                  matchExpressions:
+                    - key: amd.com/gpu
+                      operator: Exists
+      - op: replace
+        path: /spec/template/spec/volumes
+        value:
+          - name: input
+            persistentVolumeClaim:
+              claimName: montage-ai-input-nfs
+          - name: music
+            persistentVolumeClaim:
+              claimName: montage-ai-music-nfs
+          - name: assets
+            persistentVolumeClaim:
+              claimName: montage-ai-assets-nfs
+          - name: output
+            persistentVolumeClaim:
+              claimName: montage-ai-output-nfs
+          - name: cgpu-config
+            emptyDir: {}
+          - name: cgpu-secrets
+            secret:
+              secretName: cgpu-credentials
+              optional: true
+              items:
+                - key: config.json
+                  path: config.json
+                - key: session.json
+                  path: session.json
+          - name: dev-dri
+            hostPath:
+              path: /dev/dri
+              type: DirectoryOrCreate
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: FFMPEG_HWACCEL
+          value: "auto"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: USE_GPU
+          value: "prefer"
