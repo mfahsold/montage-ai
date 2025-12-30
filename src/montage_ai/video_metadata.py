@@ -51,11 +51,13 @@ class VideoMetadata:
     codec: str
     pix_fmt: str
     bitrate: int
+    rotation: int = 0
 
     @property
     def aspect_ratio(self) -> float:
-        """Width-to-height ratio."""
-        return self.width / self.height if self.height > 0 else 1.0
+        """Width-to-height ratio (accounting for rotation)."""
+        w, h = self.resolution
+        return w / h if h > 0 else 1.0
 
     @property
     def orientation(self) -> str:
@@ -69,7 +71,9 @@ class VideoMetadata:
 
     @property
     def resolution(self) -> Tuple[int, int]:
-        """Return (width, height) tuple."""
+        """Return (width, height) tuple, swapping if rotated 90/270 degrees."""
+        if abs(self.rotation) in (90, 270):
+            return (self.height, self.width)
         return (self.width, self.height)
 
     @property
@@ -93,6 +97,7 @@ class VideoMetadata:
             "codec": self.codec,
             "pix_fmt": self.pix_fmt,
             "bitrate": self.bitrate,
+            "rotation": self.rotation,
         }
 
     @classmethod
@@ -107,6 +112,7 @@ class VideoMetadata:
             codec=str(data.get("codec", "unknown")),
             pix_fmt=str(data.get("pix_fmt", "unknown")),
             bitrate=int(data.get("bitrate", 0)),
+            rotation=int(data.get("rotation", 0)),
         )
 
 
@@ -298,7 +304,7 @@ def probe_metadata(video_path: str, timeout: Optional[int] = None) -> Optional[V
         cmd = [
             "ffprobe", "-v", "error",
             "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,codec_name,pix_fmt,r_frame_rate,avg_frame_rate,bit_rate:format=duration,bit_rate",
+            "-show_entries", "stream=width,height,codec_name,pix_fmt,r_frame_rate,avg_frame_rate,bit_rate:stream_side_data=rotation:format=duration,bit_rate",
             "-of", "json",
             video_path
         ]
@@ -325,6 +331,20 @@ def probe_metadata(video_path: str, timeout: Optional[int] = None) -> Optional[V
         # Try to get bitrate from stream or format
         bitrate = int(stream.get("bit_rate") or format_info.get("bit_rate") or 0)
 
+        # Get rotation
+        side_data_list = stream.get("side_data_list", [])
+        rotation = 0
+        for side_data in side_data_list:
+            if "rotation" in side_data:
+                rotation = int(float(side_data["rotation"]))
+                break
+        
+        # Also check tags for rotate
+        if rotation == 0:
+            tags = stream.get("tags", {})
+            if "rotate" in tags:
+                rotation = int(float(tags["rotate"]))
+
         return VideoMetadata(
             path=video_path,
             width=width,
@@ -334,10 +354,42 @@ def probe_metadata(video_path: str, timeout: Optional[int] = None) -> Optional[V
             codec=codec,
             pix_fmt=pix_fmt,
             bitrate=bitrate,
+            rotation=rotation,
         )
     except Exception as exc:
         logger.warning(f"ffprobe failed for {os.path.basename(video_path)}: {exc}")
         return None
+
+
+def probe_duration(media_path: str, timeout: Optional[int] = None) -> float:
+    """
+    Get duration of any media file (audio or video) using ffprobe.
+    
+    Args:
+        media_path: Path to media file
+        timeout: Optional timeout in seconds
+        
+    Returns:
+        Duration in seconds, or 0.0 if failed
+    """
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            media_path
+        ]
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout or _settings.processing.ffprobe_timeout,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return float(result.stdout.strip())
+        return 0.0
+    except Exception:
+        return 0.0
 
 
 class MetadataProber:

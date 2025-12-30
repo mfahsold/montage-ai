@@ -345,7 +345,7 @@ class TestMetadataProber:
         result = prober.probe("/test.mp4")
 
         assert result is not None
-        mock_probe.assert_called_once_with("/test.mp4")
+        mock_probe.assert_called_once_with("/test.mp4", timeout=10)
 
     @patch('src.montage_ai.video_metadata.probe_metadata')
     def test_probe_many_filters_none(self, mock_probe):

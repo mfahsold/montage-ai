@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 
 from .config import get_settings, Settings
+from .video_metadata import probe_metadata, probe_duration
 from .ffmpeg_config import (
     get_config as get_ffmpeg_config,
     STANDARD_CODEC,
@@ -32,6 +33,7 @@ from .ffmpeg_config import (
     STANDARD_LEVEL,
 )
 from .logger import logger
+from .core.cmd_runner import run_command, CommandError
 
 
 _settings = get_settings()
@@ -118,9 +120,11 @@ def _check_vidstab_available() -> bool:
         return _VIDSTAB_AVAILABLE
 
     try:
-        result = subprocess.run(
+        result = run_command(
             ["ffmpeg", "-filters"],
-            capture_output=True, text=True, timeout=_settings.processing.ffmpeg_short_timeout
+            capture_output=True,
+            timeout=_settings.processing.ffmpeg_short_timeout,
+            check=False
         )
         _VIDSTAB_AVAILABLE = "vidstabdetect" in result.stdout
         if _VIDSTAB_AVAILABLE:
@@ -321,7 +325,7 @@ class ClipEnhancer:
         cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
         try:
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            run_command(cmd, check=True)
             return output_path
         except Exception:
             return input_path
@@ -504,7 +508,7 @@ class ClipEnhancer:
                         cmd.extend(["-level", self.output_level])
                     cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
-                    subprocess.run(cmd, check=True, capture_output=True, timeout=self.ffmpeg_timeout)
+                    run_command(cmd, check=True, timeout=self.ffmpeg_timeout)
                     results[clip_path] = output_path
 
                     # Cleanup temp frame
@@ -540,19 +544,9 @@ class ClipEnhancer:
         """
         try:
             # Get duration for sampling points
-            dur_cmd = [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                input_path
-            ]
-            dur_result = subprocess.run(
-                dur_cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.ffprobe_timeout,
-            )
-            duration = float(dur_result.stdout.strip()) if dur_result.stdout.strip() else 2.0
+            duration = probe_duration(input_path, timeout=self.ffprobe_timeout)
+            if duration <= 0:
+                duration = 2.0
 
             # Analyze mean brightness at 3 points
             sample_points = [duration * 0.25, duration * 0.5, duration * 0.75]
@@ -565,11 +559,10 @@ class ClipEnhancer:
                     "-vf", "signalstats=stat=tout+vrep+brng,metadata=print:file=-",
                     "-f", "null", "-"
                 ]
-                result = subprocess.run(
+                result = run_command(
                     analyze_cmd,
-                    capture_output=True,
-                    text=True,
                     timeout=self.ffmpeg_short_timeout,
+                    check=False
                 )
 
                 # Parse YAVG (luma average) from output
@@ -625,11 +618,10 @@ class ClipEnhancer:
                 "-f", "null", "-"
             ]
 
-            result = subprocess.run(
+            result = run_command(
                 cmd_detect,
-                capture_output=True,
-                text=True,
                 timeout=self.ffmpeg_long_timeout,
+                check=False
             )
 
             if result.returncode != 0 or not os.path.exists(transform_file):
@@ -654,10 +646,9 @@ class ClipEnhancer:
                 cmd_transform.extend(["-level", self.output_level])
             cmd_transform.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
-            subprocess.run(
+            run_command(
                 cmd_transform,
                 check=True,
-                capture_output=True,
                 timeout=self.ffmpeg_long_timeout,
             )
 
@@ -705,15 +696,14 @@ class ClipEnhancer:
         cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
         try:
-            subprocess.run(
+            run_command(
                 cmd,
                 check=True,
-                capture_output=True,
                 timeout=self.ffmpeg_timeout,
             )
             logger.info("Stabilization complete (deshake fallback)")
             return output_path
-        except subprocess.CalledProcessError:
+        except CommandError:
             logger.warning("Stabilization failed (ffmpeg error). Using original.")
             return input_path
         except Exception as e:
@@ -723,17 +713,18 @@ class ClipEnhancer:
     def _check_realesrgan_available(self) -> bool:
         """Check if Real-ESRGAN with Vulkan GPU is available."""
         try:
-            test_result = subprocess.run(
+            test_result = run_command(
                 ["realesrgan-ncnn-vulkan", "-i", "/dev/null", "-o", "/dev/null"],
                 capture_output=True,
                 timeout=self.ffmpeg_short_timeout,
+                check=False
             )
-            if b"invalid gpu" not in test_result.stderr:
-                vulkan_info = subprocess.run(
+            if "invalid gpu" not in test_result.stderr:
+                vulkan_info = run_command(
                     ["vulkaninfo", "--summary"],
                     capture_output=True,
-                    text=True,
                     timeout=self.ffmpeg_short_timeout,
+                    check=False
                 )
                 if vulkan_info.returncode == 0:
                     output = vulkan_info.stdout.lower()
@@ -759,20 +750,8 @@ class ClipEnhancer:
 
         try:
             # Check for rotation metadata
-            probe_cmd = [
-                "ffprobe", "-v", "error", "-select_streams", "v:0",
-                "-show_entries", "stream=width,height:stream_side_data=rotation",
-                "-of", "json", input_path
-            ]
-            probe_output = subprocess.check_output(probe_cmd).decode().strip()
-            probe_data = json.loads(probe_output)
-            stream = probe_data.get('streams', [{}])[0]
-
-            rotation = 0
-            for side_data in stream.get('side_data_list', []):
-                if 'rotation' in side_data:
-                    rotation = int(side_data['rotation'])
-                    break
+            metadata = probe_metadata(input_path, timeout=self.ffprobe_timeout)
+            rotation = metadata.rotation if metadata else 0
 
             # Build filter based on rotation
             if rotation == -90 or rotation == 270:
@@ -793,7 +772,7 @@ class ClipEnhancer:
                 extract_cmd += ["-vf", vf_filter]
             extract_cmd += ["-q:v", "2", f"{frame_dir}/frame_%08d.jpg"]
 
-            subprocess.run(extract_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            run_command(extract_cmd, check=True)
 
             # Upscale frames with Real-ESRGAN
             upscale_cmd = [
@@ -805,7 +784,7 @@ class ClipEnhancer:
                 "-g", "0",
                 "-m", "/usr/local/share/realesrgan-models"
             ]
-            subprocess.run(upscale_cmd, check=True)
+            run_command(upscale_cmd, check=True)
 
             # Get original FPS
             fps_cmd = [
@@ -835,7 +814,7 @@ class ClipEnhancer:
                 esrgan_cmd.extend(["-level", self.output_level])
             esrgan_cmd.extend(["-pix_fmt", self.output_pix_fmt, output_path])
 
-            subprocess.run(esrgan_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            run_command(esrgan_cmd, check=True)
 
             return output_path
 
@@ -902,7 +881,7 @@ class ClipEnhancer:
                 ffmpeg_cmd.extend(["-level", self.output_level])
             ffmpeg_cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
-            subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            run_command(ffmpeg_cmd, check=True)
             logger.info("FFmpeg upscaling complete")
             return output_path
 
@@ -919,11 +898,11 @@ class ClipEnhancer:
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 video_path
             ]
-            result = subprocess.run(
+            result = run_command(
                 probe_cmd,
                 capture_output=True,
-                text=True,
                 timeout=self.ffprobe_timeout,
+                check=False
             )
             duration = float(result.stdout.strip()) if result.stdout.strip() else 1.0
 
@@ -936,7 +915,7 @@ class ClipEnhancer:
                 "-q:v", "2",
                 output_path
             ]
-            subprocess.run(
+            run_command(
                 extract_cmd,
                 check=True,
                 capture_output=True,

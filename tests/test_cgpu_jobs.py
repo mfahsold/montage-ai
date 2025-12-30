@@ -414,17 +414,22 @@ class TestCGPUJobManager:
         assert "success_count" in stats
         assert "failed_count" in stats
 
-    @patch('src.montage_ai.cgpu_jobs.manager.is_cgpu_available')
+    @patch('src.montage_ai.cgpu_jobs.base.run_cgpu_command')
+    @patch('src.montage_ai.cgpu_jobs.base.is_cgpu_available')
     @patch('src.montage_ai.cgpu_jobs.manager.run_cgpu_command')
-    def test_process_queue_execution(self, mock_run, mock_available):
+    @patch('src.montage_ai.cgpu_jobs.manager.is_cgpu_available')
+    def test_process_queue_execution(self, mock_mgr_avail, mock_mgr_run, mock_base_avail, mock_base_run):
         """Manager processes jobs in queue."""
-        mock_available.return_value = True
-        mock_run.return_value = (True, "SESSION_READY", "")
+        mock_mgr_avail.return_value = True
+        mock_base_avail.return_value = True
+        mock_mgr_run.return_value = (True, "SESSION_READY", "")
+        mock_base_run.return_value = (True, "", "")
 
         manager = CGPUJobManager()
+        manager.clear_queue()
 
         # Create a mock job that tracks execution
-        class MockJob(BaseCGPUJob):
+        class MockJob(CGPUJob):
             job_type = "mock"
             def __init__(self):
                 super().__init__()

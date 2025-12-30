@@ -23,12 +23,6 @@ from typing import Dict, List, Optional, Any
 
 from .creative_director import (
     CreativeDirector,
-    OPENAI_API_BASE,
-    OPENAI_MODEL,
-    GOOGLE_API_KEY,
-    CGPU_ENABLED,
-    OLLAMA_HOST,
-    OLLAMA_MODEL,
 )
 from .config import get_settings
 

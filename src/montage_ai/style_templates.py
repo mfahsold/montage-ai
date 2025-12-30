@@ -19,13 +19,13 @@ from typing import Dict, Iterable, List
 
 from jsonschema import ValidationError, validate
 
+from .config import get_settings
+
 # ---------------------------------------------------------------------------
 # Locations
 # ---------------------------------------------------------------------------
 
 DEFAULT_STYLE_DIR = Path(__file__).resolve().parent / "styles"
-ENV_STYLE_FILE = os.environ.get("STYLE_PRESET_PATH") or os.environ.get("STYLE_TEMPLATE_PATH")
-ENV_STYLE_DIR = os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")
 
 
 # ---------------------------------------------------------------------------
@@ -50,21 +50,21 @@ STYLE_SCHEMA = {
 
 def _style_files() -> List[Path]:
     """Gather style preset files with precedence: defaults then overrides."""
-
+    settings = get_settings()
     candidates: List[Path] = []
 
     if DEFAULT_STYLE_DIR.exists():
         candidates.extend(sorted(DEFAULT_STYLE_DIR.glob("*.json")))
 
-    if ENV_STYLE_DIR:
-        env_dir = Path(ENV_STYLE_DIR)
+    if settings.paths.style_preset_dir:
+        env_dir = settings.paths.style_preset_dir
         if env_dir.is_dir():
             candidates.extend(sorted(env_dir.glob("*.json")))
         elif env_dir.is_file() and env_dir.suffix.lower() == ".json":
             candidates.append(env_dir)
 
-    if ENV_STYLE_FILE:
-        env_file = Path(ENV_STYLE_FILE)
+    if settings.paths.style_preset_path:
+        env_file = settings.paths.style_preset_path
         if env_file.is_file() and env_file.suffix.lower() == ".json":
             candidates.append(env_file)
 

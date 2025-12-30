@@ -63,6 +63,52 @@ STANDARD_AUDIO_BITRATE = "192k"
 
 
 # =============================================================================
+# Color Grading Presets
+# =============================================================================
+
+COLOR_PRESETS = {
+    # === CLASSIC FILM LOOKS ===
+    "cinematic": "colorbalance=rs=0.1:gs=-0.05:bs=0.1:rm=0.1:bm=0.05,curves=preset=cross_process",
+    "teal_orange": "colorbalance=rs=-0.15:gs=-0.05:bs=0.2:rm=0.1:bm=-0.1:rh=0.15:bh=-0.15,eq=saturation=1.1:contrast=1.05",
+    "blockbuster": "colorbalance=rs=-0.1:bs=0.15:rh=0.12:bh=-0.1,curves=m='0/0 0.25/0.22 0.5/0.5 0.75/0.78 1/1',eq=contrast=1.08",
+    
+    # === VINTAGE / RETRO ===
+    "vintage": "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131,curves=preset=vintage",
+    "film_fade": "curves=m='0/0.05 0.5/0.5 1/0.95',colorbalance=rs=0.1:gs=0.05:bs=-0.05,eq=saturation=0.85",
+    "70s": "colortemperature=temperature=5500,colorbalance=rs=0.15:gs=0.1:rh=0.1,eq=saturation=1.2:contrast=0.95",
+    "polaroid": "curves=r='0/0.1 0.5/0.55 1/0.9':g='0/0.05 0.5/0.5 1/0.95':b='0/0 0.5/0.45 1/0.85',eq=saturation=0.9",
+    
+    # === TEMPERATURE ===
+    "cold": "colortemperature=temperature=7500,colorbalance=bs=0.1:bm=0.05,eq=saturation=0.9",
+    "warm": "colortemperature=temperature=4000,colorbalance=rs=0.08:rh=0.05,eq=saturation=1.1",
+    "golden_hour": "colortemperature=temperature=3500,colorbalance=rs=0.12:gs=0.05:rh=0.1:gh=0.05,eq=saturation=1.15:brightness=0.03",
+    "blue_hour": "colortemperature=temperature=8000,colorbalance=bs=0.15:bm=0.08,eq=saturation=0.95:contrast=1.05",
+    
+    # === MOOD / GENRE ===
+    "noir": "hue=s=0,curves=preset=darker,eq=contrast=1.2",
+    "horror": "colorbalance=gs=-0.1:bs=0.05:bm=0.1,curves=m='0/0 0.4/0.35 0.6/0.65 1/1',eq=saturation=0.7:contrast=1.15",
+    "sci_fi": "colorbalance=bs=0.2:bm=0.1:gs=-0.05,eq=saturation=0.85:contrast=1.1,curves=m='0/0 0.3/0.25 1/1'",
+    "dreamy": "gblur=sigma=0.5,colorbalance=rs=0.05:bs=0.05,eq=saturation=0.9:brightness=0.05,curves=m='0/0.05 0.5/0.55 1/1'",
+    
+    # === PROFESSIONAL ===
+    "vivid": "eq=saturation=1.4:contrast=1.1,unsharp=5:5:1.0",
+    "muted": "eq=saturation=0.7:contrast=0.95,curves=m='0/0.05 0.5/0.5 1/0.95'",
+    "high_contrast": "curves=m='0/0 0.25/0.15 0.5/0.5 0.75/0.85 1/1',eq=contrast=1.15",
+    "low_contrast": "curves=m='0/0.1 0.5/0.5 1/0.9',eq=contrast=0.9",
+    "desaturated": "eq=saturation=0.5",
+    "punch": "eq=saturation=1.25:contrast=1.1,unsharp=3:3:0.8,curves=m='0/0 0.2/0.15 0.8/0.85 1/1'"
+}
+
+LUT_FILES = {
+    "cinematic_lut": "cinematic.cube",
+    "teal_orange_lut": "teal_orange.cube",
+    "film_emulation": "kodak_2383.cube",
+    "log_to_rec709": "log_to_rec709.cube",
+    "bleach_bypass": "bleach_bypass.cube"
+}
+
+
+# =============================================================================
 # Hardware Acceleration Detection & Configuration
 # =============================================================================
 
@@ -80,12 +126,6 @@ def get_best_gpu_encoder() -> Optional[str]:
 # =============================================================================
 # Environment variable overrides
 # =============================================================================
-
-def _env_or_default(key: str, default: Any) -> Any:
-    """Get env var, returning default if not set or empty."""
-    val = os.environ.get(key, "")
-    return val if val else default
-
 
 def _normalize_codec_preference(codec: str) -> str:
     """Normalize codec preference to 'h264' or 'hevc'."""
@@ -113,17 +153,17 @@ class FFmpegConfig:
     - hwaccel="none": Force CPU encoding (default for compatibility)
     """
     # Video encoding
-    codec: str = field(default_factory=lambda: _env_or_default("OUTPUT_CODEC", STANDARD_CODEC))
-    profile: str = field(default_factory=lambda: _env_or_default("OUTPUT_PROFILE", STANDARD_PROFILE))
-    level: str = field(default_factory=lambda: _env_or_default("OUTPUT_LEVEL", STANDARD_LEVEL))
-    pix_fmt: str = field(default_factory=lambda: _env_or_default("OUTPUT_PIX_FMT", STANDARD_PIX_FMT))
-    preset: str = field(default_factory=lambda: _env_or_default("FFMPEG_PRESET", STANDARD_PRESET))
-    crf: int = field(default_factory=lambda: int(_env_or_default("FFMPEG_CRF", STANDARD_CRF)))
-    threads: str = field(default_factory=lambda: _env_or_default("FFMPEG_THREADS", "0"))  # 0 = auto
+    codec: str = field(default_factory=lambda: get_settings().encoding.codec)
+    profile: str = field(default_factory=lambda: get_settings().encoding.profile)
+    level: str = field(default_factory=lambda: get_settings().encoding.level)
+    pix_fmt: str = field(default_factory=lambda: get_settings().encoding.pix_fmt)
+    preset: str = field(default_factory=lambda: get_settings().encoding.preset)
+    crf: int = field(default_factory=lambda: get_settings().encoding.crf)
+    threads: str = field(default_factory=lambda: str(get_settings().encoding.threads))  # 0 = auto
     
     # Audio encoding
-    audio_codec: str = field(default_factory=lambda: _env_or_default("OUTPUT_AUDIO_CODEC", STANDARD_AUDIO_CODEC))
-    audio_bitrate: str = field(default_factory=lambda: _env_or_default("OUTPUT_AUDIO_BITRATE", STANDARD_AUDIO_BITRATE))
+    audio_codec: str = field(default_factory=lambda: get_settings().encoding.audio_codec)
+    audio_bitrate: str = field(default_factory=lambda: get_settings().encoding.audio_bitrate)
     
     # Resolution (typically set by heuristics, not env)
     width: int = STANDARD_WIDTH_HORIZONTAL
@@ -131,7 +171,7 @@ class FFmpegConfig:
     fps: int = STANDARD_FPS
     
     # Hardware acceleration
-    hwaccel: str = field(default_factory=lambda: _env_or_default("FFMPEG_HWACCEL", "auto"))
+    hwaccel: str = field(default_factory=lambda: get_settings().encoding.hwaccel)
     _hw_config: Optional["hardware.HWConfig"] = field(default=None, repr=False)
     
     def __post_init__(self):

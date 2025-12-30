@@ -186,6 +186,10 @@ class TestCalculateVisualSimilarity:
         mock_cap.read.return_value = (False, None)
         mock_cv2.VideoCapture.return_value = mock_cap
 
+        # Ensure cache is cleared so we don't hit a previous successful result
+        from src.montage_ai.scene_analysis import clear_histogram_cache
+        clear_histogram_cache()
+
         result = calculate_visual_similarity("/v1.mp4", 1.0, "/v2.mp4", 2.0)
         assert result == 0.0
 

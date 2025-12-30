@@ -198,6 +198,7 @@ class TestCalculateDynamicCutLength:
 class TestAnalyzeMusicEnergy:
     """Tests for analyze_music_energy function."""
 
+    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
     @patch('src.montage_ai.audio_analysis.librosa')
     def test_returns_energy_profile(self, mock_librosa):
         """analyze_music_energy returns EnergyProfile."""
@@ -212,6 +213,7 @@ class TestAnalyzeMusicEnergy:
         assert profile.sample_rate == 22050
         assert len(profile.rms) == 3
 
+    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
     @patch('src.montage_ai.audio_analysis.librosa')
     def test_normalizes_rms(self, mock_librosa):
         """Energy values are normalized to 0-1."""
@@ -230,6 +232,7 @@ class TestAnalyzeMusicEnergy:
 class TestGetBeatTimes:
     """Tests for get_beat_times function."""
 
+    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
     @patch('src.montage_ai.audio_analysis.librosa')
     def test_returns_beat_info(self, mock_librosa):
         """get_beat_times returns BeatInfo."""
@@ -245,6 +248,7 @@ class TestGetBeatTimes:
         assert info.beat_count == 3
         assert info.duration == 4.0
 
+    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
     @patch('src.montage_ai.audio_analysis.librosa')
     def test_handles_array_tempo(self, mock_librosa):
         """Handles tempo returned as numpy array (newer librosa)."""
@@ -263,6 +267,7 @@ class TestGetBeatTimes:
 class TestAnalyzeAudio:
     """Tests for analyze_audio convenience function."""
 
+    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
     @patch('src.montage_ai.audio_analysis.librosa')
     def test_returns_both_beat_and_energy(self, mock_librosa):
         """analyze_audio returns tuple of (BeatInfo, EnergyProfile)."""

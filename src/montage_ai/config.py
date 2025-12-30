@@ -35,6 +35,8 @@ class PathConfig:
     assets_dir: Path = field(default_factory=lambda: Path(os.environ.get("ASSETS_DIR", "/data/assets")))
     temp_dir: Path = field(default_factory=lambda: Path(os.environ.get("TEMP_DIR", "/tmp")))
     lut_dir: Path = field(default_factory=lambda: Path(os.environ.get("LUT_DIR", "/data/luts")))
+    style_preset_path: Optional[Path] = field(default_factory=lambda: Path(os.environ.get("STYLE_PRESET_PATH")) if os.environ.get("STYLE_PRESET_PATH") else None)
+    style_preset_dir: Optional[Path] = field(default_factory=lambda: Path(os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")) if (os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")) else None)
 
     def ensure_directories(self) -> None:
         """Create all directories if they don't exist."""
@@ -93,23 +95,6 @@ class FeatureConfig:
     # Color/levels normalization controls (can be disabled for clean footage)
     colorlevels: bool = field(default_factory=lambda: os.environ.get("COLORLEVELS", "true").lower() == "true")
     luma_normalize: bool = field(default_factory=lambda: os.environ.get("LUMA_NORMALIZE", "true").lower() == "true")
-
-
-# =============================================================================
-# FFmpeg Configuration
-# =============================================================================
-@dataclass
-class FFmpegSettings:
-    """FFmpeg encoding settings."""
-
-    output_profile: str = field(default_factory=lambda: os.environ.get("OUTPUT_PROFILE", "high"))
-    output_level: str = field(default_factory=lambda: os.environ.get("OUTPUT_LEVEL", "4.1"))
-    output_pix_fmt: str = field(default_factory=lambda: os.environ.get("OUTPUT_PIX_FMT", "yuv420p"))
-    preset: str = field(default_factory=lambda: os.environ.get("FFMPEG_PRESET", "medium"))
-    crf: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_CRF", "18")))
-    threads: str = field(default_factory=lambda: os.environ.get("FFMPEG_THREADS", "0"))
-    audio_codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_CODEC", "aac"))
-    audio_bitrate: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_BITRATE", "192k"))
 
 
 # =============================================================================
@@ -208,6 +193,8 @@ class EncodingConfig:
     profile: str = field(default_factory=lambda: os.environ.get("OUTPUT_PROFILE", "high"))
     level: str = field(default_factory=lambda: os.environ.get("OUTPUT_LEVEL", "4.1"))
     threads: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_THREADS", "0")))
+    audio_codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_CODEC", "aac"))
+    audio_bitrate: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_BITRATE", "192k"))
     normalize_clips: bool = field(default_factory=lambda: os.environ.get("NORMALIZE_CLIPS", "true").lower() == "true")
     extract_reencode: bool = field(default_factory=lambda: os.environ.get("EXTRACT_REENCODE", "false").lower() == "true")
 

@@ -88,9 +88,11 @@ class TestEnhancementResult:
 class TestClipEnhancer:
     """Tests for ClipEnhancer class."""
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
-    def test_analyze_brightness_returns_analysis(self, mock_run):
+    def test_analyze_brightness_returns_analysis(self, mock_run, mock_get_config):
         """_analyze_brightness returns BrightnessAnalysis."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         # Mock ffprobe duration
         mock_run.side_effect = [
             Mock(stdout="10.0\n"),  # Duration
@@ -106,9 +108,11 @@ class TestClipEnhancer:
         assert analysis.is_dark is False
         assert analysis.is_bright is False
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
-    def test_analyze_brightness_dark_clip(self, mock_run):
+    def test_analyze_brightness_dark_clip(self, mock_run, mock_get_config):
         """Dark clip (avg < 70) is detected correctly."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         mock_run.side_effect = [
             Mock(stdout="10.0\n"),
             Mock(stderr="YAVG=50\n"),
@@ -122,9 +126,11 @@ class TestClipEnhancer:
         assert analysis.is_dark is True
         assert analysis.suggested_brightness > 0
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
-    def test_analyze_brightness_fallback_on_error(self, mock_run):
+    def test_analyze_brightness_fallback_on_error(self, mock_run, mock_get_config):
         """Returns neutral analysis on error."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         mock_run.side_effect = Exception("ffprobe failed")
 
         enhancer = ClipEnhancer()
@@ -134,9 +140,11 @@ class TestClipEnhancer:
         assert analysis.is_dark is False
         assert analysis.is_bright is False
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
-    def test_enhance_calls_ffmpeg(self, mock_run):
+    def test_enhance_calls_ffmpeg(self, mock_run, mock_get_config):
         """enhance() calls ffmpeg with correct filters."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         # Mock brightness analysis
         mock_run.side_effect = [
             Mock(stdout="10.0\n"),  # Duration probe
@@ -156,9 +164,11 @@ class TestClipEnhancer:
         assert "ffmpeg" in cmd
         assert "-vf" in cmd
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
-    def test_enhance_returns_original_on_failure(self, mock_run):
+    def test_enhance_returns_original_on_failure(self, mock_run, mock_get_config):
         """enhance() returns original path on FFmpeg failure."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         mock_run.side_effect = [
             Mock(stdout="10.0\n"),
             Mock(stderr=""),
@@ -176,10 +186,12 @@ class TestClipEnhancer:
 class TestStabilization:
     """Tests for stabilization functionality."""
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement._check_vidstab_available')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
-    def test_stabilize_uses_vidstab_when_available(self, mock_run, mock_vidstab):
+    def test_stabilize_uses_vidstab_when_available(self, mock_run, mock_vidstab, mock_get_config):
         """Uses vidstab 2-pass when available."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         mock_vidstab.return_value = True
         mock_run.return_value = Mock(returncode=0)
 
@@ -191,10 +203,12 @@ class TestStabilization:
         # Should have called ffmpeg twice (detect + transform)
         assert mock_run.call_count >= 2
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement._check_vidstab_available')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
-    def test_stabilize_falls_back_to_deshake(self, mock_run, mock_vidstab):
+    def test_stabilize_falls_back_to_deshake(self, mock_run, mock_vidstab, mock_get_config):
         """Falls back to deshake when vidstab unavailable."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         mock_vidstab.return_value = False
         mock_run.return_value = Mock(returncode=0)
 
@@ -205,9 +219,11 @@ class TestStabilization:
         cmd = mock_run.call_args[0][0]
         assert "deshake" in str(cmd)
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
-    def test_deshake_returns_original_on_error(self, mock_run):
+    def test_deshake_returns_original_on_error(self, mock_run, mock_get_config):
         """deshake returns original path on error."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         mock_run.side_effect = Exception("FFmpeg error")
 
         enhancer = ClipEnhancer()
@@ -219,11 +235,13 @@ class TestStabilization:
 class TestUpscaling:
     """Tests for upscaling functionality."""
 
-    @patch('src.montage_ai.clip_enhancement.subprocess')
-    def test_check_realesrgan_available(self, mock_subprocess):
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
+    @patch('subprocess.run')
+    def test_check_realesrgan_available(self, mock_run, mock_get_config):
         """_check_realesrgan_available detects Vulkan GPU."""
-        mock_subprocess.run.side_effect = [
-            Mock(stderr=b""),  # realesrgan test
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
+        mock_run.side_effect = [
+            Mock(stderr=""),  # realesrgan test
             Mock(returncode=0, stdout="nvidia geforce"),  # vulkaninfo
         ]
 
@@ -232,11 +250,13 @@ class TestUpscaling:
 
         assert result is True
 
-    @patch('src.montage_ai.clip_enhancement.subprocess')
-    def test_check_realesrgan_detects_software_renderer(self, mock_subprocess):
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
+    @patch('subprocess.run')
+    def test_check_realesrgan_detects_software_renderer(self, mock_run, mock_get_config):
         """Detects and skips software Vulkan renderers."""
-        mock_subprocess.run.side_effect = [
-            Mock(stderr=b""),
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
+        mock_run.side_effect = [
+            Mock(stderr=""),
             Mock(returncode=0, stdout="llvmpipe"),  # Software renderer
         ]
 
@@ -245,30 +265,34 @@ class TestUpscaling:
 
         assert result is False
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
     @patch('src.montage_ai.clip_enhancement.subprocess.check_output')
-    def test_upscale_ffmpeg_calculates_dimensions(self, mock_check, mock_run):
+    def test_upscale_ffmpeg_calculates_dimensions(self, mock_check, mock_run, mock_get_config):
         """FFmpeg upscaling calculates 2x dimensions."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         # Mock ffprobe
         mock_check.return_value = b'{"streams": [{"width": 1920, "height": 1080}]}'
         mock_run.return_value = Mock(returncode=0)
 
         enhancer = ClipEnhancer()
-        result = enhancer._upscale_ffmpeg("/input.mp4", "/output.mp4")
+        result = enhancer._upscale_ffmpeg("/input.mp4", "/output.mp4", scale=2)
 
         assert result == "/output.mp4"
         cmd = mock_run.call_args[0][0]
         assert "scale=3840:2160" in str(cmd)
 
+    @patch('src.montage_ai.clip_enhancement.get_ffmpeg_config')
     @patch('src.montage_ai.clip_enhancement.subprocess.run')
     @patch('src.montage_ai.clip_enhancement.subprocess.check_output')
-    def test_upscale_ffmpeg_handles_rotation(self, mock_check, mock_run):
+    def test_upscale_ffmpeg_handles_rotation(self, mock_check, mock_run, mock_get_config):
         """FFmpeg upscaling handles rotated videos."""
+        mock_get_config.return_value = MagicMock(threads=1, preset="medium", effective_codec="libx264", pix_fmt="yuv420p", profile="high", level="4.0")
         mock_check.return_value = b'{"streams": [{"width": 1080, "height": 1920, "side_data_list": [{"rotation": 90}]}]}'
         mock_run.return_value = Mock(returncode=0)
 
         enhancer = ClipEnhancer()
-        result = enhancer._upscale_ffmpeg("/input.mp4", "/output.mp4")
+        result = enhancer._upscale_ffmpeg("/input.mp4", "/output.mp4", scale=2)
 
         assert result == "/output.mp4"
         # With 90 rotation, dimensions should be swapped before 2x

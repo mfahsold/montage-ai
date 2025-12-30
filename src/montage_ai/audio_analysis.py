@@ -23,6 +23,8 @@ import numpy as np
 
 from .config import get_settings
 from .logger import logger
+from .core.cmd_runner import run_command, CommandError
+from .video_metadata import probe_duration
 
 _settings = get_settings()
 
@@ -165,26 +167,6 @@ def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
 # FFmpeg Fallback (bare-metal, no Python dependencies)
 # =============================================================================
 
-def _ffmpeg_get_duration(audio_path: str) -> float:
-    """Get audio duration using ffprobe (bare-metal)."""
-    cmd = [
-        "ffprobe", "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        audio_path
-    ]
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=_settings.processing.ffprobe_timeout,
-        )
-        return float(result.stdout.strip())
-    except Exception:
-        return 0.0
-
-
 def _ffmpeg_detect_onsets(audio_path: str, duration: float) -> List[float]:
     """
     Detect audio onsets (transients) using FFmpeg's silencedetect filter.
@@ -204,11 +186,11 @@ def _ffmpeg_detect_onsets(audio_path: str, duration: float) -> List[float]:
     ]
 
     try:
-        result = subprocess.run(
+        result = run_command(
             cmd,
             capture_output=True,
-            text=True,
             timeout=_settings.processing.analysis_timeout,
+            check=False
         )
         stderr = result.stderr
 
@@ -246,11 +228,11 @@ def _ffmpeg_analyze_loudness(audio_path: str, duration: float) -> Tuple[np.ndarr
     ]
 
     try:
-        result = subprocess.run(
+        result = run_command(
             cmd,
             capture_output=True,
-            text=True,
             timeout=_settings.processing.analysis_timeout,
+            check=False
         )
         stderr = result.stderr
 
@@ -415,11 +397,11 @@ def _ffmpeg_estimate_tempo(audio_path: str, duration: float) -> Tuple[float, np.
     ]
 
     try:
-        result = subprocess.run(
+        result = run_command(
             cmd,
             capture_output=True,
-            text=True,
             timeout=_settings.processing.analysis_timeout,
+            check=False
         )
         stderr = result.stderr
 
@@ -485,11 +467,11 @@ def _ffmpeg_analyze_energy(audio_path: str, duration: float) -> Tuple[np.ndarray
             tmp_path
         ]
 
-        result = subprocess.run(
+        result = run_command(
             cmd,
             capture_output=True,
-            text=True,
             timeout=_settings.processing.analysis_timeout,
+            check=False
         )
 
         if result.returncode != 0:
@@ -543,11 +525,11 @@ def _ffmpeg_analyze_energy(audio_path: str, duration: float) -> Tuple[np.ndarray
             "-f", "null", "-"
         ]
         try:
-            result_vol = subprocess.run(
+            result_vol = run_command(
                 cmd_vol,
                 capture_output=True,
-                text=True,
                 timeout=_settings.processing.analysis_timeout,
+                check=False
             )
 
             mean_vol = -20.0
@@ -649,7 +631,7 @@ def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> Ene
         )
     else:
         # FFmpeg fallback (bare-metal, no Python audio deps)
-        duration = _ffmpeg_get_duration(audio_path)
+        duration = probe_duration(audio_path)
         times, rms_normalized = _ffmpeg_analyze_energy(audio_path, duration)
 
         profile = EnergyProfile(
@@ -720,7 +702,7 @@ def get_beat_times(audio_path: str, verbose: Optional[bool] = None) -> BeatInfo:
         sr = int(sr)
     else:
         # FFmpeg fallback (bare-metal, no Python audio deps)
-        duration = _ffmpeg_get_duration(audio_path)
+        duration = probe_duration(audio_path)
         tempo, beat_times = _ffmpeg_estimate_tempo(audio_path, duration)
         sr = 44100  # Assumed
 

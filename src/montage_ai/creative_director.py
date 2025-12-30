@@ -160,8 +160,8 @@ class CreativeDirector:
 
     def __init__(
         self,
-        ollama_host: str = OLLAMA_HOST,
-        model: str = OLLAMA_MODEL,
+        ollama_host: Optional[str] = None,
+        model: Optional[str] = None,
         timeout: Optional[int] = None,
         use_cgpu: bool = None,
         use_google_ai: bool = None,
@@ -180,9 +180,9 @@ class CreativeDirector:
             use_openai_api: Force OpenAI-compatible backend (None = auto-detect from env)
             persona: The persona/role description for the LLM
         """
-        self.ollama_host = ollama_host
-        self.ollama_model = model
         self.llm_config = get_settings().llm
+        self.ollama_host = ollama_host if ollama_host else self.llm_config.ollama_host
+        self.ollama_model = model if model else self.llm_config.ollama_model
         self.timeout = timeout if timeout is not None else self.llm_config.timeout
         
         # Determine backend priority: OpenAI-compatible > cgpu > Google AI > Ollama
