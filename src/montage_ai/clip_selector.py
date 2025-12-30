@@ -20,13 +20,15 @@ import json
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 
+from .logger import logger
+
 # Import Creative Director for LLM access
 try:
     from .creative_director import CreativeDirector
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
-    print("⚠️ CreativeDirector not available - LLM clip selection disabled")
+    logger.warning("CreativeDirector not available - LLM clip selection disabled")
 
 VERSION = "0.1.0"
 
@@ -79,9 +81,9 @@ class IntelligentClipSelector:
         if self.use_llm and LLM_AVAILABLE:
             try:
                 self.llm = CreativeDirector()
-                print(f"   🧠 Intelligent Clip Selector enabled (LLM-powered)")
+                logger.info("Intelligent Clip Selector enabled (LLM-powered)")
             except Exception as e:
-                print(f"   ⚠️ Failed to initialize LLM: {e}")
+                logger.warning(f"Failed to initialize LLM: {e}")
                 self.use_llm = False
 
         # Tracking
@@ -134,7 +136,7 @@ class IntelligentClipSelector:
                 return best, "Heuristic fallback (LLM returned no ranking)"
 
         except Exception as e:
-            print(f"   ⚠️ LLM clip selection error: {e}")
+            logger.warning(f"LLM clip selection error: {e}")
             # Fallback to heuristic
             best = top_candidates[0]
             return best, f"Heuristic fallback (LLM error: {str(e)[:50]})"
@@ -285,7 +287,7 @@ CRITICAL: Respond with JSON only, no markdown, no explanations."""
             rankings_data = data.get('rankings', [])
 
             if not rankings_data:
-                print("   ⚠️ LLM returned empty rankings")
+                logger.warning("LLM returned empty rankings")
                 return None
 
             # Convert to ClipRanking objects
@@ -304,17 +306,17 @@ CRITICAL: Respond with JSON only, no markdown, no explanations."""
                     ))
 
             if not rankings:
-                print("   ⚠️ No valid rankings parsed")
+                logger.warning("No valid rankings parsed")
                 return None
 
             return rankings
 
         except json.JSONDecodeError as e:
-            print(f"   ⚠️ Failed to parse LLM ranking JSON: {e}")
-            print(f"      Response: {llm_response[:200]}...")
+            logger.warning(f"Failed to parse LLM ranking JSON: {e}")
+            logger.debug(f"Response: {llm_response[:200]}...")
             return None
         except Exception as e:
-            print(f"   ⚠️ Error parsing LLM ranking: {e}")
+            logger.warning(f"Error parsing LLM ranking: {e}")
             return None
 
     def get_statistics(self) -> Dict[str, Any]:

@@ -275,15 +275,31 @@ def process_clip_task(
     temp_files = [temp_clip_path]
     
     # 1. Extract subclip
-    cmd = [
-        "ffmpeg", "-y",
-        "-ss", str(clip_start),
-        "-i", scene_path,
-        "-t", str(cut_duration),
-        "-c", "copy",
-        "-avoid_negative_ts", "1",
-        temp_clip_path
-    ]
+    if settings.encoding.extract_reencode:
+        target_fps = output_profile.fps if output_profile else 24.0
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", str(clip_start),
+            "-i", scene_path,
+            "-t", str(cut_duration),
+            "-vf", f"fps={target_fps}",
+            "-c:v", settings.encoding.codec,
+            "-preset", settings.encoding.preset,
+            "-crf", str(settings.encoding.crf),
+            "-pix_fmt", settings.encoding.pix_fmt,
+            "-an",
+            temp_clip_path,
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", str(clip_start),
+            "-i", scene_path,
+            "-t", str(cut_duration),
+            "-c", "copy",
+            "-avoid_negative_ts", "1",
+            temp_clip_path
+        ]
     result = subprocess.run(
         cmd,
         capture_output=True,
@@ -406,7 +422,7 @@ def process_clip_task(
                 return True
             err_lines = (result.stderr or "").strip().splitlines()
             err = err_lines[-1] if err_lines else "unknown error"
-            print(f"   ⚠️ Normalize ({label}) failed: {err}")
+            logger.warning(f"Normalize ({label}) failed: {err}")
             if os.path.exists(final_clip_path):
                 try:
                     os.remove(final_clip_path)
@@ -431,7 +447,7 @@ def process_clip_task(
 
         if not success:
             if output_ok(current_path):
-                print("   ⚠️ Normalization failed; using unnormalized clip")
+                logger.warning("Normalization failed; using unnormalized clip")
                 final_clip_path = current_path
             else:
                 raise RuntimeError("Normalization failed and source clip missing")

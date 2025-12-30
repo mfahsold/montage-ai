@@ -33,6 +33,9 @@ import shutil
 from typing import List, Optional, Dict, Any, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 
+from .config import get_settings
+from .logger import logger
+
 if TYPE_CHECKING:
     from .core import hardware
 
@@ -67,7 +70,7 @@ def get_best_gpu_encoder() -> Optional[str]:
     """
     Get the best available GPU encoder type.
     """
-    preferred = _normalize_codec_preference(_env_or_default("OUTPUT_CODEC", STANDARD_CODEC))
+    preferred = _normalize_codec_preference(get_settings().gpu.output_codec)
     from .core import hardware
     config = hardware.get_best_hwaccel(preferred_codec=preferred)
     if config.is_gpu:
@@ -150,12 +153,12 @@ class FFmpegConfig:
             # This is a simplified fallback, ideally we'd check availability
             self._hw_config = hardware.get_best_hwaccel(preferred_codec=preferred)
             if self._hw_config.type != self.hwaccel:
-                print(f"⚠️ Requested GPU encoder '{self.hwaccel}' not available/detected, using {self._hw_config.type}")
+                logger.warning(f"Requested GPU encoder '{self.hwaccel}' not available/detected, using {self._hw_config.type}")
         
         if self._hw_config and self._hw_config.is_gpu:
             actual = _normalize_codec_preference(self._hw_config.encoder)
             if actual != preferred:
-                print(f"⚠️ Requested codec '{self.codec}' not supported by {self._hw_config.type}, using {self._hw_config.encoder}")
+                logger.warning(f"Requested codec '{self.codec}' not supported by {self._hw_config.type}, using {self._hw_config.encoder}")
 
     @property
     def is_gpu_accelerated(self) -> bool:
@@ -350,22 +353,22 @@ def print_gpu_status():
     
     Useful for debugging and configuration.
     """
-    print("\n🎮 GPU Encoder Status:")
-    print("=" * 50)
+    logger.info("\n🎮 GPU Encoder Status:")
+    logger.info("=" * 50)
     
     # Use hardware module to get status
     from .core import hardware
     hw_config = hardware.get_best_hwaccel()
     
     if hw_config.is_gpu:
-        print(f"  ✅ GPU Acceleration Detected: {hw_config.type.upper()}")
-        print(f"     Encoder: {hw_config.encoder}")
-        print(f"     Decoder Args: {' '.join(hw_config.decoder_args)}")
+        logger.info(f"  ✅ GPU Acceleration Detected: {hw_config.type.upper()}")
+        logger.info(f"     Encoder: {hw_config.encoder}")
+        logger.info(f"     Decoder Args: {' '.join(hw_config.decoder_args)}")
     else:
-        print(f"  ❌ No GPU Acceleration Detected (using CPU)")
-        print(f"     Encoder: {hw_config.encoder}")
+        logger.info(f"  ❌ No GPU Acceleration Detected (using CPU)")
+        logger.info(f"     Encoder: {hw_config.encoder}")
     
-    print("=" * 50)
+    logger.info("=" * 50)
 
 
 # =============================================================================

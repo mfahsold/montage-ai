@@ -14,8 +14,11 @@ Usage (API):
 
 import re
 import os
+import argparse
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from .logger import logger
+from .config import get_settings
 
 # Reuse video_agent for semantic search (DRY)
 try:
@@ -76,9 +79,11 @@ def plan_broll(
         List of suggestions, one per script segment
     """
     if not VIDEO_AGENT_AVAILABLE:
+        logger.error("Video Agent not available")
         return [{"error": "Video Agent not available"}]
 
-    input_dir = input_dir or os.environ.get("INPUT_DIR", "/data/input")
+    if input_dir is None:
+        input_dir = str(get_settings().paths.input_dir)
 
     # Initialize agent
     agent = create_video_agent()
@@ -89,11 +94,13 @@ def plan_broll(
         # Auto-analyze all videos in input_dir
         from pathlib import Path
         video_files = list(Path(input_dir).glob("*.mp4")) + list(Path(input_dir).glob("*.mov"))
+        logger.info(f"Analyzing {len(video_files)} videos for B-roll planning...")
         for vf in video_files:
             agent.analyze_video(str(vf))
 
     # Split script into segments
     segments = split_script(script)
+    logger.info(f"Split script into {len(segments)} segments")
 
     # Get suggestions for each segment
     results = []
@@ -144,17 +151,22 @@ def format_plan(results: List[Dict[str, Any]], verbose: bool = False) -> str:
 
 # CLI entry point
 if __name__ == "__main__":
-    import sys
+    parser = argparse.ArgumentParser(description="B-Roll Planner - Script-to-Clip Matching")
+    parser.add_argument("script", nargs="+", help="The script/voiceover text")
+    parser.add_argument("--input-dir", help="Directory with video files")
+    parser.add_argument("--top-k", type=int, default=3, help="Number of suggestions per segment")
+    parser.add_argument("--no-analyze", action="store_false", dest="analyze", help="Skip initial analysis")
+    
+    args = parser.parse_args()
+    
+    script_text = " ".join(args.script)
+    logger.info(f"Planning B-roll for: \"{script_text[:50]}...\"")
 
-    if len(sys.argv) < 2:
-        print("Usage: python -m montage_ai.broll_planner \"Your script text here.\"")
-        print("\nExample:")
-        print("  python -m montage_ai.broll_planner \"The athlete trains. Victory moment.\"")
-        sys.exit(1)
-
-    script_text = " ".join(sys.argv[1:])
-    print(f"> Planning B-roll for: \"{script_text[:50]}...\"")
-    print()
-
-    results = plan_broll(script_text)
+    results = plan_broll(
+        script_text, 
+        input_dir=args.input_dir,
+        top_k=args.top_k,
+        analyze_first=args.analyze
+    )
+    
     print(format_plan(results, verbose=True))

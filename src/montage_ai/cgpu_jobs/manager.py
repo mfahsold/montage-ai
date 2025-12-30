@@ -24,6 +24,7 @@ from typing import Dict, List, Optional, Callable
 
 from .base import CGPUJob, JobStatus, JobResult
 from ..cgpu_utils import is_cgpu_available, run_cgpu_command, CGPU_MAX_CONCURRENCY
+from ..logger import logger
 
 
 @dataclass
@@ -68,7 +69,7 @@ class CGPUJobManager:
         self._on_job_complete: Optional[Callable[[CGPUJob, JobResult], None]] = None
 
         self._initialized = True
-        print("🔧 CGPUJobManager initialized")
+        logger.info("CGPUJobManager initialized")
 
     @property
     def queue_size(self) -> int:
@@ -96,7 +97,7 @@ class CGPUJobManager:
         """
         entry = JobEntry(job=job)
         self._queue.append(entry)
-        print(f"📋 Job {job.job_id} ({job.job_type}) queued. Queue size: {len(self._queue)}")
+        logger.info(f"Job {job.job_id} ({job.job_type}) queued. Queue size: {len(self._queue)}")
         return job.job_id
 
     def get_job_status(self, job_id: str) -> Optional[JobStatus]:
@@ -149,10 +150,10 @@ class CGPUJobManager:
         if self._session_ready:
             return True
 
-        print("🔌 Initializing cgpu session...")
+        logger.info("Initializing cgpu session...")
 
         if not is_cgpu_available():
-            print("❌ cgpu not available")
+            logger.error("cgpu not available")
             return False
 
         # One-time system setup
@@ -163,10 +164,10 @@ class CGPUJobManager:
 
         if success and "SESSION_READY" in stdout:
             self._session_ready = True
-            print("✅ cgpu session ready")
+            logger.info("cgpu session ready")
             return True
         else:
-            print("⚠️ Session setup incomplete, will retry per-job")
+            logger.warning("Session setup incomplete, will retry per-job")
             return True  # Continue anyway, jobs may still work
 
     def _execute_with_retry(self, job: CGPUJob) -> JobResult:
@@ -186,7 +187,7 @@ class CGPUJobManager:
         for attempt in range(job.max_retries):
             if attempt > 0:
                 wait_time = 2 ** (attempt - 1)  # 1, 2, 4, ...
-                print(f"   ⏳ Retry {attempt}/{job.max_retries - 1} in {wait_time}s...")
+                logger.info(f"Retry {attempt}/{job.max_retries - 1} in {wait_time}s...")
                 time.sleep(wait_time)
 
             try:
@@ -217,7 +218,7 @@ class CGPUJobManager:
             List of JobResults in order of completion
         """
         if self._processing:
-            print("⚠️ Already processing queue")
+            logger.warning("Already processing queue")
             return []
 
         self._processing = True
@@ -233,7 +234,7 @@ class CGPUJobManager:
             max_workers = max(1, int(CGPU_MAX_CONCURRENCY))
 
             if max_workers == 1 or total_jobs <= 1:
-                print(f"🚀 Processing {total_jobs} job(s)...")
+                logger.info(f"Processing {total_jobs} job(s)...")
 
                 job_num = 0
                 while self._queue:
@@ -241,7 +242,7 @@ class CGPUJobManager:
                     entry = self._queue.popleft()
                     job = entry.job
 
-                    print(f"\n[{job_num}/{total_jobs}] 🔄 {job.job_type}: {job.job_id}")
+                    logger.info(f"[{job_num}/{total_jobs}] {job.job_type}: {job.job_id}")
 
                     # Execute with retry
                     result = self._execute_with_retry(job)
@@ -253,27 +254,27 @@ class CGPUJobManager:
 
                     # Status emoji
                     status_emoji = "✅" if result.success else "❌"
-                    print(f"   {status_emoji} {job.job_type} completed in {result.duration_seconds:.1f}s")
+                    logger.info(f"{status_emoji} {job.job_type} completed in {result.duration_seconds:.1f}s")
 
                     if result.error:
-                        print(f"   ⚠️ Error: {result.error}")
+                        logger.error(f"Error: {result.error}")
 
                     # Callback
                     if self._on_job_complete:
                         try:
                             self._on_job_complete(job, result)
                         except Exception as e:
-                            print(f"   ⚠️ Callback error: {e}")
+                            logger.error(f"Callback error: {e}")
             else:
                 entries = list(self._queue)
                 self._queue.clear()
-                print(f"🚀 Processing {total_jobs} job(s) with {max_workers} workers...")
+                logger.info(f"Processing {total_jobs} job(s) with {max_workers} workers...")
 
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     future_to_entry = {}
                     for entry in entries:
                         job = entry.job
-                        print(f"📤 Queued {job.job_type}: {job.job_id}")
+                        logger.info(f"Queued {job.job_type}: {job.job_id}")
                         future = executor.submit(self._execute_with_retry, job)
                         future_to_entry[future] = entry
 
@@ -290,17 +291,17 @@ class CGPUJobManager:
                         self._completed[job.job_id] = entry
 
                         status_emoji = "✅" if result.success else "❌"
-                        print(f"   {status_emoji} {job.job_type} completed in {result.duration_seconds:.1f}s")
+                        logger.info(f"{status_emoji} {job.job_type} completed in {result.duration_seconds:.1f}s")
                         if result.error:
-                            print(f"   ⚠️ Error: {result.error}")
+                            logger.error(f"Error: {result.error}")
 
                         if self._on_job_complete:
                             try:
                                 self._on_job_complete(job, result)
                             except Exception as e:
-                                print(f"   ⚠️ Callback error: {e}")
+                                logger.error(f"Callback error: {e}")
 
-            print(f"\n📊 Queue complete: {sum(1 for r in results if r.success)}/{len(results)} succeeded")
+            logger.info(f"Queue complete: {sum(1 for r in results if r.success)}/{len(results)} succeeded")
 
         finally:
             self._processing = False
@@ -318,7 +319,7 @@ class CGPUJobManager:
             return None
 
         if self._processing:
-            print("⚠️ Already processing")
+            logger.warning("Already processing")
             return None
 
         self._processing = True
@@ -330,7 +331,7 @@ class CGPUJobManager:
             entry = self._queue.popleft()
             job = entry.job
 
-            print(f"🔄 Processing {job.job_type}: {job.job_id}")
+            logger.info(f"Processing {job.job_type}: {job.job_id}")
 
             result = self._execute_with_retry(job)
             entry.result = result
@@ -356,7 +357,7 @@ class CGPUJobManager:
         """
         count = len(self._queue)
         self._queue.clear()
-        print(f"🗑️ Cleared {count} job(s) from queue")
+        logger.info(f"Cleared {count} job(s) from queue")
         return count
 
     def clear_completed(self) -> int:
@@ -373,7 +374,7 @@ class CGPUJobManager:
     def reset_session(self) -> None:
         """Reset session state (forces re-initialization)."""
         self._session_ready = False
-        print("🔄 Session reset")
+        logger.info("Session reset")
 
     def stats(self) -> Dict[str, int]:
         """

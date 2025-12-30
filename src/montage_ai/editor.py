@@ -389,77 +389,25 @@ def detect_gpu_capabilities() -> Dict[str, Any]:
     """
     Detect available GPU/hardware acceleration capabilities.
 
-    Checks for:
-    - Vulkan video encoding (h264_vulkan, hevc_vulkan)
-    - V4L2 mem2mem encoding (ARM hardware encoders)
-    - DRM devices (/dev/dri/)
-
-    Returns:
-        Dict with 'encoder' (best encoder to use) and 'hwaccel' (decode acceleration)
+    Delegates to centralized FFmpegConfig.
     """
-    logger.debug("Detecting GPU capabilities...")
+    logger.debug("Detecting GPU capabilities (via FFmpegConfig)...")
+    
+    is_gpu = _ffmpeg_config.is_gpu_accelerated
+    gpu_type = _ffmpeg_config.gpu_encoder_type
+    
     capabilities = {
-        'encoder': 'libx264',  # Default: CPU encoding
-        'hwaccel': None,
-        'available': [],
-        'gpu_name': 'CPU only'
+        'encoder': _ffmpeg_config.effective_codec,
+        'hwaccel': gpu_type if is_gpu else None,
+        'available': [gpu_type] if is_gpu and gpu_type else [],
+        'gpu_name': gpu_type.upper() if is_gpu and gpu_type else 'CPU only'
     }
-
-    # Check for DRI devices
-    dri_path = '/dev/dri'
-    if os.path.exists(dri_path):
-        devices = os.listdir(dri_path)
-        if 'renderD128' in devices or 'card0' in devices or 'card1' in devices:
-            capabilities['available'].append('drm')
-            logger.debug(f"DRM device found: {devices}")
-
-    # Test Vulkan encoder (experimental - often crashes on ARM)
-    if USE_GPU in ['auto', 'vulkan'] and 'drm' in capabilities['available']:
-        try:
-            # Quick test: Try to initialize Vulkan encoder
-            test_cmd = [
-                'ffmpeg', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=0.1',
-                '-c:v', 'h264_vulkan', '-f', 'null', '-'
-            ]
-            result = subprocess.run(
-                test_cmd,
-                capture_output=True,
-                timeout=settings.processing.ffmpeg_short_timeout,
-            )
-            if result.returncode == 0:
-                capabilities['encoder'] = 'h264_vulkan'
-                capabilities['available'].append('vulkan')
-                capabilities['gpu_name'] = 'Vulkan GPU'
-                logger.debug("Vulkan h264 encoder available")
-        except (subprocess.TimeoutExpired, Exception) as e:
-            logger.debug(f"Vulkan encoder not usable: {e}")
-
-    # Test V4L2 encoder (common on Raspberry Pi, some ARM SoCs)
-    if USE_GPU in ['auto', 'v4l2']:
-        try:
-            test_cmd = [
-                'ffmpeg', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=0.1',
-                '-c:v', 'h264_v4l2m2m', '-f', 'null', '-'
-            ]
-            result = subprocess.run(
-                test_cmd,
-                capture_output=True,
-                timeout=settings.processing.ffmpeg_short_timeout,
-            )
-            if result.returncode == 0:
-                capabilities['encoder'] = 'h264_v4l2m2m'
-                capabilities['available'].append('v4l2m2m')
-                capabilities['gpu_name'] = 'V4L2 Hardware Encoder'
-                logger.debug("V4L2 mem2mem encoder available")
-        except (subprocess.TimeoutExpired, Exception) as e:
-            pass  # V4L2 not available, use CPU
-
-    # Summary
-    if capabilities['encoder'] == 'libx264':
-        logger.debug(f"Using CPU encoding (libx264) with {multiprocessing.cpu_count()} cores")
-        logger.debug(f"Parallel enhancement: {MAX_PARALLEL_JOBS} workers")
+    
+    if is_gpu:
+        logger.debug(f"Using hardware encoder: {capabilities['encoder']} ({capabilities['gpu_name']})")
     else:
-        logger.debug(f"Using hardware encoder: {capabilities['encoder']}")
+        logger.debug(f"Using CPU encoding ({capabilities['encoder']}) with {multiprocessing.cpu_count()} cores")
+        logger.debug(f"Parallel enhancement: {MAX_PARALLEL_JOBS} workers")
 
     return capabilities
 
@@ -511,40 +459,9 @@ def get_ffmpeg_encoder_params() -> List[str]:
     """
     Get optimized FFmpeg encoder parameters based on detected capabilities.
     
-    Returns:
-        List of FFmpeg parameters for video encoding
+    Delegates to centralized FFmpegConfig.
     """
-    global GPU_CAPABILITY
-    if GPU_CAPABILITY is None:
-        GPU_CAPABILITY = detect_gpu_capabilities()
-    
-    encoder = GPU_CAPABILITY.get('encoder', 'libx264')
-    
-    if encoder == 'h264_vulkan':
-        # Vulkan GPU encoding - let GPU handle quality
-        return [
-            '-c:v', 'h264_vulkan',
-            '-qp', '20',  # Quality parameter for Vulkan
-        ]
-    
-    elif encoder == 'h264_v4l2m2m':
-        # V4L2 hardware encoding (Raspberry Pi, etc.)
-        return [
-            '-c:v', 'h264_v4l2m2m',
-            '-b:v', '8M',  # Target bitrate
-        ]
-    
-    else:
-        # CPU encoding with NEON optimization (ARM64)
-        # FFmpeg automatically uses NEON SIMD on ARM64
-        return [
-            '-c:v', 'libx264',
-            '-preset', FFMPEG_PRESET,
-            '-crf', '20',
-            '-tune', 'film',
-            '-profile:v', 'high',
-            '-level', '4.1',
-        ]
+    return _ffmpeg_config.video_params()
 
 
 def get_files(directory, extensions):
@@ -738,10 +655,13 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
 
     cmd_extract = [
         "ffmpeg", "-y", "-ss", str(start), "-i", input_path,
-        "-t", str(duration), "-c:v", OUTPUT_CODEC, "-preset", "ultrafast",
+        "-t", str(duration), "-c:v", OUTPUT_CODEC, "-preset", FFMPEG_PRESET,
         "-c:a", "copy", output_path
     ]
-    subprocess.run(cmd_extract, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(cmd_extract, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to extract subclip {input_path}: {e}")
 
 # =============================================================================
 # Audio Analysis (delegated to audio_analysis module)

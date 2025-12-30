@@ -25,6 +25,7 @@ from typing import List, Optional
 
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
+from ..logger import logger
 
 
 # Session state - shared across all UpscaleJob instances
@@ -137,9 +138,9 @@ class UpscaleJob(CGPUJob):
         # Check file size and warn
         size_mb = self.input_path.stat().st_size / (1024 * 1024)
         if size_mb > 500:
-            print(f"   ⚠️ Large file ({size_mb:.1f} MB) - upscaling may take a long time")
+            logger.warning(f"Large file ({size_mb:.1f} MB) - upscaling may take a long time")
         if size_mb > 1000:
-            print(f"   ⚠️ Very large file - consider splitting into smaller segments")
+            logger.warning(f"Very large file - consider splitting into smaller segments")
 
         return True
 
@@ -164,13 +165,13 @@ class UpscaleJob(CGPUJob):
                 timeout=30
             )
             if check_success and "ENV_OK" in check_out:
-                print(f"   ♻️ Reusing cached environment")
+                logger.info(f"Reusing cached environment")
                 return True
             else:
-                print(f"   ⚠️ Session expired, re-initializing...")
+                logger.warning(f"Session expired, re-initializing...")
                 _session_env_ready = False
 
-        print(f"   🔧 Setting up Real-ESRGAN environment...")
+        logger.info(f"Setting up Real-ESRGAN environment...")
 
         # Install dependencies with torchvision compatibility patch
         setup_script = '''
@@ -232,10 +233,10 @@ echo "ENV_READY"
             for line in stdout.split('\n'):
                 if line.strip() and not line.startswith('Authenticated'):
                     if 'CUDA' in line or 'GPU' in line or 'PyTorch' in line or 'Memory' in line:
-                        print(f"   [GPU] {line}")
+                        logger.info(f"[GPU] {line}")
 
         _session_env_ready = True
-        print(f"   ✅ Environment ready")
+        logger.info(f"Environment ready")
         return True
 
     def upload(self) -> bool:
@@ -243,7 +244,7 @@ echo "ENV_READY"
         remote_path = f"{self.remote_work_dir}/{self.input_path.name}"
 
         size_mb = self.input_path.stat().st_size / (1024 * 1024)
-        print(f"   ⬆️ Uploading {self.input_path.name} ({size_mb:.1f} MB)...")
+        logger.info(f"Uploading {self.input_path.name} ({size_mb:.1f} MB)...")
 
         # Dynamic timeout based on file size
         timeout = max(600, int(size_mb / 10 * 60))
@@ -252,7 +253,7 @@ echo "ENV_READY"
             self._error = "Failed to upload input file"
             return False
 
-        print(f"   ✅ Upload complete")
+        logger.info(f"Upload complete")
         return True
 
     def run_remote(self) -> bool:
@@ -322,7 +323,7 @@ print("UPSCALE_SUCCESS")
                 self._error = "Failed to upload processing script"
                 return False
 
-            print(f"   🖼️ Upscaling image ({self.scale}x, {self.model})...")
+            logger.info(f"Upscaling image ({self.scale}x, {self.model})...")
             success, stdout, stderr = run_cgpu_command(
                 f"python3 {script_path}",
                 timeout=self.timeout
@@ -490,7 +491,7 @@ print("UPSCALE_SUCCESS")
                 self._error = "Failed to upload processing script"
                 return False
 
-            print(f"   🎬 Upscaling video ({self.scale}x, {self.model})...")
+            logger.info(f"Upscaling video ({self.scale}x, {self.model})...")
             success, stdout, stderr = run_cgpu_command(
                 f"python3 {script_path}",
                 timeout=self.timeout
@@ -501,7 +502,7 @@ print("UPSCALE_SUCCESS")
                 for line in stdout.split('\n'):
                     if line.strip() and not line.startswith('Authenticated'):
                         if any(kw in line for kw in ['/', 'COMPLETE', 'FPS', 'frames', 'Upscaling', 'Resolution']):
-                            print(f"   [GPU] {line}")
+                            logger.info(f"[GPU] {line}")
 
         finally:
             os.unlink(local_script)
@@ -541,12 +542,12 @@ print("UPSCALE_SUCCESS")
         """Download upscaled file."""
         remote_output = f"{self.remote_work_dir}/{self.output_path.name}"
 
-        print(f"   ⬇️ Downloading upscaled file...")
+        logger.info(f"Downloading upscaled file...")
 
         if download_via_base64(remote_output, str(self.output_path)):
             if self.output_path.exists():
                 size_mb = self.output_path.stat().st_size / (1024 * 1024)
-                print(f"   📦 Output: {size_mb:.1f} MB")
+                logger.info(f"Output: {size_mb:.1f} MB")
 
             return JobResult(
                 success=True,

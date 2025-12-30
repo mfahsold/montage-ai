@@ -28,6 +28,7 @@ from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector
 
 from .config import get_settings
+from .logger import logger
 from .moviepy_compat import VideoFileClip
 
 # Import cgpu jobs for offloading
@@ -202,11 +203,11 @@ class SceneDetector:
         Returns:
             List of Scene objects with start/end times
         """
-        print(f"🎬 Detecting scenes in {os.path.basename(video_path)}...")
+        logger.info(f"Detecting scenes in {os.path.basename(video_path)}...")
 
         # Check for Cloud GPU offloading
         if CGPU_AVAILABLE and _settings.llm.cgpu_enabled and is_cgpu_available():
-            print("   ☁️ Offloading scene detection to Cloud GPU...")
+            logger.info("Offloading scene detection to Cloud GPU...")
             try:
                 job = SceneDetectionJob(input_path=video_path, threshold=self.threshold)
                 result = job.execute()
@@ -222,12 +223,12 @@ class SceneDetector:
                             end=s['end'],
                             path=video_path
                         ))
-                    print(f"   ✅ Cloud detection complete: {len(scenes)} scenes found.")
+                    logger.info(f"Cloud detection complete: {len(scenes)} scenes found.")
                     return scenes
                 else:
-                    print(f"   ⚠️ Cloud detection failed: {result.error}. Falling back to local.")
+                    logger.warning(f"Cloud detection failed: {result.error}. Falling back to local.")
             except Exception as e:
-                print(f"   ⚠️ Cloud detection error: {e}. Falling back to local.")
+                logger.warning(f"Cloud detection error: {e}. Falling back to local.")
 
         video = open_video(video_path)
         scene_manager = SceneManager()
@@ -245,7 +246,7 @@ class SceneDetector:
                 path=video_path,
             ))
 
-        print(f"   Found {len(scenes)} scenes.")
+        logger.info(f"Found {len(scenes)} scenes.")
 
         # If no scenes were detected (single shot), use the whole video
         if not scenes:
@@ -253,10 +254,10 @@ class SceneDetector:
                 clip = VideoFileClip(video_path)
                 duration = clip.duration
                 clip.close()
-                print(f"   ⚠️ No cuts detected. Using full video ({duration:.1f}s).")
+                logger.warning(f"No cuts detected. Using full video ({duration:.1f}s).")
                 return [Scene(start=0.0, end=duration, path=video_path)]
             except Exception as e:
-                print(f"   ❌ Could not read video duration: {e}")
+                logger.error(f"Could not read video duration: {e}")
                 return []
 
         return scenes
@@ -348,7 +349,7 @@ class SceneContentAnalyzer:
                 return result
 
         except Exception as e:
-            print(f"   ⚠️ AI Analysis failed: {e}")
+            logger.warning(f"AI Analysis failed: {e}")
 
         return SceneAnalysis.default()
 
@@ -412,7 +413,7 @@ class SceneContentAnalyzer:
                 return SceneAnalysis.from_dict(res_json)
 
         except Exception as e:
-            print(f"   ⚠️ OpenAI Vision API failed, falling back to Ollama: {e}")
+            logger.warning(f"OpenAI Vision API failed, falling back to Ollama: {e}")
 
         return None
 

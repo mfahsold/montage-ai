@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
 
 from .config import get_settings
+from .logger import logger
 from .ffmpeg_config import (
     get_config as get_ffmpeg_config,
     STANDARD_WIDTH_VERTICAL as DEFAULT_STANDARD_WIDTH,
@@ -335,7 +336,7 @@ def probe_metadata(video_path: str, timeout: Optional[int] = None) -> Optional[V
             bitrate=bitrate,
         )
     except Exception as exc:
-        print(f"   ffprobe failed for {os.path.basename(video_path)}: {exc}")
+        logger.warning(f"ffprobe failed for {os.path.basename(video_path)}: {exc}")
         return None
 
 

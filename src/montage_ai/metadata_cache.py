@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 
+from .logger import logger
+
 
 class MetadataCache:
     """Manages video metadata caching for performance optimization."""
@@ -128,7 +130,7 @@ class MetadataCache:
             with open(cache_path, 'w') as f:
                 json.dump(cache_data, f, indent=2)
         except OSError as e:
-            print(f"   ⚠️  Failed to save cache for {video_path}: {e}")
+            logger.warning(f"   ⚠️  Failed to save cache for {video_path}: {e}")
 
     def compute_visual_histogram(self, video_path: str, time_point: float, bins: int = 64) -> List[float]:
         """
@@ -166,7 +168,7 @@ class MetadataCache:
             return hist.tolist()
 
         except Exception as e:
-            print(f"   ⚠️  Histogram computation failed for {video_path} @ {time_point}s: {e}")
+            logger.warning(f"   ⚠️  Histogram computation failed for {video_path} @ {time_point}s: {e}")
             return [0.0] * bins
 
     def compute_brightness(self, video_path: str, time_point: float) -> float:
@@ -365,7 +367,7 @@ class MetadataCache:
         Returns:
             Metadata dictionary with 'scenes' key
         """
-        print(f"   📊 Computing metadata for {os.path.basename(video_path)} ({len(scenes)} scenes)...")
+        logger.info(f"   📊 Computing metadata for {os.path.basename(video_path)} ({len(scenes)} scenes)...")
 
         scene_metadata = []
 
@@ -379,7 +381,7 @@ class MetadataCache:
             scene_metadata.append(scene_meta)
 
             if (i + 1) % 10 == 0:
-                print(f"      Processed {i + 1}/{len(scenes)} scenes...")
+                logger.info(f"      Processed {i + 1}/{len(scenes)} scenes...")
 
         return {'scenes': scene_metadata}
 
@@ -399,7 +401,7 @@ class MetadataCache:
         if not force:
             cached = self.load_metadata_cache(video_path)
             if cached:
-                print(f"   ✓ Using cached metadata for {os.path.basename(video_path)}")
+                logger.info(f"   ✓ Using cached metadata for {os.path.basename(video_path)}")
                 return cached
 
         # Compute metadata
@@ -436,10 +438,10 @@ def precompute_all_metadata(input_dir: str, cache_dir: Optional[str] = None,
                 video_files.append(os.path.join(root, file))
 
     if not video_files:
-        print(f"   ⚠️  No video files found in {input_dir}")
+        logger.warning(f"   ⚠️  No video files found in {input_dir}")
         return 0
 
-    print(f"\n   🔍 Pre-computing metadata for {len(video_files)} videos...")
+    logger.info(f"\n   🔍 Pre-computing metadata for {len(video_files)} videos...")
 
     processed = 0
     skipped = 0
@@ -447,14 +449,14 @@ def precompute_all_metadata(input_dir: str, cache_dir: Optional[str] = None,
     for video_path in video_files:
         if cache_manager.is_cache_valid(video_path):
             skipped += 1
-            print(f"   ✓ Skipped (cached): {os.path.basename(video_path)}")
+            logger.info(f"   ✓ Skipped (cached): {os.path.basename(video_path)}")
         else:
             # Note: This requires scene detection to be run first
             # In practice, this function will be called per-video after scene detection
-            print(f"   ℹ️  Metadata computation will be done during scene analysis for {os.path.basename(video_path)}")
+            logger.info(f"   ℹ️  Metadata computation will be done during scene analysis for {os.path.basename(video_path)}")
             processed += 1
 
-    print(f"\n   ✅ Metadata pre-computation complete: {processed} computed, {skipped} from cache")
+    logger.info(f"\n   ✅ Metadata pre-computation complete: {processed} computed, {skipped} from cache")
 
     return processed
 

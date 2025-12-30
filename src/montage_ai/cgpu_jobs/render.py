@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
+from ..logger import logger
 
 
 class FFmpegRenderJob(CGPUJob):
@@ -43,7 +44,7 @@ class FFmpegRenderJob(CGPUJob):
     def prepare_local(self) -> bool:
         for p in self.input_paths:
             if not p.exists():
-                print(f"Error: Input file not found: {p}")
+                logger.error(f"Input file not found: {p}")
                 return False
         return True
 
@@ -51,28 +52,28 @@ class FFmpegRenderJob(CGPUJob):
         return []  # ffmpeg is usually installed system-wide
 
     def upload(self) -> bool:
-        print(f"Uploading {len(self.input_paths)} input files...")
+        logger.info(f"Uploading {len(self.input_paths)} input files...")
         for p in self.input_paths:
-            print(f"  - {p.name}")
+            logger.info(f"  - {p.name}")
             if not copy_to_remote(str(p), self.remote_work_dir):
                 return False
         return True
 
     def run_remote(self) -> bool:
-        print("Running FFmpeg remotely...")
+        logger.info("Running FFmpeg remotely...")
         # Construct command
         # Ensure we use the remote working directory
         cmd_str = " ".join(self.command_args)
         full_cmd = f"cd {self.remote_work_dir} && ffmpeg -y {cmd_str}"
         
-        print(f"Command: {full_cmd}")
+        logger.info(f"Command: {full_cmd}")
         success, stdout, stderr = run_cgpu_command(full_cmd)
         if not success:
-            print(f"   ❌ FFmpeg failed: {stderr or stdout}")
+            logger.error(f"FFmpeg failed: {stderr or stdout}")
         return success
 
     def download(self) -> JobResult:
-        print("Downloading result...")
+        logger.info("Downloading result...")
         # We save to the directory of the first input file, or current dir?
         # Let's save to the same dir as the first input, or a specific output dir if we had one.
         # For now, save to local current directory or alongside input.

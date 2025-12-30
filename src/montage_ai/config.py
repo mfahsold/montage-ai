@@ -96,6 +96,23 @@ class FeatureConfig:
 
 
 # =============================================================================
+# FFmpeg Configuration
+# =============================================================================
+@dataclass
+class FFmpegSettings:
+    """FFmpeg encoding settings."""
+
+    output_profile: str = field(default_factory=lambda: os.environ.get("OUTPUT_PROFILE", "high"))
+    output_level: str = field(default_factory=lambda: os.environ.get("OUTPUT_LEVEL", "4.1"))
+    output_pix_fmt: str = field(default_factory=lambda: os.environ.get("OUTPUT_PIX_FMT", "yuv420p"))
+    preset: str = field(default_factory=lambda: os.environ.get("FFMPEG_PRESET", "medium"))
+    crf: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_CRF", "18")))
+    threads: str = field(default_factory=lambda: os.environ.get("FFMPEG_THREADS", "0"))
+    audio_codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_CODEC", "aac"))
+    audio_bitrate: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_BITRATE", "192k"))
+
+
+# =============================================================================
 # GPU Configuration
 # =============================================================================
 @dataclass
@@ -103,6 +120,7 @@ class GPUConfig:
     """GPU and hardware acceleration settings."""
 
     use_gpu: str = field(default_factory=lambda: os.environ.get("USE_GPU", "auto").lower())
+    output_codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_CODEC", "h264"))
     ffmpeg_hwaccel: str = field(default_factory=lambda: os.environ.get("FFMPEG_HWACCEL", "auto"))
     use_ffmpeg_mcp: bool = field(default_factory=lambda: os.environ.get("USE_FFMPEG_MCP", "false").lower() == "true")
     ffmpeg_mcp_endpoint: str = field(default_factory=lambda: os.environ.get("FFMPEG_MCP_ENDPOINT", "http://ffmpeg-mcp.montage-ai.svc.cluster.local:8080"))
@@ -129,6 +147,7 @@ class LLMConfig:
     # Google AI
     google_api_key: str = field(default_factory=lambda: os.environ.get("GOOGLE_API_KEY", ""))
     google_ai_model: str = field(default_factory=lambda: os.environ.get("GOOGLE_AI_MODEL", "gemini-2.0-flash"))
+    google_ai_endpoint: str = field(default_factory=lambda: os.environ.get("GOOGLE_AI_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta/models"))
 
     # cgpu (Colab GPU)
     cgpu_enabled: bool = field(default_factory=lambda: os.environ.get("CGPU_ENABLED", "false").lower() == "true")
@@ -136,6 +155,7 @@ class LLMConfig:
     cgpu_host: str = field(default_factory=lambda: os.environ.get("CGPU_HOST", "127.0.0.1"))
     cgpu_port: int = field(default_factory=lambda: int(os.environ.get("CGPU_PORT", "5021")))
     cgpu_model: str = field(default_factory=lambda: os.environ.get("CGPU_MODEL", "gemini-2.5-flash"))
+    cgpu_output_dir: str = field(default_factory=lambda: os.environ.get("CGPU_OUTPUT_DIR", ""))
     cgpu_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_TIMEOUT", "1200")))
     cgpu_max_concurrency: int = field(default_factory=lambda: int(os.environ.get("CGPU_MAX_CONCURRENCY", "1")))
     
@@ -189,6 +209,7 @@ class EncodingConfig:
     level: str = field(default_factory=lambda: os.environ.get("OUTPUT_LEVEL", "4.1"))
     threads: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_THREADS", "0")))
     normalize_clips: bool = field(default_factory=lambda: os.environ.get("NORMALIZE_CLIPS", "true").lower() == "true")
+    extract_reencode: bool = field(default_factory=lambda: os.environ.get("EXTRACT_REENCODE", "false").lower() == "true")
 
     def __post_init__(self) -> None:
         """Apply quality profile defaults when explicit env overrides are absent."""
@@ -218,6 +239,19 @@ class EncodingConfig:
                 self.pix_fmt = "yuv420p10le"
             if "OUTPUT_PROFILE" not in os.environ:
                 self.profile = "main10"
+
+
+# =============================================================================
+# Export Configuration
+# =============================================================================
+@dataclass
+class ExportConfig:
+    """Timeline export and NLE integration settings."""
+    
+    resolution_width: int = field(default_factory=lambda: int(os.environ.get("EXPORT_WIDTH", "1080")))
+    resolution_height: int = field(default_factory=lambda: int(os.environ.get("EXPORT_HEIGHT", "1920")))
+    fps: float = field(default_factory=lambda: float(os.environ.get("EXPORT_FPS", "30.0")))
+    project_name_template: str = field(default_factory=lambda: os.environ.get("EXPORT_PROJECT_NAME", "fluxibri_montage"))
 
 
 # =============================================================================
@@ -392,6 +426,7 @@ class Settings:
     gpu: GPUConfig = field(default_factory=GPUConfig)
     cloud: CloudConfig = field(default_factory=CloudConfig)
     encoding: EncodingConfig = field(default_factory=EncodingConfig)
+    export: ExportConfig = field(default_factory=ExportConfig)
     upscale: UpscaleConfig = field(default_factory=UpscaleConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
     creative: CreativeConfig = field(default_factory=CreativeConfig)
@@ -544,6 +579,11 @@ class Settings:
             "FFMPEG_LONG_TIMEOUT": str(self.processing.ffmpeg_long_timeout),
             "RENDER_TIMEOUT": str(self.processing.render_timeout),
             "FINAL_CRF": str(self.encoding.crf),
+            "EXTRACT_REENCODE": str(self.encoding.extract_reencode).lower(),
+            "EXPORT_WIDTH": str(self.export.resolution_width),
+            "EXPORT_HEIGHT": str(self.export.resolution_height),
+            "EXPORT_FPS": str(self.export.fps),
+            "EXPORT_PROJECT_NAME": self.export.project_name_template,
             "UPSCALE_MODEL": self.upscale.model,
             "UPSCALE_SCALE": str(self.upscale.scale),
             "UPSCALE_FRAME_FORMAT": self.upscale.frame_format,

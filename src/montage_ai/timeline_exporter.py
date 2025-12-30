@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
 
-print(f"DEBUG: Loading timeline_exporter.py from {__file__}")
+from .logger import logger
 
 VERSION = "0.1.0"
 
@@ -34,8 +34,8 @@ try:
     import opentimelineio as otio
     OTIO_AVAILABLE = True
 except ImportError:
-    print("⚠️ OpenTimelineIO not installed. OTIO export disabled.")
-    print("   Install: pip install OpenTimelineIO")
+    logger.warning("⚠️ OpenTimelineIO not installed. OTIO export disabled.")
+    logger.warning("   Install: pip install OpenTimelineIO")
     OTIO_AVAILABLE = False
 
 
@@ -60,6 +60,17 @@ class Timeline:
     resolution: Tuple[int, int] = (1080, 1920)  # 9:16 vertical
     project_name: str = "fluxibri_montage"
 
+    def __post_init__(self):
+        # Load defaults from config if not specified
+        from .config import get_settings
+        settings = get_settings()
+        if self.fps == 30.0: # Default
+             self.fps = settings.export.fps
+        if self.resolution == (1080, 1920): # Default
+             self.resolution = (settings.export.resolution_width, settings.export.resolution_height)
+        if self.project_name == "fluxibri_montage":
+             self.project_name = settings.export.project_name_template
+
 
 class TimelineExporter:
     """
@@ -72,9 +83,12 @@ class TimelineExporter:
     4. Package as NLE project folder
     """
 
-    def __init__(self, output_dir: str = "/data/output"):
-        self.output_dir = output_dir
-        self.proxy_dir = os.path.join(output_dir, "proxies")
+    def __init__(self, output_dir: Optional[str] = None):
+        from .config import get_settings
+        settings = get_settings()
+        
+        self.output_dir = output_dir or str(settings.paths.output_dir)
+        self.proxy_dir = os.path.join(self.output_dir, "proxies")
         os.makedirs(self.proxy_dir, exist_ok=True)
 
     def _sanitize_metadata(self, data: Any) -> Any:
@@ -115,52 +129,52 @@ class TimelineExporter:
         Returns:
             Dictionary of exported file paths
         """
-        print(f"\n📽️ Timeline Exporter v{VERSION}")
-        print(f"   Project: {timeline.project_name}")
-        print(f"   Clips: {len(timeline.clips)}")
-        print(f"   Duration: {timeline.total_duration:.1f}s")
+        logger.info(f"\n📽️ Timeline Exporter v{VERSION}")
+        logger.info(f"   Project: {timeline.project_name}")
+        logger.info(f"   Clips: {len(timeline.clips)}")
+        logger.info(f"   Duration: {timeline.total_duration:.1f}s")
 
         exported_files = {}
 
         # Generate proxies first (if requested)
         if generate_proxies:
-            print("\n🎞️ Generating proxies...")
+            logger.info("\n🎞️ Generating proxies...")
             for clip in timeline.clips:
                 proxy_path = self._generate_proxy(clip.source_path)
                 if proxy_path:
                     clip.proxy_path = proxy_path
-                    print(f"   ✅ {os.path.basename(clip.source_path)}")
+                    logger.info(f"   ✅ {os.path.basename(clip.source_path)}")
 
         # Export OpenTimelineIO
         if export_otio and OTIO_AVAILABLE:
             otio_path = self._export_otio(timeline)
             if otio_path:
                 exported_files['otio'] = otio_path
-                print(f"\n✅ OTIO exported: {otio_path}")
+                logger.info(f"\n✅ OTIO exported: {otio_path}")
 
         # Export CMX EDL
         if export_edl:
             edl_path = self._export_edl(timeline)
             if edl_path:
                 exported_files['edl'] = edl_path
-                print(f"✅ EDL exported: {edl_path}")
+                logger.info(f"✅ EDL exported: {edl_path}")
 
         # Export CSV
         if export_csv:
             csv_path = self._export_csv(timeline)
             if csv_path:
                 exported_files['csv'] = csv_path
-                print(f"✅ CSV exported: {csv_path}")
+                logger.info(f"✅ CSV exported: {csv_path}")
 
         # Export metadata JSON
         metadata_path = self._export_metadata(timeline)
         exported_files['metadata'] = metadata_path
-        print(f"✅ Metadata exported: {metadata_path}")
+        logger.info(f"✅ Metadata exported: {metadata_path}")
 
         # Create project package
         package_path = self._create_project_package(timeline, exported_files)
         exported_files['package'] = package_path
-        print(f"\n📦 Project package: {package_path}")
+        logger.info(f"\n📦 Project package: {package_path}")
 
         return exported_files
 
@@ -209,7 +223,7 @@ class TimelineExporter:
             )
             return proxy_path
         except subprocess.CalledProcessError:
-            print(f"   ⚠️ Proxy generation failed: {source_name}")
+            logger.warning(f"   ⚠️ Proxy generation failed: {source_name}")
             return None
 
     def _export_otio(self, timeline: Timeline) -> Optional[str]:
@@ -313,35 +327,47 @@ class TimelineExporter:
             self.output_dir,
             f"{timeline.project_name}.edl"
         )
+        temp_path = f"{edl_path}.tmp"
 
-        with open(edl_path, 'w') as f:
-            # EDL Header
-            f.write(f"TITLE: {timeline.project_name}\n")
-            f.write(f"FCM: NON-DROP FRAME\n\n")
+        try:
+            with open(temp_path, 'w') as f:
+                # EDL Header
+                f.write(f"TITLE: {timeline.project_name}\n")
+                f.write(f"FCM: NON-DROP FRAME\n\n")
 
-            # EDL Events (one per clip)
-            for i, clip in enumerate(timeline.clips, start=1):
-                # Timecode format: HH:MM:SS:FF (frames at 30fps)
-                src_in = self._seconds_to_timecode(clip.start_time, timeline.fps)
-                src_out = self._seconds_to_timecode(
-                    clip.start_time + clip.duration,
-                    timeline.fps
-                )
-                rec_in = self._seconds_to_timecode(clip.timeline_start, timeline.fps)
-                rec_out = self._seconds_to_timecode(
-                    clip.timeline_start + clip.duration,
-                    timeline.fps
-                )
+                # EDL Events (one per clip)
+                for i, clip in enumerate(timeline.clips, start=1):
+                    # Timecode format: HH:MM:SS:FF (frames at 30fps)
+                    src_in = self._seconds_to_timecode(clip.start_time, timeline.fps)
+                    src_out = self._seconds_to_timecode(
+                        clip.start_time + clip.duration,
+                        timeline.fps
+                    )
+                    rec_in = self._seconds_to_timecode(clip.timeline_start, timeline.fps)
+                    rec_out = self._seconds_to_timecode(
+                        clip.timeline_start + clip.duration,
+                        timeline.fps
+                    )
 
-                # EDL line format:
-                # {event#} {reel} {track} {type} {src_in} {src_out} {rec_in} {rec_out}
-                reel_name = os.path.splitext(os.path.basename(clip.source_path))[0][:8]
-                f.write(f"{i:03d}  {reel_name:<8} V     C        ")
-                f.write(f"{src_in} {src_out} {rec_in} {rec_out}\n")
+                    # EDL line format:
+                    # {event#} {reel} {track} {type} {src_in} {src_out} {rec_in} {rec_out}
+                    reel_name = os.path.splitext(os.path.basename(clip.source_path))[0][:8]
+                    f.write(f"{i:03d}  {reel_name:<8} V     C        ")
+                    f.write(f"{src_in} {src_out} {rec_in} {rec_out}\n")
 
-                # Source file comment
-                f.write(f"* FROM CLIP NAME: {os.path.basename(clip.source_path)}\n")
-                f.write(f"* SOURCE FILE: {clip.source_path}\n\n")
+                    # Source file comment
+                    f.write(f"* FROM CLIP NAME: {os.path.basename(clip.source_path)}\n")
+                    f.write(f"* SOURCE FILE: {clip.source_path}\n\n")
+            
+            # Atomic rename
+            if os.path.exists(edl_path):
+                os.remove(edl_path)
+            os.rename(temp_path, edl_path)
+            
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise e
 
         return edl_path
 
@@ -364,61 +390,73 @@ class TimelineExporter:
             self.output_dir,
             f"{timeline.project_name}.csv"
         )
+        temp_path = f"{csv_path}.tmp"
 
-        with open(csv_path, 'w', newline='') as f:
-            writer = csv.writer(f)
+        try:
+            with open(temp_path, 'w', newline='') as f:
+                writer = csv.writer(f)
 
-            # CSV Header
-            writer.writerow([
-                "Clip #",
-                "Source File",
-                "Source In (sec)",
-                "Source Out (sec)",
-                "Timeline In (sec)",
-                "Timeline Out (sec)",
-                "Duration (sec)",
-                "Source In (TC)",
-                "Source Out (TC)",
-                "Timeline In (TC)",
-                "Timeline Out (TC)",
-                "Energy",
-                "Action",
-                "Shot Type",
-                "Notes"
-            ])
-
-            # CSV Rows (one per clip)
-            for i, clip in enumerate(timeline.clips, start=1):
-                # Get metadata
-                meta = clip.metadata or {}
-                energy = meta.get('energy', 0.5)
-                action = meta.get('action', 'medium')
-                shot = meta.get('shot', 'medium')
-                notes = meta.get('notes', '')
-
-                # Timecodes
-                src_in_tc = self._seconds_to_timecode(clip.start_time, timeline.fps)
-                src_out_tc = self._seconds_to_timecode(clip.start_time + clip.duration, timeline.fps)
-                tl_in_tc = self._seconds_to_timecode(clip.timeline_start, timeline.fps)
-                tl_out_tc = self._seconds_to_timecode(clip.timeline_start + clip.duration, timeline.fps)
-
+                # CSV Header
                 writer.writerow([
-                    i,  # Clip #
-                    clip.source_path,
-                    f"{clip.start_time:.2f}",
-                    f"{clip.start_time + clip.duration:.2f}",
-                    f"{clip.timeline_start:.2f}",
-                    f"{clip.timeline_start + clip.duration:.2f}",
-                    f"{clip.duration:.2f}",
-                    src_in_tc,
-                    src_out_tc,
-                    tl_in_tc,
-                    tl_out_tc,
-                    f"{energy:.2f}",
-                    action,
-                    shot,
-                    notes
+                    "Clip #",
+                    "Source File",
+                    "Source In (sec)",
+                    "Source Out (sec)",
+                    "Timeline In (sec)",
+                    "Timeline Out (sec)",
+                    "Duration (sec)",
+                    "Source In (TC)",
+                    "Source Out (TC)",
+                    "Timeline In (TC)",
+                    "Timeline Out (TC)",
+                    "Energy",
+                    "Action",
+                    "Shot Type",
+                    "Notes"
                 ])
+
+                # CSV Rows (one per clip)
+                for i, clip in enumerate(timeline.clips, start=1):
+                    # Get metadata
+                    meta = clip.metadata or {}
+                    energy = meta.get('energy', 0.5)
+                    action = meta.get('action', 'medium')
+                    shot = meta.get('shot', 'medium')
+                    notes = meta.get('notes', '')
+
+                    # Timecodes
+                    src_in_tc = self._seconds_to_timecode(clip.start_time, timeline.fps)
+                    src_out_tc = self._seconds_to_timecode(clip.start_time + clip.duration, timeline.fps)
+                    tl_in_tc = self._seconds_to_timecode(clip.timeline_start, timeline.fps)
+                    tl_out_tc = self._seconds_to_timecode(clip.timeline_start + clip.duration, timeline.fps)
+
+                    writer.writerow([
+                        i,  # Clip #
+                        clip.source_path,
+                        f"{clip.start_time:.2f}",
+                        f"{clip.start_time + clip.duration:.2f}",
+                        f"{clip.timeline_start:.2f}",
+                        f"{clip.timeline_start + clip.duration:.2f}",
+                        f"{clip.duration:.2f}",
+                        src_in_tc,
+                        src_out_tc,
+                        tl_in_tc,
+                        tl_out_tc,
+                        f"{energy:.2f}",
+                        action,
+                        shot,
+                        notes
+                    ])
+            
+            # Atomic rename
+            if os.path.exists(csv_path):
+                os.remove(csv_path)
+            os.rename(temp_path, csv_path)
+            
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise e
 
         return csv_path
 
@@ -464,10 +502,22 @@ class TimelineExporter:
             self.output_dir,
             f"{timeline.project_name}_metadata.json"
         )
+        temp_path = f"{json_path}.tmp"
 
         sanitized_metadata = self._sanitize_metadata(metadata)
-        with open(json_path, 'w') as f:
-            json.dump(sanitized_metadata, f, indent=2)
+        try:
+            with open(temp_path, 'w') as f:
+                json.dump(sanitized_metadata, f, indent=2)
+            
+            # Atomic rename
+            if os.path.exists(json_path):
+                os.remove(json_path)
+            os.rename(temp_path, json_path)
+            
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise e
 
         return json_path
 
@@ -537,12 +587,14 @@ class TimelineExporter:
         return f"{hours:02d}:{minutes:02d}:{secs:02d}:{frames:02d}"
 
 
+from .config import get_settings
+
 # Convenience function for use in smart_worker.py
 def export_timeline_from_montage(
     clips_data: List[Dict],
     audio_path: str,
     total_duration: float,
-    output_dir: str = "/data/output",
+    output_dir: Optional[str] = None,
     project_name: str = "montage_ai",
     generate_proxies: bool = False,
     resolution: Optional[Tuple[int, int]] = None,

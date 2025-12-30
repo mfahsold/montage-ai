@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import get_settings
+from .logger import logger
 
 _settings = get_settings()
 
@@ -38,7 +39,7 @@ try:
 except Exception as e:
     # Known issue: librosa/numba incompatibility with Python 3.12
     # Error: 'function' object has no attribute 'get_call_template'
-    print(f"   ⚠️ librosa unavailable ({type(e).__name__}: {str(e)[:50]}), using FFmpeg fallback")
+    logger.warning(f"librosa unavailable ({type(e).__name__}: {str(e)[:50]}), using FFmpeg fallback")
     LIBROSA_AVAILABLE = False
 
 from .config import get_settings
@@ -142,7 +143,7 @@ def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
         except Exception:
             pass  # Re-run if corrupt
 
-    print(f"   ☁️ Offloading audio analysis to Cloud GPU...")
+    logger.info("Offloading audio analysis to Cloud GPU...")
     try:
         job = BeatAnalysisJob(input_path=audio_path)
         result = job.execute()
@@ -150,12 +151,12 @@ def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
         if result.success and result.output_path:
             with open(result.output_path, 'r') as f:
                 data = json.load(f)
-            print(f"   ✅ Cloud analysis complete.")
+            logger.info("Cloud analysis complete.")
             return data
         else:
-            print(f"   ⚠️ Cloud analysis failed: {result.error}. Falling back to local.")
+            logger.warning(f"Cloud analysis failed: {result.error}. Falling back to local.")
     except Exception as e:
-        print(f"   ⚠️ Cloud analysis error: {e}. Falling back to local.")
+        logger.warning(f"Cloud analysis error: {e}. Falling back to local.")
 
     return None
 

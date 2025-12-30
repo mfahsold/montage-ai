@@ -13,6 +13,8 @@ import psutil
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
+from .logger import logger
+
 
 @dataclass
 class MemoryStats:
@@ -224,7 +226,7 @@ class AdaptiveMemoryManager:
             "critical": "🚨"
         }.get(pressure, "•")
 
-        print(f"{prefix}{emoji} Memory: {stats.rss_mb:.1f}MB / {stats.limit_mb:.1f}MB "
+        logger.info(f"{prefix}{emoji} Memory: {stats.rss_mb:.1f}MB / {stats.limit_mb:.1f}MB "
               f"({usage_pct * 100:.1f}%) - {pressure.upper()}")
 
     def get_statistics(self) -> dict:
@@ -273,7 +275,7 @@ class MemoryMonitorContext:
     def __enter__(self):
         """Enter context - record starting memory."""
         self.start_mb = self.memory_manager.get_current_usage_mb()
-        print(f"   🔍 [{self.operation_name}] Starting - Memory: {self.start_mb:.1f}MB")
+        logger.info(f"   🔍 [{self.operation_name}] Starting - Memory: {self.start_mb:.1f}MB")
         return self.memory_manager
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -284,12 +286,12 @@ class MemoryMonitorContext:
         emoji = "✓" if delta_mb < 100 else ("⚠️" if delta_mb < 300 else "🚨")
         sign = "+" if delta_mb >= 0 else ""
 
-        print(f"   {emoji} [{self.operation_name}] Finished - Memory: {self.end_mb:.1f}MB "
+        logger.info(f"   {emoji} [{self.operation_name}] Finished - Memory: {self.end_mb:.1f}MB "
               f"({sign}{delta_mb:.1f}MB delta)")
 
         # Suggest cleanup if significant growth
         if delta_mb > 200:
-            print(f"      💡 Suggestion: Consider cleanup (grew by {delta_mb:.1f}MB)")
+            logger.warning(f"      💡 Suggestion: Consider cleanup (grew by {delta_mb:.1f}MB)")
 
         return False  # Don't suppress exceptions
 

@@ -27,6 +27,8 @@ from typing import Tuple, Optional
 from pathlib import Path
 from dataclasses import dataclass
 
+from .logger import logger
+
 
 # ============================================================================
 # Configuration (from environment)
@@ -103,7 +105,7 @@ def is_cgpu_available() -> bool:
     global CGPU_GPU_ENABLED
     CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
     
-    print(f"DEBUG: CGPU_GPU_ENABLED={CGPU_GPU_ENABLED}")
+    logger.debug(f"DEBUG: CGPU_GPU_ENABLED={CGPU_GPU_ENABLED}")
 
     if not CGPU_GPU_ENABLED:
         _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
@@ -117,9 +119,9 @@ def is_cgpu_available() -> bool:
                 text=True,
                 timeout=30
             )
-        print(f"DEBUG: cgpu status returncode={result.returncode}")
-        print(f"DEBUG: cgpu status stdout={result.stdout}")
-        print(f"DEBUG: cgpu status stderr={result.stderr}")
+        logger.debug(f"DEBUG: cgpu status returncode={result.returncode}")
+        logger.debug(f"DEBUG: cgpu status stdout={result.stdout}")
+        logger.debug(f"DEBUG: cgpu status stderr={result.stderr}")
         # Check for "Authenticated" OR if it just returns success (some versions differ)
         if result.returncode != 0:
             _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
@@ -129,7 +131,7 @@ def is_cgpu_available() -> bool:
         _CGPU_AVAIL_CACHE.update({"ok": gpu_ok, "checked_at": now})
         return gpu_ok
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        print(f"DEBUG: cgpu status failed with {e}")
+        logger.debug(f"DEBUG: cgpu status failed with {e}")
         _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
         return False
 
@@ -258,7 +260,7 @@ def run_cgpu_command(
 
             # Check for session invalidation errors
             if "session expired" in result.stderr.lower() or "not authenticated" in result.stderr.lower():
-                print(f"   ⚠️ cgpu session expired, attempting reconnection...")
+                logger.warning(f"   ⚠️ cgpu session expired, attempting reconnection...")
                 # Try to reconnect (cgpu status triggers re-auth)
                 subprocess.run(["cgpu", "status"], capture_output=True, timeout=30)
                 if attempt < retries:
@@ -270,7 +272,7 @@ def run_cgpu_command(
 
             if "command finished without reporting an exit code" in result.stderr.lower():
                 if attempt < retries:
-                    print("   ⚠️ cgpu command missing exit code, retrying...")
+                    logger.warning("   ⚠️ cgpu command missing exit code, retrying...")
                     time.sleep(retry_delay)
                     continue
 
@@ -279,12 +281,12 @@ def run_cgpu_command(
         except subprocess.TimeoutExpired:
             last_error = f"Timeout after {timeout}s"
             # For timeout, don't retry - it's likely the command will timeout again
-            print(f"   ⚠️ cgpu command timed out after {timeout}s")
+            logger.warning(f"   ⚠️ cgpu command timed out after {timeout}s")
             break  # Don't retry on timeout
         except Exception as e:
             last_error = str(e)
             if attempt < retries:
-                print(f"   ⚠️ Error on attempt {attempt+1}/{retries+1}: {e}, retrying...")
+                logger.warning(f"   ⚠️ Error on attempt {attempt+1}/{retries+1}: {e}, retrying...")
                 time.sleep(retry_delay)
                 continue
 
@@ -352,7 +354,7 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
         if remote_dir:
             ok, _, stderr = run_cgpu_command(f"mkdir -p {remote_dir}", timeout=30)
             if not ok:
-                print(f"   ❌ Failed to create remote directory: {stderr}")
+                logger.error(f"   ❌ Failed to create remote directory: {stderr}")
                 return False
 
         with cgpu_slot():
@@ -364,21 +366,21 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
             )
 
         if result.returncode != 0:
-            print(f"   ❌ cgpu copy failed (file: {os.path.basename(local_path)}, size: {file_size_mb:.1f}MB)")
+            logger.error(f"   ❌ cgpu copy failed (file: {os.path.basename(local_path)}, size: {file_size_mb:.1f}MB)")
             if result.stderr:
                 # Show first line of error
                 error_line = result.stderr.strip().split('\n')[0]
-                print(f"      Error: {error_line}")
+                logger.error(f"      Error: {error_line}")
             return False
 
         return True
 
     except subprocess.TimeoutExpired:
-        print(f"   ❌ Upload timeout after {timeout}s (file: {os.path.basename(local_path)})")
-        print(f"      → File may be too large ({file_size_mb:.1f}MB), consider increasing timeout")
+        logger.error(f"   ❌ Upload timeout after {timeout}s (file: {os.path.basename(local_path)})")
+        logger.error(f"      → File may be too large ({file_size_mb:.1f}MB), consider increasing timeout")
         return False
     except Exception as e:
-        print(f"   ❌ Copy to remote failed: {e}")
+        logger.error(f"   ❌ Copy to remote failed: {e}")
         return False
 
 
@@ -406,7 +408,7 @@ def download_via_base64(
     )
     
     if not success:
-        print(f"   ❌ Download failed: {stderr}")
+        logger.error(f"   ❌ Download failed: {stderr}")
         return False
     
     try:
@@ -427,7 +429,7 @@ def download_via_base64(
         return True
         
     except Exception as e:
-        print(f"   ❌ Failed to decode/save: {e}")
+        logger.error(f"   ❌ Failed to decode/save: {e}")
         return False
 
 

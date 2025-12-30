@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
+from ..logger import logger
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
 
@@ -75,7 +76,7 @@ class TranscribeJob(CGPUJob):
         # Check file size (warn if large)
         size_mb = self.audio_path.stat().st_size / (1024 * 1024)
         if size_mb > 500:
-            print(f"   ⚠️ Large file ({size_mb:.1f} MB) - transcription may take a while")
+            logger.warning(f"Large file ({size_mb:.1f} MB) - transcription may take a while")
 
         return True
 
@@ -87,7 +88,7 @@ class TranscribeJob(CGPUJob):
         """Upload audio file to remote."""
         remote_path = f"{self.remote_work_dir}/{self.audio_path.name}"
 
-        print(f"   ⬆️ Uploading {self.audio_path.name}...")
+        logger.info(f"Uploading {self.audio_path.name}...")
         if not copy_to_remote(str(self.audio_path), remote_path):
             self._error = "Failed to upload audio file"
             return False
@@ -112,7 +113,7 @@ class TranscribeJob(CGPUJob):
 
         cmd = " && ".join([cmd_parts[0], " ".join(cmd_parts[1:])])
 
-        print(f"   🎤 Running Whisper ({self.model})...")
+        logger.info(f"Running Whisper ({self.model})...")
         success, stdout, stderr = run_cgpu_command(cmd, timeout=self.timeout)
 
         if not success:
@@ -128,7 +129,7 @@ class TranscribeJob(CGPUJob):
         remote_output = f"{self.remote_work_dir}/{output_filename}"
         local_output = self.output_dir / output_filename
 
-        print(f"   ⬇️ Downloading {output_filename}...")
+        logger.info(f"Downloading {output_filename}...")
 
         if download_via_base64(remote_output, str(local_output)):
             self._output_path = local_output

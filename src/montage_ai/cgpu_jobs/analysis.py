@@ -15,6 +15,8 @@ from typing import List, Dict, Any, Optional
 
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
+from ..logger import logger
+from ..config import get_settings
 
 
 def _pick_local_output_path(input_path: Path, suffix: str) -> Path:
@@ -24,8 +26,13 @@ def _pick_local_output_path(input_path: Path, suffix: str) -> Path:
     if os.access(candidate.parent, os.W_OK):
         return candidate
 
-    cache_root = os.environ.get("CGPU_OUTPUT_DIR")
-    for root in [cache_root, "/data/output", "/tmp"]:
+    settings = get_settings()
+    cache_root = settings.llm.cgpu_output_dir
+    
+    # Use configured paths instead of hardcoded ones
+    search_paths = [cache_root, str(settings.paths.output_dir), str(settings.paths.temp_dir)]
+    
+    for root in search_paths:
         if root and os.path.isdir(root) and os.access(root, os.W_OK):
             path_hash = hashlib.sha1(str(input_path).encode("utf-8")).hexdigest()[:8]
             filename = f"{input_path.stem}.{path_hash}{safe_suffix}"
@@ -49,7 +56,7 @@ class SceneDetectionJob(CGPUJob):
 
     def prepare_local(self) -> bool:
         if not self.input_path.exists():
-            print(f"Error: Input file not found: {self.input_path}")
+            logger.error(f"Input file not found: {self.input_path}")
             return False
         return True
 
@@ -58,7 +65,7 @@ class SceneDetectionJob(CGPUJob):
 
     def upload(self) -> bool:
         # 1. Upload video
-        print(f"Uploading {self.input_path.name}...")
+        logger.info(f"Uploading {self.input_path.name}...")
         remote_video = f"{self.remote_work_dir}/{self.input_path.name}"
         if not copy_to_remote(str(self.input_path), remote_video):
             return False
@@ -101,22 +108,22 @@ if __name__ == "__main__":
             tmp.write(script_content)
             tmp_path = tmp.name
         
-        print("Uploading analysis script...")
+        logger.info("Uploading analysis script...")
         remote_script = f"{self.remote_work_dir}/detect_scenes.py"
         success = copy_to_remote(tmp_path, remote_script)
         os.unlink(tmp_path)
         return success
 
     def run_remote(self) -> bool:
-        print("Running scene detection remotely...")
+        logger.info("Running scene detection remotely...")
         cmd = f"cd {self.remote_work_dir} && python detect_scenes.py"
         success, stdout, stderr = run_cgpu_command(cmd)
         if not success:
-            print(f"   ❌ Scene detection failed: {stderr or stdout}")
+            logger.error(f"Scene detection failed: {stderr or stdout}")
         return success
 
     def download(self) -> JobResult:
-        print("Downloading results...")
+        logger.info("Downloading results...")
         local_output = _pick_local_output_path(self.input_path, ".scenes.json")
         remote_path = f"{self.remote_work_dir}/{self.output_filename}"
         
@@ -147,7 +154,7 @@ class BeatAnalysisJob(CGPUJob):
 
     def prepare_local(self) -> bool:
         if not self.input_path.exists():
-            print(f"Error: Input file not found: {self.input_path}")
+            logger.error(f"Input file not found: {self.input_path}")
             return False
         return True
 
@@ -156,7 +163,7 @@ class BeatAnalysisJob(CGPUJob):
 
     def upload(self) -> bool:
         # 1. Upload audio
-        print(f"Uploading {self.input_path.name}...")
+        logger.info(f"Uploading {self.input_path.name}...")
         remote_audio = f"{self.remote_work_dir}/{self.input_path.name}"
         if not copy_to_remote(str(self.input_path), remote_audio):
             return False
@@ -205,22 +212,22 @@ if __name__ == "__main__":
             tmp.write(script_content)
             tmp_path = tmp.name
         
-        print("Uploading analysis script...")
+        logger.info("Uploading analysis script...")
         remote_script = f"{self.remote_work_dir}/analyze_audio.py"
         success = copy_to_remote(tmp_path, remote_script)
         os.unlink(tmp_path)
         return success
 
     def run_remote(self) -> bool:
-        print("Running audio analysis remotely...")
+        logger.info("Running audio analysis remotely...")
         cmd = f"cd {self.remote_work_dir} && python analyze_audio.py"
         success, stdout, stderr = run_cgpu_command(cmd)
         if not success:
-            print(f"   ❌ Audio analysis failed: {stderr or stdout}")
+            logger.error(f"Audio analysis failed: {stderr or stdout}")
         return success
 
     def download(self) -> JobResult:
-        print("Downloading results...")
+        logger.info("Downloading results...")
         local_output = _pick_local_output_path(self.input_path, ".analysis.json")
         remote_path = f"{self.remote_work_dir}/{self.output_filename}"
         

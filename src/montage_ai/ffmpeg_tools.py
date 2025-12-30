@@ -28,6 +28,7 @@ import os
 import subprocess
 import json
 import tempfile
+from .config import get_settings
 import shutil
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Callable, Union
@@ -98,7 +99,9 @@ class FFmpegToolkit:
     - Stabilization
     """
     
-    def __init__(self, temp_dir: str = "/tmp/ffmpeg_tools"):
+    def __init__(self, temp_dir: Optional[str] = None):
+        if temp_dir is None:
+            temp_dir = str(get_settings().paths.temp_dir / "ffmpeg_tools")
         self.temp_dir = Path(temp_dir)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.tools: Dict[str, FFmpegTool] = {}
@@ -449,7 +452,7 @@ class FFmpegToolkit:
         lut_path = params.get("lut_path")
         
         # Check for LUT directory (mounted volume or local)
-        lut_dir = os.environ.get("LUT_DIR", "/data/luts")
+        lut_dir = str(get_settings().paths.lut_dir)
         
         # Extended presets with professional color grading
         # Each preset has: filter chain OR lut file name

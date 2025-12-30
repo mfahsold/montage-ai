@@ -29,6 +29,9 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 
+from .logger import logger
+from .config import get_settings
+
 
 class LogLevel(Enum):
     DEBUG = "🔬"
@@ -114,7 +117,7 @@ class Monitor:
                     if cgpu_stats:
                         msg += f" | {cgpu_stats}"
                         
-                    print(msg)
+                    logger.info(msg)
                 except Exception:
                     pass
                 if self._stop_event.wait(self._mem_interval):
@@ -130,7 +133,10 @@ class Monitor:
         Keeps full pod logs on the output PVC so they are retrievable
         even after the Job has finished.
         """
-        log_path = os.environ.get("LOG_FILE", "/data/output/render.log")
+        log_path = os.environ.get("LOG_FILE")
+        if not log_path:
+            log_path = str(get_settings().paths.output_dir / "render.log")
+
         try:
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
             self._log_file = open(log_path, "a", buffering=1, encoding="utf-8")
@@ -163,7 +169,7 @@ class Monitor:
             sys.stdout = _Tee(sys.stdout, self._log_file)
             sys.stderr = _Tee(sys.stderr, self._log_file)
             self._tee_enabled = True
-            print(f"[monitor] tee logging enabled → {log_path}")
+            logger.info(f"[monitor] tee logging enabled → {log_path}")
 
             def _cleanup():
                 try:
@@ -187,18 +193,18 @@ class Monitor:
 
             atexit.register(_cleanup)
         except Exception as exc:
-            print(f"[monitor] ⚠️ Could not enable tee logging: {exc}")
+            logger.warning(f"[monitor] ⚠️ Could not enable tee logging: {exc}")
     
     def _print_header(self):
         """Print startup banner with job info"""
-        print("\n" + "=" * 70)
-        print(f"🎬 FLUXIBRI VIDEO EDITOR - LIVE MONITOR")
-        print("=" * 70)
-        print(f"   Job ID:     {self.job_id}")
-        print(f"   Started:    {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"   PID:        {os.getpid()}")
-        print(f"   Verbose:    {self.verbose}")
-        print("=" * 70 + "\n")
+        logger.info("\n" + "=" * 70)
+        logger.info(f"🎬 FLUXIBRI VIDEO EDITOR - LIVE MONITOR")
+        logger.info("=" * 70)
+        logger.info(f"   Job ID:     {self.job_id}")
+        logger.info(f"   Started:    {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"   PID:        {os.getpid()}")
+        logger.info(f"   Verbose:    {self.verbose}")
+        logger.info("=" * 70 + "\n")
     
     def _log(self, level: LogLevel, category: str, message: str, data: Dict = None, duration_ms: float = None):
         """Internal logging with formatted output"""
@@ -226,20 +232,20 @@ class Monitor:
                 else:
                     dur_str = f" ({duration_ms:.0f}ms)"
             
-            print(f"{time_str} {icon} {cat_str} {message}{dur_str}")
+            logger.info(f"{time_str} {icon} {cat_str} {message}{dur_str}")
             
             # Print data details if present
             if data and self.verbose:
                 for key, value in data.items():
                     if isinstance(value, float):
-                        print(f"           └─ {key}: {value:.3f}")
+                        logger.info(f"           └─ {key}: {value:.3f}")
                     elif isinstance(value, list) and len(value) <= 5:
-                        print(f"           └─ {key}: {value}")
+                        logger.info(f"           └─ {key}: {value}")
                     elif isinstance(value, dict):
-                        print(f"           └─ {key}: {json.dumps(value, indent=2)[:100]}...")
+                        logger.info(f"           └─ {key}: {json.dumps(value, indent=2)[:100]}...")
                     else:
                         val_str = str(value)[:80]
-                        print(f"           └─ {key}: {val_str}")
+                        logger.info(f"           └─ {key}: {val_str}")
     
     # ==================== PHASE TRACKING ====================
     
@@ -253,9 +259,9 @@ class Monitor:
         self.phase = phase_name
         self.phase_start = time.time()
         
-        print(f"\n{'─' * 60}")
-        print(f"📍 PHASE: {phase_name.upper()}")
-        print(f"{'─' * 60}")
+        logger.info(f"\n{'─' * 60}")
+        logger.info(f"📍 PHASE: {phase_name.upper()}")
+        logger.info(f"{'─' * 60}")
     
     def end_phase(self, summary: Dict = None):
         """Mark the end of current phase with optional summary"""
@@ -265,10 +271,10 @@ class Monitor:
         elapsed = (time.time() - self.phase_start) * 1000
         self.phase_times[self.phase] = elapsed
         
-        print(f"\n   ✓ Phase '{self.phase}' completed in {elapsed/1000:.1f}s")
+        logger.info(f"\n   ✓ Phase '{self.phase}' completed in {elapsed/1000:.1f}s")
         if summary:
             for key, value in summary.items():
-                print(f"      • {key}: {value}")
+                logger.info(f"      • {key}: {value}")
         
         self.phase_start = None
     
@@ -468,17 +474,17 @@ class Monitor:
         filled = int(bar_len * cut_num / total_cuts) if total_cuts > 0 else 0
         bar = "█" * filled + "░" * (bar_len - filled)
         
-        print(f"\n   ┌─ Cut #{cut_num} [{bar}] {pct:.0f}%")
-        print(f"   │  📹 {os.path.basename(clip_name)}")
-        print(f"   │  ⏱️  {start:.2f}s → {start+duration:.2f}s ({duration:.2f}s)")
-        print(f"   │  🎵 Beat {beat_idx} + {beats_per_cut} beats")
-        print(f"   │  ⚡ Energy: {energy:.2f} | Score: {score}")
-        print(f"   └─ 💡 {reason}")
+        logger.info(f"\n   ┌─ Cut #{cut_num} [{bar}] {pct:.0f}%")
+        logger.info(f"   │  📹 {os.path.basename(clip_name)}")
+        logger.info(f"   │  ⏱️  {start:.2f}s → {start+duration:.2f}s ({duration:.2f}s)")
+        logger.info(f"   │  🎵 Beat {beat_idx} + {beats_per_cut} beats")
+        logger.info(f"   │  ⚡ Energy: {energy:.2f} | Score: {score}")
+        logger.info(f"   └─ 💡 {reason}")
     
     def log_cut_summary(self, cut_num: int, total_expected: int, timeline_pos: float):
         """Quick progress update for cuts"""
         if cut_num % 5 == 0 or cut_num == total_expected:  # Every 5th cut
-            print(f"   📍 Progress: {cut_num} cuts placed, timeline @ {timeline_pos:.1f}s")
+            logger.info(f"   📍 Progress: {cut_num} cuts placed, timeline @ {timeline_pos:.1f}s")
     
     def log_clip_selection(self, selected: str, candidates: List[Dict], 
                            winning_score: int, selection_reason: str):
@@ -496,23 +502,23 @@ class Monitor:
     
     def log_transition_applied(self, transition_type: str, duration: float, reason: str):
         """Log transition decision"""
-        print(f"   │  🔄 Transition: {transition_type} ({duration:.2f}s) - {reason}")
+        logger.info(f"   │  🔄 Transition: {transition_type} ({duration:.2f}s) - {reason}")
     
     def log_enhancement_applied(self, clip_num: int, enhancements: List[str], duration_ms: float):
         """Log applied enhancements"""
         enh_str = " + ".join(enhancements) if enhancements else "none"
-        print(f"   │  ✨ Enhancements: {enh_str} ({duration_ms:.0f}ms)")
+        logger.info(f"   │  ✨ Enhancements: {enh_str} ({duration_ms:.0f}ms)")
     
     # ==================== RENDERING PHASE ====================
     
     def log_render_start(self, output_path: str, settings: Dict):
         """Log render start"""
-        print(f"\n{'─' * 60}")
-        print(f"🚀 RENDERING")
-        print(f"{'─' * 60}")
-        print(f"   Output: {os.path.basename(output_path)}")
+        logger.info(f"\n{'─' * 60}")
+        logger.info(f"🚀 RENDERING")
+        logger.info(f"{'─' * 60}")
+        logger.info(f"   Output: {os.path.basename(output_path)}")
         for key, value in settings.items():
-            print(f"   • {key}: {value}")
+            logger.info(f"   • {key}: {value}")
     
     def log_render_progress(self, frame: int, total_frames: int, fps: float):
         """Log render progress"""
@@ -585,30 +591,30 @@ class Monitor:
         """Print final job summary"""
         total_time = time.time() - self.start_time
         
-        print("\n" + "=" * 70)
-        print("📋 JOB SUMMARY")
-        print("=" * 70)
-        print(f"   Job ID:         {self.job_id}")
-        print(f"   Total Duration: {total_time:.1f}s ({total_time/60:.1f}min)")
-        print(f"   Clips Processed: {self.processed_count}")
-        print(f"   Decisions Made: {len(self.decisions)}")
-        print(f"   Events Logged:  {len(self.events)}")
+        logger.info("\n" + "=" * 70)
+        logger.info("📋 JOB SUMMARY")
+        logger.info("=" * 70)
+        logger.info(f"   Job ID:         {self.job_id}")
+        logger.info(f"   Total Duration: {total_time:.1f}s ({total_time/60:.1f}min)")
+        logger.info(f"   Clips Processed: {self.processed_count}")
+        logger.info(f"   Decisions Made: {len(self.decisions)}")
+        logger.info(f"   Events Logged:  {len(self.events)}")
         
         # Phase breakdown
         if self.phase_times:
-            print(f"\n   ⏱️ Phase Timing:")
+            logger.info(f"\n   ⏱️ Phase Timing:")
             for phase, ms in self.phase_times.items():
                 pct = (ms / (total_time * 1000)) * 100
-                print(f"      • {phase}: {ms/1000:.1f}s ({pct:.0f}%)")
+                logger.info(f"      • {phase}: {ms/1000:.1f}s ({pct:.0f}%)")
         
         # Metric summaries
         if self.metrics:
-            print(f"\n   📈 Metrics:")
+            logger.info(f"\n   📈 Metrics:")
             for name, values in self.metrics.items():
                 avg = sum(values) / len(values)
-                print(f"      • {name}: avg={avg:.2f}, count={len(values)}")
+                logger.info(f"      • {name}: avg={avg:.2f}, count={len(values)}")
         
-        print("=" * 70 + "\n")
+        logger.info("=" * 70 + "\n")
     
     def export_json(self, filepath: str):
         """Export all monitoring data as JSON"""

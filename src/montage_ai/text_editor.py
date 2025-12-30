@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple
 
 from .ffmpeg_config import get_config
+from .logger import logger
 
 
 @dataclass
@@ -545,8 +546,8 @@ class TextEditor:
         if not cut_list:
             raise ValueError("No content to export (everything removed?)")
 
-        print(f"   {len(cut_list)} segments to keep")
-        print(f"   🔊 Using {audio_crossfade_ms}ms audio crossfades for smooth cuts")
+        logger.info(f"   {len(cut_list)} segments to keep")
+        logger.info(f"   🔊 Using {audio_crossfade_ms}ms audio crossfades for smooth cuts")
 
         # Get hardware optimized config
         # If codec is default libx264, allow auto-detection of GPU
@@ -554,7 +555,7 @@ class TextEditor:
         config = get_config("auto" if use_hw_accel else "none")
         
         if use_hw_accel and config.is_gpu_accelerated:
-            print(f"   🚀 Using GPU acceleration: {config.gpu_encoder_type}")
+            logger.info(f"   🚀 Using GPU acceleration: {config.gpu_encoder_type}")
         
         # Prepare inputs and filters
         inputs = []
@@ -628,20 +629,20 @@ class TextEditor:
         # Output path
         cmd.append(output_path)
 
-        print(f"   Rendering...")
-        # print(" ".join(cmd)) # Debug
+        logger.info(f"   Rendering...")
+        # logger.debug(" ".join(cmd)) # Debug
         
         try:
             subprocess.run(cmd, check=True)
         except subprocess.CalledProcessError as e:
             # Fallback for "Argument list too long" or other errors
-            print(f"   ⚠️ Render failed: {e}")
-            print("   Falling back to segment-based rendering...")
+            logger.warning(f"   ⚠️ Render failed: {e}")
+            logger.warning("   Falling back to segment-based rendering...")
             return self._export_fallback(output_path, codec, crf, preset, audio_crossfade_ms)
 
         stats = self.get_stats()
-        print(f"   Removed {stats['removed_duration']:.1f}s ({stats['removal_percentage']:.1f}%)")
-        print(f"   Output: {output_path}")
+        logger.info(f"   Removed {stats['removed_duration']:.1f}s ({stats['removal_percentage']:.1f}%)")
+        logger.info(f"   Output: {output_path}")
 
         return output_path
 
@@ -707,7 +708,7 @@ class TextEditor:
             output_path
         ]
 
-        print(f"   Rendering (fallback)...")
+        logger.info(f"   Rendering (fallback)...")
         subprocess.run(cmd, check=True)
 
         # Cleanup temp files
@@ -716,8 +717,8 @@ class TextEditor:
             Path(seg_file).unlink()
 
         stats = self.get_stats()
-        print(f"   Removed {stats['removed_duration']:.1f}s ({stats['removal_percentage']:.1f}%)")
-        print(f"   Output: {output_path}")
+        logger.info(f"   Removed {stats['removed_duration']:.1f}s ({stats['removal_percentage']:.1f}%)")
+        logger.info(f"   Output: {output_path}")
 
         return output_path
 
@@ -767,7 +768,7 @@ class TextEditor:
             record_in += region.end - region.start
 
         Path(output_path).write_text("\n".join(lines))
-        print(f"   EDL exported: {output_path}")
+        logger.info(f"   EDL exported: {output_path}")
         return output_path
 
     def export_json(self, output_path: str) -> str:

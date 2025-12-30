@@ -21,10 +21,13 @@ import uuid
 from typing import Optional, Tuple
 from pathlib import Path
 
+from .config import get_settings
+from .logger import logger
+
 
 def _log(msg: str):
-    """Print with immediate flush for real-time logging."""
-    print(msg, flush=True)
+    """Log message using centralized logger."""
+    logger.info(msg)
 
 
 # Configuration
@@ -94,7 +97,7 @@ def upscale_with_cgpu(
     Uses polling approach to avoid hanging on cgpu run.
     """
     if not is_cgpu_available():
-        print("   ❌ cgpu not available")
+        logger.error("   ❌ cgpu not available")
         return None
     
     # Unique job ID for parallel safety
@@ -117,7 +120,7 @@ def upscale_with_cgpu(
         
         # 3. Generate and upload processing script
         script = _generate_pipeline_script(work_dir, scale, model)
-        script_path = f"/tmp/cgpu_script_{job_id}.py"
+        script_path = str(get_settings().paths.temp_dir / f"cgpu_script_{job_id}.py")
         with open(script_path, 'w') as f:
             f.write(script)
         

@@ -23,6 +23,8 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 import json
 
+from .logger import logger
+
 
 class ShotType(Enum):
     """Cinematographic shot classification"""
@@ -225,7 +227,7 @@ class DeepFootageAnalyzer:
             return analysis
             
         except Exception as e:
-            print(f"   ⚠️ Analysis failed for {video_path}: {e}")
+            logger.warning(f"   ⚠️ Analysis failed for {video_path}: {e}")
             return analysis
     
     def _analyze_visuals(self, frames: List[np.ndarray]) -> VisualCharacteristics:
@@ -550,39 +552,39 @@ class DeepFootageAnalyzer:
     
     def _print_analysis(self, analysis: SceneAnalysis):
         """Print formatted analysis results"""
-        print(f"\n   {'─' * 50}")
-        print(f"   📹 CLIP ANALYSIS: {analysis.source_file}")
-        print(f"   {'─' * 50}")
-        print(f"   ⏱️  Duration: {analysis.duration:.1f}s ({analysis.start_time:.1f}s - {analysis.end_time:.1f}s)")
-        print(f"   📐 Resolution: {analysis.resolution[0]}x{analysis.resolution[1]} @ {analysis.fps:.0f}fps")
-        print()
-        print(f"   🎬 VISUAL CHARACTERISTICS:")
-        print(f"      • Brightness: {analysis.visual.avg_brightness:.2f} (variance: {analysis.visual.brightness_variance:.2f})")
-        print(f"      • Saturation: {analysis.visual.color_saturation:.2f}")
-        print(f"      • Contrast: {analysis.visual.contrast:.2f}")
-        print(f"      • Color Temp: {', '.join(analysis.visual.dominant_colors)}")
-        print(f"      • Sharpness: {1-analysis.visual.blur_amount:.2f}")
-        print()
-        print(f"   🎥 MOTION ANALYSIS:")
-        print(f"      • Type: {analysis.motion.motion_type}")
-        print(f"      • Intensity: {analysis.motion.motion_intensity:.2f}")
-        print(f"      • Camera Shake: {analysis.motion.camera_shake:.2f}")
-        print()
-        print(f"   📖 NARRATIVE QUALITIES:")
-        print(f"      • Shot Type: {analysis.narrative.shot_type}")
-        print(f"      • Mood: {analysis.narrative.mood}")
-        print(f"      • Energy Level: {analysis.narrative.energy_level:.2f}")
-        print(f"      • Establishing: {analysis.narrative.establishing_potential:.2f}")
-        print(f"      • Climax: {analysis.narrative.climax_potential:.2f}")
-        print(f"      • Transition: {analysis.narrative.transition_potential:.2f}")
-        print(f"      • Closing: {analysis.narrative.closing_potential:.2f}")
-        print()
-        print(f"   📝 DESCRIPTION:")
-        print(f"      {analysis.description}")
-        print()
-        print(f"   🏷️  TAGS: {', '.join(analysis.tags)}")
-        print(f"   💡 BEST FOR: {', '.join(analysis.best_used_for)}")
-        print(f"   {'─' * 50}")
+        logger.info(f"\n   {'─' * 50}")
+        logger.info(f"   📹 CLIP ANALYSIS: {analysis.source_file}")
+        logger.info(f"   {'─' * 50}")
+        logger.info(f"   ⏱️  Duration: {analysis.duration:.1f}s ({analysis.start_time:.1f}s - {analysis.end_time:.1f}s)")
+        logger.info(f"   📐 Resolution: {analysis.resolution[0]}x{analysis.resolution[1]} @ {analysis.fps:.0f}fps")
+        logger.info("")
+        logger.info(f"   🎬 VISUAL CHARACTERISTICS:")
+        logger.info(f"      • Brightness: {analysis.visual.avg_brightness:.2f} (variance: {analysis.visual.brightness_variance:.2f})")
+        logger.info(f"      • Saturation: {analysis.visual.color_saturation:.2f}")
+        logger.info(f"      • Contrast: {analysis.visual.contrast:.2f}")
+        logger.info(f"      • Color Temp: {', '.join(analysis.visual.dominant_colors)}")
+        logger.info(f"      • Sharpness: {1-analysis.visual.blur_amount:.2f}")
+        logger.info("")
+        logger.info(f"   🎥 MOTION ANALYSIS:")
+        logger.info(f"      • Type: {analysis.motion.motion_type}")
+        logger.info(f"      • Intensity: {analysis.motion.motion_intensity:.2f}")
+        logger.info(f"      • Camera Shake: {analysis.motion.camera_shake:.2f}")
+        logger.info("")
+        logger.info(f"   📖 NARRATIVE QUALITIES:")
+        logger.info(f"      • Shot Type: {analysis.narrative.shot_type}")
+        logger.info(f"      • Mood: {analysis.narrative.mood}")
+        logger.info(f"      • Energy Level: {analysis.narrative.energy_level:.2f}")
+        logger.info(f"      • Establishing: {analysis.narrative.establishing_potential:.2f}")
+        logger.info(f"      • Climax: {analysis.narrative.climax_potential:.2f}")
+        logger.info(f"      • Transition: {analysis.narrative.transition_potential:.2f}")
+        logger.info(f"      • Closing: {analysis.narrative.closing_potential:.2f}")
+        logger.info("")
+        logger.info(f"   📝 DESCRIPTION:")
+        logger.info(f"      {analysis.description}")
+        logger.info("")
+        logger.info(f"   🏷️  TAGS: {', '.join(analysis.tags)}")
+        logger.info(f"   💡 BEST FOR: {', '.join(analysis.best_used_for)}")
+        logger.info(f"   {'─' * 50}")
     
     def get_footage_summary(self) -> Dict[str, Any]:
         """Generate a summary of all analyzed footage"""
@@ -645,49 +647,49 @@ class DeepFootageAnalyzer:
         """Print human-readable footage summary"""
         summary = self.get_footage_summary()
         if not summary:
-            print("   No footage analyzed yet.")
+            logger.info("   No footage analyzed yet.")
             return
         
-        print(f"\n{'=' * 60}")
-        print(f"📊 DEEP FOOTAGE ANALYSIS SUMMARY")
-        print(f"{'=' * 60}")
-        print(f"\n   📁 Total Clips: {summary['total_clips']}")
-        print(f"   ⏱️  Total Duration: {summary['total_duration']:.1f}s ({summary['total_duration']/60:.1f} min)")
+        logger.info(f"\n{'=' * 60}")
+        logger.info(f"📊 DEEP FOOTAGE ANALYSIS SUMMARY")
+        logger.info(f"{'=' * 60}")
+        logger.info(f"\n   📁 Total Clips: {summary['total_clips']}")
+        logger.info(f"   ⏱️  Total Duration: {summary['total_duration']:.1f}s ({summary['total_duration']/60:.1f} min)")
         
-        print(f"\n   🎬 SHOT TYPE DISTRIBUTION:")
+        logger.info(f"\n   🎬 SHOT TYPE DISTRIBUTION:")
         for shot, count in sorted(summary["shot_distribution"].items(), key=lambda x: -x[1]):
             pct = count / summary["total_clips"] * 100
             bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
-            print(f"      {shot.replace('_', ' ').title():15} [{bar}] {count:2} ({pct:.0f}%)")
+            logger.info(f"      {shot.replace('_', ' ').title():15} [{bar}] {count:2} ({pct:.0f}%)")
         
-        print(f"\n   🎭 MOOD DISTRIBUTION:")
+        logger.info(f"\n   🎭 MOOD DISTRIBUTION:")
         for mood, count in sorted(summary["mood_distribution"].items(), key=lambda x: -x[1]):
             pct = count / summary["total_clips"] * 100
             bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
-            print(f"      {mood.title():15} [{bar}] {count:2} ({pct:.0f}%)")
+            logger.info(f"      {mood.title():15} [{bar}] {count:2} ({pct:.0f}%)")
         
-        print(f"\n   🎥 MOTION DISTRIBUTION:")
+        logger.info(f"\n   🎥 MOTION DISTRIBUTION:")
         for motion, count in sorted(summary["motion_distribution"].items(), key=lambda x: -x[1]):
             pct = count / summary["total_clips"] * 100
             bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
-            print(f"      {motion.title():15} [{bar}] {count:2} ({pct:.0f}%)")
+            logger.info(f"      {motion.title():15} [{bar}] {count:2} ({pct:.0f}%)")
         
-        print(f"\n   ⚡ ENERGY PROFILE:")
+        logger.info(f"\n   ⚡ ENERGY PROFILE:")
         for level in ["low", "medium", "high"]:
             count = summary["energy_profile"][level]
             pct = count / summary["total_clips"] * 100
             emoji = {"low": "🧘", "medium": "🚶", "high": "🏃"}[level]
             bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
-            print(f"      {emoji} {level.title():10} [{bar}] {count:2} ({pct:.0f}%)")
+            logger.info(f"      {emoji} {level.title():10} [{bar}] {count:2} ({pct:.0f}%)")
         
-        print(f"\n   📖 NARRATIVE INVENTORY:")
+        logger.info(f"\n   📖 NARRATIVE INVENTORY:")
         inv = summary["narrative_inventory"]
-        print(f"      🌅 Establishing Shots: {len(inv['establishing_shots'])} clips")
-        print(f"      ⚡ Climax Candidates:  {len(inv['climax_candidates'])} clips")
-        print(f"      🔀 Transition Shots:   {len(inv['transition_shots'])} clips")
-        print(f"      🌇 Closing Shots:      {len(inv['closing_shots'])} clips")
+        logger.info(f"      🌅 Establishing Shots: {len(inv['establishing_shots'])} clips")
+        logger.info(f"      ⚡ Climax Candidates:  {len(inv['climax_candidates'])} clips")
+        logger.info(f"      🔀 Transition Shots:   {len(inv['transition_shots'])} clips")
+        logger.info(f"      🌇 Closing Shots:      {len(inv['closing_shots'])} clips")
         
-        print(f"\n{'=' * 60}\n")
+        logger.info(f"\n{'=' * 60}\n")
     
     def export_analysis(self, filepath: str):
         """Export all analyses to JSON"""
@@ -697,7 +699,7 @@ class DeepFootageAnalyzer:
         }
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2)
-        print(f"   ✅ Analysis exported to {filepath}")
+        logger.info(f"   ✅ Analysis exported to {filepath}")
 
 
 # Convenience function for quick analysis

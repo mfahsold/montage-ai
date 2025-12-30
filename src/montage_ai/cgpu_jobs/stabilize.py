@@ -20,6 +20,7 @@ from typing import List, Optional
 
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
+from ..logger import logger
 
 
 class StabilizeJob(CGPUJob):
@@ -107,7 +108,7 @@ class StabilizeJob(CGPUJob):
         remote_path = f"{self.remote_work_dir}/{self.video_path.name}"
 
         size_mb = self.video_path.stat().st_size / (1024 * 1024)
-        print(f"   ⬆️ Uploading {self.video_path.name} ({size_mb:.1f} MB)...")
+        logger.info(f"Uploading {self.video_path.name} ({size_mb:.1f} MB)...")
 
         if not copy_to_remote(str(self.video_path), remote_path):
             self._error = "Failed to upload video file"
@@ -133,7 +134,7 @@ class StabilizeJob(CGPUJob):
             f"-f null -"
         )
 
-        print(f"   🔍 Pass 1/2: Analyzing motion (shakiness={self.shakiness})...")
+        logger.info(f"Pass 1/2: Analyzing motion (shakiness={self.shakiness})...")
         success, stdout, stderr = run_cgpu_command(detect_cmd, timeout=self.timeout // 2)
 
         if not success:
@@ -155,7 +156,7 @@ class StabilizeJob(CGPUJob):
             f"'{output_name}'"
         )
 
-        print(f"   🎬 Pass 2/2: Applying stabilization (smoothing={self.smoothing})...")
+        logger.info(f"Pass 2/2: Applying stabilization (smoothing={self.smoothing})...")
         success, stdout, stderr = run_cgpu_command(transform_cmd, timeout=self.timeout // 2)
 
         if not success:
@@ -176,13 +177,13 @@ class StabilizeJob(CGPUJob):
         """Download stabilized video."""
         remote_output = f"{self.remote_work_dir}/{self.output_path.name}"
 
-        print(f"   ⬇️ Downloading stabilized video...")
+        logger.info(f"Downloading stabilized video...")
 
         if download_via_base64(remote_output, str(self.output_path)):
             # Get output size
             if self.output_path.exists():
                 size_mb = self.output_path.stat().st_size / (1024 * 1024)
-                print(f"   📦 Output: {size_mb:.1f} MB")
+                logger.info(f"Output: {size_mb:.1f} MB")
 
             return JobResult(
                 success=True,

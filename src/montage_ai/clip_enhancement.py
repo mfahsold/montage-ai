@@ -31,6 +31,7 @@ from .ffmpeg_config import (
     STANDARD_PROFILE,
     STANDARD_LEVEL,
 )
+from .logger import logger
 
 
 _settings = get_settings()
@@ -123,9 +124,9 @@ def _check_vidstab_available() -> bool:
         )
         _VIDSTAB_AVAILABLE = "vidstabdetect" in result.stdout
         if _VIDSTAB_AVAILABLE:
-            print("   vidstab (libvidstab) available - using 2-pass stabilization")
+            logger.info("vidstab (libvidstab) available - using 2-pass stabilization")
         else:
-            print("   vidstab not available - falling back to deshake filter")
+            logger.info("vidstab not available - falling back to deshake filter")
     except Exception:
         _VIDSTAB_AVAILABLE = False
 
@@ -161,7 +162,7 @@ class ClipEnhancer:
         self.max_parallel_jobs = self.settings.processing.get_adaptive_parallel_jobs(self.low_memory_mode)
 
         if self.low_memory_mode:
-            print("   ⚠️ LOW_MEMORY_MODE: Parallel jobs reduced to 1")
+            logger.warning("LOW_MEMORY_MODE: Parallel jobs reduced to 1")
 
         # FFmpeg settings
         self.ffmpeg_threads = self.ffmpeg_config.threads
@@ -192,7 +193,7 @@ class ClipEnhancer:
     def _skip_output_if_present(self, output_path: str, label: str) -> bool:
         """Skip processing if output exists and idempotency is enabled."""
         if self.settings.processing.should_skip_output(output_path):
-            print(f"   ♻️ {label} skipped (exists): {os.path.basename(output_path)}")
+            logger.info(f"{label} skipped (exists): {os.path.basename(output_path)}")
             return True
         return False
 
@@ -210,11 +211,11 @@ class ClipEnhancer:
             # Sequential processing
             results = {}
             for input_path, output_path in clip_jobs:
-                print(f"   Enhancing {os.path.basename(input_path)}...")
+                logger.info(f"Enhancing {os.path.basename(input_path)}...")
                 results[input_path] = self.enhance(input_path, output_path)
             return results
 
-        print(f"   Parallel enhancement: {len(clip_jobs)} clips with {self.max_parallel_jobs} workers...")
+        logger.info(f"Parallel enhancement: {len(clip_jobs)} clips with {self.max_parallel_jobs} workers...")
         results = {}
 
         with ThreadPoolExecutor(max_workers=self.max_parallel_jobs) as executor:
@@ -231,9 +232,9 @@ class ClipEnhancer:
                     results[input_path] = output_path
                     completed += 1
                     if completed % 10 == 0 or completed == len(clip_jobs):
-                        print(f"   Enhanced {completed}/{len(clip_jobs)} clips...")
+                        logger.info(f"Enhanced {completed}/{len(clip_jobs)} clips...")
                 except Exception as e:
-                    print(f"   Enhancement failed for {os.path.basename(input_path)}: {e}")
+                    logger.error(f"Enhancement failed for {os.path.basename(input_path)}: {e}")
                     results[input_path] = input_path
 
         return results
@@ -297,7 +298,7 @@ class ClipEnhancer:
         # Log if content needed adjustment
         if analysis.is_dark or analysis.is_bright:
             exposure_type = "dark" if analysis.is_dark else "bright"
-            print(f"   Content-aware enhance: {os.path.basename(input_path)} ({exposure_type}, brightness={analysis.avg_brightness:.0f})")
+            logger.info(f"Content-aware enhance: {os.path.basename(input_path)} ({exposure_type}, brightness={analysis.avg_brightness:.0f})")
 
         # Use fewer threads per job when running in parallel
         threads_per_job = "2" if self.parallel_enhance else self.ffmpeg_threads
@@ -341,7 +342,7 @@ class ClipEnhancer:
         Returns:
             Path to stabilized video (or original on failure)
         """
-        print(f"   Stabilizing {os.path.basename(input_path)}...")
+        logger.info(f"Stabilizing {os.path.basename(input_path)}...")
         if self._skip_output_if_present(output_path, "Stabilize"):
             return output_path
 
@@ -349,12 +350,12 @@ class ClipEnhancer:
         if self.cgpu_enabled:
             cgpu_stabilize, is_available = _get_cgpu_stabilizer()
             if cgpu_stabilize and is_available():
-                print(f"   Attempting cgpu cloud GPU stabilization...")
+                logger.info("Attempting cgpu cloud GPU stabilization...")
                 result = cgpu_stabilize(input_path, output_path)
                 if result:
-                    print(f"   Cloud stabilization complete")
+                    logger.info("Cloud stabilization complete")
                     return result
-                print(f"   Cloud stabilization failed, falling back to local...")
+                logger.warning("Cloud stabilization failed, falling back to local...")
 
         # Local stabilization
         if _check_vidstab_available():
@@ -382,7 +383,7 @@ class ClipEnhancer:
         scale_value = scale if scale is not None else self.upscale_scale
         scale_value = max(2, min(int(scale_value), 4))
         model = self.upscale_model
-        print(f"   Upscaling {os.path.basename(input_path)}...")
+        logger.info(f"Upscaling {os.path.basename(input_path)}...")
         if self._skip_output_if_present(output_path, "Upscale"):
             return output_path
 
@@ -390,7 +391,7 @@ class ClipEnhancer:
         if self.cgpu_enabled:
             cgpu_upscale, is_available = _get_cgpu_upscaler()
             if cgpu_upscale and is_available():
-                print(f"   Attempting cgpu cloud GPU upscaling...")
+                logger.info("Attempting cgpu cloud GPU upscaling...")
                 result = cgpu_upscale(
                     input_path,
                     output_path,
@@ -402,16 +403,16 @@ class ClipEnhancer:
                 )
                 if result:
                     return result
-                print(f"   cgpu upscaling failed, falling back to local methods...")
+                logger.warning("cgpu upscaling failed, falling back to local methods...")
 
         # Priority 2: Local Vulkan GPU (Real-ESRGAN)
         real_esrgan_available = self._check_realesrgan_available()
 
         if real_esrgan_available:
-            print(f"   Attempting Real-ESRGAN with Vulkan GPU...")
+            logger.info("Attempting Real-ESRGAN with Vulkan GPU...")
             return self._upscale_realesrgan(input_path, output_path, model=model, scale=scale_value)
         else:
-            print(f"   Using FFmpeg Lanczos upscaling (Vulkan GPU not available)")
+            logger.info("Using FFmpeg Lanczos upscaling (Vulkan GPU not available)")
             return self._upscale_ffmpeg(input_path, output_path, scale=scale_value)
 
     def color_match(
@@ -436,7 +437,7 @@ class ClipEnhancer:
         ColorMatcher, load_img_file = _get_color_matcher()
 
         if ColorMatcher is None:
-            print("   color-matcher not installed - skipping shot matching")
+            logger.warning("color-matcher not installed - skipping shot matching")
             return {p: p for p in clip_paths}
 
         if len(clip_paths) < 2:
@@ -446,7 +447,7 @@ class ClipEnhancer:
         os.makedirs(output_dir, exist_ok=True)
 
         ref_path = reference_clip or clip_paths[0]
-        print(f"   Color matching {len(clip_paths)} clips to reference...")
+        logger.info(f"Color matching {len(clip_paths)} clips to reference...")
 
         try:
             # Extract reference frame
@@ -454,7 +455,7 @@ class ClipEnhancer:
             self._extract_middle_frame(ref_path, ref_frame_path)
 
             if not os.path.exists(ref_frame_path):
-                print("   Could not extract reference frame")
+                logger.warning("Could not extract reference frame")
                 return {p: p for p in clip_paths}
 
             ref_img = load_img_file(ref_frame_path)
@@ -511,7 +512,7 @@ class ClipEnhancer:
                         os.remove(src_frame_path)
 
                 except Exception as e:
-                    print(f"   Color match failed for {os.path.basename(clip_path)}: {e}")
+                    logger.error(f"Color match failed for {os.path.basename(clip_path)}: {e}")
                     results[clip_path] = clip_path
 
             # Cleanup reference frame
@@ -519,12 +520,12 @@ class ClipEnhancer:
                 os.remove(ref_frame_path)
 
             matched_count = sum(1 for k, v in results.items() if k != v)
-            print(f"   Color matched {matched_count}/{len(clip_paths)-1} clips")
+            logger.info(f"Color matched {matched_count}/{len(clip_paths)-1} clips")
 
             return results
 
         except Exception as e:
-            print(f"   Color matching failed: {e}")
+            logger.error(f"Color matching failed: {e}")
             return {p: p for p in clip_paths}
 
     # =========================================================================
@@ -615,7 +616,7 @@ class ClipEnhancer:
 
         try:
             # PASS 1: Motion Analysis
-            print(f"      Pass 1/2: Analyzing motion...")
+            logger.info("Pass 1/2: Analyzing motion...")
             cmd_detect = [
                 "ffmpeg", "-y",
                 "-threads", self.ffmpeg_threads,
@@ -632,11 +633,11 @@ class ClipEnhancer:
             )
 
             if result.returncode != 0 or not os.path.exists(transform_file):
-                print(f"      Motion analysis failed, falling back to deshake")
+                logger.warning("Motion analysis failed, falling back to deshake")
                 return self._stabilize_deshake(input_path, output_path)
 
             # PASS 2: Apply Stabilization
-            print(f"      Pass 2/2: Applying stabilization...")
+            logger.info("Pass 2/2: Applying stabilization...")
             cmd_transform = [
                 "ffmpeg", "-y",
                 "-threads", self.ffmpeg_threads,
@@ -664,17 +665,17 @@ class ClipEnhancer:
             if os.path.exists(transform_file):
                 os.remove(transform_file)
 
-            print(f"      Stabilization complete (vidstab 2-pass)")
+            logger.info("Stabilization complete (vidstab 2-pass)")
             return output_path
 
         except subprocess.TimeoutExpired:
-            print(f"      Stabilization timed out, using original")
+            logger.warning("Stabilization timed out, using original")
             return input_path
         except subprocess.CalledProcessError as e:
-            print(f"      vidstab failed: {e.stderr[:200] if e.stderr else 'unknown error'}")
+            logger.error(f"vidstab failed: {e.stderr[:200] if e.stderr else 'unknown error'}")
             return self._stabilize_deshake(input_path, output_path)
         except Exception as e:
-            print(f"      Stabilization error: {e}")
+            logger.error(f"Stabilization error: {e}")
             return input_path
         finally:
             if os.path.exists(transform_file):
@@ -710,13 +711,13 @@ class ClipEnhancer:
                 capture_output=True,
                 timeout=self.ffmpeg_timeout,
             )
-            print(f"      Stabilization complete (deshake fallback)")
+            logger.info("Stabilization complete (deshake fallback)")
             return output_path
         except subprocess.CalledProcessError:
-            print("      Stabilization failed (ffmpeg error). Using original.")
+            logger.warning("Stabilization failed (ffmpeg error). Using original.")
             return input_path
         except Exception as e:
-            print(f"      Stabilization failed: {e}")
+            logger.error(f"Stabilization failed: {e}")
             return input_path
 
     def _check_realesrgan_available(self) -> bool:
@@ -738,11 +739,11 @@ class ClipEnhancer:
                     output = vulkan_info.stdout.lower()
                     # Skip software renderers
                     if any(sw in output for sw in ["llvmpipe", "lavapipe", "swiftshader", "cpu"]):
-                        print(f"   Detected software Vulkan renderer - skipping Real-ESRGAN")
+                        logger.warning("Detected software Vulkan renderer - skipping Real-ESRGAN")
                         return False
                     # Skip GPUs without compute shader support
                     if "adreno" in output:
-                        print(f"   Detected Qualcomm Adreno GPU - no compute shader support")
+                        logger.warning("Detected Qualcomm Adreno GPU - no compute shader support")
                         return False
                     return True
         except Exception:
@@ -776,13 +777,13 @@ class ClipEnhancer:
             # Build filter based on rotation
             if rotation == -90 or rotation == 270:
                 vf_filter = "transpose=1"
-                print(f"   Detected {rotation} rotation, applying transpose=1")
+                logger.info(f"Detected {rotation} rotation, applying transpose=1")
             elif rotation == 90 or rotation == -270:
                 vf_filter = "transpose=2"
-                print(f"   Detected {rotation} rotation, applying transpose=2")
+                logger.info(f"Detected {rotation} rotation, applying transpose=2")
             elif rotation == 180 or rotation == -180:
                 vf_filter = "vflip,hflip"
-                print(f"   Detected {rotation} rotation, applying vflip,hflip")
+                logger.info(f"Detected {rotation} rotation, applying vflip,hflip")
             else:
                 vf_filter = None
 
@@ -839,9 +840,9 @@ class ClipEnhancer:
             return output_path
 
         except Exception as e:
-            print(f"   Real-ESRGAN failed: {e}")
-            print(f"   Falling back to FFmpeg upscaling...")
-            return self._upscale_ffmpeg(input_path, output_path)
+            logger.warning(f"Real-ESRGAN failed: {e}")
+            logger.info("Falling back to FFmpeg upscaling...")
+            return self._upscale_ffmpeg(input_path, output_path, scale=scale_value)
         finally:
             import shutil
             if os.path.exists(frame_dir):
@@ -874,10 +875,10 @@ class ClipEnhancer:
 
             if rotation in (90, 270):
                 orig_w, orig_h = orig_h, orig_w
-                print(f"   Detected {rotation} rotation, adjusted dimensions")
+                logger.info(f"Detected {rotation} rotation, adjusted dimensions")
 
             new_w, new_h = orig_w * scale, orig_h * scale
-            print(f"   Upscaling {orig_w}x{orig_h} -> {new_w}x{new_h}")
+            logger.info(f"Upscaling {orig_w}x{orig_h} -> {new_w}x{new_h}")
 
             # Build filter chain
             filter_chain = (
@@ -902,11 +903,11 @@ class ClipEnhancer:
             ffmpeg_cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
 
             subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print(f"   FFmpeg upscaling complete")
+            logger.info("FFmpeg upscaling complete")
             return output_path
 
         except Exception as e:
-            print(f"   FFmpeg upscaling failed: {e}")
+            logger.error(f"FFmpeg upscaling failed: {e}")
             return input_path
 
     def _extract_middle_frame(self, video_path: str, output_path: str) -> bool:

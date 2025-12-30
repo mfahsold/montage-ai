@@ -74,15 +74,30 @@ class CacheEntry:
     @classmethod
     def compute_file_hash(cls, path: str) -> str:
         """
-        Fast hash based on file size + mtime.
-
-        This is much faster than computing a full file hash,
-        and sufficient for detecting file changes in most cases.
+        Robust hash based on file size + partial content.
+        
+        Reads first 64KB and last 64KB of the file to detect changes
+        even if mtime is preserved (e.g. rsync/cp -a).
         """
         try:
             stat = os.stat(path)
-            hash_input = f"{stat.st_size}:{stat.st_mtime}".encode()
-            return hashlib.md5(hash_input).hexdigest()[:16]
+            file_size = stat.st_size
+            
+            hasher = hashlib.md5()
+            hasher.update(f"{file_size}".encode())
+            
+            with open(path, "rb") as f:
+                # Read first 64KB
+                chunk = f.read(65536)
+                hasher.update(chunk)
+                
+                # Read last 64KB if file is large enough
+                if file_size > 131072:
+                    f.seek(-65536, os.SEEK_END)
+                    chunk = f.read(65536)
+                    hasher.update(chunk)
+                    
+            return hasher.hexdigest()[:16]
         except OSError:
             return ""
 
@@ -228,13 +243,22 @@ class AnalysisCache:
             return False
 
     def _write_cache(self, cache_path: Path, data: dict) -> bool:
-        """Write cache data to file with error handling."""
+        """Write cache data to file with error handling using atomic write."""
         try:
-            with open(cache_path, "w", encoding="utf-8") as f:
+            temp_path = cache_path.with_suffix(f"{cache_path.suffix}.tmp")
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
+            
+            # Atomic rename
+            temp_path.replace(cache_path)
             return True
         except OSError as e:
             logger.debug(f"Failed to write cache: {e}")
+            if 'temp_path' in locals() and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
             return False
 
     # -------------------------------------------------------------------------

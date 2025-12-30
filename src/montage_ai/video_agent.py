@@ -28,6 +28,7 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Any
 from pathlib import Path
+from .config import get_settings
 from enum import Enum
 import numpy as np
 
@@ -145,7 +146,9 @@ class VideoAgentMemory:
     embedding-based similarity search.
     """
     
-    def __init__(self, db_path: str = "/tmp/video_agent_memory.db"):
+    def __init__(self, db_path: Optional[str] = None):
+        if db_path is None:
+            db_path = str(get_settings().paths.temp_dir / "video_agent_memory.db")
         self.db_path = db_path
         self._init_database()
         
@@ -498,9 +501,11 @@ class VideoAgentAdapter:
     
     def __init__(
         self, 
-        db_path: str = "/tmp/video_agent_memory.db",
+        db_path: Optional[str] = None,
         caption_model: str = "ollama"  # or "blip", "llava"
     ):
+        if db_path is None:
+            db_path = str(get_settings().paths.temp_dir / "video_agent_memory.db")
         self.memory = VideoAgentMemory(db_path)
         self.caption_model = caption_model
         
@@ -902,5 +907,5 @@ class VideoAgentAdapter:
 def create_video_agent(db_path: Optional[str] = None) -> VideoAgentAdapter:
     """Create a VideoAgent adapter instance."""
     if db_path is None:
-        db_path = os.environ.get("VIDEO_AGENT_DB", "/tmp/video_agent_memory.db")
+        db_path = os.environ.get("VIDEO_AGENT_DB", str(get_settings().paths.temp_dir / "video_agent_memory.db"))
     return VideoAgentAdapter(db_path)

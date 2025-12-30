@@ -313,6 +313,20 @@ See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
 
 ---
 
+## Export Settings
+
+Control the format and specifications of the final video output.
+
+| Variable          | Default | Description                                                                 |
+| ----------------- | ------- | --------------------------------------------------------------------------- |
+| `EXPORT_WIDTH`    | `1920`  | Output video width (pixels)                                                 |
+| `EXPORT_HEIGHT`   | `1080`  | Output video height (pixels)                                                |
+| `EXPORT_FPS`      | `30.0`  | Output frame rate                                                           |
+| `EXPORT_TIMELINE` | `false` | Export timeline files (`.otio`, `.edl`, `.csv`) alongside video             |
+| `GENERATE_PROXIES`| `false` | Generate low-res proxy files for NLE import                                 |
+
+---
+
 ## Paths (Container)
 
 | Variable     | Default        | Description        |

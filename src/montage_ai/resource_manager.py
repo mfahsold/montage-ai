@@ -31,6 +31,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 
+from .logger import logger
+
 if TYPE_CHECKING:
     from .ffmpeg_config import FFmpegConfig
 
@@ -395,57 +397,57 @@ class ResourceManager:
         """Print detailed resource status."""
         status = self.status
 
-        print("\n" + "=" * 60)
-        print("  RESOURCE MANAGER - Compute Resource Status")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("  RESOURCE MANAGER - Compute Resource Status")
+        logger.info("=" * 60)
 
         # Cloud GPU
-        print("\n  Cloud GPU (cgpu):")
+        logger.info("\n  Cloud GPU (cgpu):")
         if status.cgpu_available:
-            print(f"    Status: AVAILABLE")
+            logger.info(f"    Status: AVAILABLE")
             if status.cgpu_gpu_info:
-                print(f"    GPU: {status.cgpu_gpu_info}")
+                logger.info(f"    GPU: {status.cgpu_gpu_info}")
         else:
-            print(f"    Status: Not available")
+            logger.info(f"    Status: Not available")
             if os.environ.get("CGPU_GPU_ENABLED", "false").lower() != "true":
-                print(f"    Hint: Set CGPU_GPU_ENABLED=true to enable")
+                logger.info(f"    Hint: Set CGPU_GPU_ENABLED=true to enable")
 
         if status.cgpu_serve_available:
-            print(f"    LLM Endpoint: Running")
+            logger.info(f"    LLM Endpoint: Running")
 
         # Local GPU
-        print("\n  Local GPU:")
+        logger.info("\n  Local GPU:")
         if status.local_gpu_available:
-            print(f"    Status: AVAILABLE")
-            print(f"    Type: {status.local_gpu_type.upper() if status.local_gpu_type else 'Unknown'}")
+            logger.info(f"    Status: AVAILABLE")
+            logger.info(f"    Type: {status.local_gpu_type.upper() if status.local_gpu_type else 'Unknown'}")
             if status.local_gpu_info:
-                print(f"    Info: {status.local_gpu_info}")
+                logger.info(f"    Info: {status.local_gpu_info}")
         else:
-            print(f"    Status: Not available")
-            print(f"    Hint: Set FFMPEG_HWACCEL=auto to auto-detect")
+            logger.info(f"    Status: Not available")
+            logger.info(f"    Hint: Set FFMPEG_HWACCEL=auto to auto-detect")
 
         # CPU
-        print("\n  CPU:")
-        print(f"    Cores: {status.cpu_cores}")
-        print(f"    Optimal Threads: {self.get_optimal_threads()}")
+        logger.info("\n  CPU:")
+        logger.info(f"    Cores: {status.cpu_cores}")
+        logger.info(f"    Optimal Threads: {self.get_optimal_threads()}")
 
         # K3s Cluster
-        print("\n  K3s Cluster:")
+        logger.info("\n  K3s Cluster:")
         if status.k3s_available:
-            print(f"    Status: AVAILABLE")
-            print(f"    Nodes: {len(status.k3s_nodes)} total, {status.k3s_ready_nodes} ready")
+            logger.info(f"    Status: AVAILABLE")
+            logger.info(f"    Nodes: {len(status.k3s_nodes)} total, {status.k3s_ready_nodes} ready")
             for node in status.k3s_nodes:
-                print(f"      - {node}")
+                logger.info(f"      - {node}")
         else:
-            print(f"    Status: Not available")
+            logger.info(f"    Status: Not available")
 
         # Summary
-        print("\n  Summary:")
-        print(f"    Best Backend: {status.best_backend.value.upper()}")
-        print(f"    GPU Available: {'Yes' if status.has_any_gpu else 'No'}")
-        print(f"    Cluster Ready: {'Yes' if status.k3s_ready_nodes > 0 else 'No'}")
+        logger.info("\n  Summary:")
+        logger.info(f"    Best Backend: {status.best_backend.value.upper()}")
+        logger.info(f"    GPU Available: {'Yes' if status.has_any_gpu else 'No'}")
+        logger.info(f"    Cluster Ready: {'Yes' if status.k3s_ready_nodes > 0 else 'No'}")
 
-        print("\n" + "=" * 60)
+        logger.info("\n" + "=" * 60)
 
     def get_status_line(self) -> str:
         """

@@ -16,6 +16,7 @@ from typing import List, Optional
 
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
+from ..logger import logger
 
 
 class VoiceIsolationJob(CGPUJob):
@@ -87,7 +88,7 @@ class VoiceIsolationJob(CGPUJob):
         # Check file size
         size_mb = self.audio_path.stat().st_size / (1024 * 1024)
         if size_mb > 500:
-            print(f"   ⚠️ Large file ({size_mb:.1f} MB) - processing may take a while")
+            logger.warning(f"Large file ({size_mb:.1f} MB) - processing may take a while")
 
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -102,7 +103,7 @@ class VoiceIsolationJob(CGPUJob):
         """Upload audio file to remote."""
         remote_path = f"{self.remote_work_dir}/{self.audio_path.name}"
 
-        print(f"   ⬆️ Uploading {self.audio_path.name}...")
+        logger.info(f"Uploading {self.audio_path.name}...")
         if not copy_to_remote(str(self.audio_path), remote_path):
             self._error = "Failed to upload audio file"
             return False
@@ -131,8 +132,8 @@ class VoiceIsolationJob(CGPUJob):
 
         cmd = " ".join(cmd_parts)
 
-        print(f"   🎤 Running demucs ({self.model})...")
-        print(f"   ⏳ This may take several minutes...")
+        logger.info(f"Running demucs ({self.model})...")
+        logger.info(f"This may take several minutes...")
 
         success, stdout, stderr = run_cgpu_command(cmd, timeout=self.timeout)
 
@@ -144,7 +145,7 @@ class VoiceIsolationJob(CGPUJob):
             verify_ok, verify_out, _ = run_cgpu_command(verify_cmd, timeout=30)
 
             if verify_ok and "EXISTS" in verify_out:
-                print(f"   ✅ Output verified despite exit code issue")
+                logger.info(f"Output verified despite exit code issue")
                 return True
 
             # Check for common errors
@@ -178,14 +179,14 @@ class VoiceIsolationJob(CGPUJob):
             remote_stem = f"{self.remote_work_dir}/{self.model}/{stem}/{stem_name}.wav"
             local_stem = self.output_dir / f"{stem}_{stem_name}.wav"
 
-            print(f"   ⬇️ Downloading {stem_name}...")
+            logger.info(f"Downloading {stem_name}...")
 
             if download_via_base64(remote_stem, str(local_stem)):
                 downloaded[stem_name] = str(local_stem)
                 if stem_name == "vocals":
                     primary_output = str(local_stem)
             else:
-                print(f"   ⚠️ Could not download {stem_name}")
+                logger.warning(f"Could not download {stem_name}")
 
         if not primary_output:
             return JobResult(
@@ -279,7 +280,7 @@ class NoiseReductionJob(CGPUJob):
         """Upload audio file to remote."""
         remote_path = f"{self.remote_work_dir}/{self.audio_path.name}"
 
-        print(f"   ⬆️ Uploading {self.audio_path.name}...")
+        logger.info(f"Uploading {self.audio_path.name}...")
         if not copy_to_remote(str(self.audio_path), remote_path):
             self._error = "Failed to upload audio file"
             return False
@@ -298,7 +299,7 @@ class NoiseReductionJob(CGPUJob):
             f"--atten-lim {self.attenuation_limit}"
         )
 
-        print(f"   🔇 Running DeepFilterNet...")
+        logger.info(f"Running DeepFilterNet...")
         success, stdout, stderr = run_cgpu_command(cmd, timeout=self.timeout)
 
         if not success:
@@ -314,7 +315,7 @@ class NoiseReductionJob(CGPUJob):
         remote_output = f"{self.remote_work_dir}/{output_name}"
         local_output = self.output_dir / f"{self.audio_path.stem}_clean.wav"
 
-        print(f"   ⬇️ Downloading cleaned audio...")
+        logger.info(f"Downloading cleaned audio...")
 
         if download_via_base64(remote_output, str(local_output)):
             self._output_path = local_output

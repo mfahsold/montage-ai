@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Robustness & Reliability**
+  - **Atomic Writes**: Implemented "write-to-temp, rename" pattern for video segments, analysis cache, and timeline exports to prevent file corruption on interruption.
+  - **Robust Caching**: Replaced fragile mtime-based hashing with content-based hashing (Head+Tail+Size) in `analysis_cache.py`.
+  - **Video Quality**: Added `NORMALIZE_CLIPS` enforcement to `segment_writer.py` to fix stuttering by re-encoding variable frame rate sources to CFR.
+
+### Changed
+- **Configuration Refactor**
+  - Moved hardcoded export settings (Resolution, FPS) to `ExportConfig` in `config.py`.
+  - `timeline_exporter.py` now uses centralized settings instead of magic numbers.
+  - Removed hardcoded paths (`/data/input`, `/tmp`, etc.) across multiple modules (`ffmpeg_tools`, `video_agent`, `segment_writer`, `cgpu_upscaler_v3`, `timeline_exporter`) in favor of centralized `config.Settings`.
+  - Fixed missing `export` configuration field in `Settings` class.
+- **Logging**
+  - Standardized logging in `segment_writer.py` (replaced `print` with `logger`).
 
 - **Monetization Infrastructure** (`src/montage_ai/config.py`)
   - Added `CloudConfig` for Pro features (API keys, endpoints)

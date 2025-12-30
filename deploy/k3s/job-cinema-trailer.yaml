@@ -54,9 +54,13 @@ spec:
             - name: LLM_CLIP_SELECTION
               value: "false"
             - name: NORMALIZE_CLIPS
-              value: "false"
+              value: "true"
             - name: FFMPEG_THREADS
               value: "2"
+            - name: FFMPEG_HWACCEL
+              value: "none"
+            - name: EXTRACT_REENCODE
+              value: "true"
             - name: MAX_PARALLEL_JOBS
               value: "4"
             - name: TEMP_DIR

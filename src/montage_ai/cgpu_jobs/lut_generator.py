@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .base import CGPUJob, JobResult, JobStatus
+from ..logger import logger
 
 
 class LUTGeneratorJob(CGPUJob):
@@ -94,7 +95,7 @@ class LUTGeneratorJob(CGPUJob):
 
         if style and style not in self.BUILTIN_STYLES:
             # Allow custom styles, just warn
-            print(f"Warning: '{style}' is not a built-in style. Using custom prompt.")
+            logger.warning(f"'{style}' is not a built-in style. Using custom prompt.")
 
     def prepare_local(self) -> bool:
         """Validate reference image exists and output directory is writable."""

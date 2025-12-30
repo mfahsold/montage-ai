@@ -24,6 +24,7 @@ from typing import Dict, Optional, Any
 
 from .config import get_settings
 from .style_templates import get_style_template, list_available_styles
+from .logger import logger
 
 # Try importing OpenAI client for cgpu/Gemini support
 try:
@@ -33,30 +34,22 @@ except ImportError:
     OPENAI_AVAILABLE = False
     OpenAI = None
 
+from .config import get_settings
+
 VERSION = "0.3.0"
 
 # Backend configuration
 # Priority: OPENAI_API_BASE (KubeAI/OpenAI-compatible) > GOOGLE_API_KEY (direct Gemini) > CGPU_ENABLED (cgpu serve) > Ollama (local)
 
+def _get_llm_config():
+    return get_settings().llm
+
 # OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.)
-OPENAI_API_BASE = os.environ.get("OPENAI_API_BASE", "")  # e.g. http://kubeai.kubeai-system.svc.cluster.local/openai/v1
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "not-needed")  # KubeAI ignores this
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "")  # e.g. gemma3-4b, qwen2-5-32b
+# These are now accessed via get_settings().llm.* inside functions to ensure fresh config
+# Keeping them as properties for backward compatibility if needed, but pointing to config
 
 # Google AI (direct API)
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
-GOOGLE_AI_MODEL = os.environ.get("GOOGLE_AI_MODEL", "gemini-flash-latest")
 GOOGLE_AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
-
-# cgpu serve (Gemini via OpenAI Responses API)
-CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
-CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
-CGPU_PORT = os.environ.get("CGPU_PORT", "8090")  # Updated default port to match montage-ai.sh
-CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-flash-latest")
-
-# Ollama (local fallback)
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")  # or deepseek-r1:70b
 
 # System prompt for the Creative Director LLM (style list is injected at runtime)
 DIRECTOR_SYSTEM_PROMPT = """You are {persona}.
@@ -189,56 +182,57 @@ class CreativeDirector:
         """
         self.ollama_host = ollama_host
         self.ollama_model = model
-        self.timeout = timeout if timeout is not None else get_settings().llm.timeout
+        self.llm_config = get_settings().llm
+        self.timeout = timeout if timeout is not None else self.llm_config.timeout
         
         # Determine backend priority: OpenAI-compatible > cgpu > Google AI > Ollama
         if use_openai_api is None:
-            self.use_openai_api = bool(OPENAI_API_BASE and OPENAI_MODEL)
+            self.use_openai_api = self.llm_config.has_openai_backend
         else:
             self.use_openai_api = use_openai_api
 
         if use_cgpu is None:
             # Prioritize cgpu if enabled, even if Google API key is present
-            self.use_cgpu = CGPU_ENABLED and OPENAI_AVAILABLE and not self.use_openai_api
+            self.use_cgpu = self.llm_config.cgpu_enabled and OPENAI_AVAILABLE and not self.use_openai_api
         else:
             self.use_cgpu = use_cgpu and OPENAI_AVAILABLE and not self.use_openai_api
             
         if use_google_ai is None:
             # Only use Google AI if cgpu is NOT enabled
-            self.use_google_ai = bool(GOOGLE_API_KEY) and not self.use_openai_api and not self.use_cgpu
+            self.use_google_ai = self.llm_config.has_google_backend and not self.use_openai_api and not self.use_cgpu
         else:
             self.use_google_ai = use_google_ai and not self.use_openai_api and not self.use_cgpu
         
         # Log backend selection
         if self.use_openai_api:
-            print(f"   🌐 Creative Director using OpenAI-compatible API ({OPENAI_MODEL} @ {OPENAI_API_BASE})")
+            logger.info(f"Creative Director using OpenAI-compatible API ({self.llm_config.openai_model} @ {self.llm_config.openai_api_base})")
         elif self.use_google_ai:
-            print(f"   🌐 Creative Director using Google AI ({GOOGLE_AI_MODEL})")
+            logger.info(f"Creative Director using Google AI ({self.llm_config.google_ai_model})")
         elif self.use_cgpu:
             # cgpu serve exposes OpenAI-compatible API at root, not /v1
-            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}"
-            print(f"   🌐 Creative Director using cgpu/Gemini at {cgpu_url}")
+            cgpu_url = f"http://{self.llm_config.cgpu_host}:{self.llm_config.cgpu_port}"
+            logger.info(f"Creative Director using cgpu/Gemini at {cgpu_url}")
         else:
-            print(f"   🏠 Creative Director using Ollama ({self.ollama_model})")
+            logger.info(f"Creative Director using Ollama ({self.ollama_model})")
         
         # Initialize OpenAI client for OpenAI-compatible or cgpu backend
         self.openai_client = None
         if self.use_openai_api and OPENAI_AVAILABLE:
             try:
                 self.openai_client = OpenAI(
-                    base_url=OPENAI_API_BASE,
-                    api_key=OPENAI_API_KEY,
+                    base_url=self.llm_config.openai_api_base,
+                    api_key=self.llm_config.openai_api_key,
                     timeout=self.timeout
                 )
             except Exception as e:
-                print(f"   ⚠️ Failed to initialize OpenAI client: {e}")
+                logger.warning(f"Failed to initialize OpenAI client: {e}")
                 self.use_openai_api = False
         
         # Initialize cgpu client if enabled
         self.cgpu_client = None
         if self.use_cgpu:
             # cgpu serve exposes OpenAI-compatible API at /v1
-            cgpu_url = f"http://{CGPU_HOST}:{CGPU_PORT}/v1"
+            cgpu_url = f"http://{self.llm_config.cgpu_host}:{self.llm_config.cgpu_port}/v1"
             try:
                 self.cgpu_client = OpenAI(
                     base_url=cgpu_url,
@@ -246,7 +240,7 @@ class CreativeDirector:
                     timeout=self.timeout
                 )
             except Exception as e:
-                print(f"   ⚠️ Failed to initialize cgpu client: {e}")
+                logger.warning(f"Failed to initialize cgpu client: {e}")
                 self.use_cgpu = False
 
         # Build system prompt with available styles from presets
@@ -278,13 +272,13 @@ class CreativeDirector:
             >>> print(instructions['style']['name'])
             'hitchcock'
         """
-        print(f"🎬 Creative Director analyzing: '{user_prompt}'")
+        logger.info(f"Creative Director analyzing: '{user_prompt}'")
 
         # Check if prompt directly references a template
         user_lower = user_prompt.lower()
         for style_name in list_available_styles():
             if style_name in user_lower or style_name.replace('_', ' ') in user_lower:
-                print(f"   🎯 Detected style template: {style_name}")
+                logger.info(f"Detected style template: {style_name}")
                 template = get_style_template(style_name)
                 return template['params']
 
@@ -314,14 +308,14 @@ class CreativeDirector:
         for style_name, keywords in style_keywords.items():
             for keyword in keywords:
                 if keyword in user_lower:
-                    print(f"   🎯 Keyword match '{keyword}' → {style_name}")
+                    logger.info(f"Keyword match '{keyword}' → {style_name}")
                     template = get_style_template(style_name)
                     return template['params']
         
         # Check mood keywords
         for mood_keyword, style_name in mood_to_style.items():
             if mood_keyword in user_lower:
-                print(f"   🎯 Mood match '{mood_keyword}' → {style_name}")
+                logger.info(f"Mood match '{mood_keyword}' → {style_name}")
                 template = get_style_template(style_name)
                 return template['params']
 
@@ -329,20 +323,20 @@ class CreativeDirector:
         try:
             response = self._query_llm(user_prompt)
             if not response:
-                print("   ❌ LLM returned empty response")
+                logger.error("LLM returned empty response")
                 return None
 
             # Parse and validate JSON
             instructions = self._parse_and_validate(response)
             if instructions:
-                print(f"   ✅ Generated editing instructions (style: {instructions['style']['name']})")
+                logger.info(f"Generated editing instructions (style: {instructions['style']['name']})")
                 return instructions
             else:
-                print("   ⚠️ LLM response failed validation")
+                logger.warning("LLM response failed validation")
                 return None
 
         except Exception as e:
-            print(f"   ❌ Creative Director error: {e}")
+            logger.error(f"Creative Director error: {e}")
             return None
 
     def _query_llm(self, user_prompt: str) -> Optional[str]:
@@ -373,7 +367,7 @@ class CreativeDirector:
         """
         try:
             response = self.openai_client.chat.completions.create(
-                model=OPENAI_MODEL,
+                model=self.llm_config.openai_model,
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -394,7 +388,7 @@ class CreativeDirector:
                     content = content[:-3]
                 return content.strip()
             else:
-                print("   ⚠️ OpenAI API returned empty response")
+                logger.warning("OpenAI API returned empty response")
                 return None
                 
         except Exception as e:
@@ -402,11 +396,11 @@ class CreativeDirector:
             # Check if it's a model-not-found or similar error
             if "response_format" in error_str.lower() or "json" in error_str.lower():
                 # Model doesn't support JSON mode, retry without it
-                print("   ⚠️ Model doesn't support JSON mode, retrying without...")
+                logger.warning("Model doesn't support JSON mode, retrying without...")
                 return self._query_openai_api_no_json_mode(user_prompt)
-            print(f"   ⚠️ OpenAI API error: {e}")
+            logger.warning(f"OpenAI API error: {e}")
             # Fallback to Ollama
-            print("   🔄 Falling back to Ollama...")
+            logger.info("Falling back to Ollama...")
             return self._query_ollama(user_prompt)
 
     def _query_openai_api_no_json_mode(self, user_prompt: str) -> Optional[str]:
@@ -415,7 +409,7 @@ class CreativeDirector:
         """
         try:
             response = self.openai_client.chat.completions.create(
-                model=OPENAI_MODEL,
+                model=self.llm_config.openai_model,
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -437,7 +431,7 @@ class CreativeDirector:
             else:
                 return None
         except Exception as e:
-            print(f"   ⚠️ OpenAI API error (no JSON mode): {e}")
+            logger.warning(f"OpenAI API error (no JSON mode): {e}")
             return self._query_ollama(user_prompt)
 
     def _query_google_ai(self, user_prompt: str) -> Optional[str]:
@@ -448,7 +442,7 @@ class CreativeDirector:
         This bypasses cgpu serve and gemini-cli entirely.
         """
         try:
-            url = f"{GOOGLE_AI_ENDPOINT}/{GOOGLE_AI_MODEL}:generateContent"
+            url = f"{self.llm_config.google_ai_endpoint}/{self.llm_config.google_ai_model}:generateContent"
             
             # Build request payload
             payload = {
@@ -469,7 +463,7 @@ class CreativeDirector:
             
             headers = {
                 "Content-Type": "application/json",
-                "X-goog-api-key": GOOGLE_API_KEY
+                "X-goog-api-key": self.llm_config.google_api_key
             }
             
             response = requests.post(
@@ -496,22 +490,22 @@ class CreativeDirector:
                         if text.endswith("```"):
                             text = text[:-3]
                         return text.strip()
-                print("   ⚠️ Google AI returned empty response")
+                logger.warning("Google AI returned empty response")
                 return None
             else:
                 error_msg = response.json().get("error", {}).get("message", response.text)
-                print(f"   ⚠️ Google AI error ({response.status_code}): {error_msg}")
+                logger.warning(f"Google AI error ({response.status_code}): {error_msg}")
                 # Fallback to Ollama
-                print("   🔄 Falling back to Ollama...")
+                logger.info("Falling back to Ollama...")
                 return self._query_ollama(user_prompt)
                 
         except requests.exceptions.Timeout:
-            print(f"   ⚠️ Google AI request timeout ({self.timeout}s)")
+            logger.warning(f"Google AI request timeout ({self.timeout}s)")
             return self._query_ollama(user_prompt)
         except Exception as e:
-            print(f"   ⚠️ Google AI error: {e}")
+            logger.warning(f"Google AI error: {e}")
             # Fallback to Ollama if Google AI fails
-            print("   🔄 Falling back to Ollama...")
+            logger.info("Falling back to Ollama...")
             return self._query_ollama(user_prompt)
 
     def _query_cgpu(self, user_prompt: str) -> Optional[str]:
@@ -539,13 +533,13 @@ class CreativeDirector:
                     content = content[:-3]
                 return content.strip()
             else:
-                print("   ⚠️ cgpu/Gemini returned empty response")
+                logger.warning("cgpu/Gemini returned empty response")
                 return None
                 
         except Exception as e:
-            print(f"   ⚠️ cgpu/Gemini error: {e}")
+            logger.warning(f"cgpu/Gemini error: {e}")
             # Fallback to Ollama if cgpu fails
-            print("   🔄 Falling back to Ollama...")
+            logger.info("Falling back to Ollama...")
             return self._query_ollama(user_prompt)
 
     def _query_ollama(self, user_prompt: str) -> Optional[str]:
@@ -576,18 +570,18 @@ class CreativeDirector:
                 result = response.json()
                 return result.get("response", "")
             else:
-                print(f"   ⚠️ Ollama API error: {response.status_code}")
+                logger.warning(f"Ollama API error: {response.status_code}")
                 return None
 
         except requests.exceptions.Timeout:
-            print(f"   ⚠️ Ollama request timeout ({self.timeout}s)")
+            logger.warning(f"Ollama request timeout ({self.timeout}s)")
             return None
         except requests.exceptions.ConnectionError:
-            print(f"   ⚠️ Cannot connect to Ollama at {self.ollama_host}")
-            print(f"      Make sure Ollama is running: ollama serve")
+            logger.warning(f"Cannot connect to Ollama at {self.ollama_host}")
+            logger.warning(f"Make sure Ollama is running: ollama serve")
             return None
         except Exception as e:
-            print(f"   ❌ LLM query error: {e}")
+            logger.error(f"LLM query error: {e}")
             return None
 
     def _parse_and_validate(self, llm_response: str) -> Optional[Dict[str, Any]]:
@@ -606,14 +600,14 @@ class CreativeDirector:
 
             # Basic validation: required fields
             if "style" not in instructions or "pacing" not in instructions:
-                print(f"   ⚠️ Missing required fields (style/pacing)")
+                logger.warning(f"Missing required fields (style/pacing)")
                 return None
 
             # Validate style name
             style_name = instructions["style"].get("name")
             valid_styles = list_available_styles() + ["custom"]
             if style_name not in valid_styles:
-                print(f"   ⚠️ Invalid style name: {style_name}")
+                logger.warning(f"Invalid style name: {style_name}")
                 return None
 
             # TODO: Full JSON schema validation (jsonschema library)
@@ -622,11 +616,11 @@ class CreativeDirector:
             return instructions
 
         except json.JSONDecodeError as e:
-            print(f"   ❌ Invalid JSON from LLM: {e}")
-            print(f"      Response: {llm_response[:200]}...")
+            logger.error(f"Invalid JSON from LLM: {e}")
+            logger.debug(f"Response: {llm_response[:200]}...")
             return None
         except Exception as e:
-            print(f"   ❌ Validation error: {e}")
+            logger.error(f"Validation error: {e}")
             return None
 
     def get_default_instructions(self) -> Dict[str, Any]:
@@ -692,7 +686,7 @@ def interpret_natural_language(prompt: str) -> Dict[str, Any]:
     if instructions:
         return instructions
     else:
-        print("   ℹ️ Falling back to default editing style")
+        logger.info("Falling back to default editing style")
         return director.get_default_instructions()
 
 
