@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: montage-ai-style-cinema-trailer
+  namespace: montage-ai
+data:
+  cinema_trailer.json: |
+    {
+      "id": "cinema_trailer",
+      "name": "Cinema Trailer",
+      "description": "Dramatic build-up, intense climax, professional grading for cinema",
+      "params": {
+        "style": {"name": "cinema_trailer", "mood": "suspenseful"},
+        "pacing": {"speed": "dynamic", "variation": "ramp_up", "intro_duration_beats": 8, "climax_intensity": 1.0},
+        "cinematography": {"prefer_wide_shots": true, "prefer_high_action": true, "match_cuts_enabled": true, "invisible_cuts_enabled": false, "shot_variation_priority": "high"},
+        "transitions": {"type": "energy_aware", "crossfade_duration_sec": 0.5},
+        "effects": {"color_grading": "teal_orange", "stabilization": true, "sharpness_boost": true},
+        "energy_mapping": {"sync_to_beats": true, "energy_amplification": 1.5}
+      }
+    }

@@ -1,0 +1,83 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-cinema-trailer
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: renderer
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: renderer
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: montage-ai
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+              amd.com/gpu: "1"
+          env:
+            - name: CUT_STYLE
+              value: "cinema_trailer"
+            - name: EXPORT_TIMELINE
+              value: "true"
+            - name: CREATIVE_PROMPT
+              value: "Create a cinematic trailer with a dramatic build-up using B-roll footage."
+            - name: LOG_LEVEL
+              value: "DEBUG"
+            - name: CGPU_ENABLED
+              value: "true"
+            - name: UPSCALE
+              value: "true"
+            - name: STABILIZE
+              value: "true"
+          envFrom:
+            - configMapRef:
+                name: montage-ai-config
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+            - name: assets
+              mountPath: /data/assets
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+            - name: source-code
+              mountPath: /app/src/montage_ai
+      volumes:
+        - name: source-code
+          hostPath:
+            path: /home/codeai/montage-ai/src/montage_ai
+            type: Directory
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+      nodeSelector:
+        kubernetes.io/hostname: codeai-fluxibriserver

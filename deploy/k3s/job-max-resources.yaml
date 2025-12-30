@@ -1,0 +1,82 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-render-max-resources
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: renderer
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: renderer
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: montage-ai
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+              amd.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+              amd.com/gpu: "1"
+          envFrom:
+            - configMapRef:
+                name: montage-ai-config
+          env:
+            - name: JOB_ID
+              value: "max_resources_test"
+            - name: CGPU_MAX_CONCURRENCY
+              value: "4"
+            - name: MAX_PARALLEL_JOBS
+              value: "8"
+            - name: LLM_TIMEOUT
+              value: "120"
+            - name: FFMPEG_TIMEOUT
+              value: "300"
+            - name: SILENCE_THRESHOLD
+              value: "-30dB"
+            - name: ENERGY_HIGH_THRESHOLD
+              value: "0.55"
+            - name: ENERGY_LOW_THRESHOLD
+              value: "0.35"
+            - name: TRANSCRIPTION_MODEL
+              value: "large"
+            - name: VERBOSE
+              value: "true"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+            - name: assets
+              mountPath: /data/assets
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+      nodeSelector:
+        kubernetes.io/arch: amd64

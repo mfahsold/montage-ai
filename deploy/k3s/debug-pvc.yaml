@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-pvc
+  namespace: montage-ai
+spec:
+  containers:
+    - name: debug
+      image: busybox
+      command: ["sleep", "3600"]
+      volumeMounts:
+        - name: input
+          mountPath: /data/input
+        - name: music
+          mountPath: /data/music
+        - name: output
+          mountPath: /data/output
+  volumes:
+    - name: input
+      persistentVolumeClaim:
+        claimName: montage-ai-input-nfs
+    - name: music
+      persistentVolumeClaim:
+        claimName: montage-ai-music-nfs
+    - name: output
+      persistentVolumeClaim:
+        claimName: montage-ai-output-nfs
