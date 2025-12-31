@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper for the Python CLI
+export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+python3 src/montage_ai/cli.py "$@"

@@ -1,0 +1,144 @@
+/* New Elegant UI Styles */
+
+/* Status Grid */
+.status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.status-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.status-panel h3 {
+    font-size: 0.9rem;
+    color: var(--muted-text);
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Job Card */
+.job-card.active {
+    border-left: 4px solid var(--primary);
+    padding-left: 1rem;
+}
+
+.job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.job-id {
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.job-phase {
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--primary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 99px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.progress-bar-container {
+    height: 8px;
+    background: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--primary);
+    transition: width 0.5s ease;
+}
+
+.job-details {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* Terminal Window */
+.terminal-window {
+    background: #1a1a1a;
+    color: #0f0;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    padding: 1rem;
+    border-radius: 8px;
+    height: 200px;
+    overflow-y: auto;
+    border: 1px solid #333;
+}
+
+.terminal-line {
+    margin-bottom: 0.25rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.log-info { color: #fff; }
+.log-warn { color: #fbbf24; }
+.log-error { color: #ef4444; }
+.log-dim { color: #666; }
+
+/* Gallery Grid */
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.gallery-item {
+    background: #fff;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 1rem;
+    transition: transform 0.2s;
+}
+
+.gallery-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+
+.gallery-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.gallery-style {
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-transform: capitalize;
+}
+
+.gallery-item.failed {
+    border-left: 4px solid var(--danger);
+}
+
+.gallery-item.completed {
+    border-left: 4px solid var(--success);
+}

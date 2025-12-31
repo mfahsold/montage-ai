@@ -12,10 +12,11 @@ import shutil
 import subprocess
 import threading
 import psutil
+import queue
 from datetime import datetime
 from pathlib import Path
 from collections import deque
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 
 from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
@@ -26,6 +27,33 @@ from ..config import get_settings, reload_settings
 
 # Job phase tracking models
 from .models import JobPhase, PIPELINE_PHASES
+
+# SSE Helper
+class MessageAnnouncer:
+    def __init__(self):
+        self.listeners = []
+
+    def listen(self):
+        q = queue.Queue(maxsize=5)
+        self.listeners.append(q)
+        return q
+
+    def announce(self, msg):
+        # We iterate backwards to allow deleting dead listeners
+        for i in reversed(range(len(self.listeners))):
+            try:
+                self.listeners[i].put_nowait(msg)
+            except queue.Full:
+                del self.listeners[i]
+
+announcer = MessageAnnouncer()
+
+def format_sse(data: str, event=None) -> str:
+    msg = f'data: {data}\n\n'
+    if event is not None:
+        msg = f'event: {event}\n{msg}'
+    return msg
+
 
 # B-Roll Planning (semantic clip search via video_agent)
 try:
@@ -87,6 +115,8 @@ DEFAULT_OPTIONS = {
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max upload
 app.config['UPLOAD_FOLDER'] = INPUT_DIR
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files (Hardware Nah: minimize I/O)
+
 
 # Job queue and management
 jobs = {}
@@ -274,6 +304,14 @@ def run_montage(job_id: str, style: str, options: dict):
 
         # Run montage
         log_path = OUTPUT_DIR / f"render_{job_id}.log"
+        
+        def set_low_priority():
+            """Set process priority to low (nice +10) to keep UI responsive."""
+            try:
+                os.nice(10)
+            except Exception:
+                pass
+
         with open(log_path, "w", encoding="utf-8") as log_file:
             process = subprocess.Popen(
                 cmd,
@@ -282,7 +320,8 @@ def run_montage(job_id: str, style: str, options: dict):
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                preexec_fn=set_low_priority  # Hardware Nah: Lower priority for background task
             )
             
             # Stream output and track phase
@@ -300,15 +339,23 @@ def run_montage(job_id: str, style: str, options: dict):
                             phase_num = int(match.group(1))
                             phase_total = int(match.group(2))
                             phase_name = match.group(3).lower()
+                            phase_data = {
+                                "name": phase_name,
+                                "label": f"Phase {phase_num}/{phase_total}: {match.group(3)}",
+                                "number": phase_num,
+                                "total": phase_total,
+                                "started_at": datetime.now().isoformat(),
+                                "progress_percent": int((phase_num / phase_total) * 100)
+                            }
                             with job_lock:
-                                jobs[job_id]["phase"] = {
-                                    "name": phase_name,
-                                    "label": f"Phase {phase_num}/{phase_total}: {match.group(3)}",
-                                    "number": phase_num,
-                                    "total": phase_total,
-                                    "started_at": datetime.now().isoformat(),
-                                    "progress_percent": int((phase_num / phase_total) * 100)
-                                }
+                                jobs[job_id]["phase"] = phase_data
+                            
+                            # Announce update via SSE
+                            announcer.announce(format_sse(json.dumps({
+                                "job_id": job_id,
+                                "status": "running",
+                                "phase": phase_data
+                            }), event="job_update"))
                     except Exception:
                         pass
             
@@ -342,7 +389,15 @@ def run_montage(job_id: str, style: str, options: dict):
                 if result.returncode != 0 and output_files:
                     jobs[job_id]["warning"] = f"Process exited with code {result.returncode} but output was created successfully"
 
+                # Announce completion
+                announcer.announce(format_sse(json.dumps({
+                    "job_id": job_id,
+                    "status": "completed",
+                    "output_file": jobs[job_id].get("output_file")
+                }), event="job_complete"))
+
                 # Timeline files (if exported)
+
                 if options.get("export_timeline"):
                     timeline_files = {
                         "otio": list(OUTPUT_DIR.glob(f"*{job_id}*.otio")),
@@ -550,6 +605,17 @@ def api_create_job():
     return jsonify(job)
 
 
+@app.route('/api/stream')
+def stream():
+    """Server-Sent Events for real-time updates (Hardware Nah: Zero polling overhead)."""
+    def event_stream():
+        messages = announcer.listen()
+        while True:
+            msg = messages.get()  # blocks until a new message arrives
+            yield msg
+    return Response(event_stream(), mimetype='text/event-stream')
+
+
 @app.route('/api/jobs/<job_id>', methods=['GET'])
 def api_get_job(job_id):
     """Get job status."""
@@ -557,6 +623,22 @@ def api_get_job(job_id):
     if job.get("status") == "not_found":
         return jsonify({"error": "Job not found"}), 404
     return jsonify(job)
+
+
+@app.route('/api/jobs/<job_id>/logs', methods=['GET'])
+def api_get_job_logs(job_id):
+    """Get job logs."""
+    log_path = OUTPUT_DIR / f"render_{job_id}.log"
+    if not log_path.exists():
+        return jsonify({"logs": ""})
+    
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            logs = f.read()
+        return jsonify({"logs": logs})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/api/jobs', methods=['GET'])

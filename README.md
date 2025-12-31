@@ -36,8 +36,9 @@ cp your_videos/*.mp4 data/input/
 cp your_music.mp3 data/music/
 
 # Create a montage
-./montage-ai.sh run hitchcock
+./montage run hitchcock
 ```
+
 
 Your video lands in `data/output/montage.mp4`.
 

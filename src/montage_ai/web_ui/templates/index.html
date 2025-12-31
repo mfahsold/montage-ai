@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Montage AI - Creative Console</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='elegant.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -181,18 +182,48 @@
             </section>
         </div>
 
-        <section class="job-status-container">
+        <section class="job-status-container" id="jobStatusSection" style="display: none;">
             <div class="job-status-header">
                 <span>> SYSTEM_MONITOR</span>
                 <span id="clock">00:00:00</span>
             </div>
-            <div id="jobList" class="job-list">
-                <div class="job-item">
-                    <span>[WAITING]</span>
-                    <span>System initialized. Ready for input.</span>
+            
+            <div class="status-grid">
+                <div class="status-panel">
+                    <h3>Current Job</h3>
+                    <div id="currentJobStatus" class="job-card active">
+                        <div class="job-header">
+                            <span class="job-id">#INIT</span>
+                            <span class="job-phase">WAITING</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="job-details">
+                            Initializing system...
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="status-panel terminal-panel">
+                    <h3>Live Logs</h3>
+                    <div id="terminalOutput" class="terminal-window">
+                        <div class="terminal-line"><span class="dim">System ready. Waiting for input...</span></div>
+                    </div>
                 </div>
             </div>
+
             <div class="timeline-viz" title="Processing Stream"></div>
+        </section>
+
+        <section class="voxel-card" id="gallerySection">
+            <div class="section-heading">
+                <h2>ARCHIVE // GALLERY</h2>
+                <div class="badge">Recent Outputs</div>
+            </div>
+            <div id="jobList" class="gallery-grid">
+                <!-- Populated by JS -->
+            </div>
         </section>
     </div>
 

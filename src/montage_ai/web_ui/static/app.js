@@ -457,161 +457,142 @@ async function searchBroll() {
 // Job Listing & Monitoring
 // =============================================================================
 
+let eventSource = null;
+
 function startPolling() {
-    if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(refreshJobs, 3000);
+    // Initial fetch to populate UI
+    refreshJobs();
+
+    // Setup SSE for real-time updates (Hardware Nah: Push instead of Pull)
+    if (eventSource) eventSource.close();
+    
+    eventSource = new EventSource(`${API_BASE}/stream`);
+    
+    eventSource.onmessage = (e) => {
+        // Generic message
+        console.log('SSE Message:', e.data);
+    };
+
+    eventSource.addEventListener('job_update', (e) => {
+        const data = JSON.parse(e.data);
+        // Only update active job UI to save DOM operations
+        updateActiveJobUI({
+            id: data.job_id,
+            status: data.status,
+            phase: data.phase
+        });
+    });
+
+    eventSource.addEventListener('job_complete', (e) => {
+        const data = JSON.parse(e.data);
+        showToast(`Job ${data.job_id.substring(0,8)} Completed!`, 'success');
+        refreshJobs(); // Full refresh to update gallery
+    });
+
+    eventSource.onerror = () => {
+        // Fallback to polling if SSE fails (e.g. connection lost)
+        console.warn('SSE connection lost, falling back to polling');
+        eventSource.close();
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(refreshJobs, 5000); // Slower polling as fallback
+    };
 }
 
 async function refreshJobs() {
     try {
         const response = await fetch(`${API_BASE}/jobs`);
         const data = await response.json();
-        const jobList = document.getElementById('jobList'); // Matches new HTML ID
+        
+        const activeJob = data.jobs.find(j => j.status === 'running' || j.status === 'queued');
+        const completedJobs = data.jobs.filter(j => j.status === 'completed' || j.status === 'failed');
 
-        if (!jobList) return;
-
-        if (data.jobs.length === 0) {
-            jobList.innerHTML = `
-                <div class="job-item">
-                    <span>[WAITING]</span>
-                    <span>System initialized. Ready for input.</span>
-                </div>`;
-            return;
-        }
-
-        jobList.innerHTML = data.jobs.map(job => renderJob(job)).join('');
+        updateActiveJobUI(activeJob);
+        updateGalleryUI(completedJobs);
 
     } catch (error) {
         console.error('Error fetching jobs:', error);
     }
 }
 
-function getPhaseIndex(phaseText) {
-    if (!phaseText) return -1;
-    const text = phaseText.toLowerCase();
-    for (let i = 0; i < PIPELINE_PHASES.length; i++) {
-        for (const keyword of PIPELINE_PHASES[i].keywords) {
-            if (text.includes(keyword.toLowerCase())) return i;
+async function updateActiveJobUI(job) {
+    const section = document.getElementById('jobStatusSection');
+    const statusCard = document.getElementById('currentJobStatus');
+    const terminal = document.getElementById('terminalOutput');
+
+    if (!job) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    
+    // Update Status Card
+    const phase = job.phase || {};
+    const percent = phase.progress_percent || 0;
+    
+    statusCard.innerHTML = `
+        <div class="job-header">
+            <span class="job-id">#${job.id.substring(0, 8)}</span>
+            <span class="job-phase">${(phase.name || job.status).toUpperCase()}</span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" style="width: ${percent}%"></div>
+        </div>
+        <div class="job-details">
+            ${phase.label || 'Processing...'}
+        </div>
+    `;
+
+    // Update Terminal
+    try {
+        const logResponse = await fetch(`${API_BASE}/jobs/${job.id}/logs`);
+        const logData = await logResponse.json();
+        if (logData.logs) {
+            // Keep only last 20 lines to avoid DOM bloat
+            const lines = logData.logs.split('\n').slice(-20);
+            terminal.innerHTML = lines.map(line => 
+                `<div class="terminal-line">${formatLogLine(line)}</div>`
+            ).join('');
+            terminal.scrollTop = terminal.scrollHeight;
         }
+    } catch (e) {
+        console.warn('Log fetch failed', e);
     }
-    return -1;
 }
 
-function renderPhaseChips(phaseText, status) {
-    if (status === 'completed') {
-        return PIPELINE_PHASES.map(p =>
-            `<span class="phase-chip completed">${p.label}</span>`
-        ).join('<span class="phase-connector active"></span>');
-    }
-    if (status === 'failed' || status === 'queued') {
-        return PIPELINE_PHASES.map(p =>
-            `<span class="phase-chip pending">${p.label}</span>`
-        ).join('<span class="phase-connector"></span>');
-    }
-
-    const activeIndex = getPhaseIndex(phaseText);
-    return PIPELINE_PHASES.map((p, i) => {
-        let chipClass = 'pending';
-        if (i < activeIndex) chipClass = 'completed';
-        else if (i === activeIndex) chipClass = 'active';
-        return `<span class="phase-chip ${chipClass}">${p.label}</span>`;
-    }).join('<span class="phase-connector' + (activeIndex > 0 ? ' active' : '') + '"></span>');
+function formatLogLine(line) {
+    if (line.includes('[INFO]')) return `<span class="log-info">${line}</span>`;
+    if (line.includes('[WARNING]')) return `<span class="log-warn">${line}</span>`;
+    if (line.includes('[ERROR]')) return `<span class="log-error">${line}</span>`;
+    return `<span class="log-dim">${line}</span>`;
 }
 
-function renderCompletionCard(job) {
-    const warnings = [];
-    if (systemStatus.gpu === 'unknown' || systemStatus.gpu === 'none') {
-        warnings.push('CPU encoding used (no GPU encoder detected)');
+function updateGalleryUI(jobs) {
+    const gallery = document.getElementById('jobList'); // Reusing ID for gallery grid
+    if (!gallery) return;
+
+    if (jobs.length === 0) {
+        gallery.innerHTML = '<div class="empty-state">No recent jobs found.</div>';
+        return;
     }
 
-    return `
-        <div class="completion-card">
-            <div class="header">
-                <span class="title">MONTAGE_COMPLETE</span>
+    gallery.innerHTML = jobs.map(job => `
+        <div class="gallery-item ${job.status}">
+            <div class="gallery-header">
+                <span class="gallery-id">#${job.id.substring(0, 6)}</span>
+                <span class="gallery-date">${new Date(job.created_at).toLocaleTimeString()}</span>
             </div>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-label">Style</span>
-                    <span class="stat-value">${(job.style || 'dynamic').toUpperCase()}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Duration</span>
-                    <span class="stat-value">${job.duration ? job.duration.toFixed(1) + 's' : '--'}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Cuts</span>
-                    <span class="stat-value">${job.cut_count || '--'}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Render</span>
-                    <span class="stat-value">${job.render_time ? job.render_time.toFixed(0) + 's' : '--'}</span>
-                </div>
-            </div>
-            <div class="actions">
-                <a href="${API_BASE}/download/${job.output_file}" class="voxel-btn primary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
-                    Download
-                </a>
-                <a href="${API_BASE}/jobs/${job.id}/logs" target="_blank" class="voxel-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
-                    View Logs
-                </a>
-            </div>
-            ${warnings.length ? `<div class="warning-banner">${warnings.join(' | ')}</div>` : ''}
-        </div>
-    `;
-}
-
-function renderJob(job) {
-    let statusColor = '#fff';
-    let statusLabel = job.status.toUpperCase();
-
-    if (job.status === 'running') statusColor = '#0ff';
-    if (job.status === 'completed') statusColor = '#0f0';
-    if (job.status === 'failed') statusColor = '#f00';
-    if (job.status === 'queued') statusColor = '#ff0';
-
-    const phaseChips = renderPhaseChips(job.phase, job.status);
-    const logLink = `<a href="${API_BASE}/jobs/${job.id}/logs" target="_blank" class="status-badge" style="color: #888; border-color: #888; text-decoration: none;">[ LOGS ]</a>`;
-
-    // Completed jobs get enhanced card
-    if (job.status === 'completed') {
-        return `
-            <div class="job-item" style="flex-direction: column; align-items: stretch;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span class="status-badge" style="color: ${statusColor}; border-color: ${statusColor}">
-                        [ ${statusLabel} ]
-                    </span>
-                    <span style="font-size: 0.8em; opacity: 0.7;">ID: ${job.id}</span>
-                </div>
-                <div class="phase-progress" style="margin: 0.5rem 0;">
-                    ${phaseChips}
-                </div>
-                ${renderCompletionCard(job)}
-            </div>
-        `;
-    }
-
-    // Running/queued/failed jobs
-    const statusMessage = job.error || (job.status === 'running' ? job.phase || 'Processing...' : 'Queued');
-    return `
-        <div class="job-item" style="flex-direction: column; align-items: stretch;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="status-badge" style="color: ${statusColor}; border-color: ${statusColor}">
-                    [ ${statusLabel} ]
-                </span>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <span style="font-size: 0.8em; opacity: 0.7;">ID: ${job.id}</span>
-                    ${logLink}
-                </div>
-            </div>
-            <div class="phase-progress" style="margin: 0.5rem 0;">
-                ${phaseChips}
-            </div>
-            <div style="font-size: 0.8em; color: ${job.status === 'failed' ? '#f00' : '#888'};">
-                > ${statusMessage}
+            <div class="gallery-info">
+                <div class="gallery-style">${job.style.toUpperCase()}</div>
+                ${job.output_file ? 
+                    `<a href="${API_BASE}/download/${job.output_file}" class="voxel-btn primary small">Download MP4</a>` : 
+                    `<span class="status-text">${job.status}</span>`
+                }
             </div>
         </div>
-    `;
+    `).join('');
 }
+
 
 // =============================================================================
 // Status & Defaults

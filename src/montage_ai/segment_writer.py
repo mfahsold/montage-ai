@@ -998,7 +998,7 @@ class SegmentWriter:
         if logo_path:
             actual_output = str(self.output_dir / "pre_logo.mp4")
         else:
-            actual_output = f"{output_path}.tmp"
+            actual_output = f"{output_path}.tmp.mp4"
         
         try:
             if audio_path and os.path.exists(audio_path):
