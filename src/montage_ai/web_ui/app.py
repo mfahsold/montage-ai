@@ -28,32 +28,10 @@ from ..config import get_settings, reload_settings
 # Job phase tracking models
 from .models import JobPhase, PIPELINE_PHASES
 
-# SSE Helper
-class MessageAnnouncer:
-    def __init__(self):
-        self.listeners = []
-
-    def listen(self):
-        q = queue.Queue(maxsize=5)
-        self.listeners.append(q)
-        return q
-
-    def announce(self, msg):
-        # We iterate backwards to allow deleting dead listeners
-        for i in reversed(range(len(self.listeners))):
-            try:
-                self.listeners[i].put_nowait(msg)
-            except queue.Full:
-                del self.listeners[i]
+# SSE Helper (Refactored to separate module)
+from .sse import MessageAnnouncer, format_sse
 
 announcer = MessageAnnouncer()
-
-def format_sse(data: str, event=None) -> str:
-    msg = f'data: {data}\n\n'
-    if event is not None:
-        msg = f'event: {event}\n{msg}'
-    return msg
-
 
 # B-Roll Planning (semantic clip search via video_agent)
 try:
@@ -267,40 +245,19 @@ def run_montage(job_id: str, style: str, options: dict):
     try:
         # Build command
         import sys
+        from ..env_mapper import map_options_to_env
+        
         cmd = [sys.executable, "-m", "montage_ai.editor"]
 
-        # Set environment variables
+        # Set environment variables using DRY mapper
         # options dict is already normalized via normalize_options() with DEFAULT_OPTIONS
-        env = os.environ.copy()
+        env = map_options_to_env(style, options, job_id)
+        
+        # Add Web-UI specific paths (if not already in env)
         env["INPUT_DIR"] = str(INPUT_DIR)
         env["MUSIC_DIR"] = str(MUSIC_DIR)
         env["OUTPUT_DIR"] = str(OUTPUT_DIR)
         env["ASSETS_DIR"] = str(ASSETS_DIR)
-        env["JOB_ID"] = job_id
-        env["CUT_STYLE"] = style
-        env["CREATIVE_PROMPT"] = options.get("prompt", "")
-        # Boolean options -> env vars (DRY: use bool_to_env helper)
-        env["STABILIZE"] = bool_to_env(options.get("stabilize"))
-        env["UPSCALE"] = bool_to_env(options.get("upscale"))
-        env["ENHANCE"] = bool_to_env(options.get("enhance"))
-        env["LLM_CLIP_SELECTION"] = bool_to_env(options.get("llm_clip_selection"))
-        env["EXPORT_TIMELINE"] = bool_to_env(options.get("export_timeline"))
-        env["GENERATE_PROXIES"] = bool_to_env(options.get("generate_proxies"))
-        env["PRESERVE_ASPECT"] = bool_to_env(options.get("preserve_aspect"))
-        env["CREATIVE_LOOP"] = bool_to_env(options.get("creative_loop"))
-        env["CGPU_ENABLED"] = bool_to_env(options.get("cgpu"))
-        env["CGPU_GPU_ENABLED"] = bool_to_env(options.get("cgpu"))
-        # Quick Preview: Use fast FFmpeg preset
-        if options.get("preview"):
-            env["FFMPEG_PRESET"] = "ultrafast"
-            env["FINAL_CRF"] = "28"  # Lower quality for speed
-        # Video duration & music trimming (already normalized by normalize_options)
-        env["TARGET_DURATION"] = str(options.get("target_duration", 0))
-        env["MUSIC_START"] = str(options.get("music_start", 0))
-        music_end = options.get("music_end")
-        env["MUSIC_END"] = str(music_end) if music_end is not None else ""
-        env["VERBOSE"] = "true"
-        env["PYTHONUNBUFFERED"] = "1"
 
         # Run montage
         log_path = OUTPUT_DIR / f"render_{job_id}.log"
@@ -625,19 +582,7 @@ def api_get_job(job_id):
     return jsonify(job)
 
 
-@app.route('/api/jobs/<job_id>/logs', methods=['GET'])
-def api_get_job_logs(job_id):
-    """Get job logs."""
-    log_path = OUTPUT_DIR / f"render_{job_id}.log"
-    if not log_path.exists():
-        return jsonify({"logs": ""})
-    
-    try:
-        with open(log_path, "r", encoding="utf-8") as f:
-            logs = f.read()
-        return jsonify({"logs": logs})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
 
 
 

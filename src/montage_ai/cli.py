@@ -53,11 +53,14 @@ def run(style: Optional[str], stabilize: bool, upscale: bool, cgpu: bool, varian
 
     console.print(f"\n🚀 Starting Montage AI with style: [bold green]{style}[/]")
     
-    env_vars = os.environ.copy()
-    env_vars["CUT_STYLE"] = style
-    env_vars["STABILIZE"] = str(stabilize).lower()
-    env_vars["UPSCALE"] = str(upscale).lower()
-    env_vars["CGPU_ENABLED"] = str(cgpu).lower()
+    # Use DRY env mapper
+    from .env_mapper import map_options_to_env
+    options = {
+        "stabilize": stabilize,
+        "upscale": upscale,
+        "cgpu": cgpu
+    }
+    env_vars = map_options_to_env(style, options)
     
     if docker:
         cmd = ["docker", "compose", "run", "--rm", "montage-ai", "./montage-ai.sh", "run", style]

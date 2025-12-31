@@ -84,6 +84,13 @@ build: ## Build Docker image for local architecture
 	@echo "$(CYAN)Building montage-ai (local arch, commit: $(GIT_COMMIT))...$(RESET)"
 	docker build --build-arg GIT_COMMIT=$(GIT_COMMIT) -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
+build-multiarch: ## Build Docker image for amd64 and arm64
+	@echo "$(CYAN)Building montage-ai for linux/amd64,linux/arm64 (commit: $(GIT_COMMIT))...$(RESET)"
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		-t $(IMAGE_NAME):$(IMAGE_TAG) \
+		--push .
+
 build-amd64: ## Build Docker image for amd64 (cluster deployment)
 	@echo "$(CYAN)Building montage-ai for linux/amd64 (commit: $(GIT_COMMIT))...$(RESET)"
 	docker buildx build --platform linux/amd64 \

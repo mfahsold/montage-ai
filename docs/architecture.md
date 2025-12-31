@@ -97,6 +97,9 @@ The central orchestrator that executes the editing pipeline in phases:
 | **Parallel Scene Detection** | `ThreadPoolExecutor(max_workers=4)` | 3-4x speedup on multi-core |
 | **FFmpeg Beat Detection** | `silencedetect` + `ebur128` filters | Works without librosa (Python 3.12 compat) |
 | **Auto GPU Encoding** | NVENC > VAAPI > QSV > CPU | 2-6x encoding speedup |
+| **Hardware Nah (Web)** | Server-Sent Events (SSE) + `os.nice(10)` | Zero polling overhead, responsive UI under load |
+| **Lazy Loading (CLI)** | Import heavy libs only when needed | Instant CLI startup time |
+| **Cluster Efficiency** | `imagePullPolicy: IfNotPresent` | Minimized network traffic for cached images |
 
 ### editor.py (CLI Entry Point)
 

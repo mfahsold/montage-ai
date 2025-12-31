@@ -20,10 +20,12 @@ Drop your clips and a music track, pick a style, and let the AI do the editing. 
 ```bash
 git clone https://github.com/mfahsold/montage-ai.git
 cd montage-ai
-make web
+./montage web
 ```
 
-Open **http://localhost:5001** → upload videos + music → pick a style → hit Create → done.
+Open **http://localhost:8080** → upload videos + music → pick a style → hit Create → done.
+
+The Web UI features a **real-time terminal** and **live status dashboard** powered by Server-Sent Events (SSE) for zero-overhead monitoring.
 
 ![Web UI Dashboard](docs/images/web-ui-dashboard.png)
 <!-- TODO: Add screenshot of the Web UI dashboard with upload and style selection -->
@@ -39,6 +41,7 @@ cp your_music.mp3 data/music/
 ./montage run hitchcock
 ```
 
+The new CLI is powered by Python `click` and `rich` for a modern, interactive experience.
 
 Your video lands in `data/output/montage.mp4`.
 
