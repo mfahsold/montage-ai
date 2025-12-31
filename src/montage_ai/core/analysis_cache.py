@@ -183,19 +183,32 @@ class AnalysisCache:
     Automatically invalidates cache when source file changes or TTL expires.
     """
 
-    def __init__(self, ttl_hours: int = DEFAULT_TTL_HOURS, enabled: bool = True):
+    def __init__(self, ttl_hours: int = DEFAULT_TTL_HOURS, enabled: bool = True, cache_dir: Optional[str] = None):
         """
         Initialize the analysis cache.
 
         Args:
             ttl_hours: Time-to-live in hours before cache expires
             enabled: Whether caching is enabled (can be disabled for testing)
+            cache_dir: Optional directory to store cache files (overrides sidecar behavior)
         """
         self.ttl_hours = ttl_hours
         self.enabled = enabled
+        
+        # Allow override via environment variable if not explicitly provided
+        if cache_dir is None:
+            cache_dir = os.environ.get("METADATA_CACHE_DIR")
+        self.cache_dir = cache_dir
 
     def _cache_path(self, source_path: str, suffix: str) -> Path:
-        """Get sidecar cache file path."""
+        """Get cache file path (sidecar or centralized)."""
+        filename = f"{os.path.basename(source_path)}.{suffix}.json"
+        
+        if self.cache_dir:
+            # Ensure cache directory exists
+            os.makedirs(self.cache_dir, exist_ok=True)
+            return Path(os.path.join(self.cache_dir, filename))
+            
         return Path(f"{source_path}.{suffix}.json")
 
     def _is_valid(self, cache_path: Path, source_path: str) -> bool:

@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-nature-doc
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: renderer
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: renderer
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: montage-ai
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "6"
+              memory: "12Gi"
+          env:
+            - name: INPUT_DIR
+              value: "/data/input/nature-doc"
+            - name: METADATA_CACHE_DIR
+              value: "/data/output/cache"
+            - name: CUT_STYLE
+              value: "documentary"
+            - name: EXPORT_TIMELINE
+              value: "true"
+            - name: LOG_LEVEL
+              value: "DEBUG"
+            - name: CGPU_ENABLED
+              value: "true"
+            - name: CGPU_GPU_ENABLED
+              value: "true"
+            - name: UPSCALE
+              value: "true"
+            - name: STABILIZE
+              value: "true"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+            - name: music
+              mountPath: /data/music
+            - name: output
+              mountPath: /data/output
+            - name: cgpu-secrets
+              mountPath: /root/.config/cgpu
+              readOnly: true
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+        - name: cgpu-secrets
+          secret:
+            secretName: cgpu-credentials
+            optional: true

@@ -88,6 +88,8 @@ build-multiarch: ## Build Docker image for amd64 and arm64
 	@echo "$(CYAN)Building montage-ai for linux/amd64,linux/arm64 (commit: $(GIT_COMMIT))...$(RESET)"
 	docker buildx build --platform linux/amd64,linux/arm64 \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--cache-from type=registry,ref=$(IMAGE_NAME):build-cache \
+		--cache-to type=registry,ref=$(IMAGE_NAME):build-cache,mode=max \
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \
 		--push .
 
@@ -143,7 +145,15 @@ job: ## Start a render job in cluster
 	@echo "$(GREEN)Job started. Use 'make logs' to watch progress.$(RESET)"
 
 logs: ## View job logs
-	kubectl logs -n $(NAMESPACE) -f job/montage-ai-render
+	@echo "$(CYAN)Fetching logs for most recent job...$(RESET)"
+	@# Try to find the most recent job pod
+	@POD=$$(kubectl get pods -n $(NAMESPACE) --sort-by=.metadata.creationTimestamp -o name | grep montage-ai-distributed | tail -1); \
+	if [ -z "$$POD" ]; then \
+		echo "$(YELLOW)No running jobs found. Try 'make job' first.$(RESET)"; \
+	else \
+		echo "$(GREEN)Streaming logs from $$POD...$(RESET)"; \
+		kubectl logs -n $(NAMESPACE) -f $$POD; \
+	fi
 
 status: ## Show cluster deployment status
 	@echo "$(CYAN)Montage AI Cluster Status$(RESET)"
@@ -202,6 +212,8 @@ release: validate ## Create a release (builds, tags, pushes)
 	@echo "$(CYAN)Creating release $(VERSION) (commit: $(GIT_COMMIT))...$(RESET)"
 	docker buildx build --platform linux/amd64,linux/arm64 \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--cache-from type=registry,ref=$(IMAGE_NAME):build-cache \
+		--cache-to type=registry,ref=$(IMAGE_NAME):build-cache,mode=max \
 		-t $(IMAGE_NAME):$(VERSION) \
 		-t $(IMAGE_NAME):latest \
 		--push .
