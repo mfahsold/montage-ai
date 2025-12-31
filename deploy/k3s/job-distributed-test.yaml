@@ -1,0 +1,123 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-distributed-test
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: renderer
+spec:
+  parallelism: 3  # Run 3 pods in parallel to test distribution
+  completions: 3
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: renderer
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: montage-ai
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+              # We don't request specific GPU here to allow scheduling on mixed nodes
+              # The application will auto-detect available hardware
+          env:
+            - name: CUT_STYLE
+              value: "dynamic"
+            - name: EXPORT_TIMELINE
+              value: "true"
+            - name: LOG_LEVEL
+              value: "DEBUG"
+            # Enable Cloud GPU offloading for heavy AI tasks
+            - name: CGPU_ENABLED
+              value: "true"
+            - name: CGPU_GPU_ENABLED
+              value: "true"
+            # Enable local features
+            - name: UPSCALE
+              value: "true"
+            - name: STABILIZE
+              value: "true"
+            - name: COLOR_MATCH
+              value: "true"
+            - name: ENHANCE
+              value: "true"
+            - name: INPUT_DIR
+              value: "/data/input/curated"
+            - name: MUSIC_DIR
+              value: "/data/music/curated"
+            - name: TARGET_DURATION
+              value: "45"
+            - name: MUSIC_END
+              value: "45"
+            - name: LLM_CLIP_SELECTION
+              value: "true"
+            - name: NORMALIZE_CLIPS
+              value: "true"
+            - name: FFMPEG_THREADS
+              value: "4"
+            # Auto-detect HW acceleration
+            - name: FFMPEG_HWACCEL
+              value: "auto"
+            - name: EXTRACT_REENCODE
+              value: "true"
+            - name: MAX_PARALLEL_JOBS
+              value: "2"
+            - name: TEMP_DIR
+              value: "/data/output/tmp"
+            - name: CREATIVE_LOOP
+              value: "false"
+          envFrom:
+            - configMapRef:
+                name: montage-ai-config
+          command: ["/bin/sh", "-c", "echo 'Starting Distributed Run...'; python -u -m montage_ai.editor"]
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+            - name: assets
+              mountPath: /data/assets
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+      # Affinity to spread pods across different nodes (AMD, ARM, etc.)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - montage-ai
+              topologyKey: kubernetes.io/hostname

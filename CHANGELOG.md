@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Video Quality**: Added `NORMALIZE_CLIPS` enforcement to `segment_writer.py` to fix stuttering by re-encoding variable frame rate sources to CFR.
 
 ### Changed
+- **Infrastructure**
+  - **ARM Support**: Updated `Dockerfile` to build `realesrgan-ncnn-vulkan` from source on non-x86 architectures, enabling AI upscaling on ARM workers.
+  - **Vulkan Config**: Removed hardcoded x86_64 Vulkan ICD path to support multi-architecture deployments.
 - **Configuration Refactor**
   - Moved hardcoded export settings (Resolution, FPS) to `ExportConfig` in `config.py`.
   - `timeline_exporter.py` now uses centralized settings instead of magic numbers.

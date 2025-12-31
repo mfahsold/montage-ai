@@ -32,6 +32,10 @@ class MetadataCache:
             cache_dir: Directory to store cache files (default: same as video)
             invalidation_hours: Hours before cache is considered stale
         """
+        # Allow override via environment variable if not explicitly provided
+        if cache_dir is None:
+            cache_dir = os.environ.get("METADATA_CACHE_DIR")
+            
         self.cache_dir = cache_dir
         self.invalidation_hours = invalidation_hours
 
@@ -469,5 +473,8 @@ def get_metadata_cache(cache_dir: Optional[str] = None) -> MetadataCache:
     global _default_cache
     if _default_cache is None:
         invalidation_hours = int(os.environ.get('CACHE_INVALIDATION_HOURS', '24'))
+        # Check for env var if cache_dir not explicitly provided
+        if cache_dir is None:
+            cache_dir = os.environ.get('METADATA_CACHE_DIR')
         _default_cache = MetadataCache(cache_dir=cache_dir, invalidation_hours=invalidation_hours)
     return _default_cache

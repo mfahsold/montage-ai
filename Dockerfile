@@ -74,11 +74,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 FROM python-deps AS realesrgan
 
 # Install Real-ESRGAN binary and models
-RUN if [ "$(uname -m)" = "x86_64" ]; then \
-        curl -L -o realesrgan.zip https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip && \
-        unzip -q realesrgan.zip -d realesrgan_temp && \
+RUN curl -L -o realesrgan.zip https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip && \
+    unzip -q realesrgan.zip -d realesrgan_temp && \
+    if [ "$(uname -m)" = "x86_64" ]; then \
         mv realesrgan_temp/realesrgan-ncnn-vulkan /usr/local/bin/ && \
         chmod +x /usr/local/bin/realesrgan-ncnn-vulkan; \
+    else \
+        apt-get update && apt-get install -y cmake build-essential git glslang-tools libvulkan-dev && \
+        git config --global url."https://github.com/".insteadOf git@github.com: && \
+        git clone https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan.git && \
+        cd Real-ESRGAN-ncnn-vulkan && \
+        git submodule update --init --recursive && \
+        mkdir build && cd build && \
+        cmake ../src && make -j4 && \
+        mv realesrgan-ncnn-vulkan /usr/local/bin/ && \
+        cd ../.. && rm -rf Real-ESRGAN-ncnn-vulkan; \
     fi && \
     mkdir -p /usr/local/share/realesrgan-models && \
     (find realesrgan_temp -name "*.param" -exec mv {} /usr/local/share/realesrgan-models/ \; 2>/dev/null || true) && \
@@ -101,7 +111,7 @@ COPY pyproject.toml .
 RUN pip install --no-cache-dir -e .
 
 # Vulkan headless environment
-ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
+# ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
 ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 RUN mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
 
