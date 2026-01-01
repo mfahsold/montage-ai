@@ -5,7 +5,7 @@ Detects available hardware acceleration (GPU) for FFmpeg to ensure
 we are running as close to the metal as possible.
 
 Supported Accelerators:
-- NVIDIA NVENC (Linux/Windows)
+- NVIDIA NVENC / NVMPI (Linux/Windows/Jetson)
 - VAAPI (Intel/AMD Linux)
 - VideoToolbox (macOS Apple Silicon/Intel)
 - QSV (Intel Linux/Windows)
@@ -26,7 +26,7 @@ from dataclasses import dataclass
 
 @dataclass
 class HWConfig:
-    type: str  # 'cpu', 'nvenc', 'vaapi', 'videotoolbox', 'qsv'
+    type: str  # 'cpu', 'nvenc', 'nvmpi', 'vaapi', 'videotoolbox', 'qsv'
     encoder: str  # 'libx264', 'h264_nvenc', etc.
     decoder_args: List[str]  # Input args (before -i)
     encoder_args: List[str]  # Output args
@@ -42,8 +42,20 @@ def _check_command(cmd: List[str]) -> bool:
         return False
 
 def _has_nvidia() -> bool:
-    """Check for NVIDIA GPU via nvidia-smi."""
-    return shutil.which("nvidia-smi") is not None
+    """Check for NVIDIA GPU via nvidia-smi or Jetson device nodes."""
+    visible = os.environ.get("NVIDIA_VISIBLE_DEVICES")
+    if visible is not None and visible.strip().lower() in {"none", "void"}:
+        return False
+    if shutil.which("nvidia-smi") is not None:
+        return True
+    nvidia_paths = (
+        "/dev/nvidia0",
+        "/dev/nvhost-ctrl",
+        "/dev/nvhost-nvenc",
+        "/proc/driver/nvidia/version",
+        "/etc/nv_tegra_release",
+    )
+    return any(os.path.exists(path) for path in nvidia_paths)
 
 def _has_vaapi() -> bool:
     """
@@ -115,53 +127,88 @@ def _pick_encoder(h264_name: str, hevc_name: str, preferred: str) -> Optional[st
         return hevc_name
     return None
 
-def get_best_hwaccel(preferred_codec: str = "h264") -> HWConfig:
+def get_hwaccel_by_type(hwaccel: str, preferred_codec: str = "h264") -> Optional[HWConfig]:
     """
-    Detect the best available hardware acceleration.
-    Returns a HWConfig object with FFmpeg arguments.
+    Resolve a specific hardware acceleration type to an HWConfig.
+
+    Returns None when the requested accelerator isn't available.
     """
     codec_pref = _normalize_codec(preferred_codec)
-    
-    # 1. NVIDIA NVENC (Preferred on Linux/Windows)
-    if _has_nvidia():
+    accel = (hwaccel or "").lower()
+
+    if accel in ("none", "cpu"):
+        cpu_encoder = "libx264"
+        if codec_pref == "hevc" and _check_ffmpeg_encoder("libx265"):
+            cpu_encoder = "libx265"
+        return HWConfig(
+            type="cpu",
+            encoder=cpu_encoder,
+            decoder_args=[],
+            encoder_args=["-c:v", cpu_encoder],
+            is_gpu=False
+        )
+
+    if accel == "nvenc":
+        if not _has_nvidia():
+            return None
         encoder = _pick_encoder("h264_nvenc", "hevc_nvenc", codec_pref)
-        if encoder:
-            return HWConfig(
-                type="nvenc",
-                encoder=encoder,
-                decoder_args=["-hwaccel", "cuda"],
-                encoder_args=["-c:v", encoder],
-                is_gpu=True
-            )
+        if not encoder:
+            return None
+        return HWConfig(
+            type="nvenc",
+            encoder=encoder,
+            decoder_args=["-hwaccel", "cuda"],
+            encoder_args=["-c:v", encoder],
+            is_gpu=True
+        )
 
-    # 2. macOS VideoToolbox (Apple Silicon/Intel)
-    if _has_macos():
+    if accel == "nvmpi":
+        if not _has_nvidia():
+            return None
+        encoder = _pick_encoder("h264_nvmpi", "hevc_nvmpi", codec_pref)
+        if not encoder:
+            return None
+        return HWConfig(
+            type="nvmpi",
+            encoder=encoder,
+            decoder_args=[],
+            encoder_args=["-c:v", encoder],
+            is_gpu=True
+        )
+
+    if accel == "videotoolbox":
+        if not _has_macos():
+            return None
         encoder = _pick_encoder("h264_videotoolbox", "hevc_videotoolbox", codec_pref)
-        if encoder:
-            return HWConfig(
-                type="videotoolbox",
-                encoder=encoder,
-                decoder_args=["-hwaccel", "videotoolbox"],
-                encoder_args=["-c:v", encoder, "-allow_sw", "1"],
-                is_gpu=True
-            )
+        if not encoder:
+            return None
+        return HWConfig(
+            type="videotoolbox",
+            encoder=encoder,
+            decoder_args=["-hwaccel", "videotoolbox"],
+            encoder_args=["-c:v", encoder, "-allow_sw", "1"],
+            is_gpu=True
+        )
 
-    # 3. VAAPI (Intel/AMD on Linux)
-    if _has_vaapi():
+    if accel == "vaapi":
+        if not _has_vaapi():
+            return None
         encoder = _pick_encoder("h264_vaapi", "hevc_vaapi", codec_pref)
-        if encoder:
-            return HWConfig(
-                type="vaapi",
-                encoder=encoder,
-                decoder_args=["-hwaccel", "vaapi", "-hwaccel_device", "/dev/dri/renderD128"],
-                encoder_args=["-c:v", encoder],
-                is_gpu=True,
-                hwupload_filter="format=nv12,hwupload"
-            )
+        if not encoder:
+            return None
+        return HWConfig(
+            type="vaapi",
+            encoder=encoder,
+            decoder_args=["-hwaccel", "vaapi", "-hwaccel_device", "/dev/dri/renderD128"],
+            encoder_args=["-c:v", encoder],
+            is_gpu=True,
+            hwupload_filter="format=nv12,hwupload"
+        )
 
-    # 4. QSV (Intel QuickSync) - often requires specific setup, lower prio than VAAPI for generic Linux
-    encoder = _pick_encoder("h264_qsv", "hevc_qsv", codec_pref)
-    if encoder:
+    if accel == "qsv":
+        encoder = _pick_encoder("h264_qsv", "hevc_qsv", codec_pref)
+        if not encoder:
+            return None
         return HWConfig(
             type="qsv",
             encoder=encoder,
@@ -170,17 +217,20 @@ def get_best_hwaccel(preferred_codec: str = "h264") -> HWConfig:
             is_gpu=True
         )
 
-    # 5. CPU Fallback (libx264)
-    cpu_encoder = "libx264"
-    if codec_pref == "hevc" and _check_ffmpeg_encoder("libx265"):
-        cpu_encoder = "libx265"
-    return HWConfig(
-        type="cpu",
-        encoder=cpu_encoder,
-        decoder_args=[],
-        encoder_args=["-c:v", cpu_encoder],
-        is_gpu=False
-    )
+    return None
+
+
+def get_best_hwaccel(preferred_codec: str = "h264") -> HWConfig:
+    """
+    Detect the best available hardware acceleration.
+    Returns a HWConfig object with FFmpeg arguments.
+    """
+    for accel in ("nvenc", "nvmpi", "videotoolbox", "vaapi", "qsv"):
+        config = get_hwaccel_by_type(accel, preferred_codec=preferred_codec)
+        if config:
+            return config
+
+    return get_hwaccel_by_type("cpu", preferred_codec=preferred_codec)
 
 def get_ffmpeg_hw_args(mode: str = "encode", preferred_codec: str = "h264") -> List[str]:
     """

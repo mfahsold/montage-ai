@@ -27,11 +27,13 @@ DRY Principle: All resource detection logic consolidated here.
 import os
 import subprocess
 import shutil
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 
 from .logger import logger
+from .config import get_effective_cpu_count
 
 if TYPE_CHECKING:
     from .ffmpeg_config import FFmpegConfig
@@ -72,7 +74,7 @@ class ResourceStatus:
 
     # Local GPU
     local_gpu_available: bool = False
-    local_gpu_type: Optional[str] = None  # nvenc, vaapi, qsv, videotoolbox
+    local_gpu_type: Optional[str] = None  # nvenc, nvmpi, vaapi, qsv, videotoolbox
     local_gpu_info: Optional[str] = None
 
     # CPU info
@@ -143,10 +145,7 @@ class ResourceManager:
             self._detect_local_gpu()
 
         # Detect CPU (respect cgroup affinity when available)
-        try:
-            status.cpu_cores = len(os.sched_getaffinity(0))
-        except AttributeError:
-            status.cpu_cores = os.cpu_count() or 1
+        status.cpu_cores = get_effective_cpu_count()
 
         # Detect K3s cluster
         status.k3s_available, status.k3s_nodes, status.k3s_ready_nodes = \
@@ -220,7 +219,7 @@ class ResourceManager:
         info = f"{hw_config.type.upper()} ({hw_config.encoder})"
 
         # For NVIDIA, try to get device name
-        if hw_config.type == "nvenc":
+        if hw_config.type in ("nvenc", "nvmpi"):
             try:
                 result = subprocess.run(
                     ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
@@ -232,6 +231,15 @@ class ResourceManager:
                     info = f"NVENC: {result.stdout.strip()}"
             except Exception:
                 pass
+
+            if hw_config.type == "nvmpi":
+                try:
+                    tegra_release = "/etc/nv_tegra_release"
+                    if os.path.exists(tegra_release):
+                        release_info = Path(tegra_release).read_text(encoding="utf-8").strip()
+                        info = f"Jetson: {release_info}"
+                except Exception:
+                    pass
 
         # For VAAPI, try to get device info
         elif hw_config.type == "vaapi":

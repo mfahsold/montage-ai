@@ -624,10 +624,9 @@ class MontageBuilder:
         self._init_intelligent_selector()
 
         # Initialize thread pool for parallel clip processing
-        max_workers = self._resource_manager.status.cpu_cores
-        # Reserve one core for main thread/orchestration if possible
-        if max_workers > 2:
-            max_workers -= 1
+        adaptive_workers = self.settings.processing.get_adaptive_parallel_jobs(self.settings.features.low_memory_mode)
+        optimal_workers = self._resource_manager.get_optimal_threads()
+        max_workers = max(1, min(adaptive_workers, optimal_workers))
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         logger.info(f"   🚀 Initialized parallel processor with {max_workers} workers")
 
@@ -1035,7 +1034,8 @@ class MontageBuilder:
             # Use ThreadPoolExecutor for parallel I/O
             # Use more workers based on available CPU cores for better cluster utilization
             optimal_workers = self._resource_manager.get_optimal_threads()
-            max_workers = min(optimal_workers, len(uncached_videos))
+            adaptive_workers = self.settings.processing.get_adaptive_parallel_jobs(self.settings.features.low_memory_mode)
+            max_workers = min(optimal_workers, adaptive_workers, len(uncached_videos))
             logger.info(f"   🚀 Parallel scene detection ({len(uncached_videos)} videos, {max_workers} workers)")
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:

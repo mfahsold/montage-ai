@@ -18,7 +18,7 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Set
+from typing import Optional, Set, Tuple, List
 from dataclasses import dataclass, field
 
 
@@ -48,12 +48,68 @@ class PathConfig:
         return self.output_dir / f"render_{job_id}.log"
 
 
-def _effective_cpu_count() -> int:
-    """Best-effort CPU count (respects cgroup affinity when available)."""
+def _read_cgroup_cpu_limit() -> Optional[int]:
+    """Best-effort CPU limit from cgroups (returns None when unlimited/unknown)."""
+    # cgroup v2
     try:
-        return len(os.sched_getaffinity(0))
+        cpu_max = Path("/sys/fs/cgroup/cpu.max")
+        if cpu_max.exists():
+            parts = cpu_max.read_text().strip().split()
+            if len(parts) >= 2 and parts[0] != "max":
+                quota = int(parts[0])
+                period = int(parts[1])
+                if quota > 0 and period > 0:
+                    return max(1, int(quota / period))
+    except (OSError, ValueError):
+        pass
+
+    # cgroup v1
+    try:
+        quota_path = Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us")
+        period_path = Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us")
+        if quota_path.exists() and period_path.exists():
+            quota = int(quota_path.read_text().strip())
+            period = int(period_path.read_text().strip())
+            if quota > 0 and period > 0:
+                return max(1, int(quota / period))
+    except (OSError, ValueError):
+        pass
+
+    return None
+
+
+def _parse_int(raw: Optional[str], default: int) -> int:
+    """Parse an int from env strings with fallback."""
+    try:
+        return int(raw) if raw is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def get_cluster_shard_index() -> int:
+    """Cluster shard index with Kubernetes Indexed Job fallback."""
+    raw = os.environ.get("CLUSTER_SHARD_INDEX")
+    if raw is None:
+        raw = os.environ.get("JOB_COMPLETION_INDEX", "0")
+    return _parse_int(raw, 0)
+
+
+def get_cluster_shard_count() -> int:
+    """Total shard count for cluster sharding."""
+    return _parse_int(os.environ.get("CLUSTER_SHARD_COUNT", "1"), 1)
+
+
+def get_effective_cpu_count() -> int:
+    """Best-effort CPU count (respects cgroup limits + affinity when available)."""
+    try:
+        affinity = len(os.sched_getaffinity(0))
     except AttributeError:
-        return multiprocessing.cpu_count()
+        affinity = multiprocessing.cpu_count() or 1
+
+    cgroup_limit = _read_cgroup_cpu_limit()
+    if cgroup_limit is None:
+        return max(1, affinity)
+    return max(1, min(affinity, cgroup_limit))
 
 
 # =============================================================================
@@ -269,9 +325,11 @@ class ProcessingConfig:
     force_reprocess: bool = field(default_factory=lambda: os.environ.get("FORCE_REPROCESS", "false").lower() == "true")
     min_output_bytes: int = field(default_factory=lambda: int(os.environ.get("MIN_OUTPUT_BYTES", "1024")))
     job_id_strategy: str = field(default_factory=lambda: os.environ.get("JOB_ID_STRATEGY", "timestamp").lower())
-    max_parallel_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, _effective_cpu_count() - 2)))))
+    max_parallel_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, get_effective_cpu_count() - 2)))))
     max_concurrent_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_CONCURRENT_JOBS", "2")))
     max_scene_reuse: int = field(default_factory=lambda: int(os.environ.get("MAX_SCENE_REUSE", "3")))
+    cluster_shard_index: int = field(default_factory=get_cluster_shard_index)
+    cluster_shard_count: int = field(default_factory=get_cluster_shard_count)
 
     # Adaptive settings for low-resource hardware
     clip_prefetch_count: int = field(default_factory=lambda: int(os.environ.get("CLIP_PREFETCH_COUNT", "3")))
@@ -293,6 +351,32 @@ class ProcessingConfig:
         if low_memory or os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true":
             return 1  # Sequential processing in low memory mode
         return self.max_parallel_jobs
+
+    def get_cluster_shard(self) -> Tuple[int, int]:
+        """Normalize cluster shard index/count with safe defaults."""
+        count = max(1, int(self.cluster_shard_count))
+        index = max(0, int(self.cluster_shard_index))
+        if index >= count:
+            index = index % count
+        return index, count
+
+    def get_sharded_variants(self, total_variants: int) -> List[int]:
+        """
+        Compute variant ids assigned to this shard.
+
+        Uses round-robin sharding: variant (1-indexed) is assigned when
+        (variant - 1) % shard_count == shard_index.
+        """
+        if total_variants <= 0:
+            return []
+        shard_index, shard_count = self.get_cluster_shard()
+        if shard_count <= 1:
+            return list(range(1, total_variants + 1))
+        return [
+            variant_id
+            for variant_id in range(1, total_variants + 1)
+            if (variant_id - 1) % shard_count == shard_index
+        ]
 
     def should_skip_output(self, output_path: Optional[Path]) -> bool:
         """
@@ -556,6 +640,8 @@ class Settings:
             "TARGET_DURATION": str(self.creative.target_duration),
             "MUSIC_START": str(self.creative.music_start),
             "MUSIC_END": str(self.creative.music_end or ""),
+            "CLUSTER_SHARD_INDEX": str(self.processing.get_cluster_shard()[0]),
+            "CLUSTER_SHARD_COUNT": str(self.processing.get_cluster_shard()[1]),
             "SKIP_EXISTING_OUTPUTS": str(self.processing.skip_existing_outputs).lower(),
             "FORCE_REPROCESS": str(self.processing.force_reprocess).lower(),
             "MIN_OUTPUT_BYTES": str(self.processing.min_output_bytes),

@@ -28,6 +28,14 @@ spec:
   nfs:
     server: 192.168.1.16
     path: /mnt/nfs-montage/input
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - timeo=600
+    - retrans=2
+    - noatime
+    - nodiratime
   persistentVolumeReclaimPolicy: Retain
 ---
 apiVersion: v1
@@ -45,6 +53,14 @@ spec:
   nfs:
     server: 192.168.1.16
     path: /mnt/nfs-montage/music
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - timeo=600
+    - retrans=2
+    - noatime
+    - nodiratime
   persistentVolumeReclaimPolicy: Retain
 ---
 apiVersion: v1
@@ -62,6 +78,14 @@ spec:
   nfs:
     server: 192.168.1.16
     path: /mnt/nfs-montage/output
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - timeo=600
+    - retrans=2
+    - noatime
+    - nodiratime
   persistentVolumeReclaimPolicy: Retain
 ---
 apiVersion: v1
@@ -79,4 +103,12 @@ spec:
   nfs:
     server: 192.168.1.16
     path: /mnt/nfs-montage/assets
+  mountOptions:
+    - nfsvers=4.1
+    - rsize=1048576
+    - wsize=1048576
+    - timeo=600
+    - retrans=2
+    - noatime
+    - nodiratime
   persistentVolumeReclaimPolicy: Retain

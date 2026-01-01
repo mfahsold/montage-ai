@@ -5,7 +5,8 @@ DRY principle: All FFmpeg parameters defined once, imported everywhere.
 Env vars allow runtime override without code changes.
 
 GPU Acceleration Support:
-- NVENC (NVIDIA): h264_nvenc, hevc_nvenc - via CUDA
+    - NVENC (NVIDIA): h264_nvenc, hevc_nvenc - via CUDA
+    - NVMPI (Jetson): h264_nvmpi, hevc_nvmpi
 - VAAPI (AMD/Intel Linux): h264_vaapi, hevc_vaapi - via /dev/dri/renderD128
 - VideoToolbox (macOS): h264_videotoolbox, hevc_videotoolbox
 - QSV (Intel): h264_qsv, hevc_qsv - via Intel Media SDK
@@ -144,11 +145,12 @@ class FFmpegConfig:
     - OUTPUT_CODEC, OUTPUT_PROFILE, OUTPUT_LEVEL, OUTPUT_PIX_FMT
     - FFMPEG_PRESET, FFMPEG_CRF, FFMPEG_THREADS
     - OUTPUT_AUDIO_CODEC, OUTPUT_AUDIO_BITRATE
-    - FFMPEG_HWACCEL: "auto", "nvenc", "vaapi", "qsv", "videotoolbox", "none"
+    - FFMPEG_HWACCEL: "auto", "nvenc", "nvmpi", "vaapi", "qsv", "videotoolbox", "none"
     
     GPU Acceleration:
     - hwaccel="auto": Auto-detect best available GPU encoder
     - hwaccel="nvenc": Force NVIDIA NVENC
+    - hwaccel="nvmpi": Force Jetson NVMPI
     - hwaccel="vaapi": Force AMD/Intel VAAPI (Linux)
     - hwaccel="none": Force CPU encoding (default for compatibility)
     """
@@ -180,20 +182,17 @@ class FFmpegConfig:
         from .core import hardware  # Lazy import to avoid circular dependency
         if self.hwaccel == "auto":
             self._hw_config = hardware.get_best_hwaccel(preferred_codec=preferred)
-        elif self.hwaccel == "none":
-            self._hw_config = hardware.HWConfig(
-                type="cpu",
-                encoder=self.codec,
-                decoder_args=[],
-                encoder_args=["-c:v", self.codec],
-                is_gpu=False
-            )
+        elif self.hwaccel in ("none", "cpu"):
+            self._hw_config = hardware.get_hwaccel_by_type("cpu", preferred_codec=preferred)
         else:
-            # Try to force specific HW accel
-            # This is a simplified fallback, ideally we'd check availability
-            self._hw_config = hardware.get_best_hwaccel(preferred_codec=preferred)
-            if self._hw_config.type != self.hwaccel:
-                logger.warning(f"Requested GPU encoder '{self.hwaccel}' not available/detected, using {self._hw_config.type}")
+            requested = hardware.get_hwaccel_by_type(self.hwaccel, preferred_codec=preferred)
+            if requested:
+                self._hw_config = requested
+            else:
+                self._hw_config = hardware.get_best_hwaccel(preferred_codec=preferred)
+                logger.warning(
+                    f"Requested GPU encoder '{self.hwaccel}' not available/detected, using {self._hw_config.type}"
+                )
         
         if self._hw_config and self._hw_config.is_gpu:
             actual = _normalize_codec_preference(self._hw_config.encoder)
@@ -233,6 +232,8 @@ class FFmpegConfig:
             return []
         if self._hw_config.type == "nvenc":
             return ["-rc", "vbr_hq", "-cq", str(crf_clamped), "-b:v", "0"]
+        if self._hw_config.type == "nvmpi":
+            return ["-qp", str(crf_clamped)]
         if self._hw_config.type == "vaapi":
             return ["-qp", str(crf_clamped)]
         if self._hw_config.type == "qsv":

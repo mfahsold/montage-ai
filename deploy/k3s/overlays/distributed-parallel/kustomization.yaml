@@ -1,0 +1,42 @@
+# Distributed Parallel Rendering Overlay
+#
+# Runs indexed Job shards in parallel across GPU nodes.
+# Adjust completions/parallelism and CLUSTER_SHARD_COUNT to match.
+#
+# Usage:
+#   kubectl apply -k deploy/k3s/overlays/distributed-parallel/
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: montage-ai
+
+resources:
+  - ../distributed
+
+patches:
+  - target:
+      kind: Job
+      name: montage-ai-render
+    patch: |-
+      - op: add
+        path: /spec/completionMode
+        value: Indexed
+      - op: add
+        path: /spec/completions
+        value: 2
+      - op: add
+        path: /spec/parallelism
+        value: 2
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CLUSTER_SHARD_INDEX
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CLUSTER_SHARD_COUNT
+          value: "2"

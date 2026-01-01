@@ -327,6 +327,20 @@ FFMPEG_MCP_ENDPOINT = _settings.gpu.ffmpeg_mcp_endpoint
 # cgpu Cloud GPU Configuration (from _settings.llm)
 CGPU_GPU_ENABLED = _settings.llm.cgpu_gpu_enabled
 
+# Reuse a single MCP HTTP session to reduce connection overhead in cluster runs
+_FFMPEG_MCP_SESSION = None
+
+
+def _get_ffmpeg_mcp_session() -> requests.Session:
+    global _FFMPEG_MCP_SESSION
+    if _FFMPEG_MCP_SESSION is None:
+        session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=8)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        _FFMPEG_MCP_SESSION = session
+    return _FFMPEG_MCP_SESSION
+
 # ============================================================================
 # GLOBAL EDITING INSTRUCTIONS (Set by Creative Director)
 # ============================================================================
@@ -635,7 +649,8 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
     """
     if USE_FFMPEG_MCP:
         try:
-            resp = requests.post(
+            session = _get_ffmpeg_mcp_session()
+            resp = session.post(
                 f"{FFMPEG_MCP_ENDPOINT}/clip",
                 json={
                     "input": input_path,
@@ -916,8 +931,20 @@ if __name__ == "__main__":
     if monitor:
         monitor.end_phase({"style": EDITING_INSTRUCTIONS.get('style', {}).get('name', CUT_STYLE) if EDITING_INSTRUCTIONS else CUT_STYLE})
 
+    shard_index, shard_count = _settings.processing.get_cluster_shard()
+    if shard_count > 1:
+        logger.info(f"   🧩 Cluster shard: {shard_index + 1}/{shard_count}")
+
+    variant_ids = _settings.processing.get_sharded_variants(NUM_VARIANTS)
+    if not variant_ids:
+        logger.warning("No variants assigned to this shard; exiting")
+        if monitor:
+            monitor.log_resources()
+            monitor.print_summary()
+        raise SystemExit(0)
+
     # Generate variants
-    for i in range(1, NUM_VARIANTS + 1):
+    for i in variant_ids:
         if monitor:
             monitor.start_phase(f"variant_{i}")
         create_montage(i)

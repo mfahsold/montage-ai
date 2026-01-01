@@ -26,11 +26,11 @@ spec:
             privileged: true
             allowPrivilegeEscalation: true
           env:
-            # Force NVMPI for Jetson (bypass auto-detection)
+            # Force NVMPI for Jetson
             - name: OUTPUT_CODEC
               value: "h264_nvmpi"
             - name: FFMPEG_HWACCEL
-              value: "none"
+              value: "nvmpi"
             - name: NVIDIA_VISIBLE_DEVICES
               value: "all"
             - name: NVIDIA_DRIVER_CAPABILITIES

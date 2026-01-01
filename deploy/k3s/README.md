@@ -156,7 +156,7 @@ kubectl apply -k deploy/k3s/overlays/jetson/
 | ------------- | -------------------------- | ------------ | ------- | --------------------------- |
 | `gpu`         | Any NVIDIA GPU node        | NVIDIA CUDA  | NVENC   | Generic NVIDIA acceleration |
 | `amd`         | codeai-fluxibriserver      | AMD Radeon   | VAAPI   | AMD GPU encoding            |
-| `jetson`      | codeaijetson-desktop       | NVIDIA Tegra | NVENC   | Edge device rendering       |
+| `jetson`      | codeaijetson-desktop       | NVIDIA Tegra | NVMPI   | Edge device rendering       |
 | `distributed` | Any GPU node (NFS storage) | Auto-detect  | Auto    | Multi-node GPU scheduling   |
 
 ## Architecture
@@ -264,11 +264,27 @@ kubectl apply -k deploy/k3s/overlays/jetson/
 
 # Distributed rendering (multi-node GPU)
 kubectl apply -k deploy/k3s/overlays/distributed/
+
+# Distributed parallel rendering (indexed Job shards)
+kubectl apply -k deploy/k3s/overlays/distributed-parallel/
 ```
 
 ## Distributed Rendering (Multi-Node GPU)
 
 The `distributed` overlay enables jobs to run on **any GPU node** in the cluster using NFS shared storage.
+
+### Parallel Sharding (Indexed Jobs)
+
+Use the `distributed-parallel` overlay to run multiple shards in parallel across the cluster.
+Each shard processes a subset of variants using `CLUSTER_SHARD_INDEX` and `CLUSTER_SHARD_COUNT`.
+
+```bash
+# Example: 2-way sharding
+kubectl apply -k deploy/k3s/overlays/distributed-parallel/
+```
+
+Set `NUM_VARIANTS` in the ConfigMap (or job env) to the total number of variants you want
+and adjust `completions`, `parallelism`, and `CLUSTER_SHARD_COUNT` together.
 
 ### Setup NFS Storage
 

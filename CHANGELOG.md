@@ -67,6 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Contains clip metadata: source paths, timecodes, energy, scene types
   - Enable via `EXPORT_TIMELINE=true` (default in K8s)
 
+- **Cluster Sharding & Parallel Jobs**
+  - `CLUSTER_SHARD_INDEX` / `CLUSTER_SHARD_COUNT` to shard variants across nodes
+  - New `deploy/k3s/overlays/distributed-parallel/` overlay for Indexed Jobs
+
 ### Changed
 
 - **Hardcoded Values to Configuration**
@@ -88,6 +92,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Voice isolation now runs async on cgpu while scene detection runs on local CPU
   - Maximizes utilization of both cloud GPU and local resources
   - Scene detection parallelism uses optimal CPU threads
+
+- **Hardware & Throughput Tuning**
+  - cgroup-aware CPU detection for more accurate worker sizing in containers
+  - Jetson NVMPI support in hardware detection/FFmpeg config
+  - Jetson overlay now sets `FFMPEG_HWACCEL=nvmpi` for GPU encoding
+  - FFmpeg MCP calls reuse a pooled HTTP session for lower overhead
+  - NFS PVs include tuned mount options for better cluster I/O
 
 - **Config-Driven Timeouts**
   - Creative Director/Evaluator default timeouts now use `LLM_TIMEOUT`

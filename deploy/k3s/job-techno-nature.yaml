@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-techno-nature
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: renderer
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: renderer
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: montage-ai
+          image: 192.168.1.12:5000/montage-ai:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "4"
+              memory: "8Gi"
+            limits:
+              cpu: "8"
+              memory: "16Gi"
+          env:
+            - name: INPUT_DIR
+              value: "/data/input/techno-nature"
+            - name: MUSIC_DIR
+              value: "/data/music/techno-nature"
+            - name: METADATA_CACHE_DIR
+              value: "/data/output/cache"
+            - name: CUT_STYLE
+              value: "mtv"
+            - name: EXPORT_TIMELINE
+              value: "true"
+            - name: LOG_LEVEL
+              value: "DEBUG"
+            - name: CGPU_ENABLED
+              value: "true"
+            - name: CGPU_GPU_ENABLED
+              value: "true"
+            - name: UPSCALE
+              value: "true"
+            - name: STABILIZE
+              value: "true"
+            - name: TARGET_DURATION
+              value: "60"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+            - name: music
+              mountPath: /data/music
+            - name: output
+              mountPath: /data/output
+            - name: cgpu-secrets
+              mountPath: /root/.config/cgpu
+              readOnly: true
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+        - name: cgpu-secrets
+          secret:
+            secretName: cgpu-credentials
+            optional: true

@@ -55,7 +55,7 @@ data:
   QUALITY_PROFILE: "standard"
   
   # Performance / Hardware Acceleration
-  FFMPEG_HWACCEL: "auto"  # auto, nvenc, vaapi, qsv, none
+  FFMPEG_HWACCEL: "auto"  # auto, nvenc, nvmpi, vaapi, qsv, none
   FFMPEG_THREADS: "0"
   FFMPEG_PRESET: "medium"
   PARALLEL_ENHANCE: "true"
