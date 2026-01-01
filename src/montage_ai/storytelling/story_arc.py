@@ -1,7 +1,7 @@
 """Story arc definition and tension curve evaluation."""
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Dict, Any
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -10,6 +10,13 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     if value > high:
         return high
     return value
+
+
+def _coerce_float(value: object) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @dataclass
@@ -78,8 +85,115 @@ class StoryArc:
                 (0.7, 0.6),
                 (1.0, 0.35),
             ],
+            "three_act": [
+                (0.0, 0.25),
+                (0.35, 0.5),
+                (0.7, 0.9),
+                (1.0, 0.3),
+            ],
+            "fichtean_curve": [
+                (0.0, 0.3),
+                (0.2, 0.55),
+                (0.4, 0.45),
+                (0.6, 0.75),
+                (0.8, 0.6),
+                (1.0, 0.85),
+            ],
+            "linear_build": [
+                (0.0, 0.2),
+                (1.0, 0.85),
+            ],
+            "constant": [
+                (0.0, 0.5),
+                (1.0, 0.5),
+            ],
         }
-        key = (name or "").lower().strip()
+        key = (name or "").lower().strip().replace(" ", "_").replace("-", "_")
+        aliases = {
+            "mtv": "mtv_energy",
+            "hero": "hero_journey",
+            "journey": "hero_journey",
+            "linear": "linear_build",
+            "flat": "constant",
+        }
+        key = aliases.get(key, key)
         if key in presets:
             return cls(curve_points=presets[key])
         return cls(curve_points=presets["hero_journey"])
+
+    @classmethod
+    def from_spec(cls, spec: Optional[Dict[str, Any]]) -> "StoryArc":
+        """Build a StoryArc from Creative Director spec."""
+        if not spec:
+            return cls.from_preset("hero_journey")
+
+        arc_type = (spec.get("type") or "").lower().strip().replace(" ", "_").replace("-", "_")
+        tension_target = _coerce_float(spec.get("tension_target"))
+        if tension_target is not None:
+            tension_target = _clamp(tension_target)
+
+        climax_position = _coerce_float(spec.get("climax_position"))
+        if climax_position is None:
+            climax_position = 0.75
+        climax_position = _clamp(climax_position, 0.6, 0.9)
+
+        if arc_type == "constant":
+            value = tension_target if tension_target is not None else 0.5
+            return cls(curve_points=[(0.0, value), (1.0, value)])
+
+        if arc_type == "linear_build":
+            peak = tension_target if tension_target is not None else 0.85
+            start = max(0.15, peak * 0.35)
+            return cls(curve_points=[(0.0, start), (climax_position, peak), (1.0, peak)])
+
+        if arc_type == "three_act":
+            peak = tension_target if tension_target is not None else 0.9
+            low = max(0.2, peak * 0.25)
+            mid = max(low, peak * 0.6)
+            pre = max(mid, peak * 0.75)
+            end = max(low, peak * 0.35)
+            return cls(
+                curve_points=[
+                    (0.0, low),
+                    (climax_position * 0.4, mid),
+                    (climax_position * 0.75, pre),
+                    (climax_position, peak),
+                    (1.0, end),
+                ]
+            )
+
+        if arc_type == "fichtean_curve":
+            peak = tension_target if tension_target is not None else 0.9
+            base = max(0.3, peak * 0.4)
+            mid1 = max(base, peak * 0.6)
+            mid2 = max(base, peak * 0.7)
+            mid3 = max(base, peak * 0.8)
+            end = max(base, peak * 0.5)
+            return cls(
+                curve_points=[
+                    (0.0, base),
+                    (climax_position * 0.3, mid1),
+                    (climax_position * 0.55, mid2),
+                    (climax_position * 0.8, mid3),
+                    (climax_position, peak),
+                    (1.0, end),
+                ]
+            )
+
+        if arc_type == "hero_journey":
+            peak = tension_target if tension_target is not None else 0.9
+            low = max(0.15, peak * 0.25)
+            mid = max(low, peak * 0.5)
+            fall = max(low, peak * 0.65)
+            end = max(low, peak * 0.3)
+            return cls(
+                curve_points=[
+                    (0.0, low),
+                    (climax_position * 0.5, mid),
+                    (climax_position, peak),
+                    (min(1.0, climax_position + 0.15), fall),
+                    (1.0, end),
+                ]
+            )
+
+        return cls.from_preset(arc_type or "hero_journey")

@@ -60,3 +60,6 @@ downloads/
 local_downloads/
 reproduce_*.py
 verify_*.py
+
+# Test fixtures (generated via make test-fixtures)
+tests/fixtures/

@@ -20,7 +20,7 @@ Drop your clips and a music track, pick a style, and let the AI do the editing. 
 ```bash
 git clone https://github.com/mfahsold/montage-ai.git
 cd montage-ai
-./montage web
+./montage-ai.sh web
 ```
 
 Open **http://localhost:8080** → upload videos + music → pick a style → hit Create → done.
@@ -38,7 +38,7 @@ cp your_videos/*.mp4 data/input/
 cp your_music.mp3 data/music/
 
 # Create a montage
-./montage run hitchcock
+./montage-ai.sh run hitchcock
 ```
 
 The new CLI is powered by Python `click` and `rich` for a modern, interactive experience.

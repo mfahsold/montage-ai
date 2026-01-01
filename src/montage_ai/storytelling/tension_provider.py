@@ -101,5 +101,13 @@ class TensionProvider:
     @staticmethod
     def _get_clip_id(clip_path: str) -> str:
         path = Path(clip_path)
-        digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:8]
+        try:
+            # Use filename + size for stable ID across mounts/environments
+            stat = path.stat()
+            identifier = f"{path.name}_{stat.st_size}"
+        except OSError:
+            # Fallback to just filename if stat fails
+            identifier = path.name
+
+        digest = hashlib.sha1(identifier.encode("utf-8")).hexdigest()[:8]
         return f"{path.stem}_{digest}"

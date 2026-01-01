@@ -223,14 +223,18 @@ class MontageContext:
 
     def get_story_phase(self) -> str:
         """Get current story phase based on position."""
-        pos = self.get_story_position()
-        if pos < 0.15:
+        return self.map_position_to_phase(self.get_story_position())
+
+    @staticmethod
+    def map_position_to_phase(position: float) -> str:
+        """Map normalized timeline position (0.0-1.0) to story phase."""
+        if position < 0.15:
             return "intro"
-        elif pos < 0.40:
+        elif position < 0.40:
             return "build"
-        elif pos < 0.70:
+        elif position < 0.70:
             return "climax"
-        elif pos < 0.90:
+        elif position < 0.90:
             return "sustain"
         return "outro"
 
@@ -499,6 +503,7 @@ class MontageBuilder:
         """
         self.settings = settings or get_settings()
         self.variant_id = variant_id
+        self.rng = random.Random(42 + variant_id)  # Seeded RNG for determinism
         self.editing_instructions = editing_instructions
 
         # Initialize context
@@ -697,6 +702,22 @@ class MontageBuilder:
         # Initialize footage pool
         self._init_footage_pool()
 
+    def _setup_output_paths(self, style_name: str):
+        """Determine output filename and logo path."""
+        # Sanitize style name
+        style_label = "".join(c for c in style_name if c.isalnum() or c in ('-', '_')).strip()
+        if not style_label:
+            style_label = "dynamic"
+
+        self.ctx.output_filename = os.path.join(
+            str(self.ctx.output_dir),
+            f"gallery_montage_{self.ctx.job_id}_v{self.variant_id}_{style_label}.mp4"
+        )
+
+        # Check for logo
+        logo_files = self._get_files(self.ctx.assets_dir, ('.png', '.jpg'))
+        self.ctx.logo_path = logo_files[0] if logo_files else None
+
     def _plan_montage(self):
         """
         Phase 3: Plan the montage timeline.
@@ -733,19 +754,7 @@ class MontageBuilder:
         if self.ctx.editing_instructions is not None:
             style_name = self.ctx.editing_instructions.get('style', {}).get('name', 'dynamic')
         
-        # Sanitize style name to prevent invalid characters in filename
-        style_name = "".join(c for c in style_name if c.isalnum() or c in ('-', '_')).strip()
-        if not style_name:
-            style_name = "dynamic"
-
-        self.ctx.output_filename = os.path.join(
-            str(self.ctx.output_dir),
-            f"gallery_montage_{self.ctx.job_id}_v{self.variant_id}_{style_name}.mp4"
-        )
-
-        # Check for logo
-        logo_files = self._get_files(self.ctx.assets_dir, ('.png', '.jpg'))
-        self.ctx.logo_path = logo_files[0] if logo_files else None
+        self._setup_output_paths(style_name)
 
         # Run the main assembly loop
         logger.info("   ✂️ Assembling cuts...")
@@ -1327,6 +1336,31 @@ class MontageBuilder:
             self._memory_manager = None
             logger.warning("   ⚠️ Progressive Renderer not available")
 
+    def _flush_pending_futures(self):
+        """Wait for all pending clip processing futures to complete."""
+        if not self._pending_futures:
+            return
+
+        logger.info(f"   ⏳ Waiting for {len(self._pending_futures)} pending clips to finish processing...")
+        while self._pending_futures:
+            fut, meta = self._pending_futures.pop(0)
+            try:
+                final_path, enhancements, temp_files = fut.result()
+                meta.enhancements = enhancements
+                
+                if self._progressive_renderer:
+                    self._progressive_renderer.add_clip_path(final_path)
+                    
+                    # Cleanup intermediate temp files
+                    for tf in temp_files:
+                        if tf != final_path and os.path.exists(tf):
+                            try:
+                                os.remove(tf)
+                            except Exception:
+                                pass
+            except Exception as e:
+                logger.error(f"Error processing clip {meta.source_path}: {e}")
+
     def _run_assembly_loop(self):
         """
         Main assembly loop: select clips, apply enhancements, add to timeline.
@@ -1462,26 +1496,7 @@ class MontageBuilder:
                 )
 
         # Flush remaining futures
-        if self._pending_futures:
-            logger.info(f"   ⏳ Waiting for {len(self._pending_futures)} pending clips to finish processing...")
-            while self._pending_futures:
-                fut, meta = self._pending_futures.pop(0)
-                try:
-                    final_path, enhancements, temp_files = fut.result()
-                    meta.enhancements = enhancements
-                    
-                    if self._progressive_renderer:
-                        self._progressive_renderer.add_clip_path(final_path)
-                        
-                        # Cleanup intermediate temp files
-                        for tf in temp_files:
-                            if tf != final_path and os.path.exists(tf):
-                                try:
-                                    os.remove(tf)
-                                except Exception:
-                                    pass
-                except Exception as e:
-                    logger.error(f"Error processing clip {meta.source_path}: {e}")
+        self._flush_pending_futures()
 
         logger.info(f"   ✅ Assembly complete: {self.ctx.cut_number} cuts, {self.ctx.current_time:.1f}s")
 
@@ -1868,17 +1883,7 @@ class MontageBuilder:
         if saved_count > 0:
             logger.info(f"   📝 Episodic memory: saved {saved_count} clip usage records")
 
-    def _get_story_phase_for_position(self, position: float) -> str:
-        """Get story phase for normalized timeline position (0.0-1.0)."""
-        if position < 0.15:
-            return "intro"
-        elif position < 0.40:
-            return "build"
-        elif position < 0.70:
-            return "climax"
-        elif position < 0.90:
-            return "sustain"
-        return "outro"
+
 
 
     # =========================================================================
@@ -1970,23 +1975,22 @@ class MontageBuilder:
 
         # Determine style/arc
         style_name = "dynamic"
+        story_arc_spec = None
         if self.ctx.editing_instructions:
             style_name = self.ctx.editing_instructions.get('style', {}).get('name', 'dynamic')
+            story_arc_spec = self.ctx.editing_instructions.get("story_arc")
 
         # Determine output filename and logo
-        style_label = "".join(c for c in style_name if c.isalnum() or c in ('-', '_')).strip() or "dynamic"
-        self.ctx.output_filename = os.path.join(
-            str(self.ctx.output_dir),
-            f"gallery_montage_{self.ctx.job_id}_v{self.variant_id}_{style_label}.mp4"
-        )
-        logo_files = self._get_files(self.ctx.assets_dir, ('.png', '.jpg'))
-        self.ctx.logo_path = logo_files[0] if logo_files else None
+        self._setup_output_paths(style_name)
 
         # Setup tension provider + solver
         tension_meta_dir = self._get_tension_metadata_dir()
         allow_dummy = not self.settings.features.strict_cloud_compute
         provider = TensionProvider(tension_meta_dir, allow_dummy=allow_dummy)
-        arc = StoryArc.from_preset(style_name)
+        if story_arc_spec:
+            arc = StoryArc.from_spec(story_arc_spec)
+        else:
+            arc = StoryArc.from_preset(style_name)
         solver = StorySolver(arc, provider)
 
         # Build beat list (clamped to target duration)
@@ -2023,7 +2027,7 @@ class MontageBuilder:
                         }]
 
         for scenes in scenes_by_path.values():
-            random.shuffle(scenes)
+            self.rng.shuffle(scenes)
 
         logger.info(f"   ✅ Generated {len(timeline_events)} cuts based on '{style_name}' arc.")
 
@@ -2058,7 +2062,7 @@ class MontageBuilder:
 
             min_usage = min(s.get('usage_count', 0) for s in candidates)
             least_used = [s for s in candidates if s.get('usage_count', 0) == min_usage]
-            scene = random.choice(least_used) if least_used else random.choice(candidates)
+            scene = self.rng.choice(least_used) if least_used else self.rng.choice(candidates)
 
             scene_start = float(scene.get('start', 0.0))
             scene_end = float(scene.get('end', scene_start + cut_duration))
@@ -2070,7 +2074,7 @@ class MontageBuilder:
             if max_start <= scene_start:
                 clip_start = scene_start
             else:
-                clip_start = random.uniform(scene_start, max_start)
+                clip_start = self.rng.uniform(scene_start, max_start)
 
             self.ctx.current_time = start_time
             self.ctx.beat_idx = idx
@@ -2090,25 +2094,7 @@ class MontageBuilder:
             self.ctx.current_time = start_time + cut_duration
 
         # Flush remaining futures to finalize segments
-        if self._pending_futures:
-            logger.info(f"   ⏳ Waiting for {len(self._pending_futures)} pending clips to finish processing...")
-            while self._pending_futures:
-                fut, meta = self._pending_futures.pop(0)
-                try:
-                    final_path, enhancements, temp_files = fut.result()
-                    meta.enhancements = enhancements
-
-                    if self._progressive_renderer:
-                        self._progressive_renderer.add_clip_path(final_path)
-
-                        for tf in temp_files:
-                            if tf != final_path and os.path.exists(tf):
-                                try:
-                                    os.remove(tf)
-                                except Exception:
-                                    pass
-                except Exception as e:
-                    logger.error(f"Error processing clip {meta.source_path}: {e}")
+        self._flush_pending_futures()
 
 
 # =============================================================================

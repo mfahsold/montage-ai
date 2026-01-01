@@ -169,8 +169,34 @@ test: validate test-local test-unit ## Run all tests
 
 test-unit: ## Run unit tests with pytest
 	@echo "$(CYAN)Running unit tests...$(RESET)"
-	pytest tests/ -v
+	pytest tests/ -v --ignore=tests/integration/
 	@echo "$(GREEN)✓ Unit tests passed$(RESET)"
+
+test-assets: ## Download NASA test footage (public domain)
+	@echo "$(CYAN)Downloading NASA test assets...$(RESET)"
+	python scripts/prepare_trailer_assets.py --videos 3 --max-video-mb 50
+	@echo "$(GREEN)✓ Test assets downloaded to data/input/ and data/music/$(RESET)"
+
+test-fixtures: ## Generate synthetic test fixtures (no download)
+	@echo "$(CYAN)Generating synthetic test fixtures...$(RESET)"
+	@mkdir -p tests/fixtures/video tests/fixtures/audio
+	@# Generate 5-second 1080p test video with color bars
+	ffmpeg -y -f lavfi -i "testsrc=duration=5:size=1920x1080:rate=30" \
+		-f lavfi -i "sine=frequency=440:duration=5" \
+		-c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k \
+		tests/fixtures/video/test_1080p_5s.mp4 2>/dev/null
+	@# Generate 10-second 120 BPM beat track
+	ffmpeg -y -f lavfi -i "sine=frequency=80:duration=0.1,apad=pad_dur=0.4[kick]; \
+		sine=frequency=200:duration=0.05,apad=pad_dur=0.45[snare]; \
+		[kick][snare]amix=inputs=2,aloop=loop=20:size=22050" \
+		-t 10 -ar 44100 tests/fixtures/audio/test_120bpm_10s.wav 2>/dev/null
+	@echo "$(GREEN)✓ Fixtures created in tests/fixtures/$(RESET)"
+
+clean-data: ## Remove all downloaded media (saves ~1GB)
+	@echo "$(YELLOW)Removing downloaded media...$(RESET)"
+	rm -rf data/input/archive data/music/archive
+	rm -rf data/output/*
+	@echo "$(GREEN)✓ Media cleaned$(RESET)"
 
 test-local: ## Test local Docker workflow
 	@echo "$(CYAN)Testing local Docker workflow...$(RESET)"

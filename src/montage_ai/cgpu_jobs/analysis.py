@@ -272,7 +272,7 @@ class TensionAnalysisBatchJob(CGPUJob):
         return True
 
     def get_requirements(self) -> List[str]:
-        return ["opencv-python-headless", "numpy", "librosa", "soundfile"]
+        return ["opencv-python-headless", "numpy", "librosa", "soundfile", "imageio-ffmpeg"]
 
     def upload(self) -> bool:
         # Upload video clips + manifest
@@ -314,6 +314,7 @@ import subprocess
 import cv2
 import numpy as np
 import librosa
+import imageio_ffmpeg
 
 MANIFEST = "{self.manifest_name}"
 OUTPUT_DIR = "outputs"
@@ -321,12 +322,13 @@ SAMPLE_FPS = {self.sample_fps}
 ARCHIVE = "{self.output_archive}"
 
 def extract_audio(video_path, wav_path):
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     cmd = [
-        "ffmpeg", "-y", "-i", video_path,
+        ffmpeg_exe, "-y", "-i", video_path,
         "-vn", "-ac", "1", "-ar", "22050",
         wav_path
     ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
 def analyze_visual(video_path):
     cap = cv2.VideoCapture(video_path)
