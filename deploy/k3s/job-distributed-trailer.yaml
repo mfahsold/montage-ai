@@ -22,7 +22,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: 192.168.1.12:5000/montage-ai:latest
           imagePullPolicy: Always
           resources:
             requests:
@@ -37,6 +37,8 @@ spec:
               value: "/data/output/cache"
             - name: CUT_STYLE
               value: "action"  # Action style is good for trailers
+            - name: EXTRACT_REENCODE
+              value: "true"
             - name: EXPORT_TIMELINE
               value: "true"
             - name: LOG_LEVEL

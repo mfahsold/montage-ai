@@ -6,7 +6,7 @@ metadata:
 spec:
   containers:
     - name: debug
-      image: busybox
+      image: 192.168.1.12:5000/montage-ai:latest
       command: ["sleep", "3600"]
       volumeMounts:
         - name: input

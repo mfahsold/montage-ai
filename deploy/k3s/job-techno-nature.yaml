@@ -54,6 +54,8 @@ spec:
               value: "true"
             - name: TARGET_DURATION
               value: "60"
+            - name: EXTRACT_REENCODE
+              value: "true"
           volumeMounts:
             - name: input
               mountPath: /data/input

@@ -1370,13 +1370,32 @@ class MontageBuilder:
                 logger.warning("   ⚠️ No valid scene found. Stopping.")
                 break
 
-            # Find best start point
-            clip_start = find_best_start_point(
-                selected_scene['path'],
-                selected_scene['start'],
-                selected_scene['end'],
-                cut_duration
-            )
+            # Determine start point
+            # If this scene has been used before, use random selection to ensure variety
+            # Otherwise use optical flow to find the "best" moment
+            usage_count = 0
+            if hasattr(self, '_footage_pool') and hasattr(self._footage_pool, 'clips'):
+                clip_obj = self._footage_pool.clips.get(id(selected_scene))
+                if clip_obj:
+                    usage_count = clip_obj.usage_count
+
+            if usage_count > 0:
+                # Random selection for variety on reuse
+                max_start = selected_scene['end'] - cut_duration
+                if max_start > selected_scene['start']:
+                    clip_start = random.uniform(selected_scene['start'], max_start)
+                    logger.info(f"   🎲 Reusing scene (count={usage_count}): Random start {clip_start:.1f}s")
+                else:
+                    clip_start = selected_scene['start']
+            else:
+                # First use: Find peak action via optical flow
+                clip_start = find_best_start_point(
+                    selected_scene['path'],
+                    selected_scene['start'],
+                    selected_scene['end'],
+                    cut_duration
+                )
+
             clip_end = clip_start + cut_duration
 
             # Mark clip as consumed
