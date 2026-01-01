@@ -1,4 +1,0 @@
-Clip #,Source File,Source In (sec),Source Out (sec),Timeline In (sec),Timeline Out (sec),Duration (sec),Source In (TC),Source Out (TC),Timeline In (TC),Timeline Out (TC),Energy,Action,Shot Type,Notes
-1,/data/input/techno-nature/nature_raw.mp4,0.50,2.36,0.00,1.86,1.86,00:00:00:30,00:00:02:21,00:00:00:00,00:00:01:51,0.33,medium,medium,
-2,/data/input/techno-nature/nature_raw.mp4,0.50,2.36,1.86,3.72,1.86,00:00:00:30,00:00:02:21,00:00:01:51,00:00:03:43,0.63,medium,medium,
-3,/data/input/techno-nature/nature_raw.mp4,0.50,2.36,3.72,5.58,1.86,00:00:00:30,00:00:02:21,00:00:03:43,00:00:05:34,0.51,medium,medium,
