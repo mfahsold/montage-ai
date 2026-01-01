@@ -138,6 +138,10 @@ class FeatureConfig:
     ai_lut_generation: bool = field(default_factory=lambda: os.environ.get("AI_LUT_GENERATION", "false").lower() == "true")
     episodic_memory: bool = field(default_factory=lambda: os.environ.get("EPISODIC_MEMORY", "false").lower() == "true")
 
+    # Storytelling Engine (Phase 1 scaffolding)
+    story_engine: bool = field(default_factory=lambda: os.environ.get("ENABLE_STORY_ENGINE", "false").lower() == "true")
+    strict_cloud_compute: bool = field(default_factory=lambda: os.environ.get("STRICT_CLOUD_COMPUTE", "true").lower() == "true")
+
     # 2025 P0/P1: Burn-in captions and voice isolation
     captions: bool = field(default_factory=lambda: os.environ.get("CAPTIONS", "false").lower() == "true")
     captions_style: str = field(default_factory=lambda: os.environ.get("CAPTIONS_STYLE", "youtube"))
@@ -544,6 +548,8 @@ class Settings:
                 "voice_isolation": self.features.voice_isolation,
                 "colorlevels": self.features.colorlevels,
                 "luma_normalize": self.features.luma_normalize,
+                "story_engine": self.features.story_engine,
+                "strict_cloud_compute": self.features.strict_cloud_compute,
             },
             "creative": {
                 "cut_style": self.creative.cut_style,
@@ -627,6 +633,8 @@ class Settings:
             "EXPORT_TIMELINE": str(self.features.export_timeline).lower(),
             "LLM_CLIP_SELECTION": str(self.features.llm_clip_selection).lower(),
             "VERBOSE": str(self.features.verbose).lower(),
+            "ENABLE_STORY_ENGINE": str(self.features.story_engine).lower(),
+            "STRICT_CLOUD_COMPUTE": str(self.features.strict_cloud_compute).lower(),
             "CGPU_ENABLED": str(self.llm.cgpu_enabled).lower(),
             "MONTAGE_CLOUD_ENABLED": str(self.cloud.enabled).lower(),
             "MONTAGE_CLOUD_ENDPOINT": self.cloud.endpoint,

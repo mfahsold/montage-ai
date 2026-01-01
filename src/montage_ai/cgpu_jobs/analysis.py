@@ -10,6 +10,7 @@ import json
 import tempfile
 import os
 import hashlib
+import tarfile
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -17,6 +18,7 @@ from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
 from ..logger import logger
 from ..config import get_settings
+from ..storytelling.tension_provider import TensionProvider
 
 
 def _pick_local_output_path(input_path: Path, suffix: str) -> Path:
@@ -240,3 +242,219 @@ if __name__ == "__main__":
     def expected_output_path(self) -> Optional[Path]:
         """Expected output path for idempotent reuse."""
         return _pick_local_output_path(self.input_path, ".analysis.json")
+
+
+class TensionAnalysisBatchJob(CGPUJob):
+    """
+    Offload tension analysis (optical flow + edge density + audio energy) to cgpu.
+    """
+    job_type: str = "tension_analysis_batch"
+    timeout: int = 1200
+
+    def __init__(self, input_paths: List[str], output_dir: str, sample_fps: float = 2.0):
+        super().__init__()
+        self.input_paths = [Path(p).resolve() for p in input_paths]
+        self.output_dir = Path(output_dir)
+        self.sample_fps = max(0.5, float(sample_fps))
+        self.output_archive = "tension_results.tar.gz"
+        self.manifest_name = "manifest.json"
+
+    def prepare_local(self) -> bool:
+        if not self.input_paths:
+            logger.error("No input clips provided for tension analysis")
+            return False
+        missing = [p for p in self.input_paths if not p.exists()]
+        if missing:
+            logger.error(f"Missing input clips: {missing}")
+            return False
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        return True
+
+    def get_requirements(self) -> List[str]:
+        return ["opencv-python-headless", "numpy", "librosa", "soundfile"]
+
+    def upload(self) -> bool:
+        # Upload video clips + manifest
+        manifest = {"clips": []}
+
+        for idx, clip in enumerate(self.input_paths):
+            remote_name = f"clip_{idx}{clip.suffix.lower()}"
+            remote_path = f"{self.remote_work_dir}/{remote_name}"
+            logger.info(f"Uploading {clip.name} -> {remote_name}...")
+            if not copy_to_remote(str(clip), remote_path):
+                return False
+
+            clip_id = TensionProvider._get_clip_id(str(clip))
+            manifest["clips"].append(
+                {
+                    "clip_id": clip_id,
+                    "remote_name": remote_name,
+                    "source_path": str(clip),
+                }
+            )
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            json.dump(manifest, tmp)
+            manifest_path = tmp.name
+
+        remote_manifest = f"{self.remote_work_dir}/{self.manifest_name}"
+        success = copy_to_remote(manifest_path, remote_manifest)
+        os.unlink(manifest_path)
+        return success
+
+    def run_remote(self) -> bool:
+        logger.info("Running tension analysis remotely...")
+        script_content = f"""
+import json
+import math
+import os
+import tarfile
+import subprocess
+import cv2
+import numpy as np
+import librosa
+
+MANIFEST = "{self.manifest_name}"
+OUTPUT_DIR = "outputs"
+SAMPLE_FPS = {self.sample_fps}
+ARCHIVE = "{self.output_archive}"
+
+def extract_audio(video_path, wav_path):
+    cmd = [
+        "ffmpeg", "-y", "-i", video_path,
+        "-vn", "-ac", "1", "-ar", "22050",
+        wav_path
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
+def analyze_visual(video_path):
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    step = max(1, int(fps / SAMPLE_FPS))
+    prev_gray = None
+    flow_vals = []
+    edge_vals = []
+    frame_idx = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        if frame_idx % step != 0:
+            frame_idx += 1
+            continue
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 100, 200)
+        edge_vals.append(float(edges.mean() / 255.0))
+        if prev_gray is not None:
+            flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+            mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
+            flow_vals.append(float(np.mean(mag)))
+        prev_gray = gray
+        frame_idx += 1
+    cap.release()
+    motion = float(np.mean(flow_vals)) if flow_vals else 0.0
+    edge_density = float(np.mean(edge_vals)) if edge_vals else 0.0
+    motion_norm = math.tanh(motion)
+    tension = max(0.0, min(1.0, 0.6 * motion_norm + 0.4 * edge_density))
+    return motion, edge_density, tension
+
+def analyze_audio(video_path):
+    audio_rms = 0.0
+    spectral_flux = 0.0
+    wav_path = video_path + ".wav"
+    try:
+        extract_audio(video_path, wav_path)
+        y, sr = librosa.load(wav_path, sr=22050)
+        rms = librosa.feature.rms(y=y)[0]
+        audio_rms = float(np.mean(rms))
+        spec = np.abs(librosa.stft(y))
+        flux = np.sqrt(np.sum(np.diff(spec, axis=1) ** 2, axis=0))
+        spectral_flux = float(np.mean(flux)) if flux.size else 0.0
+    except Exception:
+        pass
+    finally:
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
+    return audio_rms, spectral_flux
+
+def main():
+    with open(MANIFEST, "r") as f:
+        manifest = json.load(f)
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    for entry in manifest.get("clips", []):
+        clip_id = entry["clip_id"]
+        remote_name = entry["remote_name"]
+        motion, edge_density, tension = analyze_visual(remote_name)
+        audio_rms, audio_flux = analyze_audio(remote_name)
+        output = {{
+            "clip_id": clip_id,
+            "visual": {{
+                "motion_score": motion,
+                "edge_density": edge_density
+            }},
+            "audio": {{
+                "rms": audio_rms,
+                "spectral_flux": audio_flux
+            }},
+            "tension": tension
+        }}
+        out_path = os.path.join(OUTPUT_DIR, f"{{clip_id}}_analysis.json")
+        with open(out_path, "w") as out_file:
+            json.dump(output, out_file)
+
+    with tarfile.open(ARCHIVE, "w:gz") as tar:
+        tar.add(OUTPUT_DIR, arcname=OUTPUT_DIR)
+
+if __name__ == "__main__":
+    main()
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+            tmp.write(script_content)
+            local_script = tmp.name
+
+        remote_script = f"{self.remote_work_dir}/tension_batch.py"
+        if not copy_to_remote(local_script, remote_script):
+            os.unlink(local_script)
+            return False
+        os.unlink(local_script)
+
+        cmd = f"cd {self.remote_work_dir} && python tension_batch.py"
+        success, stdout, stderr = run_cgpu_command(cmd, timeout=self.timeout)
+        if not success:
+            logger.error(f"Tension analysis failed: {stderr or stdout}")
+        return success
+
+    def download(self) -> JobResult:
+        logger.info("Downloading tension analysis results...")
+        remote_archive = f"{self.remote_work_dir}/{self.output_archive}"
+        local_archive = self.output_dir / self.output_archive
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        if not download_via_base64(remote_archive, str(local_archive)):
+            return JobResult(success=False, error="Failed to download tension archive")
+
+        try:
+            with tarfile.open(local_archive, "r:gz") as tar:
+                tar.extractall(path=self.output_dir)
+        except Exception as exc:
+            return JobResult(success=False, error=f"Failed to extract archive: {exc}")
+        finally:
+            try:
+                local_archive.unlink()
+            except OSError:
+                pass
+
+        outputs = list((self.output_dir / "outputs").glob("*_analysis.json"))
+        for item in outputs:
+            item.replace(self.output_dir / item.name)
+        try:
+            (self.output_dir / "outputs").rmdir()
+        except OSError:
+            pass
+
+        return JobResult(
+            success=True,
+            output_path=str(self.output_dir),
+            metadata={"clip_count": len(outputs)},
+        )

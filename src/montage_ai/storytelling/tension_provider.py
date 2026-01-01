@@ -1,0 +1,78 @@
+"""Lightweight tension lookup from precomputed metadata."""
+
+import hashlib
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Optional
+
+
+class MissingAnalysisError(RuntimeError):
+    """Raised when tension metadata is missing for a clip."""
+
+
+def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
+    if value < low:
+        return low
+    if value > high:
+        return high
+    return value
+
+
+@dataclass
+class TensionProvider:
+    """Reads precomputed clip metadata and returns a tension score."""
+
+    metadata_dir: Path
+    allow_dummy: bool = False
+    _cache: Optional[Dict[str, float]] = None
+
+    def __post_init__(self) -> None:
+        self.metadata_dir = Path(self.metadata_dir)
+        if self._cache is None:
+            self._cache = {}
+
+    def get_tension(self, clip_path: str) -> float:
+        """Retrieve tension score for a clip from metadata."""
+        clip_id = self._get_clip_id(clip_path)
+        if clip_id in self._cache:
+            return self._cache[clip_id]
+
+        meta_file = self.metadata_dir / f"{clip_id}_analysis.json"
+        if not meta_file.exists():
+            if self.allow_dummy:
+                tension = self._dummy_tension(clip_id)
+                self._cache[clip_id] = tension
+                return tension
+            raise MissingAnalysisError(f"Analysis missing for {clip_id}. Run cgpu job first.")
+
+        with meta_file.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+
+        tension = self._extract_tension(data)
+        self._cache[clip_id] = tension
+        return tension
+
+    def _extract_tension(self, data: Dict[str, object]) -> float:
+        """Compute tension from metadata with safe defaults."""
+        if isinstance(data, dict) and "tension" in data:
+            return _clamp(float(data["tension"]))
+
+        visual = data.get("visual", {}) if isinstance(data, dict) else {}
+        motion = float(visual.get("motion_score", 0.0))
+        edge = float(visual.get("edge_density", 0.0))
+        tension = (motion * 0.6) + (edge * 0.4)
+        return _clamp(tension)
+
+    def _dummy_tension(self, clip_id: str) -> float:
+        """Deterministic fallback tension for dry-run testing."""
+        digest = hashlib.sha1(clip_id.encode("utf-8")).hexdigest()
+        # Map first 8 hex chars to [0, 1]
+        value = int(digest[:8], 16) / float(0xFFFFFFFF)
+        return _clamp(value)
+
+    @staticmethod
+    def _get_clip_id(clip_path: str) -> str:
+        path = Path(clip_path)
+        digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:8]
+        return f"{path.stem}_{digest}"

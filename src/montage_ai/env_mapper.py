@@ -52,6 +52,9 @@ def map_options_to_env(
     env["GENERATE_PROXIES"] = bool_to_env(options.get("generate_proxies"))
     env["PRESERVE_ASPECT"] = bool_to_env(options.get("preserve_aspect"))
     env["CREATIVE_LOOP"] = bool_to_env(options.get("creative_loop"))
+    env["ENABLE_STORY_ENGINE"] = bool_to_env(options.get("story_engine"))
+    if "strict_cloud_compute" in options:
+        env["STRICT_CLOUD_COMPUTE"] = bool_to_env(options.get("strict_cloud_compute"))
     
     # Cloud/GPU
     cgpu_enabled = bool_to_env(options.get("cgpu"))

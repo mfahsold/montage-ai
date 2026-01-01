@@ -51,3 +51,12 @@ secrets/
 
 # macOS
 .DS_Store
+
+# Temporary/Generated
+gallery_montage_*
+patch_files/
+tmp_test/
+downloads/
+local_downloads/
+reproduce_*.py
+verify_*.py

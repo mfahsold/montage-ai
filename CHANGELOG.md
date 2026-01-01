@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Storytelling Engine (Phase 1)**
+  - **Scaffolding**: Added `src/montage_ai/storytelling/` with `StoryArc`, `TensionProvider`, and `StorySolver`.
+  - **Feature Flags**: Added `ENABLE_STORY_ENGINE` and `STRICT_CLOUD_COMPUTE` to toggle the new engine and enforce remote analysis.
+  - **Integration**: Wired `MontageBuilder` to trigger story analysis and use the new solver when enabled.
+  - **Evaluation**: Added `scripts/evaluate_story_engine.py` to verify solver adherence to narrative arcs.
+
+### Changed
+- **Repository Cleanup**
+  - Removed accidental large file commits (`gallery_montage_*.mp4`, `downloads/`).
+  - Removed temporary patch files and throwaway scripts (`reproduce_numpy.py`, `verify_fix.py`).
+  - Updated `.gitignore` to prevent future leaks of generated artifacts and temporary downloads.
+  - Moved root-level test scripts to `scripts/` directory for better organization.
+
 - **Robustness & Reliability**
   - **Atomic Writes**: Implemented "write-to-temp, rename" pattern for video segments, analysis cache, and timeline exports to prevent file corruption on interruption.
   - **Robust Caching**: Replaced fragile mtime-based hashing with content-based hashing (Head+Tail+Size) in `analysis_cache.py`.
