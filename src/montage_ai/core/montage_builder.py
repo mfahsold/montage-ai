@@ -1885,6 +1885,16 @@ class MontageBuilder:
     # Story Engine Methods (Phase 1)
     # =========================================================================
 
+    def _get_tension_metadata_dir(self) -> Path:
+        """Resolve the directory for tension metadata (prefers cache or output)."""
+        env_dir = os.environ.get("TENSION_METADATA_DIR")
+        if env_dir:
+            return Path(env_dir)
+        cache_dir = os.environ.get("METADATA_CACHE_DIR")
+        if cache_dir:
+            return Path(cache_dir) / "tension"
+        return self.ctx.output_dir / "tension_analysis"
+
     def _trigger_story_analysis(self):
         """
         Identifies clips missing tension analysis and triggers cgpu jobs.
@@ -1892,24 +1902,27 @@ class MontageBuilder:
         logger.info("   📖 Story Engine: Checking for missing analysis...")
         
         # 1. Identify all input clips
-        input_clips = self._get_files(self.ctx.input_dir, ('.mp4', '.mov', '.mkv'))
+        input_clips = self.ctx.video_files or self._get_files(self.ctx.input_dir, ('.mp4', '.mov', '.mkv'))
+        if not input_clips:
+            logger.warning("   ⚠️ Story Engine: No input clips found for analysis.")
+            return
         
         # 2. Check which ones are missing metadata
         # We use TensionProvider to check existence (it has logic for ID generation)
-        # But TensionProvider expects a directory.
-        # We assume metadata is stored in a 'tension' subdir of analysis cache or similar.
-        
-        # For now, let's use a dedicated directory in temp or cache
-        tension_meta_dir = self.ctx.temp_dir / "tension_analysis"
-        tension_meta_dir.mkdir(exist_ok=True)
-        
+        tension_meta_dir = self._get_tension_metadata_dir()
+        tension_meta_dir.mkdir(parents=True, exist_ok=True)
+
         provider = TensionProvider(tension_meta_dir)
         missing_clips = []
         
+        from ..storytelling.tension_provider import MissingAnalysisError
         for clip in input_clips:
             try:
                 provider.get_tension(clip)
-            except Exception:
+            except MissingAnalysisError:
+                missing_clips.append(clip)
+            except Exception as exc:
+                logger.warning(f"   ⚠️ Story Engine: Failed to read metadata for {os.path.basename(clip)}: {exc}")
                 missing_clips.append(clip)
                 
         if not missing_clips:
@@ -1918,31 +1931,27 @@ class MontageBuilder:
 
         logger.info(f"   ⚠️ Missing analysis for {len(missing_clips)} clips.")
         
-        if self.settings.features.strict_cloud_compute:
-            logger.info("   ☁️ Offloading analysis to Cluster (Strict Mode)...")
-            # TODO: Implement actual cgpu client call here
-            # For Phase 1 scaffolding, we will simulate it or raise if strict
-            # raise NotImplementedError("CGPU client integration pending")
-            
-            # Mocking the behavior for now to allow progress
-            logger.warning("   [MOCK] Simulating remote analysis...")
-            for clip in missing_clips:
-                clip_id = Path(clip).stem
-                meta_file = tension_meta_dir / f"{clip_id}_analysis.json"
-                with open(meta_file, 'w') as f:
-                    # Dummy data
-                    json.dump({
-                        "visual": {
-                            "motion_score": random.random(),
-                            "edge_density": random.random()
-                        }
-                    }, f)
-            time.sleep(2) # Simulate network delay
-            
-        else:
-            logger.info("   🖥️ Running local analysis (Fallback)...")
-            # Local fallback logic would go here
-            pass
+        from ..cgpu_utils import is_cgpu_available
+        if not is_cgpu_available(require_gpu=False):
+            message = "Story Engine requires cgpu for tension analysis but cgpu is not available."
+            if self.settings.features.strict_cloud_compute:
+                raise RuntimeError(message)
+            logger.warning(f"   ⚠️ {message} Proceeding with dummy tension values.")
+            return
+
+        logger.info("   ☁️ Offloading tension analysis to cgpu...")
+        from ..cgpu_jobs import TensionAnalysisBatchJob
+        job = TensionAnalysisBatchJob(missing_clips, output_dir=str(tension_meta_dir))
+        result = job.execute()
+        if not result.success:
+            message = f"Story tension analysis failed: {result.error}"
+            if self.settings.features.strict_cloud_compute:
+                raise RuntimeError(message)
+            logger.warning(f"   ⚠️ {message}")
+            return
+
+        analyzed = result.metadata.get("clip_count", len(missing_clips))
+        logger.info(f"   ✅ Tension analysis complete for {analyzed} clip(s).")
 
     def _run_story_assembly(self):
         """
@@ -1950,74 +1959,156 @@ class MontageBuilder:
         """
         logger.info("   📖 Story Engine: Assembling narrative...")
         
-        # 1. Setup
-        tension_meta_dir = self.ctx.temp_dir / "tension_analysis"
-        provider = TensionProvider(tension_meta_dir)
-        
+        # Ensure audio analysis is done
+        if not hasattr(self.ctx, 'audio_result') or self.ctx.audio_result is None:
+            self._analyze_music()
+
+        # Initialize duration, transitions, and renderer
+        self._init_audio_duration()
+        self._init_crossfade_settings()
+        self._init_progressive_renderer()
+
         # Determine style/arc
         style_name = "dynamic"
         if self.ctx.editing_instructions:
             style_name = self.ctx.editing_instructions.get('style', {}).get('name', 'dynamic')
-        
+
+        # Determine output filename and logo
+        style_label = "".join(c for c in style_name if c.isalnum() or c in ('-', '_')).strip() or "dynamic"
+        self.ctx.output_filename = os.path.join(
+            str(self.ctx.output_dir),
+            f"gallery_montage_{self.ctx.job_id}_v{self.variant_id}_{style_label}.mp4"
+        )
+        logo_files = self._get_files(self.ctx.assets_dir, ('.png', '.jpg'))
+        self.ctx.logo_path = logo_files[0] if logo_files else None
+
+        # Setup tension provider + solver
+        tension_meta_dir = self._get_tension_metadata_dir()
+        allow_dummy = not self.settings.features.strict_cloud_compute
+        provider = TensionProvider(tension_meta_dir, allow_dummy=allow_dummy)
         arc = StoryArc.from_preset(style_name)
         solver = StorySolver(arc, provider)
-        
-        # 2. Get Beats
-        # Ensure audio analysis is done
-        if not hasattr(self.ctx, 'audio_result') or self.ctx.audio_result is None:
-             self._analyze_music()
-             
-        beats = self.ctx.audio_result.beat_times.tolist()
-        duration = self.ctx.audio_result.duration
-        
-        # 3. Get Clips
-        input_clips = self._get_files(self.ctx.input_dir, ('.mp4', '.mov', '.mkv'))
-        
-        # 4. Solve
+
+        # Build beat list (clamped to target duration)
+        duration = self.ctx.target_duration or self.ctx.audio_result.duration
+        beats = [t for t in self.ctx.audio_result.beat_times.tolist() if 0.0 <= t <= duration]
+        if not beats:
+            beats = [0.0]
+
+        # Build timeline plan
+        input_clips = self.ctx.video_files or self._get_files(self.ctx.input_dir, ('.mp4', '.mov', '.mkv'))
         timeline_events = solver.solve(input_clips, duration, beats)
-        
-        # 5. Convert to MontageResult/Context format
-        # The legacy pipeline builds 'self.ctx.timeline' which is a list of Clip objects (MoviePy)
-        # But here we are in the 'Plan' phase. 
-        # The 'Render' phase (_render_output) expects self.ctx.timeline to be populated.
-        
-        # We need to convert the solver's timeline (dicts) into MoviePy clips
-        # This requires loading them.
-        
+        if not timeline_events:
+            raise RuntimeError("Story Engine produced no timeline events")
+
+        # Map scenes by source path (fallback to full clip duration if scenes missing)
+        scenes_by_path: Dict[str, List[Dict[str, Any]]] = {}
+        for scene in self.ctx.all_scenes_dicts:
+            scenes_by_path.setdefault(scene['path'], []).append(scene)
+            scene.setdefault('usage_count', 0)
+
+        if input_clips:
+            from ..video_metadata import probe_duration
+            for clip_path in input_clips:
+                if clip_path not in scenes_by_path:
+                    clip_duration = probe_duration(clip_path)
+                    if clip_duration > 0:
+                        scenes_by_path[clip_path] = [{
+                            "path": clip_path,
+                            "start": 0.0,
+                            "end": clip_duration,
+                            "duration": clip_duration,
+                            "meta": {},
+                            "usage_count": 0,
+                        }]
+
+        for scenes in scenes_by_path.values():
+            random.shuffle(scenes)
+
         logger.info(f"   ✅ Generated {len(timeline_events)} cuts based on '{style_name}' arc.")
-        
-        self.ctx.timeline = []
-        
-        # We need to load clips. This might be slow if we load all at once.
-        # The legacy pipeline loads them progressively or uses a pool.
-        
-        # For Phase 1, we'll load them one by one.
-        for event in timeline_events:
-            clip_path = event['clip']
-            start_time = event['time']
-            duration = event['duration']
-            
-            # Load clip
-            # We use the helper from moviepy_compat or similar
-            video = VideoFileClip(clip_path)
-            
-            # Select a random subclip of correct duration? 
-            # Or use the best part? 
-            # For now, random valid subclip.
-            if video.duration > duration:
-                start = random.uniform(0, video.duration - duration)
-                sub = video.subclip(start, start + duration)
+
+        self.ctx.cut_number = 0
+        self.ctx.current_time = 0.0
+
+        # Assemble timeline using existing clip processing pipeline
+        for idx, event in enumerate(timeline_events):
+            start_time = float(event.get('time', 0.0))
+            if start_time >= duration:
+                break
+
+            if idx < len(timeline_events) - 1:
+                end_time = float(timeline_events[idx + 1].get('time', duration))
             else:
-                # Loop or stretch? For now, just take what we have (it will be short)
-                sub = video
-                
-            # Set start time in timeline
-            sub = sub.set_start(start_time)
-            
-            self.ctx.timeline.append(sub)
-            
-        self.ctx.cut_number = len(self.ctx.timeline)
-        self.ctx.current_time = duration
+                end_time = duration
+
+            cut_duration = max(0.5, min(end_time - start_time, duration - start_time))
+            if cut_duration <= 0:
+                continue
+
+            clip_path = event.get('clip')
+            if not clip_path:
+                continue
+
+            candidates = [s for s in scenes_by_path.get(clip_path, []) if s.get('duration', 0.0) >= cut_duration]
+            if not candidates:
+                candidates = scenes_by_path.get(clip_path, [])
+            if not candidates:
+                logger.warning(f"   ⚠️ Story Engine: No scenes available for {os.path.basename(clip_path)}")
+                continue
+
+            min_usage = min(s.get('usage_count', 0) for s in candidates)
+            least_used = [s for s in candidates if s.get('usage_count', 0) == min_usage]
+            scene = random.choice(least_used) if least_used else random.choice(candidates)
+
+            scene_start = float(scene.get('start', 0.0))
+            scene_end = float(scene.get('end', scene_start + cut_duration))
+            scene_duration = float(scene.get('duration', max(scene_end - scene_start, cut_duration)))
+            if cut_duration > scene_duration:
+                cut_duration = max(0.5, scene_duration)
+
+            max_start = scene_end - cut_duration
+            if max_start <= scene_start:
+                clip_start = scene_start
+            else:
+                clip_start = random.uniform(scene_start, max_start)
+
+            self.ctx.current_time = start_time
+            self.ctx.beat_idx = idx
+            current_energy = float(event.get('clip_tension') or event.get('target_tension') or 0.5)
+            selection_score = float(event.get('score', 0.0))
+
+            self._process_and_add_clip(
+                scene,
+                clip_start,
+                cut_duration,
+                current_energy,
+                selection_score,
+            )
+
+            scene['usage_count'] = scene.get('usage_count', 0) + 1
+            self.ctx.cut_number += 1
+            self.ctx.current_time = start_time + cut_duration
+
+        # Flush remaining futures to finalize segments
+        if self._pending_futures:
+            logger.info(f"   ⏳ Waiting for {len(self._pending_futures)} pending clips to finish processing...")
+            while self._pending_futures:
+                fut, meta = self._pending_futures.pop(0)
+                try:
+                    final_path, enhancements, temp_files = fut.result()
+                    meta.enhancements = enhancements
+
+                    if self._progressive_renderer:
+                        self._progressive_renderer.add_clip_path(final_path)
+
+                        for tf in temp_files:
+                            if tf != final_path and os.path.exists(tf):
+                                try:
+                                    os.remove(tf)
+                                except Exception:
+                                    pass
+                except Exception as e:
+                    logger.error(f"Error processing clip {meta.source_path}: {e}")
 
 
 # =============================================================================

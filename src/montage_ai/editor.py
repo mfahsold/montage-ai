@@ -12,6 +12,11 @@ Architecture:
   Editing Engine (This) → FFmpeg/MoviePy → Final Video
 
 Version: 0.2.0 (Natural Language Control)
+
+.. note::
+    This module acts as a **Facade** for the legacy procedural API.
+    New code should prefer using `src/montage_ai/core/montage_builder.py` directly.
+    This file maintains backward compatibility for scripts like `montage-ai.sh`.
 """
 
 import os
@@ -32,9 +37,6 @@ from .logger import logger
 if not settings.features.verbose:
     os.environ["TQDM_DISABLE"] = "true"
 
-import librosa
-import cv2
-import base64
 import subprocess
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -48,8 +50,6 @@ from .moviepy_compat import (
     crossfadein, crossfadeout,
     enforce_dimensions, log_clip_info, ensure_even_dimensions, pad_to_target,
 )
-from scenedetect import open_video, SceneManager
-from scenedetect.detectors import ContentDetector
 from tqdm import tqdm
 
 # Alias for backward compatibility
@@ -346,8 +346,8 @@ def _get_ffmpeg_mcp_session() -> requests.Session:
 # ============================================================================
 EDITING_INSTRUCTIONS = None  # Will be populated by interpret_creative_prompt()
 
-# GPU/Hardware Capability Detection (set at runtime)
-GPU_CAPABILITY = None  # Will be set by detect_gpu_capabilities()
+# GPU/Hardware Capability Detection (Deprecated)
+GPU_CAPABILITY = None
 
 # Import cgpu Cloud Upscaler (unified job-based architecture)
 try:
@@ -397,85 +397,6 @@ except ImportError as exc:
 
 # Deep Analysis Configuration (from _settings.features)
 DEEP_ANALYSIS = _settings.features.deep_analysis
-
-
-def detect_gpu_capabilities() -> Dict[str, Any]:
-    """
-    Detect available GPU/hardware acceleration capabilities.
-
-    Delegates to centralized FFmpegConfig.
-    """
-    logger.debug("Detecting GPU capabilities (via FFmpegConfig)...")
-    
-    is_gpu = _ffmpeg_config.is_gpu_accelerated
-    gpu_type = _ffmpeg_config.gpu_encoder_type
-    
-    capabilities = {
-        'encoder': _ffmpeg_config.effective_codec,
-        'hwaccel': gpu_type if is_gpu else None,
-        'available': [gpu_type] if is_gpu and gpu_type else [],
-        'gpu_name': gpu_type.upper() if is_gpu and gpu_type else 'CPU only'
-    }
-    
-    if is_gpu:
-        logger.debug(f"Using hardware encoder: {capabilities['encoder']} ({capabilities['gpu_name']})")
-    else:
-        logger.debug(f"Using CPU encoding ({capabilities['encoder']}) with {multiprocessing.cpu_count()} cores")
-        logger.debug(f"Parallel enhancement: {MAX_PARALLEL_JOBS} workers")
-
-    return capabilities
-
-
-def get_video_rotation(video_path: str) -> int:
-    """
-    Get video rotation metadata using ffprobe.
-    
-    Many phone videos are stored with rotation metadata (e.g., -90° for portrait).
-    MoviePy doesn't automatically apply this rotation, so we need to handle it manually.
-    
-    Args:
-        video_path: Path to the video file
-        
-    Returns:
-        Rotation angle in degrees (0, 90, 180, 270, or -90, -180, -270)
-    """
-    try:
-        cmd = [
-            'ffprobe', '-v', 'error',
-            '-select_streams', 'v:0',
-            '-show_entries', 'stream_side_data=rotation',
-            '-of', 'json',
-            video_path
-        ]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=settings.processing.ffprobe_timeout,
-        )
-        
-        if result.returncode == 0:
-            data = json.loads(result.stdout)
-            streams = data.get('streams', [])
-            if streams:
-                side_data_list = streams[0].get('side_data_list', [])
-                for side_data in side_data_list:
-                    if 'rotation' in side_data:
-                        rotation = int(side_data['rotation'])
-                        return rotation
-    except Exception as e:
-        logger.debug(f"Could not get rotation metadata: {e}")
-
-    return 0
-
-
-def get_ffmpeg_encoder_params() -> List[str]:
-    """
-    Get optimized FFmpeg encoder parameters based on detected capabilities.
-    
-    Delegates to centralized FFmpegConfig.
-    """
-    return _ffmpeg_config.video_params()
 
 
 def get_files(directory, extensions):

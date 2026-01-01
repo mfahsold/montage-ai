@@ -93,7 +93,8 @@ Evaluate the montage against these criteria:
 - ENERGY: Do high-energy sections have fast cuts? Do calm sections breathe?
 - TRANSITIONS: Are transitions appropriate for the style?
 - DURATION: Is the overall length appropriate?
-- STORY ARC: Does the edit follow intro → build → climax → outro structure?
+- STORY ARC: Does the edit follow the requested narrative structure (e.g., Hero's Journey)?
+- TENSION: Does the visual tension match the intended emotional arc?
 
 You MUST respond with ONLY valid JSON matching this structure:
 {{

@@ -89,26 +89,38 @@ def cgpu_slot() -> None:
 _CGPU_AVAIL_CACHE = {"ok": None, "checked_at": 0.0}
 _CGPU_AVAIL_TTL = 300  # seconds
 
-def is_cgpu_available() -> bool:
+def is_cgpu_available(require_gpu: bool = True) -> bool:
     """
     Check if cgpu is installed and authenticated.
     
+    Args:
+        require_gpu: If True, checks CGPU_GPU_ENABLED and GPU availability.
+                     If False, checks CGPU_ENABLED and basic cgpu connectivity.
+    
     Returns:
-        True if cgpu is available for cloud GPU tasks
+        True if cgpu is available
     """
     now = time.time()
-    cached = _CGPU_AVAIL_CACHE["ok"]
-    if cached is not None and (now - _CGPU_AVAIL_CACHE["checked_at"]) < _CGPU_AVAIL_TTL:
-        return cached
-
-    # Re-read env var to ensure we have the latest value
-    global CGPU_GPU_ENABLED
-    CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
     
-    logger.debug(f"DEBUG: CGPU_GPU_ENABLED={CGPU_GPU_ENABLED}")
+    # Use cache only for the default require_gpu=True case to avoid complexity
+    if require_gpu:
+        cached = _CGPU_AVAIL_CACHE["ok"]
+        if cached is not None and (now - _CGPU_AVAIL_CACHE["checked_at"]) < _CGPU_AVAIL_TTL:
+            return cached
 
-    if not CGPU_GPU_ENABLED:
-        _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
+    # Re-read env vars
+    global CGPU_GPU_ENABLED, CGPU_ENABLED
+    CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
+    CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
+    
+    logger.debug(f"DEBUG: CGPU_GPU_ENABLED={CGPU_GPU_ENABLED}, CGPU_ENABLED={CGPU_ENABLED}")
+
+    # Check flags
+    if require_gpu and not CGPU_GPU_ENABLED:
+        if require_gpu: _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
+        return False
+    
+    if not require_gpu and not CGPU_ENABLED:
         return False
     
     try:
@@ -120,19 +132,21 @@ def is_cgpu_available() -> bool:
                 timeout=30
             )
         logger.debug(f"DEBUG: cgpu status returncode={result.returncode}")
-        logger.debug(f"DEBUG: cgpu status stdout={result.stdout}")
-        logger.debug(f"DEBUG: cgpu status stderr={result.stderr}")
-        # Check for "Authenticated" OR if it just returns success (some versions differ)
+        
         if result.returncode != 0:
-            _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
+            if require_gpu: _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
             return False
 
-        gpu_ok, _ = check_cgpu_gpu()
-        _CGPU_AVAIL_CACHE.update({"ok": gpu_ok, "checked_at": now})
-        return gpu_ok
+        if require_gpu:
+            gpu_ok, _ = check_cgpu_gpu()
+            _CGPU_AVAIL_CACHE.update({"ok": gpu_ok, "checked_at": now})
+            return gpu_ok
+        
+        return True
+
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
         logger.debug(f"DEBUG: cgpu status failed with {e}")
-        _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
+        if require_gpu: _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
         return False
 
 

@@ -20,7 +20,7 @@ from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 
 from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
-from ..editor import detect_gpu_capabilities
+from ..core.hardware import get_best_hwaccel
 
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
@@ -82,6 +82,7 @@ DEFAULT_OPTIONS = {
     "stabilize": _settings.features.stabilize,
     "upscale": _settings.features.upscale,
     "cgpu": _settings.llm.cgpu_gpu_enabled,
+    "story_engine": _settings.features.story_engine,
     "llm_clip_selection": _settings.features.llm_clip_selection,
     "creative_loop": _settings.features.creative_loop,
     "export_timeline": _settings.features.export_timeline,
@@ -410,10 +411,10 @@ def api_status():
     memory_ok, available_gb = check_memory_available()
 
     # GPU/CGPU stats
-    gpu_info = detect_gpu_capabilities()
-    encoder_status = gpu_info.get("encoder", "cpu")
-    if gpu_info.get("hwaccel") != "none":
-        encoder_status = f"{gpu_info.get('hwaccel')} ({encoder_status})"
+    hw_config = get_best_hwaccel()
+    encoder_status = hw_config.encoder
+    if hw_config.is_gpu:
+        encoder_status = f"{hw_config.type} ({encoder_status})"
     cgpu_ok = is_cgpu_available()
 
     return jsonify({
@@ -430,7 +431,7 @@ def api_status():
             "max_concurrent_jobs": MAX_CONCURRENT_JOBS,
             # New fields for UI
             "gpu_encoder": encoder_status,
-            "encoder": gpu_info.get("encoder", "libx264"),
+            "encoder": hw_config.encoder,
             "cgpu_available": cgpu_ok,
             "version": VERSION
         },

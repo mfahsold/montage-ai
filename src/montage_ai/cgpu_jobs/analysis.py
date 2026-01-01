@@ -250,6 +250,7 @@ class TensionAnalysisBatchJob(CGPUJob):
     """
     job_type: str = "tension_analysis_batch"
     timeout: int = 1200
+    requires_gpu: bool = False
 
     def __init__(self, input_paths: List[str], output_dir: str, sample_fps: float = 2.0):
         super().__init__()

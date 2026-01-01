@@ -88,6 +88,7 @@ class CGPUJob(ABC):
     timeout: int = 600  # 10 minutes default
     max_retries: int = 3
     job_type: str = "generic"
+    requires_gpu: bool = True  # Whether this job requires a GPU
 
     def __init__(self, job_id: Optional[str] = None):
         """
@@ -251,7 +252,7 @@ class CGPUJob(ABC):
 
         try:
             # Check cgpu availability
-            if not is_cgpu_available():
+            if not is_cgpu_available(require_gpu=self.requires_gpu):
                 self.status = JobStatus.FAILED
                 return JobResult(
                     success=False,

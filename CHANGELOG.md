@@ -14,7 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Integration**: Wired `MontageBuilder` to trigger story analysis and use the new solver when enabled.
   - **Evaluation**: Added `scripts/evaluate_story_engine.py` to verify solver adherence to narrative arcs.
 
+### Fixed
+- **Story Engine Stability**: Fixed crash when cgpu is unavailable by defaulting `STRICT_CLOUD_COMPUTE` to `false` and allowing fallback to dummy tension values.
+- **CGPU Integration**: Improved `is_cgpu_available` to support LLM-only mode (no GPU required) for Creative Director.
+- **Cleanup**: Removed leftover build artifacts and temporary files from root directory.
+
 ### Changed
+- **Refactoring & Documentation**
+  - **Editor Facade**: Refactored `src/montage_ai/editor.py` to act as a clean facade for the legacy API, removing unused imports and redundant functions (`get_video_rotation`, `detect_gpu_capabilities`) to adhere to DRY principles.
+  - **Storytelling Docs**: Added comprehensive docstrings to `StorySolver` and `TensionProvider` to explain the greedy algorithm and tension data sources for better LLM readability.
+
 - **Repository Cleanup**
   - Removed accidental large file commits (`gallery_montage_*.mp4`, `downloads/`).
   - Removed temporary patch files and throwaway scripts (`reproduce_numpy.py`, `verify_fix.py`).

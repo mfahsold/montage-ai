@@ -140,7 +140,7 @@ class FeatureConfig:
 
     # Storytelling Engine (Phase 1 scaffolding)
     story_engine: bool = field(default_factory=lambda: os.environ.get("ENABLE_STORY_ENGINE", "false").lower() == "true")
-    strict_cloud_compute: bool = field(default_factory=lambda: os.environ.get("STRICT_CLOUD_COMPUTE", "true").lower() == "true")
+    strict_cloud_compute: bool = field(default_factory=lambda: os.environ.get("STRICT_CLOUD_COMPUTE", "false").lower() == "true")
 
     # 2025 P0/P1: Burn-in captions and voice isolation
     captions: bool = field(default_factory=lambda: os.environ.get("CAPTIONS", "false").lower() == "true")

@@ -14,6 +14,7 @@ __all__ = [
     "StabilizeJob",
     "SceneDetectionJob",
     "BeatAnalysisJob",
+    "TensionAnalysisBatchJob",
     "FFmpegRenderJob",
     "VoiceIsolationJob",
     "NoiseReductionJob",
@@ -40,6 +41,9 @@ def __getattr__(name):
     elif name == "BeatAnalysisJob":
         from .analysis import BeatAnalysisJob
         return BeatAnalysisJob
+    elif name == "TensionAnalysisBatchJob":
+        from .analysis import TensionAnalysisBatchJob
+        return TensionAnalysisBatchJob
     elif name == "FFmpegRenderJob":
         from .render import FFmpegRenderJob
         return FFmpegRenderJob

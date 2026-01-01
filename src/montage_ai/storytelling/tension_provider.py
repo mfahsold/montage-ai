@@ -21,7 +21,23 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 
 @dataclass
 class TensionProvider:
-    """Reads precomputed clip metadata and returns a tension score."""
+    """
+    Reads precomputed clip metadata and returns a tension score.
+
+    Tension is a normalized value (0.0 to 1.0) representing the intensity of a clip.
+    It is typically derived from:
+    - Visual Motion (Optical Flow magnitude)
+    - Audio Energy (RMS amplitude)
+    - Semantic Content (e.g., "action", "calm" labels)
+
+    This provider expects a directory of JSON files named `{clip_hash}_analysis.json`.
+
+    Attributes:
+        metadata_dir (Path): Directory containing the JSON analysis files.
+        allow_dummy (bool): If True, generates a deterministic random tension for missing files.
+                            Useful for testing or when full analysis is pending.
+        _cache (Dict): Internal cache to avoid re-reading JSON files.
+    """
 
     metadata_dir: Path
     allow_dummy: bool = False
@@ -33,7 +49,18 @@ class TensionProvider:
             self._cache = {}
 
     def get_tension(self, clip_path: str) -> float:
-        """Retrieve tension score for a clip from metadata."""
+        """
+        Retrieve tension score for a clip from metadata.
+
+        Args:
+            clip_path: Absolute path to the video clip.
+
+        Returns:
+            float: Tension score between 0.0 and 1.0.
+
+        Raises:
+            MissingAnalysisError: If metadata is missing and allow_dummy is False.
+        """
         clip_id = self._get_clip_id(clip_path)
         if clip_id in self._cache:
             return self._cache[clip_id]

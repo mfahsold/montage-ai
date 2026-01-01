@@ -66,6 +66,11 @@ You MUST respond with ONLY valid JSON matching this structure:
     "mood": "suspenseful" | "playful" | "energetic" | "calm" | "dramatic" | "mysterious",
     "description": "Custom style description (only if name=custom)"
   }},
+  "story_arc": {{
+    "type": "hero_journey" | "three_act" | "fichtean_curve" | "linear_build" | "constant",
+    "tension_target": 0.0-1.0,
+    "climax_position": 0.6-0.9
+  }},
   "pacing": {{
     "speed": "very_slow" | "slow" | "medium" | "fast" | "very_fast" | "dynamic",
     "variation": "minimal" | "moderate" | "high" | "fibonacci",
@@ -517,7 +522,7 @@ class CreativeDirector:
         try:
             # cgpu serve (Gemini) via OpenAI Responses API
             response = self.cgpu_client.responses.create(
-                model=CGPU_MODEL,
+                model=os.environ.get("CGPU_MODEL", "gemini-2.0-flash-exp"),
                 instructions=self.system_prompt,
                 input=user_prompt,
             )

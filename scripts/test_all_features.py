@@ -24,7 +24,7 @@ os.environ['STABILIZE'] = 'true'
 os.environ['ENHANCE'] = 'true'
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
 def test_intelligent_selector():
     """Test 1: Intelligent Clip Selector"""
@@ -136,10 +136,14 @@ def test_content_aware_enhancement():
     print("="*70)
 
     try:
-        from montage_ai.editor import _analyze_clip_brightness
+        from montage_ai.clip_enhancement import ClipEnhancer
 
         print("✓ Import successful")
-        print("✓ Function _analyze_clip_brightness() exists")
+        if hasattr(ClipEnhancer, '_analyze_brightness'):
+            print("✓ Method _analyze_brightness() exists in ClipEnhancer")
+        else:
+            print("⚠️ Method _analyze_brightness() not found in ClipEnhancer")
+
         print("  Note: Requires actual video file for brightness analysis")
         print("  Will be tested in real montage render")
 
