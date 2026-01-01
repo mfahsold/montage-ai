@@ -25,6 +25,7 @@ import numpy as np
 from ..config import get_settings, Settings
 from ..logger import logger
 from ..resource_manager import get_resource_manager, ResourceManager
+from ..utils import file_exists_and_valid
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 from ..timeline_exporter import export_timeline_from_montage
 from ..storytelling import StoryArc, TensionProvider, StorySolver
@@ -352,18 +353,15 @@ def process_clip_task(
     # 3. Normalize (optional)
     final_clip_path = current_path
 
-    def output_ok(path: str) -> bool:
-        return os.path.exists(path) and os.path.getsize(path) > 0
-
     if not settings.encoding.normalize_clips:
-        if not output_ok(final_clip_path):
+        if not file_exists_and_valid(final_clip_path):
             raise RuntimeError("source clip missing before normalize")
     elif not output_profile:
         final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
-        if not output_ok(current_path):
+        if not file_exists_and_valid(current_path):
             raise RuntimeError("source clip missing before normalize")
         shutil.copy(current_path, final_clip_path)
-        if not output_ok(final_clip_path):
+        if not file_exists_and_valid(final_clip_path):
             raise RuntimeError("failed to write normalized clip")
     else:
         final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
@@ -425,7 +423,7 @@ def process_clip_task(
                 text=True,
                 timeout=settings.processing.ffmpeg_timeout,
             )
-            if result.returncode == 0 and output_ok(final_clip_path):
+            if result.returncode == 0 and file_exists_and_valid(final_clip_path):
                 return True
             err_lines = (result.stderr or "").strip().splitlines()
             err = err_lines[-1] if err_lines else "unknown error"
@@ -453,7 +451,7 @@ def process_clip_task(
             success = run_normalize(cpu_config, cpu_params, "cpu_fallback")
 
         if not success:
-            if output_ok(current_path):
+            if file_exists_and_valid(current_path):
                 logger.warning("Normalization failed; using unnormalized clip")
                 final_clip_path = current_path
             else:

@@ -18,6 +18,8 @@ const TOGGLE_CONFIG = [
     { id: 'cgpu', label: 'Cloud GPU', desc: 'Offload to cloud.', default: false, badges: [{ type: 'info', text: 'Remote' }] },
     { id: 'llm_clip_selection', label: 'LLM Clip Selection', desc: 'Semantic scene analysis.', default: false, badges: [{ type: 'quality', text: 'Smart Cuts' }] },
     { id: 'creative_loop', label: 'Creative Loop', desc: 'LLM refines cuts iteratively.', default: false, badges: [{ type: 'quality', text: 'Agentic' }, { type: 'cost', text: '2-3x Time' }] },
+    { id: 'story_engine', label: 'Story Engine', desc: 'Narrative tension-based editing.', default: false, badges: [{ type: 'quality', text: 'Cinematic' }] },
+    { id: 'captions', label: 'Burn-in Captions', desc: 'Auto-transcribed subtitles.', default: false, badges: [{ type: 'info', text: 'Social Ready' }, { type: 'cost', text: 'cgpu' }] },
     { id: 'export_timeline', label: 'Export Timeline', desc: 'OTIO/EDL for NLEs.', default: false, badges: [{ type: 'info', text: 'Resolve/Premiere' }] },
     { id: 'generate_proxies', label: 'Generate Proxies', desc: 'Faster NLE editing.', default: false, badges: [{ type: 'cost', text: 'Extra Files' }] },
     { id: 'preserve_aspect', label: 'Preserve Aspect', desc: 'Letterbox vs crop.', default: false, badges: [{ type: 'info', text: 'Safe Area' }] }
@@ -30,6 +32,26 @@ const PIPELINE_PHASES = [
     { id: 'scenes', label: 'Scenes', keywords: ['Scene', 'Detecting', 'Analysis'] },
     { id: 'selection', label: 'Selection', keywords: ['Select', 'Clip', 'Choosing'] },
     { id: 'render', label: 'Render', keywords: ['Render', 'Encoding', 'Writing', 'FFmpeg'] }
+];
+
+// Story arc presets (matches backend story_arc.py)
+const STORY_ARC_PRESETS = [
+    { id: 'hero_journey', name: 'Hero Journey', desc: 'Classic 3-act with climax at 70%' },
+    { id: 'mtv_energy', name: 'MTV Energy', desc: 'High energy throughout' },
+    { id: 'slow_burn', name: 'Slow Burn', desc: 'Gradual build to late climax' },
+    { id: 'documentary', name: 'Documentary', desc: 'Natural, observational flow' },
+    { id: 'three_act', name: 'Three Act', desc: 'Classic dramatic structure' },
+    { id: 'fichtean_curve', name: 'Fichtean Curve', desc: 'Rising action with mini-crises' },
+    { id: 'linear_build', name: 'Linear Build', desc: 'Steady tension increase' },
+    { id: 'constant', name: 'Constant', desc: 'Flat energy (music videos)' }
+];
+
+// Quality profile presets
+const QUALITY_PROFILES = [
+    { id: 'preview', name: 'Preview', desc: 'Fast render, lower quality' },
+    { id: 'standard', name: 'Standard', desc: 'Balanced (default)' },
+    { id: 'high', name: 'High', desc: 'Slow render, high quality' },
+    { id: 'master', name: 'Master', desc: 'Archive quality (HEVC)' }
 ];
 
 // File validation config
@@ -47,23 +69,61 @@ const FILE_VALIDATION = {
 };
 
 // =============================================================================
+// DRY API Helper
+// =============================================================================
+
+/**
+ * DRY: Centralized API fetch with error handling
+ * @param {string} endpoint - API endpoint (without /api prefix)
+ * @param {object} options - fetch options (method, body, etc)
+ * @returns {Promise<object>} - parsed JSON response
+ */
+async function apiCall(endpoint, options = {}) {
+    const url = `${API_BASE}/${endpoint}`;
+    const defaultOptions = {
+        headers: { 'Content-Type': 'application/json' }
+    };
+
+    try {
+        const response = await fetch(url, { ...defaultOptions, ...options });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(data.error || `API Error: ${response.status}`);
+        }
+
+        return data;
+    } catch (error) {
+        console.error(`API call failed: ${endpoint}`, error);
+        throw error;
+    }
+}
+
+// =============================================================================
 // Initialization
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    fetchStatus().then(() => renderToggles());
-    
+    fetchStatus().then(() => {
+        renderToggles();
+        renderStoryArcSelector();
+        renderQualitySelector();
+    });
+
     // Attach listeners to static inputs
-    ['style', 'targetDuration', 'prompt'].forEach(id => {
+    ['style', 'targetDuration', 'prompt', 'storyArc', 'qualityProfile'].forEach(id => {
         document.getElementById(id)?.addEventListener('input', updateRunSummary);
     });
-    
+
+    // Make prompt chips clickable
+    initPromptChips();
+
     updateRunSummary(); // Initial render
 
     refreshFiles();
     refreshJobs();
     startPolling();
-    
+
     // Update duration display
     const durationSlider = document.getElementById('targetDuration');
     if (durationSlider) {
@@ -72,11 +132,61 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('durationValue').textContent = val === '0' ? 'Auto' : `${val}s`;
         });
     }
+
+    // Load saved preset if exists
+    loadPreset();
 });
 
 // =============================================================================
 // UI Rendering
 // =============================================================================
+
+function renderStoryArcSelector() {
+    const container = document.getElementById('storyArc-container');
+    if (!container) return;
+
+    container.innerHTML = `
+        <label for="storyArc">Story Arc</label>
+        <select id="storyArc" class="voxel-select">
+            <option value="">Auto (match style)</option>
+            ${STORY_ARC_PRESETS.map(arc =>
+                `<option value="${arc.id}">${arc.name} - ${arc.desc}</option>`
+            ).join('')}
+        </select>
+        <div class="helper">Controls tension curve over time when Story Engine is enabled.</div>
+    `;
+}
+
+function renderQualitySelector() {
+    const container = document.getElementById('qualityProfile-container');
+    if (!container) return;
+
+    container.innerHTML = `
+        <label for="qualityProfile">Quality Profile</label>
+        <select id="qualityProfile" class="voxel-select">
+            ${QUALITY_PROFILES.map(qp =>
+                `<option value="${qp.id}" ${qp.id === 'standard' ? 'selected' : ''}>${qp.name} - ${qp.desc}</option>`
+            ).join('')}
+        </select>
+        <div class="helper">Higher quality = slower render. Master uses HEVC codec.</div>
+    `;
+}
+
+function initPromptChips() {
+    const chips = document.querySelectorAll('.chips .chip');
+    const promptInput = document.getElementById('prompt');
+
+    chips.forEach(chip => {
+        chip.style.cursor = 'pointer';
+        chip.addEventListener('click', () => {
+            if (promptInput) {
+                promptInput.value = chip.textContent;
+                promptInput.dispatchEvent(new Event('input'));
+                showToast(`Prompt set: "${chip.textContent}"`, 'info');
+            }
+        });
+    });
+}
 
 function renderToggles() {
     const container = document.getElementById('toggles-container');
@@ -286,7 +396,10 @@ function buildJobPayload() {
         prompt: getVal('prompt') || '',
         target_duration: parseFloat(getVal('targetDuration')) || 0,
         music_start: parseFloat(getVal('musicStart')) || 0,
-        music_end: getVal('musicEnd') ? parseFloat(getVal('musicEnd')) : null
+        music_end: getVal('musicEnd') ? parseFloat(getVal('musicEnd')) : null,
+        // New fields
+        story_arc: getVal('storyArc') || '',
+        quality_profile: getVal('qualityProfile') || 'standard'
     };
 
     TOGGLE_CONFIG.forEach(toggle => {
@@ -652,4 +765,75 @@ function showToast(message, type = 'info') {
         toast.style.transition = 'all 0.3s ease-in';
         setTimeout(() => toast.remove(), 300);
     }, 4000);
+}
+
+// =============================================================================
+// Preset Save/Load (DRY for End Users)
+// =============================================================================
+
+const PRESET_STORAGE_KEY = 'montage_ai_preset';
+
+function savePreset() {
+    const preset = buildJobPayload();
+    try {
+        localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(preset));
+        showToast('Preset saved to browser', 'success');
+    } catch (e) {
+        showToast('Failed to save preset', 'error');
+    }
+}
+
+function loadPreset() {
+    try {
+        const saved = localStorage.getItem(PRESET_STORAGE_KEY);
+        if (!saved) return;
+
+        const preset = JSON.parse(saved);
+
+        // Apply saved values
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        };
+        const setCheck = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.checked = !!val;
+        };
+
+        setVal('style', preset.style);
+        setVal('prompt', preset.prompt);
+        setVal('targetDuration', preset.target_duration);
+        setVal('musicStart', preset.music_start);
+        if (preset.music_end) setVal('musicEnd', preset.music_end);
+        setVal('storyArc', preset.story_arc || '');
+        setVal('qualityProfile', preset.quality_profile || 'standard');
+
+        // Apply toggles
+        TOGGLE_CONFIG.forEach(toggle => {
+            if (preset[toggle.id] !== undefined) {
+                setCheck(toggle.id, preset[toggle.id]);
+            }
+        });
+
+        // Update duration display
+        const durationValue = document.getElementById('durationValue');
+        if (durationValue) {
+            const dur = preset.target_duration || 0;
+            durationValue.textContent = dur === 0 ? 'Auto' : `${dur}s`;
+        }
+
+        updateRunSummary();
+        console.log('Preset loaded from browser storage');
+    } catch (e) {
+        console.warn('Failed to load preset', e);
+    }
+}
+
+function clearPreset() {
+    try {
+        localStorage.removeItem(PRESET_STORAGE_KEY);
+        showToast('Preset cleared', 'info');
+    } catch (e) {
+        // Ignore
+    }
 }

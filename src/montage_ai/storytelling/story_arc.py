@@ -3,20 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 
-
-def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
-    if value < low:
-        return low
-    if value > high:
-        return high
-    return value
-
-
-def _coerce_float(value: object) -> Optional[float]:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
+from ..utils import clamp, coerce_float
 
 
 @dataclass
@@ -31,7 +18,7 @@ class StoryArc:
         # Sort by progress and clamp values into [0, 1]
         normalized = []
         for t, tension in self.curve_points:
-            normalized.append((_clamp(float(t)), _clamp(float(tension))))
+            normalized.append((clamp(float(t)), clamp(float(tension))))
         normalized.sort(key=lambda pair: pair[0])
         self.curve_points = normalized
 
@@ -40,7 +27,7 @@ class StoryArc:
         if not self.curve_points:
             return 0.5
 
-        p = _clamp(float(progress))
+        p = clamp(float(progress))
         first_t, first_val = self.curve_points[0]
         if p <= first_t:
             return first_val
@@ -128,14 +115,14 @@ class StoryArc:
             return cls.from_preset("hero_journey")
 
         arc_type = (spec.get("type") or "").lower().strip().replace(" ", "_").replace("-", "_")
-        tension_target = _coerce_float(spec.get("tension_target"))
+        tension_target = coerce_float(spec.get("tension_target"))
         if tension_target is not None:
-            tension_target = _clamp(tension_target)
+            tension_target = clamp(tension_target)
 
-        climax_position = _coerce_float(spec.get("climax_position"))
+        climax_position = coerce_float(spec.get("climax_position"))
         if climax_position is None:
             climax_position = 0.75
-        climax_position = _clamp(climax_position, 0.6, 0.9)
+        climax_position = clamp(climax_position, 0.6, 0.9)
 
         if arc_type == "constant":
             value = tension_target if tension_target is not None else 0.5

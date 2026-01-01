@@ -6,17 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
+from ..utils import clamp
+
 
 class MissingAnalysisError(RuntimeError):
     """Raised when tension metadata is missing for a clip."""
-
-
-def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
-    if value < low:
-        return low
-    if value > high:
-        return high
-    return value
 
 
 @dataclass
@@ -83,20 +77,20 @@ class TensionProvider:
     def _extract_tension(self, data: Dict[str, object]) -> float:
         """Compute tension from metadata with safe defaults."""
         if isinstance(data, dict) and "tension" in data:
-            return _clamp(float(data["tension"]))
+            return clamp(float(data["tension"]))
 
         visual = data.get("visual", {}) if isinstance(data, dict) else {}
         motion = float(visual.get("motion_score", 0.0))
         edge = float(visual.get("edge_density", 0.0))
         tension = (motion * 0.6) + (edge * 0.4)
-        return _clamp(tension)
+        return clamp(tension)
 
     def _dummy_tension(self, clip_id: str) -> float:
         """Deterministic fallback tension for dry-run testing."""
         digest = hashlib.sha1(clip_id.encode("utf-8")).hexdigest()
         # Map first 8 hex chars to [0, 1]
         value = int(digest[:8], 16) / float(0xFFFFFFFF)
-        return _clamp(value)
+        return clamp(value)
 
     @staticmethod
     def _get_clip_id(clip_path: str) -> str:

@@ -103,13 +103,18 @@
                 <div class="form-group">
                     <label for="prompt">Creative Director Prompt</label>
                     <input type="text" id="prompt" class="voxel-input" placeholder="e.g., make it feel like a 90s skateboard video">
-                    <div class="helper">Natural language overrides preset pacing/energy.</div>
+                    <div class="helper">Natural language overrides preset pacing/energy. Click a chip to use it.</div>
                 </div>
                 <div class="chips">
                     <span class="chip">Fast social cut</span>
                     <span class="chip">Cinematic vlog</span>
                     <span class="chip">Travel montage</span>
                     <span class="chip">Product hype</span>
+                    <span class="chip">Emotional journey</span>
+                    <span class="chip">High energy action</span>
+                </div>
+                <div id="storyArc-container" class="form-group" style="margin-top: 1rem;">
+                    <!-- Rendered by JS -->
                 </div>
             </section>
 
@@ -118,6 +123,10 @@
                 <div class="section-heading">
                     <h2>QUALITY // DELIVERY</h2>
                     <div class="badge quality">Balanced defaults</div>
+                </div>
+
+                <div id="qualityProfile-container" class="form-group">
+                    <!-- Rendered by JS -->
                 </div>
 
                 <div class="form-group">
@@ -151,10 +160,18 @@
 
                 <div class="text-center mt-4" style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
                     <button onclick="createJob()" class="voxel-btn primary">
-                        ▶ Create Montage
+                        Create Montage
                     </button>
                     <button onclick="createJob(true)" class="voxel-btn">
-                        ⚡ Quick Preview (fast preset)
+                        Quick Preview
+                    </button>
+                </div>
+                <div class="text-center mt-4" style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; opacity: 0.8;">
+                    <button onclick="savePreset()" class="voxel-btn small" title="Save current settings to browser">
+                        Save Preset
+                    </button>
+                    <button onclick="clearPreset()" class="voxel-btn small" title="Clear saved preset">
+                        Clear Preset
                     </button>
                 </div>
             </section>
