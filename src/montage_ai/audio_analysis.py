@@ -90,6 +90,19 @@ class BeatInfo:
 
 
 @dataclass
+class MusicSection:
+    """A section of music with defined energy level."""
+    start_time: float
+    end_time: float
+    energy_level: str  # "low", "medium", "high"
+    avg_energy: float
+
+    @property
+    def duration(self) -> float:
+        return self.end_time - self.start_time
+
+
+@dataclass
 class EnergyProfile:
     """Energy envelope analysis results."""
     times: np.ndarray
@@ -124,6 +137,119 @@ class EnergyProfile:
         idx = np.searchsorted(self.times, time_sec)
         idx = min(idx, len(self.rms) - 1)
         return float(self.rms[idx])
+
+
+def detect_music_sections(profile: EnergyProfile, min_section_duration: float = 5.0) -> List[MusicSection]:
+    """
+    Detect music sections (Intro, Verse, Chorus, etc.) based on energy levels.
+    
+    Args:
+        profile: EnergyProfile object
+        min_section_duration: Minimum duration for a section to be valid (seconds)
+        
+    Returns:
+        List of MusicSection objects
+    """
+    if len(profile.rms) == 0:
+        return []
+
+    # 1. Smooth the energy profile to remove transient spikes
+    window_size = int(2.0 * profile.sample_rate / profile.hop_length)  # 2 second window
+    if window_size < 1:
+        window_size = 1
+    
+    smoothed_energy = np.convolve(profile.rms, np.ones(window_size)/window_size, mode='same')
+    
+    # 2. Determine thresholds based on dynamic range
+    # We use percentiles to be robust against overall loudness differences
+    low_thresh = np.percentile(smoothed_energy, 33)
+    high_thresh = np.percentile(smoothed_energy, 66)
+    
+    # 3. Classify each frame
+    # 0=Low, 1=Medium, 2=High
+    classes = np.zeros_like(smoothed_energy, dtype=int)
+    classes[smoothed_energy >= low_thresh] = 1
+    classes[smoothed_energy >= high_thresh] = 2
+    
+    # 4. Merge consecutive frames into sections
+    sections = []
+    current_class = classes[0]
+    start_idx = 0
+    
+    for i in range(1, len(classes)):
+        if classes[i] != current_class:
+            # End of section
+            end_idx = i
+            start_time = profile.times[start_idx]
+            end_time = profile.times[end_idx]
+            
+            # Map class to string
+            level_map = {0: "low", 1: "medium", 2: "high"}
+            
+            sections.append(MusicSection(
+                start_time=float(start_time),
+                end_time=float(end_time),
+                energy_level=level_map[current_class],
+                avg_energy=float(np.mean(profile.rms[start_idx:end_idx]))
+            ))
+            
+            current_class = classes[i]
+            start_idx = i
+            
+    # Add final section
+    end_idx = len(classes) - 1
+    if start_idx < end_idx:
+        level_map = {0: "low", 1: "medium", 2: "high"}
+        sections.append(MusicSection(
+            start_time=float(profile.times[start_idx]),
+            end_time=float(profile.times[end_idx]),
+            energy_level=level_map[current_class],
+            avg_energy=float(np.mean(profile.rms[start_idx:end_idx]))
+        ))
+        
+    # 5. Merge short sections into neighbors
+    # This is a simple iterative merge
+    merged = True
+    while merged:
+        merged = False
+        if len(sections) <= 1:
+            break
+            
+        new_sections = []
+        i = 0
+        while i < len(sections):
+            current = sections[i]
+            
+            # If short section, try to merge with neighbor
+            if current.duration < min_section_duration:
+                merged = True
+                # Merge with previous if possible (and similar energy preference?)
+                # For now, just merge with the longer neighbor or previous
+                if len(new_sections) > 0:
+                    prev = new_sections[-1]
+                    # Extend previous
+                    prev.end_time = current.end_time
+                    # Re-calculate avg energy (weighted)
+                    total_dur = prev.duration + current.duration
+                    prev.avg_energy = (prev.avg_energy * prev.duration + current.avg_energy * current.duration) / total_dur
+                    # Keep previous energy level label
+                elif i + 1 < len(sections):
+                    # Merge with next
+                    next_sec = sections[i+1]
+                    next_sec.start_time = current.start_time
+                    # Update next's stats
+                    total_dur = next_sec.duration + current.duration
+                    next_sec.avg_energy = (next_sec.avg_energy * next_sec.duration + current.avg_energy * current.duration) / total_dur
+                    # Skip current, next iteration will handle the now-extended next_sec
+                else:
+                    # Orphaned short section at end, just keep it
+                    new_sections.append(current)
+            else:
+                new_sections.append(current)
+            i += 1
+        sections = new_sections
+
+    return sections
 
 
 # =============================================================================

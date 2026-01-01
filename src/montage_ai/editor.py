@@ -899,13 +899,6 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
             if _settings.features.captions:
                 final_output = _apply_captions(final_output, _settings)
 
-            # Post-processing: Export timeline for NLE if enabled
-            if EXPORT_TIMELINE and TIMELINE_EXPORT_AVAILABLE and builder is not None:
-                try:
-                    _export_timeline_for_nle(builder, result, _settings)
-                except Exception as e:
-                    logger.warning(f"   ⚠️ Timeline export failed: {e}")
-
             return final_output
         else:
             logger.error(f"Variant #{variant_id} Failed: {result.error}")

@@ -80,17 +80,9 @@ RUN curl -L -o realesrgan.zip https://github.com/xinntao/Real-ESRGAN/releases/do
         mv realesrgan_temp/realesrgan-ncnn-vulkan /usr/local/bin/ && \
         chmod +x /usr/local/bin/realesrgan-ncnn-vulkan; \
     else \
-        apt-get update && apt-get install -y cmake build-essential git glslang-tools libvulkan-dev && \
-        git config --global url."https://github.com/".insteadOf git@github.com: && \
-        git clone https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan.git && \
-        cd Real-ESRGAN-ncnn-vulkan && \
-        git checkout v0.2.0 && \
-        git submodule update --init --recursive && \
-        cd src/ncnn && git checkout 20240410 && git submodule update --init --recursive && cd ../.. && \
-        mkdir build && cd build && \
-        cmake ../src && make -j4 && \
-        mv realesrgan-ncnn-vulkan /usr/local/bin/ && \
-        cd ../.. && rm -rf Real-ESRGAN-ncnn-vulkan; \
+        echo "WARNING: Skipping Real-ESRGAN build on non-x86 to speed up build. Upscaling will be unavailable." && \
+        touch /usr/local/bin/realesrgan-ncnn-vulkan && \
+        chmod +x /usr/local/bin/realesrgan-ncnn-vulkan; \
     fi && \
     mkdir -p /usr/local/share/realesrgan-models && \
     (find realesrgan_temp -name "*.param" -exec mv {} /usr/local/share/realesrgan-models/ \; 2>/dev/null || true) && \

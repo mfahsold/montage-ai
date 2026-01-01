@@ -48,7 +48,7 @@ spec:
             - name: CGPU_GPU_ENABLED
               value: "true"
             - name: UPSCALE
-              value: "true"
+              value: "false"
             - name: STABILIZE
               value: "true"
             - name: COLOR_MATCH

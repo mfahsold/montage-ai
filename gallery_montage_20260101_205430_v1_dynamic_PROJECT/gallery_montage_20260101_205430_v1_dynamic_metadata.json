@@ -1,0 +1,55 @@
+{
+  "project_name": "gallery_montage_20260101_205430_v1_dynamic",
+  "duration_sec": 5.581855576507755,
+  "fps": 60,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "audio_file": "/data/music/techno-nature/techno_trend.mp3",
+  "clips": [
+    {
+      "index": 1,
+      "source_file": "/data/input/techno-nature/nature_raw.mp4",
+      "proxy_file": null,
+      "source_in": 0.5,
+      "source_out": 2.3598564746456088,
+      "timeline_in": 0.0,
+      "timeline_out": 1.8598564746456085,
+      "duration": 1.8598564746456085,
+      "metadata": {
+        "energy": 0.32697972655296326,
+        "scene_type": null
+      }
+    },
+    {
+      "index": 2,
+      "source_file": "/data/input/techno-nature/nature_raw.mp4",
+      "proxy_file": null,
+      "source_in": 0.5,
+      "source_out": 2.3624374070570573,
+      "timeline_in": 1.8598564746456085,
+      "timeline_out": 3.722293881702666,
+      "duration": 1.8624374070570575,
+      "metadata": {
+        "energy": 0.6327753663063049,
+        "scene_type": null
+      }
+    },
+    {
+      "index": 3,
+      "source_file": "/data/input/techno-nature/nature_raw.mp4",
+      "proxy_file": null,
+      "source_in": 0.5,
+      "source_out": 2.3595616948050893,
+      "timeline_in": 3.722293881702666,
+      "timeline_out": 5.581855576507755,
+      "duration": 1.8595616948050893,
+      "metadata": {
+        "energy": 0.5105017423629761,
+        "scene_type": null
+      }
+    }
+  ],
+  "exporter_version": "0.1.0"
+}

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: buildkit-config
+  namespace: montage-ai
+data:
+  buildkitd.toml: |
+    debug = true
+    [registry."192.168.1.12:5000"]
+      http = true
+      insecure = true

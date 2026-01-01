@@ -26,6 +26,7 @@ from ..config import get_settings, Settings
 from ..logger import logger
 from ..resource_manager import get_resource_manager, ResourceManager
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
+from ..timeline_exporter import export_timeline_from_montage
 
 
 # =============================================================================
@@ -41,6 +42,7 @@ class AudioAnalysisResult:
     energy_times: np.ndarray
     energy_values: np.ndarray
     duration: float
+    sections: List[Any] = field(default_factory=list)
 
     @property
     def beat_count(self) -> int:
@@ -561,10 +563,13 @@ class MontageBuilder:
             # Phase 5: Render
             self._render_output()
 
-            # Phase 6: Save episodic memory (if enabled)
+            # Phase 6: Export Timeline
+            self._export_timeline()
+
+            # Phase 7: Save episodic memory (if enabled)
             self._save_episodic_memory()
 
-            # Phase 7: Cleanup
+            # Phase 8: Cleanup
             self._cleanup()
 
             # Build result
@@ -925,7 +930,7 @@ class MontageBuilder:
             isolated_audio_path: Pre-isolated audio path from async processing.
                                  If provided, skips voice isolation step.
         """
-        from ..audio_analysis import get_beat_times, analyze_music_energy
+        from ..audio_analysis import get_beat_times, analyze_music_energy, detect_music_sections
 
         # Get music files
         music_files = self._get_files(self.ctx.music_dir, ('.mp3', '.wav'))
@@ -950,6 +955,20 @@ class MontageBuilder:
         if cached:
             # Cache hit - use cached analysis
             logger.info("   ⚡ Using cached audio analysis")
+            # Note: Cached object might not have sections if it's old, so we might need to re-detect
+            # For now, we'll just re-detect sections from energy profile if missing
+            
+            energy_profile = analyze_music_energy(music_path, verbose=False) # Lightweight if cached? No, analyze_music_energy does work.
+            # Actually, we can reconstruct EnergyProfile from cached data
+            from ..audio_analysis import EnergyProfile
+            ep = EnergyProfile(
+                times=np.array(cached.energy_times),
+                rms=np.array(cached.energy_values),
+                sample_rate=22050, # Assumption
+                hop_length=512 # Assumption
+            )
+            sections = detect_music_sections(ep)
+
             self.ctx.audio_result = AudioAnalysisResult(
                 music_path=music_path,
                 beat_times=np.array(cached.beat_times),
@@ -957,11 +976,13 @@ class MontageBuilder:
                 energy_times=np.array(cached.energy_times),
                 energy_values=np.array(cached.energy_values),
                 duration=cached.duration,
+                sections=sections
             )
         else:
             # Cache miss - analyze and cache
             beat_info = get_beat_times(music_path, verbose=self.settings.features.verbose)
             energy_profile = analyze_music_energy(music_path, verbose=self.settings.features.verbose)
+            sections = detect_music_sections(energy_profile)
 
             # Store in context
             self.ctx.audio_result = AudioAnalysisResult(
@@ -971,6 +992,7 @@ class MontageBuilder:
                 energy_times=energy_profile.times,
                 energy_values=energy_profile.rms,
                 duration=beat_info.duration,
+                sections=sections
             )
 
             # Save to cache
@@ -1472,6 +1494,24 @@ class MontageBuilder:
         if self.ctx.editing_instructions is not None:
             pacing_speed = self.ctx.editing_instructions.get('pacing', {}).get('speed', 'dynamic')
 
+        # Section-based pacing override (Pacing Curves)
+        # If we are in a high energy section, force faster cuts regardless of instantaneous drops
+        current_section = None
+        if self.ctx.audio_result and self.ctx.audio_result.sections:
+            for section in self.ctx.audio_result.sections:
+                if section.start_time <= self.ctx.current_time < section.end_time:
+                    current_section = section
+                    break
+        
+        if pacing_speed == "dynamic" and current_section:
+            if current_section.energy_level == "high":
+                # High energy section: 2 beats (fast) or 4 beats (medium-fast)
+                # We still allow some variation but cap the max length
+                return 2 if tempo < 130 else 4
+            elif current_section.energy_level == "low":
+                # Low energy section: 8 beats (slow) or 16 beats (very slow)
+                return 16 if tempo < 100 else 8
+
         if pacing_speed == "very_fast":
             return 1
         elif pacing_speed == "fast":
@@ -1549,6 +1589,14 @@ class MontageBuilder:
         best_score = -1000
         selected_scene = candidates[0]
 
+        # Determine current music section
+        current_section = None
+        if self.ctx.audio_result and self.ctx.audio_result.sections:
+            for section in self.ctx.audio_result.sections:
+                if section.start_time <= self.ctx.current_time < section.end_time:
+                    current_section = section
+                    break
+
         for scene in candidates:
             score = 0
 
@@ -1591,6 +1639,13 @@ class MontageBuilder:
                 score += 20
             if current_energy < 0.4 and action == 'low':
                 score += 20
+            
+            # Rule 3.5: Section Energy Matching (Pacing Curves)
+            if current_section:
+                if current_section.energy_level == "high" and action == "high":
+                    score += 25
+                elif current_section.energy_level == "low" and action == "low":
+                    score += 25
 
             # Rule 4: Shot Variation
             if self.ctx.last_shot_type and shot == self.ctx.last_shot_type:
@@ -1711,6 +1766,52 @@ class MontageBuilder:
                 logger.error(f"Error processing clip {meta.source_path}: {e}")
 
 
+
+    def _export_timeline(self):
+        """
+        Phase 6: Export timeline to NLE formats (EDL, XML, OTIO).
+        """
+        if not self.settings.features.export_timeline:
+            return
+
+        logger.info("\n   📝 Exporting timeline...")
+        
+        # Convert ClipMetadata to format expected by exporter
+        clips_data = []
+        for clip in self.ctx.clips_metadata:
+            clips_data.append({
+                'source_path': clip.source_path,
+                'start_time': clip.start_time,
+                'duration': clip.duration,
+                'timeline_start': clip.timeline_start,
+                'metadata': {
+                    'energy': clip.energy,
+                    'action': clip.action,
+                    'shot': clip.shot,
+                    'selection_score': clip.selection_score,
+                    'enhancements': clip.enhancements
+                }
+            })
+
+        # Get audio path safely
+        audio_path = self.ctx.audio_result.music_path if self.ctx.audio_result else ""
+        if not audio_path:
+            logger.warning("   ⚠️ No audio path found for export, using placeholder")
+            audio_path = "audio_track_missing.mp3"
+
+        try:
+            export_timeline_from_montage(
+                clips_data=clips_data,
+                audio_path=audio_path,
+                total_duration=self.ctx.current_time,
+                output_dir=str(self.ctx.output_dir),
+                project_name=f"{self.ctx.job_id}_v{self.variant_id}",
+                generate_proxies=self.settings.features.generate_proxies,
+                resolution=(self.ctx.output_profile.width, self.ctx.output_profile.height),
+                fps=self.ctx.output_profile.fps
+            )
+        except Exception as e:
+            logger.error(f"   ❌ Timeline export failed: {e}")
 
     def _save_episodic_memory(self):
         """

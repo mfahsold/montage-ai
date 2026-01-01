@@ -114,6 +114,7 @@ class TimelineExporter:
         generate_proxies: bool = False,
         export_otio: bool = True,
         export_edl: bool = True,
+        export_xml: bool = True,
         export_csv: bool = True
     ) -> Dict[str, str]:
         """
@@ -124,6 +125,7 @@ class TimelineExporter:
             generate_proxies: Create H.264 proxies for editing
             export_otio: Export OpenTimelineIO file
             export_edl: Export CMX 3600 EDL file
+            export_xml: Export FCP XML v7 file (Resolve/Premiere/Kdenlive)
             export_csv: Export CSV spreadsheet
 
         Returns:
@@ -158,6 +160,13 @@ class TimelineExporter:
             if edl_path:
                 exported_files['edl'] = edl_path
                 logger.info(f"✅ EDL exported: {edl_path}")
+
+        # Export FCP XML
+        if export_xml:
+            xml_path = self._export_xml(timeline)
+            if xml_path:
+                exported_files['xml'] = xml_path
+                logger.info(f"✅ XML exported: {xml_path}")
 
         # Export CSV
         if export_csv:
@@ -371,6 +380,172 @@ class TimelineExporter:
 
         return edl_path
 
+    def _export_xml(self, timeline: Timeline) -> str:
+        """
+        Export FCP XML v7 file.
+
+        Compatible with:
+        - DaVinci Resolve
+        - Adobe Premiere Pro
+        - Final Cut Pro 7 / X (via converter)
+        - Kdenlive
+        - Shotcut
+
+        Args:
+            timeline: Timeline object
+
+        Returns:
+            Path to .xml file
+        """
+        xml_path = os.path.join(
+            self.output_dir,
+            f"{timeline.project_name}.xml"
+        )
+        temp_path = f"{xml_path}.tmp"
+
+        fps_int = int(timeline.fps)
+        width, height = timeline.resolution
+
+        try:
+            with open(temp_path, 'w') as f:
+                f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+                f.write('<!DOCTYPE xmeml>\n')
+                f.write('<xmeml version="4">\n')
+                f.write('  <project>\n')
+                f.write(f'    <name>{timeline.project_name}</name>\n')
+                f.write('    <children>\n')
+                f.write(f'      <sequence id="sequence-1">\n')
+                f.write(f'        <name>{timeline.project_name}</name>\n')
+                f.write(f'        <duration>{int(timeline.total_duration * fps_int)}</duration>\n')
+                f.write('        <rate>\n')
+                f.write(f'          <timebase>{fps_int}</timebase>\n')
+                f.write('          <ntsc>FALSE</ntsc>\n')
+                f.write('        </rate>\n')
+                f.write('        <media>\n')
+                f.write('          <video>\n')
+                f.write('            <format>\n')
+                f.write('              <samplecharacteristics>\n')
+                f.write('                <rate>\n')
+                f.write(f'                  <timebase>{fps_int}</timebase>\n')
+                f.write('                </rate>\n')
+                f.write(f'                <width>{width}</width>\n')
+                f.write(f'                <height>{height}</height>\n')
+                f.write('                <pixelaspectratio>square</pixelaspectratio>\n')
+                f.write('              </samplecharacteristics>\n')
+                f.write('            </format>\n')
+                f.write('            <track>\n')
+
+                # Video Clips
+                for i, clip in enumerate(timeline.clips, start=1):
+                    clip_id = f"clipitem-{i}"
+                    file_id = f"file-{i}"
+                    path = clip.proxy_path or clip.source_path
+                    filename = os.path.basename(path)
+                    
+                    # Calculate frames
+                    start_frame = int(clip.timeline_start * fps_int)
+                    end_frame = int((clip.timeline_start + clip.duration) * fps_int)
+                    duration_frames = end_frame - start_frame
+                    src_in_frame = int(clip.start_time * fps_int)
+                    src_out_frame = src_in_frame + duration_frames
+                    
+                    # For file duration, we assume it's at least as long as the clip usage
+                    # In a real scenario, we'd need the actual file duration. 
+                    # We'll estimate it as src_out + 10 seconds buffer
+                    file_duration = src_out_frame + (10 * fps_int)
+
+                    f.write(f'              <clipitem id="{clip_id}">\n')
+                    f.write(f'                <name>{filename}</name>\n')
+                    f.write(f'                <duration>{duration_frames}</duration>\n')
+                    f.write('                <rate>\n')
+                    f.write(f'                  <timebase>{fps_int}</timebase>\n')
+                    f.write('                  <ntsc>FALSE</ntsc>\n')
+                    f.write('                </rate>\n')
+                    f.write(f'                <start>{start_frame}</start>\n')
+                    f.write(f'                <end>{end_frame}</end>\n')
+                    f.write(f'                <in>{src_in_frame}</in>\n')
+                    f.write(f'                <out>{src_out_frame}</out>\n')
+                    f.write(f'                <file id="{file_id}">\n')
+                    f.write(f'                  <name>{filename}</name>\n')
+                    f.write(f'                  <pathurl>file://{path}</pathurl>\n')
+                    f.write('                  <rate>\n')
+                    f.write(f'                    <timebase>{fps_int}</timebase>\n')
+                    f.write('                    <ntsc>FALSE</ntsc>\n')
+                    f.write('                  </rate>\n')
+                    f.write(f'                  <duration>{file_duration}</duration>\n')
+                    f.write('                  <media>\n')
+                    f.write('                    <video>\n')
+                    f.write('                      <samplecharacteristics>\n')
+                    f.write('                        <rate>\n')
+                    f.write(f'                          <timebase>{fps_int}</timebase>\n')
+                    f.write('                        </rate>\n')
+                    f.write(f'                        <width>{width}</width>\n')
+                    f.write(f'                        <height>{height}</height>\n')
+                    f.write('                      </samplecharacteristics>\n')
+                    f.write('                    </video>\n')
+                    f.write('                  </media>\n')
+                    f.write('                </file>\n')
+                    
+                    # Add metadata as labels/comments if possible
+                    if clip.metadata:
+                        f.write('                <labels>\n')
+                        f.write(f'                  <label2>{clip.metadata.get("action", "")}</label2>\n')
+                        f.write('                </labels>\n')
+                        f.write(f'                <comments>\n')
+                        f.write(f'                  <mastercomment1>{clip.metadata.get("energy", "")}</mastercomment1>\n')
+                        f.write(f'                  <mastercomment2>{clip.metadata.get("shot", "")}</mastercomment2>\n')
+                        f.write('                </comments>\n')
+
+                    f.write('              </clipitem>\n')
+
+                f.write('            </track>\n')
+                f.write('          </video>\n')
+                
+                # Audio Track
+                f.write('          <audio>\n')
+                f.write('            <track>\n')
+                f.write(f'              <clipitem id="clipitem-audio-1">\n')
+                f.write(f'                <name>{os.path.basename(timeline.audio_path)}</name>\n')
+                f.write(f'                <duration>{int(timeline.total_duration * fps_int)}</duration>\n')
+                f.write('                <rate>\n')
+                f.write(f'                  <timebase>{fps_int}</timebase>\n')
+                f.write('                  <ntsc>FALSE</ntsc>\n')
+                f.write('                </rate>\n')
+                f.write('                <start>0</start>\n')
+                f.write(f'                <end>{int(timeline.total_duration * fps_int)}</end>\n')
+                f.write('                <in>0</in>\n')
+                f.write(f'                <out>{int(timeline.total_duration * fps_int)}</out>\n')
+                f.write(f'                <file id="file-audio-1">\n')
+                f.write(f'                  <name>{os.path.basename(timeline.audio_path)}</name>\n')
+                f.write(f'                  <pathurl>file://{timeline.audio_path}</pathurl>\n')
+                f.write('                  <rate>\n')
+                f.write(f'                    <timebase>{fps_int}</timebase>\n')
+                f.write('                    <ntsc>FALSE</ntsc>\n')
+                f.write('                  </rate>\n')
+                f.write(f'                  <duration>{int(timeline.total_duration * fps_int)}</duration>\n')
+                f.write('                </file>\n')
+                f.write('              </clipitem>\n')
+                f.write('            </track>\n')
+                f.write('          </audio>\n')
+                
+                f.write('        </media>\n')
+                f.write('      </sequence>\n')
+                f.write('    </children>\n')
+                f.write('  </project>\n')
+                f.write('</xmeml>\n')
+
+            # Atomic rename
+            if os.path.exists(xml_path):
+                os.remove(xml_path)
+            os.rename(temp_path, xml_path)
+
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise e
+
+        return xml_path
+
     def _export_csv(self, timeline: Timeline) -> str:
         """
         Export timeline as CSV spreadsheet.
@@ -557,13 +732,25 @@ class TimelineExporter:
             f.write("into professional NLE software (DaVinci, Premiere, FCP, etc.)\n\n")
             f.write("Files:\n")
             f.write(f"- {timeline.project_name}.otio: OpenTimelineIO (recommended)\n")
+            f.write(f"- {timeline.project_name}.xml: FCP XML v7 (Resolve/Premiere/Kdenlive)\n")
             f.write(f"- {timeline.project_name}.edl: CMX EDL (universal fallback)\n")
             f.write(f"- metadata.json: Full edit metadata from Fluxibri\n\n")
             f.write("Import Instructions:\n")
-            f.write("1. DaVinci Resolve: File > Import > Timeline > .otio\n")
-            f.write("2. Adobe Premiere: File > Import > .edl\n")
-            f.write("3. Final Cut Pro: File > Import > XML (use .otio)\n\n")
+            f.write("1. DaVinci Resolve: File > Import > Timeline > .xml (or .otio)\n")
+            f.write("2. Adobe Premiere: File > Import > .xml\n")
+            f.write("3. Final Cut Pro: File > Import > XML\n")
+            f.write("4. Kdenlive/Shotcut: File > Open > .xml\n\n")
             f.write(f"Generated by Montage AI v{VERSION}\n")
+
+        # Move exported files into package directory
+        import shutil
+        for key, file_path in exported_files.items():
+            if key == 'package': continue
+            if os.path.exists(file_path):
+                dest_path = os.path.join(package_dir, os.path.basename(file_path))
+                shutil.move(file_path, dest_path)
+                # Update path in exported_files to point to new location
+                exported_files[key] = dest_path
 
         return package_dir
 
@@ -653,7 +840,8 @@ def export_timeline_from_montage(
         timeline,
         generate_proxies=generate_proxies,
         export_otio=True,
-        export_edl=True
+        export_edl=True,
+        export_xml=True
     )
 
 
