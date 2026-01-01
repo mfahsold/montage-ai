@@ -53,8 +53,19 @@ def map_options_to_env(
     env["PRESERVE_ASPECT"] = bool_to_env(options.get("preserve_aspect"))
     env["CREATIVE_LOOP"] = bool_to_env(options.get("creative_loop"))
     env["ENABLE_STORY_ENGINE"] = bool_to_env(options.get("story_engine"))
+    env["CAPTIONS"] = bool_to_env(options.get("captions"))
     if "strict_cloud_compute" in options:
         env["STRICT_CLOUD_COMPUTE"] = bool_to_env(options.get("strict_cloud_compute"))
+
+    # Story Arc (tension curve preset)
+    story_arc = options.get("story_arc", "")
+    if story_arc:
+        env["STORY_ARC"] = str(story_arc)
+
+    # Quality Profile (preview, standard, high, master)
+    quality_profile = options.get("quality_profile", "standard")
+    if quality_profile:
+        env["QUALITY_PROFILE"] = str(quality_profile)
     
     # Cloud/GPU
     cgpu_enabled = bool_to_env(options.get("cgpu"))

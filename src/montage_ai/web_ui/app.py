@@ -199,6 +199,8 @@ def normalize_options(data: dict) -> dict:
         "enhance": get_bool('enhance'),
         "llm_clip_selection": get_bool('llm_clip_selection'),
         "creative_loop": get_bool('creative_loop'),
+        "story_engine": get_bool('story_engine'),
+        "captions": get_bool('captions'),
         "export_timeline": get_bool('export_timeline'),
         "generate_proxies": get_bool('generate_proxies'),
         # Default cgpu to true if env var is set, otherwise use UI value
@@ -209,6 +211,9 @@ def normalize_options(data: dict) -> dict:
         "music_end": music_end,
         # Preview mode flag (for FFMPEG_PRESET)
         "preview": data.get('preset') == 'fast',
+        # New fields
+        "story_arc": str(opts.get('story_arc', data.get('story_arc', ''))),
+        "quality_profile": str(opts.get('quality_profile', data.get('quality_profile', 'standard'))),
     }
 
 

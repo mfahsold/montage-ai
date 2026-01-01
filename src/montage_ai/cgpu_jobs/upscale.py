@@ -136,11 +136,7 @@ class UpscaleJob(CGPUJob):
             return False
 
         # Check file size and warn
-        size_mb = self.input_path.stat().st_size / (1024 * 1024)
-        if size_mb > 500:
-            logger.warning(f"Large file ({size_mb:.1f} MB) - upscaling may take a long time")
-        if size_mb > 1000:
-            logger.warning(f"Very large file - consider splitting into smaller segments")
+        self.warn_large_file(self.input_path)
 
         return True
 
@@ -241,19 +237,20 @@ echo "ENV_READY"
 
     def upload(self) -> bool:
         """Upload input file to remote."""
+        from ..utils import file_size_mb
         remote_path = f"{self.remote_work_dir}/{self.input_path.name}"
 
-        size_mb = self.input_path.stat().st_size / (1024 * 1024)
-        logger.info(f"Uploading {self.input_path.name} ({size_mb:.1f} MB)...")
+        self.log_upload_start(self.input_path)
 
         # Dynamic timeout based on file size
+        size_mb = file_size_mb(self.input_path)
         timeout = max(600, int(size_mb / 10 * 60))
 
         if not copy_to_remote(str(self.input_path), remote_path, timeout=timeout):
             self._error = "Failed to upload input file"
             return False
 
-        logger.info(f"Upload complete")
+        self.log_upload_complete()
         return True
 
     def run_remote(self) -> bool:
@@ -542,12 +539,10 @@ print("UPSCALE_SUCCESS")
         """Download upscaled file."""
         remote_output = f"{self.remote_work_dir}/{self.output_path.name}"
 
-        logger.info(f"Downloading upscaled file...")
+        self.log_download_start("upscaled file")
 
         if download_via_base64(remote_output, str(self.output_path)):
-            if self.output_path.exists():
-                size_mb = self.output_path.stat().st_size / (1024 * 1024)
-                logger.info(f"Output: {size_mb:.1f} MB")
+            self.log_output_size(self.output_path)
 
             return JobResult(
                 success=True,

@@ -34,6 +34,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..config import get_settings
+from ..logger import logger
+from ..utils import file_size_mb
 from ..cgpu_utils import (
     is_cgpu_available,
     run_cgpu_command,
@@ -227,6 +229,40 @@ class CGPUJob(ABC):
             run_cgpu_command(f"rm -rf {self.remote_work_dir}", timeout=30)
         except Exception:
             pass  # Best effort cleanup
+
+    def log_upload_start(self, path: Path) -> None:
+        """Log upload start message with file size."""
+        size = file_size_mb(path)
+        logger.info(f"Uploading {path.name} ({size:.1f} MB)...")
+
+    def log_upload_complete(self) -> None:
+        """Log upload completion."""
+        logger.info("Upload complete")
+
+    def log_download_start(self, description: str = "result") -> None:
+        """Log download start message."""
+        logger.info(f"Downloading {description}...")
+
+    def log_output_size(self, path: Path) -> None:
+        """Log output file size."""
+        if path.exists():
+            size = file_size_mb(path)
+            logger.info(f"Output: {size:.1f} MB")
+
+    def warn_large_file(self, path: Path, warn_mb: float = 500.0, very_large_mb: float = 1000.0) -> None:
+        """
+        Warn if file is large.
+
+        Args:
+            path: Path to check.
+            warn_mb: Size in MB to trigger warning.
+            very_large_mb: Size in MB to trigger strong warning.
+        """
+        size = file_size_mb(path)
+        if size > very_large_mb:
+            logger.warning(f"Very large file ({size:.1f} MB) - consider splitting into smaller segments")
+        elif size > warn_mb:
+            logger.warning(f"Large file ({size:.1f} MB) - processing may take a long time")
 
     def execute(self) -> JobResult:
         """
