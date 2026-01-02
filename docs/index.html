@@ -3,437 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage AI — AI Rough Cut · Social-Ready · Pro Handoff</title>
-    <meta name="description" content="Turn raw footage into beat-synced montages, vertical shorts, and pro-ready exports. Local-first, privacy-first video editing with AI. We polish pixels, we don't generate them.">
-    <meta name="keywords" content="video editing, AI, montage, shorts, TikTok, Reels, beat sync, OTIO, EDL, DaVinci Resolve, Premiere Pro">
-    <meta property="og:title" content="Montage AI — Polish Your Footage with AI">
-    <meta property="og:description" content="AI rough cut + social-ready output + pro handoff. Local-first, privacy-first.">
-    <meta property="og:type" content="website">
+    <title>Montage AI — Polish Pixels, Not Generate Them</title>
+    <meta name="description" content="AI rough cut + social-ready output + pro handoff. Local-first video editing.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Ambient Background -->
-    <div class="ambient-bg">
-        <div class="glow glow-1"></div>
-        <div class="glow glow-2"></div>
-        <div class="glow glow-3"></div>
-    </div>
-
     <div class="container">
-        <header>
-            <a href="#" class="logo">
+        <!-- Header -->
+        <header class="voxel-card">
+            <div class="logo-container">
                 <span class="logo-icon">🎬</span>
-                <span class="logo-text">Montage AI</span>
-            </a>
-            <nav>
-                <a href="#features">Features</a>
-                <a href="#new">What's New</a>
-                <a href="#profiles">Profiles</a>
-                <a href="#how-it-works">How it Works</a>
-                <a href="STRATEGY.md" class="nav-accent">Roadmap</a>
-                <a href="https://github.com/mfahsold/montage-ai" class="github-btn">
-                    <i class="fab fa-github"></i>
-                    <span>GitHub</span>
-                </a>
-            </nav>
-            <button class="mobile-menu-btn" aria-label="Menu">
-                <i class="fas fa-bars"></i>
-            </button>
+                <div class="logo-text">
+                    <h1>MONTAGE <span class="logo-ai">AI</span></h1>
+                    <p class="subtitle">// POLISH PIXELS, DON'T GENERATE THEM</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span class="version-badge">v2.0</span>
+                <a href="https://github.com/mfahsold/montage-ai" class="voxel-btn small">GitHub →</a>
+            </div>
         </header>
 
-        <main>
-            <!-- Hero Section -->
-            <section class="hero">
-                <div class="hero-badge">
-                    <span class="pulse"></span>
-                    <span>Open Source · Local-First · Privacy-First</span>
+        <!-- Hero -->
+        <section class="voxel-card hero">
+            <div class="hero-content">
+                <p class="hero-tag">// LOCAL-FIRST · PRIVACY-FIRST · OPEN SOURCE</p>
+                <h2>AI rough cut +<br><span class="highlight">social-ready</span> output +<br>pro handoff</h2>
+                <p class="hero-desc">Drop your clips, pick a quality profile, get a beat-synced edit ready for social media or NLE handoff in minutes.</p>
+                <div class="hero-actions">
+                    <a href="https://github.com/mfahsold/montage-ai" class="voxel-btn primary">GET STARTED</a>
+                    <a href="getting-started.md" class="voxel-btn">DOCUMENTATION</a>
                 </div>
-                <h1>
-                    <span class="hero-line">AI rough cut</span>
-                    <span class="hero-line"><span class="gradient-text">social-ready</span> output</span>
-                    <span class="hero-line">pro handoff</span>
-                </h1>
-                <p class="subtitle">We polish pixels, we don't generate them. Drop your clips, pick a quality profile, and get a beat-synced edit ready for social media or NLE handoff.</p>
-                <div class="cta-group">
-                    <a href="https://github.com/mfahsold/montage-ai" class="btn primary">
-                        <i class="fab fa-github"></i>
-                        <span>Get Started</span>
-                    </a>
-                    <a href="#new" class="btn secondary">
-                        <span>What's New in 2026</span>
-                        <i class="fas fa-arrow-down"></i>
-                    </a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <span class="stat-value">8</span>
+                    <span class="stat-label">STYLE TEMPLATES</span>
                 </div>
-                <div class="hero-stats">
-                    <div class="stat">
-                        <span class="stat-value">8</span>
-                        <span class="stat-label">Style Templates</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <div class="stat">
-                        <span class="stat-value">&lt;3min</span>
-                        <span class="stat-label">Preview Time</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <div class="stat">
-                        <span class="stat-value">100%</span>
-                        <span class="stat-label">Local Processing</span>
-                    </div>
+                <div class="stat-item">
+                    <span class="stat-value">&lt;3m</span>
+                    <span class="stat-label">PREVIEW TIME</span>
                 </div>
-            </section>
+                <div class="stat-item">
+                    <span class="stat-value">100%</span>
+                    <span class="stat-label">LOCAL PROCESSING</span>
+                </div>
+            </div>
+        </section>
 
-            <!-- What's New Section -->
-            <section id="new" class="whats-new">
-                <div class="section-header">
-                    <span class="section-tag">January 2026</span>
-                    <h2>What's New</h2>
-                    <p class="section-desc">Major updates focused on text-based editing, shorts creation, and streamlined workflows</p>
+        <!-- What's New -->
+        <section class="voxel-card">
+            <h2>// WHAT'S NEW IN 2026</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">⌨️</span>
+                    <h3>TRANSCRIPT EDITOR</h3>
+                    <p>Descript-style text editing. Delete words to cut video. Rearrange to reorder scenes.</p>
+                    <span class="badge new">NEW</span>
                 </div>
-                <div class="feature-grid">
-                    <div class="feature-card highlight-card">
-                        <div class="card-glow"></div>
-                        <div class="feature-icon">
-                            <i class="fas fa-keyboard"></i>
-                        </div>
-                        <div class="feature-content">
-                            <span class="badge">New</span>
-                            <h3>Transcript Editor</h3>
-                            <p>Descript-style text editing. Delete words to cut video. Rearrange paragraphs to reorder scenes. Export to OTIO/EDL.</p>
-                        </div>
-                    </div>
-                    <div class="feature-card highlight-card">
-                        <div class="card-glow"></div>
-                        <div class="feature-icon">
-                            <i class="fas fa-mobile-screen"></i>
-                        </div>
-                        <div class="feature-content">
-                            <span class="badge">New</span>
-                            <h3>Shorts Studio</h3>
-                            <p>Vertical reframing, safe zones, caption styles. Create TikTok, Reels, and YouTube Shorts in one click.</p>
-                        </div>
-                    </div>
-                    <div class="feature-card highlight-card">
-                        <div class="card-glow"></div>
-                        <div class="feature-icon">
-                            <i class="fas fa-sliders"></i>
-                        </div>
-                        <div class="feature-content">
-                            <span class="badge">New</span>
-                            <h3>Quality Profiles</h3>
-                            <p>Preview → Standard → High → Master. One selection replaces 5+ toggles. Outcome-based, not toggle-based.</p>
-                        </div>
-                    </div>
-                    <div class="feature-card highlight-card">
-                        <div class="card-glow"></div>
-                        <div class="feature-icon">
-                            <i class="fas fa-cloud-bolt"></i>
-                        </div>
-                        <div class="feature-content">
-                            <span class="badge">New</span>
-                            <h3>Cloud Acceleration</h3>
-                            <p>Single toggle for GPU offloading. Graceful fallback to local. Your footage stays private.</p>
-                        </div>
-                    </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📱</span>
+                    <h3>SHORTS STUDIO</h3>
+                    <p>Vertical reframing, safe zones, caption styles. TikTok/Reels/Shorts in one click.</p>
+                    <span class="badge new">NEW</span>
                 </div>
-            </section>
+                <div class="feature-card">
+                    <span class="feature-icon">🎚️</span>
+                    <h3>QUALITY PROFILES</h3>
+                    <p>Preview → Standard → High → Master. One selection replaces 5+ toggles.</p>
+                    <span class="badge new">NEW</span>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">☁️</span>
+                    <h3>CLOUD ACCELERATION</h3>
+                    <p>Single toggle for GPU offloading. Graceful fallback to local processing.</p>
+                    <span class="badge new">NEW</span>
+                </div>
+            </div>
+        </section>
 
-            <!-- Core Features Section -->
-            <section id="features" class="features-section">
-                <div class="section-header">
-                    <span class="section-tag">Core Capabilities</span>
-                    <h2>Features</h2>
-                    <p class="section-desc">Everything you need to go from raw footage to polished edit</p>
+        <!-- Quality Profiles -->
+        <section class="voxel-card">
+            <h2>// QUALITY PROFILES</h2>
+            <p class="section-desc">Choose your outcome, not technical settings.</p>
+            <div class="profile-grid">
+                <div class="profile-card">
+                    <span class="profile-icon">🚀</span>
+                    <h4>PREVIEW</h4>
+                    <p class="profile-spec">360p · CRF 28</p>
+                    <ul>
+                        <li>Fast draft</li>
+                        <li>No enhancements</li>
+                        <li>~30 seconds</li>
+                    </ul>
                 </div>
-                <div class="features-grid">
-                    <div class="feature-item">
-                        <div class="feature-icon-small">
-                            <i class="fas fa-music"></i>
-                        </div>
-                        <div>
-                            <h4>Beat Sync</h4>
-                            <p>Cuts automatically aligned to the rhythm. No manual markers needed.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon-small">
-                            <i class="fas fa-wand-magic-sparkles"></i>
-                        </div>
-                        <div>
-                            <h4>AI Enhancement</h4>
-                            <p>Color grading, stabilization, and 4K upscaling. All optional, all reversible.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon-small">
-                            <i class="fas fa-file-export"></i>
-                        </div>
-                        <div>
-                            <h4>Pro Handoff</h4>
-                            <p>Export to DaVinci Resolve, Premiere Pro via OTIO/EDL.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon-small">
-                            <i class="fas fa-closed-captioning"></i>
-                        </div>
-                        <div>
-                            <h4>Auto Captions</h4>
-                            <p>Transcription + burn-in with TikTok, minimal, or karaoke styles.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon-small">
-                            <i class="fas fa-microphone-lines"></i>
-                        </div>
-                        <div>
-                            <h4>Audio Polish</h4>
-                            <p>Voice isolation + noise reduction in one "Clean Audio" toggle.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon-small">
-                            <i class="fas fa-palette"></i>
-                        </div>
-                        <div>
-                            <h4>Style Templates</h4>
-                            <p>Dynamic, Hitchcock, MTV, Documentary, Wes Anderson, and more.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon-small">
-                            <i class="fas fa-shield-halved"></i>
-                        </div>
-                        <div>
-                            <h4>Privacy First</h4>
-                            <p>No tracking, no data collection, no training on your content.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon-small">
-                            <i class="fas fa-bolt"></i>
-                        </div>
-                        <div>
-                            <h4>Preview First</h4>
-                            <p>Fast 360p preview, then one-click final render at full quality.</p>
-                        </div>
-                    </div>
+                <div class="profile-card">
+                    <span class="profile-icon">📺</span>
+                    <h4>STANDARD</h4>
+                    <p class="profile-spec">1080p · CRF 23</p>
+                    <ul>
+                        <li>Production ready</li>
+                        <li>Color grading</li>
+                        <li>~2 minutes</li>
+                    </ul>
                 </div>
-            </section>
+                <div class="profile-card selected">
+                    <span class="profile-icon">✨</span>
+                    <h4>HIGH</h4>
+                    <p class="profile-spec">1080p · CRF 20</p>
+                    <ul>
+                        <li>Professional</li>
+                        <li>+ Stabilization</li>
+                        <li>~5 minutes</li>
+                    </ul>
+                    <span class="badge">RECOMMENDED</span>
+                </div>
+                <div class="profile-card">
+                    <span class="profile-icon">🎬</span>
+                    <h4>MASTER</h4>
+                    <p class="profile-spec">4K · CRF 18</p>
+                    <ul>
+                        <li>Maximum quality</li>
+                        <li>+ AI Upscaling</li>
+                        <li>~15 minutes</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
 
-            <!-- Quality Profiles Section -->
-            <section id="profiles" class="profiles-section">
-                <div class="section-header">
-                    <span class="section-tag">Simplified Workflow</span>
-                    <h2>Quality Profiles</h2>
-                    <p class="section-desc">Choose your outcome, not technical settings</p>
+        <!-- Terminal Demo -->
+        <section class="voxel-card">
+            <h2>// HOW IT WORKS</h2>
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                    <span class="terminal-title">montage-ai</span>
                 </div>
-                <div class="profiles-grid">
-                    <div class="profile-card">
-                        <div class="profile-icon">🚀</div>
-                        <h4>Preview</h4>
-                        <p class="profile-res">360p · CRF 28</p>
-                        <ul class="profile-features">
-                            <li>Fast draft rendering</li>
-                            <li>No enhancements</li>
-                            <li>Instant feedback</li>
-                        </ul>
-                        <span class="profile-time">~30 seconds</span>
-                    </div>
-                    <div class="profile-card">
-                        <div class="profile-icon">📺</div>
-                        <h4>Standard</h4>
-                        <p class="profile-res">1080p · CRF 23</p>
-                        <ul class="profile-features">
-                            <li>Production quality</li>
-                            <li>Color grading</li>
-                            <li>Social-ready</li>
-                        </ul>
-                        <span class="profile-time">~2 minutes</span>
-                    </div>
-                    <div class="profile-card featured">
-                        <div class="featured-badge">Recommended</div>
-                        <div class="profile-icon">✨</div>
-                        <h4>High</h4>
-                        <p class="profile-res">1080p · CRF 20</p>
-                        <ul class="profile-features">
-                            <li>Professional output</li>
-                            <li>+ Stabilization</li>
-                            <li>YouTube/Vimeo ready</li>
-                        </ul>
-                        <span class="profile-time">~5 minutes</span>
-                    </div>
-                    <div class="profile-card">
-                        <div class="profile-icon">🎬</div>
-                        <h4>Master</h4>
-                        <p class="profile-res">4K · CRF 18</p>
-                        <ul class="profile-features">
-                            <li>Maximum quality</li>
-                            <li>+ AI Upscaling</li>
-                            <li>Archive grade</li>
-                        </ul>
-                        <span class="profile-time">~15 minutes</span>
-                    </div>
+                <div class="terminal-body">
+                    <p><span class="prompt">$</span> cp ./vacation/*.mp4 data/input/</p>
+                    <p><span class="prompt">$</span> cp ./music.mp3 data/music/</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh run hitchcock --quality high</p>
+                    <p class="output">[INFO] 🎵 Analyzing audio beat structure...</p>
+                    <p class="output">[INFO] 🎬 Detecting scenes and stability...</p>
+                    <p class="output">[INFO] 🤖 Creative Director: "Building tension for dramatic reveal"</p>
+                    <p class="output">[INFO] ✨ Rendering montage.mp4...</p>
+                    <p class="output success">[DONE] ✅ Complete! (2m 14s) → montage.mp4, montage.otio</p>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- How it Works Section -->
-            <section id="how-it-works" class="terminal-section">
-                <div class="section-header">
-                    <span class="section-tag">Quick Start</span>
-                    <h2>How it Works</h2>
-                    <p class="section-desc">Three commands from raw footage to polished edit</p>
-                </div>
-                <div class="terminal-window">
-                    <div class="terminal-header">
-                        <div class="terminal-dots">
-                            <span class="dot red"></span>
-                            <span class="dot yellow"></span>
-                            <span class="dot green"></span>
-                        </div>
-                        <span class="terminal-title">montage-ai</span>
-                    </div>
-                    <div class="terminal-body">
-                        <div class="terminal-line">
-                            <span class="prompt">$</span>
-                            <span class="command">cp ./vacation/*.mp4 data/input/</span>
-                            <span class="comment"># add your clips</span>
-                        </div>
-                        <div class="terminal-line">
-                            <span class="prompt">$</span>
-                            <span class="command">cp ./music.mp3 data/music/</span>
-                            <span class="comment"># add your soundtrack</span>
-                        </div>
-                        <div class="terminal-line">
-                            <span class="prompt">$</span>
-                            <span class="command">./montage-ai.sh run hitchcock --quality high</span>
-                        </div>
-                        <div class="terminal-output">
-                            <p><span class="output-icon">🎵</span> Analyzing audio beat structure...</p>
-                            <p><span class="output-icon">🎬</span> Detecting scenes and stability...</p>
-                            <p><span class="output-icon">🤖</span> Creative Director: "Building tension for dramatic reveal"</p>
-                            <p><span class="output-icon">✨</span> Rendering montage.mp4...</p>
-                            <p class="output-success"><span class="output-icon">✅</span> Done! (2m 14s) → montage.mp4, montage.otio, montage.edl</p>
-                        </div>
+        <!-- Core Features -->
+        <section class="voxel-card">
+            <h2>// CORE FEATURES</h2>
+            <div class="features-list">
+                <div class="feature-item">
+                    <span class="feature-bullet">►</span>
+                    <div>
+                        <strong>BEAT SYNC</strong>
+                        <p>Cuts aligned to music rhythm. No manual markers.</p>
                     </div>
                 </div>
-            </section>
+                <div class="feature-item">
+                    <span class="feature-bullet">►</span>
+                    <div>
+                        <strong>PRO HANDOFF</strong>
+                        <p>Export to DaVinci/Premiere via OTIO/EDL.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-bullet">►</span>
+                    <div>
+                        <strong>AUTO CAPTIONS</strong>
+                        <p>Whisper transcription + burn-in styles.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-bullet">►</span>
+                    <div>
+                        <strong>AUDIO POLISH</strong>
+                        <p>Voice isolation + noise reduction.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-bullet">►</span>
+                    <div>
+                        <strong>STYLE TEMPLATES</strong>
+                        <p>Dynamic, Hitchcock, MTV, Documentary, Wes Anderson...</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-bullet">►</span>
+                    <div>
+                        <strong>PRIVACY FIRST</strong>
+                        <p>No tracking. No data collection. Ever.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-            <!-- Target Audience Section -->
-            <section id="audience" class="audience-section">
-                <div class="section-header">
-                    <span class="section-tag">Built For</span>
-                    <h2>Who It's For</h2>
-                </div>
-                <div class="audience-grid">
-                    <div class="audience-card">
-                        <div class="audience-icon">
-                            <i class="fas fa-bullhorn"></i>
-                        </div>
-                        <h4>Creator & Marketing Teams</h4>
-                        <p>Fast turnaround social clips with consistent brand style. TikTok, Reels, Shorts at scale.</p>
-                        <ul class="audience-features">
-                            <li>Shorts Studio</li>
-                            <li>Auto Captions</li>
-                            <li>Brand Templates</li>
-                        </ul>
-                    </div>
-                    <div class="audience-card">
-                        <div class="audience-icon">
-                            <i class="fas fa-film"></i>
-                        </div>
-                        <h4>Professional Editors</h4>
-                        <p>AI rough cut → OTIO export → finish in your NLE. Skip the tedious assembly.</p>
-                        <ul class="audience-features">
-                            <li>OTIO/EDL Export</li>
-                            <li>Proxy Workflow</li>
-                            <li>Decision Logs</li>
-                        </ul>
-                    </div>
-                    <div class="audience-card">
-                        <div class="audience-icon">
-                            <i class="fas fa-video"></i>
-                        </div>
-                        <h4>Indie Filmmakers</h4>
-                        <p>Festival trailers, sizzle reels, behind-the-scenes. Professional quality, indie budget.</p>
-                        <ul class="audience-features">
-                            <li>Beat Sync</li>
-                            <li>Style Templates</li>
-                            <li>4K Upscaling</li>
-                        </ul>
+        <!-- Target Audience -->
+        <section class="voxel-card">
+            <h2>// WHO IT'S FOR</h2>
+            <div class="audience-grid">
+                <div class="audience-card">
+                    <span class="audience-icon">📢</span>
+                    <h4>CREATOR TEAMS</h4>
+                    <p>Fast social clips at scale</p>
+                    <div class="tags">
+                        <span class="tag">Shorts Studio</span>
+                        <span class="tag">Auto Captions</span>
                     </div>
                 </div>
-            </section>
+                <div class="audience-card">
+                    <span class="audience-icon">🎞️</span>
+                    <h4>PRO EDITORS</h4>
+                    <p>AI rough cut → NLE finish</p>
+                    <div class="tags">
+                        <span class="tag">OTIO Export</span>
+                        <span class="tag">Proxies</span>
+                    </div>
+                </div>
+                <div class="audience-card">
+                    <span class="audience-icon">🎥</span>
+                    <h4>INDIE FILMMAKERS</h4>
+                    <p>Festival trailers, sizzle reels</p>
+                    <div class="tags">
+                        <span class="tag">Beat Sync</span>
+                        <span class="tag">4K Upscale</span>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-            <!-- CTA Section -->
-            <section id="cta" class="cta-section">
-                <div class="cta-content">
-                    <h2>Ready to <span class="gradient-text">Polish</span> Some Pixels?</h2>
-                    <p>Source available, free for personal use, commercial license available.</p>
-                    <div class="cta-group">
-                        <a href="https://github.com/mfahsold/montage-ai" class="btn primary">
-                            <i class="fab fa-github"></i>
-                            <span>View on GitHub</span>
-                        </a>
-                        <a href="getting-started.md" class="btn secondary">
-                            <i class="fas fa-book"></i>
-                            <span>Documentation</span>
-                        </a>
-                    </div>
-                </div>
-            </section>
-        </main>
+        <!-- CTA -->
+        <section class="voxel-card cta">
+            <h2>// READY TO POLISH SOME PIXELS?</h2>
+            <p>Source available. Free for personal use. Commercial license available.</p>
+            <div class="cta-actions">
+                <a href="https://github.com/mfahsold/montage-ai" class="voxel-btn primary">VIEW ON GITHUB</a>
+                <a href="features.md" class="voxel-btn">FEATURES</a>
+                <a href="STRATEGY.md" class="voxel-btn">ROADMAP</a>
+            </div>
+        </section>
 
+        <!-- Footer -->
         <footer>
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <span class="logo-icon">🎬</span>
-                    <span>Montage AI</span>
-                </div>
-                <div class="footer-links">
-                    <a href="https://github.com/mfahsold/montage-ai">GitHub</a>
-                    <a href="features.md">Features</a>
-                    <a href="STRATEGY.md">Roadmap</a>
-                    <a href="getting-started.md">Docs</a>
-                    <a href="https://github.com/mfahsold/montage-ai/blob/main/LICENSE">License</a>
-                </div>
+            <div class="footer-links">
+                <a href="https://github.com/mfahsold/montage-ai">GitHub</a>
+                <a href="features.md">Features</a>
+                <a href="getting-started.md">Docs</a>
+                <a href="STRATEGY.md">Roadmap</a>
             </div>
-            <div class="footer-bottom">
-                <p>&copy; 2026 Montage AI Project · <a href="https://github.com/mfahsold/montage-ai/blob/main/LICENSE">PolyForm Noncommercial License</a></p>
-                <p class="footer-tagline">"We polish pixels, we don't generate them."</p>
-            </div>
+            <p class="copyright">© 2026 Montage AI · <a href="https://github.com/mfahsold/montage-ai/blob/main/LICENSE">PolyForm License</a></p>
+            <p class="tagline">// WE POLISH PIXELS, WE DON'T GENERATE THEM</p>
         </footer>
     </div>
-
-    <script>
-        // Mobile menu toggle
-        document.querySelector('.mobile-menu-btn')?.addEventListener('click', () => {
-            document.querySelector('nav').classList.toggle('active');
-        });
-
-        // Smooth scroll for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
-        });
-
-        // Add scroll-based header styling
-        window.addEventListener('scroll', () => {
-            const header = document.querySelector('header');
-            if (window.scrollY > 50) {
-                header.classList.add('scrolled');
-            } else {
-                header.classList.remove('scrolled');
-            }
-        });
-    </script>
 </body>
 </html>
