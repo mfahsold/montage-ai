@@ -301,6 +301,8 @@ See [configuration.md](configuration.md#creative-loop-agentic-refinement) for al
 
 The Web UI exposes a REST API for automation:
 
+### Core Endpoints
+
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/status` | GET | Health check |
@@ -309,9 +311,42 @@ The Web UI exposes a REST API for automation:
 | `/api/jobs` | POST | Create montage job |
 | `/api/jobs/{id}` | GET | Job status |
 | `/api/download/{file}` | GET | Download output |
-| `/api/transcript` | POST | Start transcription |
-| `/api/transcript/{id}` | GET | Get transcript |
-| `/api/transcript/{id}/edit` | POST | Apply text edits |
+
+### Transcript Editor
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/transcript/upload` | POST | Upload video for editing |
+| `/api/transcript/transcribe` | POST | Generate transcript |
+| `/api/transcript/export` | POST | Export edited video/EDL/OTIO |
+
+**Export formats:** `video`, `edl`, `otio`
+
+### Shorts Studio
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/shorts/upload` | POST | Upload video for shorts |
+| `/api/shorts/analyze` | POST | Analyze for smart reframing |
+| `/api/shorts/highlights` | POST | Detect highlight moments |
+| `/api/shorts/render` | POST | Render vertical video |
+| `/api/shorts/create` | POST | Alias for render |
+
+**Highlight types:** Energy, Drop, Speech, Beat
+
+### Audio Polish
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/audio/clean` | POST | One-click voice isolation + noise reduction |
+| `/api/audio/analyze` | POST | Analyze audio quality, get recommendations |
+
+### Quality Profiles
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/quality-profiles` | GET | Get available profiles |
+| `/api/cloud/status` | GET | Check cloud acceleration availability |
 
 **Example: Create a job via API**
 ```bash
@@ -322,6 +357,29 @@ curl -X POST http://localhost:8080/api/jobs \
     "quality_profile": "high",
     "cloud_acceleration": false,
     "export_timeline": true
+  }'
+```
+
+**Example: Clean audio**
+```bash
+curl -X POST http://localhost:8080/api/audio/clean \
+  -H "Content-Type: application/json" \
+  -d '{
+    "audio_path": "/data/output/my_video.mp4",
+    "isolate_voice": true,
+    "reduce_noise": true
+  }'
+```
+
+**Example: Detect highlights**
+```bash
+curl -X POST http://localhost:8080/api/shorts/highlights \
+  -H "Content-Type: application/json" \
+  -d '{
+    "video_path": "/data/output/my_video.mp4",
+    "max_clips": 5,
+    "min_duration": 5,
+    "include_speech": true
   }'
 ```
 

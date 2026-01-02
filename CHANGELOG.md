@@ -9,22 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### 🆕 Transcript Editor (Descript-style)
+#### 🆕 Transcript Editor (Descript-style) - FULLY WIRED
 - **Text-based editing**: Delete words to cut video, rearrange paragraphs to reorder scenes
 - **Word-level sync**: Click any word to seek video
 - **Filler word detection**: Highlights "um", "uh", "like" for easy removal
 - **Silence removal**: Adjustable threshold for automatic gap removal
-- **Export formats**: SRT, VTT subtitle export
+- **Export formats**: Video (with smooth audio crossfades), EDL, OTIO
+- **Backend integration**: `TextEditor` class now properly wired to `/api/transcript/export`
+- **Stats tracking**: Real-time removed word count and time saved
 - **Web UI**: New `/transcript` route with dedicated editor interface
-- **API endpoints**: `/api/transcript`, `/api/transcript/{id}`, `/api/transcript/{id}/edit`
 
-#### 📱 Shorts Studio
+#### 📱 Shorts Studio - CAPTION BURN-IN COMPLETE
 - **Phone-frame preview**: Live 9:16 aspect ratio preview with safe zones
 - **Reframe modes**: Auto (AI tracking), Speaker (face detection), Center, Custom
-- **Caption styles**: TikTok, Minimal, Bold, Karaoke with live preview
-- **Highlight detection**: AI identifies best moments for clip extraction
-- **Batch export**: Extract multiple highlights in one operation
+- **Caption styles**: TikTok, Minimal, Bold, Gradient with live preview
+- **Caption burn-in**: Full integration with `CaptionBurner` for hardcoded subtitles
+- **File upload**: New `/api/shorts/upload` endpoint for video uploads
 - **Web UI**: New `/shorts` route with dedicated studio interface
+
+#### ⚡ Highlight Detection MVP - MULTI-SIGNAL
+- **Energy peaks**: Detects high-energy audio regions (drops, loud moments)
+- **Beat drops**: Identifies sudden energy increases aligned with beats
+- **Speech hooks**: Finds punchy speech delivery in first 30 seconds
+- **Fallback beats**: Evenly distributed beat-aligned moments
+- **Scoring**: Normalized 0-1 scores with type labels (🔥 Energy, 💥 Drop, 🎤 Hook, 🎵 Beat)
+
+#### 🔊 Audio Polish ("Clean Audio")
+- **One-click audio cleanup**: `/api/audio/clean` bundles voice isolation + noise reduction
+- **CGPU voice isolation**: Uses demucs for stem separation when cloud available
+- **FFmpeg fallback**: Adaptive FFT denoiser, highpass/lowpass, light compression
+- **Audio analysis**: `/api/audio/analyze` returns SNR estimate and recommendations
+- **SNR improvement**: ~6dB with voice isolation, ~3dB with noise reduction alone
 
 #### 🎚️ Quality Profiles
 - **Outcome-based selection**: Preview → Standard → High → Master
@@ -34,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Standard: 1080p, color grading (default)
   - High: 1080p + stabilization + enhancement
   - Master: 4K + all enhancements + AI upscaling
-- **Web UI**: New `/v2` route with profile cards
+- **Web UI**: Profile cards in `/v2` route
 
 #### ☁️ Cloud Acceleration
 - **Single toggle**: Consolidates CGPU, cloud transcription, LLM features
@@ -45,13 +60,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Strategic docs**: `docs/STRATEGY.md` with product vision and market analysis
 - **Roadmap**: `docs/roadmap/ROADMAP_2026.md` with 12-month development plan
 - **Backlog**: `docs/BACKLOG.md` with prioritized Epics and User Stories
+- **GitHub Pages**: Poly-Chrome design matching webapp aesthetic
 - **OSS compliance**: `THIRD_PARTY_LICENSES.md` with all dependency licenses
-- **Attribution**: `NOTICE` file for distribution compliance
 
 ### Changed
 - **README.md**: Complete refresh with new positioning, feature highlights, Quality Profiles documentation
 - **docs/features.md**: Added sections for all new features, API reference
 - **CONTRIBUTING.md**: Updated with OSS license compliance requirements
+
+### Fixed
+- **Transcript export**: `TextEditor` now properly initialized with video path
+- **Shorts API**: Frontend calls `/api/shorts/create` now correctly routed
+- **Highlights format**: Response includes `time` and `type` fields for frontend compatibility
 
 ---
 
