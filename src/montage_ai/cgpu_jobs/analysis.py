@@ -328,6 +328,7 @@ def extract_audio(video_path, wav_path):
         "-vn", "-ac", "1", "-ar", "22050",
         wav_path
     ]
+    # Use subprocess.run directly in remote script (no cmd_runner available there)
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
 def analyze_visual(video_path):

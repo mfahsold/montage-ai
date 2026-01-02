@@ -20,7 +20,7 @@ echo ""
 echo "TEST 2: Module Import Verification"
 echo "-----------------------------------"
 python3 -c "from montage_ai.clip_selector import IntelligentClipSelector, ClipCandidate; print('✅ Intelligent Clip Selector imports OK')" || echo "❌ Import failed"
-python3 -c "from montage_ai.editor import _check_vidstab_available, color_match_clips, _analyze_clip_brightness; print('✅ Enhancement functions import OK')" || echo "❌ Import failed"
+python3 -c "from montage_ai.editor import _check_vidstab_available, color_match_clips; from montage_ai.clip_enhancement import ClipEnhancer; print('✅ Enhancement functions import OK')" || echo "❌ Import failed"
 python3 -c "from montage_ai.ffmpeg_tools import _color_grade; print('✅ Color grading functions import OK')" || echo "❌ Import failed"
 
 # Test 3: vidstab availability

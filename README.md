@@ -98,8 +98,10 @@ Everything else lives in [`docs/`](docs/):
 | Doc                                        | What's inside               |
 | ------------------------------------------ | --------------------------- |
 | [Getting Started](docs/getting-started.md) | All the ways to run it      |
+| [Deployment Guide](docs/deployment_scenarios.md) | Installation types & Use Cases |
 | [Configuration](docs/configuration.md)     | Every setting explained     |
 | [Features](docs/features.md)               | Deep dive on capabilities   |
+| [Responsible AI](docs/responsible_ai.md)   | Transparency & OSS-first policy |
 | [Architecture](docs/architecture.md)       | How it works under the hood |
 | [Contributing](CONTRIBUTING.md)            | Want to help? Start here    |
 

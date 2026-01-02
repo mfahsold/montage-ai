@@ -11,6 +11,7 @@ Welcome to Montage AI documentation.
 | [Getting Started](getting-started.md) | Installation, first montage, Web UI & CLI |
 | [Configuration](configuration.md) | All environment variables explained |
 | [Features](features.md) | Styles, Creative Loop, enhancements, timeline export |
+| [Responsible AI](responsible_ai.md) | Transparency, data handling, OSS-first policy |
 | [Troubleshooting](troubleshooting.md) | Common issues and fixes |
 
 ---

@@ -251,9 +251,10 @@ CRITICAL: Respond with JSON only, no markdown, no explanations."""
         action = meta.get('action', 'medium')
         shot = meta.get('shot', 'medium')
         energy = meta.get('energy', 0.5)
+        face_count = meta.get('face_count', 0)
 
         return (f"{shot.capitalize()} shot, {action} action, "
-                f"energy={energy:.2f}, duration={candidate.duration:.1f}s "
+                f"energy={energy:.2f}, faces={face_count}, duration={candidate.duration:.1f}s "
                 f"(heuristic_score={candidate.heuristic_score})")
 
     def _parse_llm_ranking(

@@ -142,6 +142,9 @@ class FeatureConfig:
     story_engine: bool = field(default_factory=lambda: os.environ.get("ENABLE_STORY_ENGINE", "false").lower() == "true")
     strict_cloud_compute: bool = field(default_factory=lambda: os.environ.get("STRICT_CLOUD_COMPUTE", "false").lower() == "true")
 
+    # Shorts Workflow (Vertical Video + Smart Reframing)
+    shorts_mode: bool = field(default_factory=lambda: os.environ.get("SHORTS_MODE", "false").lower() == "true")
+
     # 2025 P0/P1: Burn-in captions and voice isolation
     captions: bool = field(default_factory=lambda: os.environ.get("CAPTIONS", "false").lower() == "true")
     captions_style: str = field(default_factory=lambda: os.environ.get("CAPTIONS_STYLE", "youtube"))

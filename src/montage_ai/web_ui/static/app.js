@@ -16,6 +16,7 @@ const TOGGLE_CONFIG = [
     { id: 'stabilize', label: 'Stabilize', desc: 'Reduce camera shake.', default: false, badges: [{ type: 'quality', text: 'Quality+' }, { type: 'cost', text: 'Slower' }] },
     { id: 'upscale', label: 'Upscale', desc: 'AI 4x upscaling.', default: false, badges: [{ type: 'quality', text: 'Quality++' }, { type: 'cost', text: 'GPU Heavy' }] },
     { id: 'cgpu', label: 'Cloud GPU', desc: 'Offload to cloud.', default: false, badges: [{ type: 'info', text: 'Remote' }] },
+    { id: 'shorts_mode', label: 'Shorts Mode', desc: '9:16 Vertical + Smart Crop.', default: false, badges: [{ type: 'info', text: 'TikTok/Reels' }, { type: 'quality', text: 'AI Reframing' }] },
     { id: 'llm_clip_selection', label: 'LLM Clip Selection', desc: 'Semantic scene analysis.', default: false, badges: [{ type: 'quality', text: 'Smart Cuts' }] },
     { id: 'creative_loop', label: 'Creative Loop', desc: 'LLM refines cuts iteratively.', default: false, badges: [{ type: 'quality', text: 'Agentic' }, { type: 'cost', text: '2-3x Time' }] },
     { id: 'story_engine', label: 'Story Engine', desc: 'Narrative tension-based editing.', default: false, badges: [{ type: 'quality', text: 'Cinematic' }] },
@@ -109,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderStoryArcSelector();
         renderQualitySelector();
     });
+    fetchTransparency();
 
     // Attach listeners to static inputs
     ['style', 'targetDuration', 'prompt', 'storyArc', 'qualityProfile'].forEach(id => {
@@ -443,6 +445,7 @@ async function createJob(isPreview = false) {
     const jobData = buildJobPayload();
     if (isPreview) {
         jobData.preset = 'fast';
+        jobData.quality_profile = 'preview';
     }
 
     try {
@@ -697,10 +700,15 @@ function updateGalleryUI(jobs) {
             </div>
             <div class="gallery-info">
                 <div class="gallery-style">${job.style.toUpperCase()}</div>
-                ${job.output_file ? 
-                    `<a href="${API_BASE}/download/${job.output_file}" class="voxel-btn primary small">Download MP4</a>` : 
-                    `<span class="status-text">${job.status}</span>`
-                }
+                <div class="gallery-actions" style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                    ${job.output_file ? 
+                        `<a href="${API_BASE}/download/${job.output_file}" class="voxel-btn primary small">Download</a>` : 
+                        `<span class="status-text">${job.status}</span>`
+                    }
+                    ${job.status === 'completed' || job.status === 'failed' ? 
+                        `<button onclick="showDecisions('${job.id}')" class="voxel-btn small secondary" title="View AI Decisions">Log</button>` : ''
+                    }
+                </div>
             </div>
         </div>
     `).join('');
@@ -739,6 +747,92 @@ function getDefaultValue(id) {
     }
     const cfg = TOGGLE_CONFIG.find(t => t.id === id);
     return cfg ? cfg.default : false;
+}
+
+function formatBackendStatus(value) {
+    if (value === true) return 'enabled';
+    if (value === false) return 'disabled';
+    return 'unknown';
+}
+
+function renderTransparencyCard(data) {
+    const container = document.getElementById('transparencyContent');
+    if (!container) return;
+
+    const policy = data.policy || {};
+    const explainability = data.explainability || {};
+    const llm = data.llm_backends || {};
+    const ossStack = data.oss_stack || [];
+    const scope = data.scope || [];
+    const outOfScope = data.out_of_scope || [];
+
+    const ossList = ossStack.length
+        ? ossStack.map(item => `<li>${item.name} — ${item.purpose}</li>`).join('')
+        : '<li>OSS stack details unavailable.</li>';
+
+    const scopeList = scope.length
+        ? scope.map(item => `<li>${item}</li>`).join('')
+        : '<li>Scope details unavailable.</li>';
+
+    const outOfScopeList = outOfScope.length
+        ? outOfScope.map(item => `<li>${item}</li>`).join('')
+        : '<li>Out-of-scope details unavailable.</li>';
+
+    container.innerHTML = `
+        <div class="transparency-block">
+            <h3>DATA & CONTROL</h3>
+            <ul class="transparency-list">
+                <li><strong>Data:</strong> ${policy.data_handling || 'Local by default.'}</li>
+                <li><strong>Training:</strong> ${policy.training || 'No training on user footage.'}</li>
+                <li><strong>Control:</strong> ${policy.control || 'User-configurable pipeline.'}</li>
+            </ul>
+        </div>
+        <div class="transparency-block">
+            <h3>EXPLAINABILITY</h3>
+            <ul class="transparency-list">
+                <li>${explainability.decision_logs || 'Decision logs available when enabled.'}</li>
+            </ul>
+        </div>
+        <div class="transparency-block">
+            <h3>MODEL BACKENDS</h3>
+            <ul class="transparency-list">
+                <li>OpenAI-compatible: ${formatBackendStatus(llm.openai_compatible)}</li>
+                <li>Google AI: ${formatBackendStatus(llm.google_ai)}</li>
+                <li>cgpu proxy: ${formatBackendStatus(llm.cgpu)}</li>
+                <li>Ollama (local): ${formatBackendStatus(llm.ollama)}</li>
+            </ul>
+        </div>
+        <div class="transparency-block">
+            <h3>OSS STACK</h3>
+            <ul class="transparency-list">
+                ${ossList}
+            </ul>
+        </div>
+        <div class="transparency-block">
+            <h3>SCOPE</h3>
+            <ul class="transparency-list">
+                ${scopeList}
+            </ul>
+        </div>
+        <div class="transparency-block">
+            <h3>OUT OF SCOPE</h3>
+            <ul class="transparency-list">
+                ${outOfScopeList}
+            </ul>
+        </div>
+    `;
+}
+
+async function fetchTransparency() {
+    try {
+        const data = await apiCall('transparency');
+        renderTransparencyCard(data);
+    } catch (error) {
+        const container = document.getElementById('transparencyContent');
+        if (container) {
+            container.innerHTML = '<div class="helper">Transparency data unavailable.</div>';
+        }
+    }
 }
 
 function showToast(message, type = 'info') {
@@ -836,4 +930,94 @@ function clearPreset() {
     } catch (e) {
         // Ignore
     }
+}
+
+// =============================================================================
+// Transparency / Decisions Modal
+// =============================================================================
+
+async function showDecisions(jobId) {
+    const modal = document.getElementById('decisionsModal');
+    const content = document.getElementById('decisionsContent');
+    
+    if (!modal || !content) return;
+    
+    content.innerHTML = '<div class="helper">Loading decisions...</div>';
+    modal.style.display = 'flex';
+    
+    try {
+        const data = await apiCall(`jobs/${jobId}/decisions`);
+        
+        if (data.available === false) {
+            content.innerHTML = `
+                <div class="transparency-block">
+                    <h3>⚠️ No Decisions Log</h3>
+                    <p>${data.message || 'Director\'s log is not available for this job.'}</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        
+        // Director's Commentary
+        if (data.director_commentary) {
+            html += `
+                <div class="transparency-block">
+                    <h3>🗣️ Director's Note</h3>
+                    <p>${data.director_commentary}</p>
+                </div>
+            `;
+        }
+        
+        // Style Details
+        if (data.style) {
+            html += `
+                <div class="transparency-block">
+                    <h3>🎨 Style: ${data.style.name.toUpperCase()}</h3>
+                    <ul class="transparency-list">
+                        <li><strong>Mood:</strong> ${data.style.mood}</li>
+                        ${data.style.description ? `<li><strong>Description:</strong> ${data.style.description}</li>` : ''}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        // Pacing
+        if (data.pacing) {
+            html += `
+                <div class="transparency-block">
+                    <h3>⏱️ Pacing</h3>
+                    <ul class="transparency-list">
+                        <li><strong>Speed:</strong> ${data.pacing.speed}</li>
+                        <li><strong>Variation:</strong> ${data.pacing.variation}</li>
+                        <li><strong>Intro:</strong> ${data.pacing.intro_duration_beats} beats</li>
+                    </ul>
+                </div>
+            `;
+        }
+        
+        // Raw JSON toggle
+        html += `
+            <div style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                <button onclick="document.getElementById('rawJson').style.display = 'block'" class="voxel-btn small secondary">Show Raw JSON</button>
+                <pre id="rawJson" style="display: none;">${JSON.stringify(data, null, 2)}</pre>
+            </div>
+        `;
+        
+        content.innerHTML = html;
+        
+    } catch (e) {
+        content.innerHTML = `
+            <div class="system-banner warning">
+                <span class="icon">⚠️</span>
+                <span>No decision logs found for this job. (Was Creative Director enabled?)</span>
+            </div>
+        `;
+    }
+}
+
+function closeDecisions() {
+    const modal = document.getElementById('decisionsModal');
+    if (modal) modal.style.display = 'none';
 }

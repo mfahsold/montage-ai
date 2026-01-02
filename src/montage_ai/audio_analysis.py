@@ -259,6 +259,8 @@ def detect_music_sections(profile: EnergyProfile, min_section_duration: float = 
 def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
     """Run audio analysis on Cloud GPU if enabled."""
     if not (CGPU_AVAILABLE and _settings.llm.cgpu_enabled and is_cgpu_available()):
+        if _settings.features.strict_cloud_compute:
+            raise RuntimeError("Strict cloud compute enabled: cgpu audio analysis not available or disabled.")
         return None
 
     analysis_path = Path(audio_path).with_suffix('.analysis.json')
@@ -282,8 +284,12 @@ def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
             logger.info("Cloud analysis complete.")
             return data
         else:
+            if _settings.features.strict_cloud_compute:
+                raise RuntimeError(f"Strict cloud compute enabled: Cloud audio analysis failed: {result.error}")
             logger.warning(f"Cloud analysis failed: {result.error}. Falling back to local.")
     except Exception as e:
+        if _settings.features.strict_cloud_compute:
+            raise RuntimeError(f"Strict cloud compute enabled: Cloud audio analysis error: {e}")
         logger.warning(f"Cloud analysis error: {e}. Falling back to local.")
 
     return None

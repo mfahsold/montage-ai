@@ -74,6 +74,7 @@ Available cinematic styles:
 
 You MUST respond with ONLY valid JSON matching this structure:
 {{
+  "director_commentary": "Brief explanation of creative choices (max 2 sentences)",
   "style": {{
     "name": {style_name_options},
     "mood": "suspenseful" | "playful" | "energetic" | "calm" | "dramatic" | "mysterious",
@@ -125,6 +126,7 @@ Examples:
 User: "Edit this like a Hitchcock thriller"
 Response:
 {{
+  "director_commentary": "Chosen a suspenseful Hitchcock style with slow pacing and high tension to match the thriller request.",
   "style": {{"name": "hitchcock", "mood": "suspenseful"}},
   "story_arc": {{"type": "hero_journey", "tension_target": 0.85, "climax_position": 0.8}},
   "pacing": {{"speed": "dynamic", "variation": "high", "intro_duration_beats": 16, "climax_intensity": 0.9}},
@@ -136,6 +138,7 @@ Response:
 User: "Make it calm and meditative with long shots"
 Response:
 {{
+  "director_commentary": "Opted for a minimalist style with very slow pacing and long crossfades to create a meditative atmosphere.",
   "style": {{"name": "minimalist", "mood": "calm"}},
   "story_arc": {{"type": "constant", "tension_target": 0.3, "climax_position": 0.7}},
   "pacing": {{"speed": "very_slow", "variation": "minimal", "intro_duration_beats": 32, "climax_intensity": 0.3}},
@@ -148,6 +151,7 @@ Response:
 User: "Fast-paced music video style"
 Response:
 {{
+  "director_commentary": "Selected high-energy MTV style with rapid cuts and vibrant colors to match the fast-paced request.",
   "style": {{"name": "mtv", "mood": "energetic"}},
   "story_arc": {{"type": "linear_build", "tension_target": 0.95, "climax_position": 0.85}},
   "pacing": {{"speed": "very_fast", "variation": "high", "intro_duration_beats": 2, "climax_intensity": 1.0}},
@@ -158,10 +162,10 @@ Response:
 }}
 
 CRITICAL RULES:
-1. Return ONLY valid JSON - no markdown, no explanations
+1. Return ONLY valid JSON - no markdown, no explanations outside JSON
 2. Use predefined styles when possible (hitchcock, mtv, etc.)
 3. For unknown requests, use "custom" style and describe intent
-4. Always include "style" and "pacing" (required fields)
+4. Always include "director_commentary", "style" and "pacing" (required fields)
 5. Be conservative with effects (stabilization/upscale are slow!)
 6. Match the user's creative intent while staying technically feasible
 7. Always include story_arc, transitions, effects, energy_mapping, cinematography, and constraints (use defaults if unsure)

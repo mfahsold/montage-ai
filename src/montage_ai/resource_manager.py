@@ -365,7 +365,11 @@ class ResourceManager:
 
         status = self.status
 
-        if prefer_gpu and status.local_gpu_available:
+        # Respect FFMPEG_HWACCEL env var if explicitly set to "none"
+        env_hwaccel = os.environ.get("FFMPEG_HWACCEL", "").lower()
+        if env_hwaccel in ("none", "cpu"):
+            hwaccel = "none"
+        elif prefer_gpu and status.local_gpu_available:
             hwaccel = status.local_gpu_type
         elif prefer_gpu:
             hwaccel = "auto"  # Will auto-detect

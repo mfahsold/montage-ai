@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **AI Transparency**: Added "Director's Log" to Web UI, exposing the AI's creative reasoning (pacing, mood, scene selection) for each job.
+- **Shorts Workflow (Phase 1)**
+  - **Smart Reframing**: Added `SmartReframer` with segmented cropping logic to stabilize 9:16 crops from horizontal footage.
+  - **Web UI**: Added "Shorts Mode" toggle to the Web UI.
+  - **Preview**: Added "Real 360p Preview" profile (360x640 for Shorts, 640x360 for standard) for fast iteration.
 - **Storytelling Engine (Phase 1)**
   - **Scaffolding**: Added `src/montage_ai/storytelling/` with `StoryArc`, `TensionProvider`, and `StorySolver`.
   - **Feature Flags**: Added `ENABLE_STORY_ENGINE` and `STRICT_CLOUD_COMPUTE` to toggle the new engine and enforce remote analysis.

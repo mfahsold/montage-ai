@@ -890,13 +890,21 @@ if __name__ == "__main__":
         print("  python -m montage_ai.text_editor video.mp4 whisper.json --remove-fillers")
         print("  python -m montage_ai.text_editor video.mp4 whisper.json --interactive")
 
-    if len(sys.argv) < 3 or sys.argv[1] in ["-h", "--help"]:
+    if len(sys.argv) < 2 or sys.argv[1] in ["-h", "--help"]:
         print_usage()
         sys.exit(0)
 
     video = sys.argv[1]
-    transcript = sys.argv[2]
-    args = sys.argv[3:]
+    transcript = None
+    args = []
+
+    # Check if second arg is transcript (file) or option
+    if len(sys.argv) > 2:
+        if not sys.argv[2].startswith("--") and (sys.argv[2].endswith(".json") or sys.argv[2].endswith(".srt")):
+            transcript = sys.argv[2]
+            args = sys.argv[3:]
+        else:
+            args = sys.argv[2:]
 
     # Parse options
     remove_fillers = "--remove-fillers" in args
@@ -908,7 +916,7 @@ if __name__ == "__main__":
         if arg == "--export-edl" and i + 1 < len(args):
             edl_export = args[i + 1]
 
-    # Find output path (first non-flag argument after transcript)
+    # Find output path (first non-flag argument)
     output = None
     for arg in args:
         if not arg.startswith("--") and arg != edl_export:
@@ -916,6 +924,24 @@ if __name__ == "__main__":
             break
 
     try:
+        # Auto-generate transcript if missing
+        if transcript is None:
+            print("   No transcript provided. Attempting to generate via cgpu...")
+            try:
+                from .transcriber import transcribe_audio
+                # Use json format for word-level timestamps (needed for editing)
+                transcript = transcribe_audio(video, output_format="json")
+                if not transcript:
+                    print("   ❌ Failed to generate transcript (is cgpu running?).")
+                    sys.exit(1)
+                print(f"   ✅ Generated transcript: {transcript}")
+            except ImportError:
+                print("   ❌ Transcriber module not found.")
+                sys.exit(1)
+            except Exception as e:
+                print(f"   ❌ Transcription error: {e}")
+                sys.exit(1)
+
         if interactive:
             result = edit_transcript_interactive(video, transcript, output)
             print(f"\n Edited video: {result}")

@@ -48,6 +48,7 @@ def map_options_to_env(
     env["UPSCALE"] = bool_to_env(options.get("upscale"))
     env["ENHANCE"] = bool_to_env(options.get("enhance"))
     env["LLM_CLIP_SELECTION"] = bool_to_env(options.get("llm_clip_selection"))
+    env["SHORTS_MODE"] = bool_to_env(options.get("shorts_mode"))
     env["EXPORT_TIMELINE"] = bool_to_env(options.get("export_timeline"))
     env["GENERATE_PROXIES"] = bool_to_env(options.get("generate_proxies"))
     env["PRESERVE_ASPECT"] = bool_to_env(options.get("preserve_aspect"))
@@ -78,10 +79,18 @@ def map_options_to_env(
     music_end = options.get("music_end")
     env["MUSIC_END"] = str(music_end) if music_end is not None else ""
     
+    # Export Resolution
+    if "export_width" in options:
+        env["EXPORT_WIDTH"] = str(options["export_width"])
+    if "export_height" in options:
+        env["EXPORT_HEIGHT"] = str(options["export_height"])
+
     # Performance / Preview
     if options.get("preview"):
         env["FFMPEG_PRESET"] = "ultrafast"
         env["FINAL_CRF"] = "28"
+        # Force quality profile to preview to trigger resolution/effect overrides
+        env["QUALITY_PROFILE"] = "preview"
     
     # System
     env["VERBOSE"] = "true"

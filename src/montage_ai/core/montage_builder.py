@@ -25,6 +25,7 @@ import numpy as np
 from ..config import get_settings, Settings
 from ..logger import logger
 from ..resource_manager import get_resource_manager, ResourceManager
+from ..style_templates import get_style_template
 from ..utils import file_exists_and_valid, coerce_float
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 from ..timeline_exporter import export_timeline_from_montage
@@ -196,6 +197,9 @@ class MontageContext:
     enable_xfade: bool = False
     xfade_duration: float = 0.3
 
+    # Style params
+    style_params: Dict[str, Any] = field(default_factory=dict)
+
     # Rendering
     output_filename: Optional[str] = None
     render_duration: float = 0.0
@@ -319,6 +323,32 @@ def process_clip_task(
         err = err_lines[-1] if err_lines else "unknown error"
         raise RuntimeError(f"ffmpeg extract failed: {err}")
     
+    # 1.5 Smart Reframing (Shorts Mode)
+    if settings.features.shorts_mode:
+        try:
+            from ..smart_reframing import SmartReframer
+            # Initialize reframer (target 9:16)
+            reframer = SmartReframer(target_aspect=9/16)
+            
+            # Analyze the extracted subclip
+            crops = reframer.analyze(temp_clip_path)
+            
+            shorts_clip_name = f"shorts_{temp_clip_name}"
+            shorts_clip_path = os.path.join(temp_dir, shorts_clip_name)
+            
+            # Apply dynamic crop
+            reframer.apply(crops, temp_clip_path, shorts_clip_path)
+            
+            # Update path and track temp file
+            if os.path.exists(shorts_clip_path) and os.path.getsize(shorts_clip_path) > 0:
+                temp_clip_path = shorts_clip_path
+                temp_files.append(shorts_clip_path)
+            else:
+                logger.warning("Smart reframing failed, using original crop")
+                
+        except Exception as e:
+            logger.warning(f"Smart reframing error: {e}")
+
     # 2. Enhance
     current_path = temp_clip_path
     stabilize_applied = False
@@ -688,6 +718,8 @@ class MontageBuilder:
                 isolated_audio_path = voice_isolation_future.result(timeout=timeout)
                 logger.info(f"   ✅ Voice isolation completed")
             except Exception as e:
+                if self.settings.features.strict_cloud_compute:
+                    raise RuntimeError(f"Strict cloud compute enabled: Voice isolation async failed: {e}") from e
                 logger.warning(f"   ⚠️ Voice isolation async failed: {e}")
                 isolated_audio_path = None
 
@@ -752,6 +784,15 @@ class MontageBuilder:
         if self.ctx.editing_instructions is not None:
             style_name = self.ctx.editing_instructions.get('style', {}).get('name', 'dynamic')
         
+        # Load style params
+        try:
+            template = get_style_template(style_name)
+            self.ctx.style_params = template.get("params", {})
+            logger.info(f"   🎨 Loaded style '{style_name}' params")
+        except Exception as e:
+            logger.warning(f"   ⚠️ Failed to load style '{style_name}': {e}")
+            self.ctx.style_params = {}
+
         self._setup_output_paths(style_name)
 
         # Run the main assembly loop
@@ -877,6 +918,18 @@ class MontageBuilder:
         env_stabilize = self.settings.features.stabilize
         env_upscale = self.settings.features.upscale
         env_enhance = self.settings.features.enhance
+
+        # Force disable heavy features in Preview Mode
+        if self.settings.encoding.quality_profile == "preview":
+            logger.info("   ⚡ Preview Mode: Disabling stabilization, upscale, and enhancement")
+            env_stabilize = False
+            env_upscale = False
+            env_enhance = False
+            # Also override instructions
+            if 'effects' in self.ctx.editing_instructions:
+                self.ctx.editing_instructions['effects']['stabilization'] = False
+                self.ctx.editing_instructions['effects']['upscale'] = False
+                self.ctx.editing_instructions['effects']['sharpness_boost'] = False
 
         if not env_stabilize and 'stabilization' in effects:
             self.ctx.stabilize = effects['stabilization']
@@ -1139,6 +1192,27 @@ class MontageBuilder:
 
         profile = _determine_profile(self.ctx.video_files)
 
+        # Override for Shorts Mode
+        if self.settings.features.shorts_mode:
+            logger.info("   📱 Shorts Mode enabled: Forcing 9:16 vertical output")
+            # Assuming 1080x1920 for shorts
+            profile.width = 1080
+            profile.height = 1920
+            profile.orientation = "vertical"
+            profile.aspect_ratio = "9:16"
+            profile.reason = "shorts_mode"
+
+        # Override for Preview Mode (Low Res)
+        if self.settings.encoding.quality_profile == "preview":
+            logger.info("   ⚡ Preview Mode enabled: Forcing low resolution (360p)")
+            if profile.orientation == "vertical" or self.settings.features.shorts_mode:
+                profile.width = 360
+                profile.height = 640
+            else:
+                profile.width = 640
+                profile.height = 360
+            profile.reason = "preview_mode"
+
         # determine_output_profile returns an OutputProfile dataclass
         self.ctx.output_profile = OutputProfile(
             width=profile.width,
@@ -1197,6 +1271,8 @@ class MontageBuilder:
         try:
             from ..cgpu_utils import is_cgpu_available
             if not is_cgpu_available():
+                if self.settings.features.strict_cloud_compute:
+                    raise RuntimeError("Strict cloud compute enabled: cgpu voice isolation not available.")
                 logger.warning("   Voice isolation requires cgpu - using original audio")
                 return audio_path
 
@@ -1221,10 +1297,14 @@ class MontageBuilder:
                     logger.info(f"   ✅ Voice isolated: {result.output_path}")
                     return result.output_path
             else:
+                if self.settings.features.strict_cloud_compute:
+                    raise RuntimeError(f"Strict cloud compute enabled: Voice isolation failed: {result.error}")
                 logger.warning(f"   Voice isolation failed: {result.error}")
                 return audio_path
 
         except Exception as e:
+            if self.settings.features.strict_cloud_compute:
+                raise RuntimeError(f"Strict cloud compute enabled: Voice isolation error: {e}")
             logger.warning(f"   Voice isolation error: {e}")
             return audio_path
 
@@ -1380,13 +1460,19 @@ class MontageBuilder:
         )
 
         # Cut patterns for dynamic pacing
-        cut_patterns = [
+        default_patterns = [
             [4, 4, 4, 4],       # Steady pace
             [2, 2, 4, 8],       # Accelerate then hold
             [8, 4, 2, 2],       # Long shot into fast cuts
             [1, 1, 2, 3, 5],    # Fibonacci
             [1.5, 1.5, 5],      # Syncopated
         ]
+        
+        # Load patterns from style if available
+        cut_patterns = default_patterns
+        if self.ctx.style_params and "cut_patterns" in self.ctx.style_params:
+            cut_patterns = self.ctx.style_params["cut_patterns"]
+            logger.info(f"   🎨 Using {len(cut_patterns)} custom cut patterns from style")
 
         # Get audio data
         beat_times = self.ctx.audio_result.beat_times
@@ -1619,6 +1705,51 @@ class MontageBuilder:
 
         return max(cut_duration, 0.5)
 
+    def _apply_style_scoring(self, meta: Dict[str, Any], style_params: Dict[str, Any]) -> float:
+        """
+        Apply data-driven scoring based on style weights.
+        
+        Abstracts the logic so new styles can be defined purely in JSON
+        without code changes.
+        """
+        score = 0.0
+        weights = style_params.get('weights', {})
+        
+        # 1. Numeric Fields (Linear scaling)
+        # Automatically apply weights to any matching numeric field in meta
+        # e.g. "face_count": 2.0 -> +20 points per face
+        # e.g. "visual_quality": 1.5 -> +15 points per quality point (0-1)
+        for key, weight in weights.items():
+            if key == 'action': continue  # Handled specially below
+            
+            val = meta.get(key)
+            if isinstance(val, (int, float)) and val > 0:
+                # Normalize factor: 10 points per unit * weight
+                score += (val * 10.0) * weight
+
+        # 2. Action Level (Categorical -> Scalar)
+        if 'action' in weights:
+            action = meta.get('action', 'medium')
+            weight = weights['action']
+            if action == 'high':
+                score += 15.0 * weight
+            elif action == 'low':
+                score -= 5.0 * weight
+
+        # 3. Preferred Lists (Binary match)
+        # Automatically checks "preferred_X" against "X" in meta
+        # e.g. "preferred_shots" -> checks meta["shot"]
+        for param_key, param_val in style_params.items():
+            if param_key.startswith('preferred_') and isinstance(param_val, list):
+                # Extract field name: preferred_shots -> shot
+                field_name = param_key.replace('preferred_', '').rstrip('s')
+                
+                meta_val = meta.get(field_name)
+                if meta_val and meta_val in param_val:
+                    score += 20.0
+
+        return score
+
     def _select_clip(
         self,
         available_footage,
@@ -1641,6 +1772,13 @@ class MontageBuilder:
         best_score = -1000
         selected_scene = candidates[0]
 
+        # Get scoring rules from style or defaults
+        scoring_rules = self.ctx.style_params.get("scoring_rules", {})
+        fresh_clip_bonus = scoring_rules.get("fresh_clip_bonus", 50)
+        jump_cut_penalty = scoring_rules.get("jump_cut_penalty", 50)
+        shot_variation_bonus = scoring_rules.get("shot_variation_bonus", 10)
+        shot_repetition_penalty = scoring_rules.get("shot_repetition_penalty", 10)
+
         # Determine current music section
         current_section = None
         if self.ctx.audio_result and self.ctx.audio_result.sections:
@@ -1657,9 +1795,9 @@ class MontageBuilder:
             footage_clip = next((c for c in available_footage if c.clip_id == scene_id), None)
             if footage_clip:
                 if footage_clip.usage_count == 0:
-                    score += 50
+                    score += fresh_clip_bonus
                 elif footage_clip.usage_count == 1:
-                    score += 20
+                    score += (fresh_clip_bonus * 0.4)
                 else:
                     score -= footage_clip.usage_count * 10
 
@@ -1678,9 +1816,9 @@ class MontageBuilder:
             # Rule 2: Avoid jump cuts
             if scene['path'] == self.ctx.last_used_path:
                 if unique_videos > 1:
-                    score -= 50
+                    score -= jump_cut_penalty
                 else:
-                    score -= 5
+                    score -= (jump_cut_penalty * 0.1)
 
             # Rule 3: AI Content Matching
             meta = scene.get('meta', {})
@@ -1699,11 +1837,16 @@ class MontageBuilder:
                 elif current_section.energy_level == "low" and action == "low":
                     score += 25
 
+            # Rule 3.6: Style Weights & Preferences (Abstracted)
+            style_params = self.ctx.style_params
+            if style_params:
+                score += self._apply_style_scoring(meta, style_params)
+
             # Rule 4: Shot Variation
             if self.ctx.last_shot_type and shot == self.ctx.last_shot_type:
-                score -= 10
+                score -= shot_repetition_penalty
             else:
-                score += 10
+                score += shot_variation_bonus
 
             # Rule 5: Match cut detection
             if self.ctx.last_clip_end_time is not None and self.ctx.last_used_path is not None:

@@ -99,6 +99,7 @@ class SceneAnalysis:
     - objects: Detected objects in the frame
     - mood: Emotional tone of the scene
     - setting: Location/environment type
+    - face_count: Number of detected faces
     """
     quality: str  # "YES" or "NO"
     description: str  # 5-word summary
@@ -110,6 +111,7 @@ class SceneAnalysis:
     objects: List[str] = field(default_factory=list)  # Detected objects
     mood: str = "neutral"  # calm, energetic, dramatic, playful, tense, peaceful, mysterious
     setting: str = "unknown"  # indoor, outdoor, beach, city, nature, studio, street, home
+    face_count: int = 0  # Number of detected faces
 
     @classmethod
     def default(cls) -> "SceneAnalysis":
@@ -124,6 +126,7 @@ class SceneAnalysis:
             objects=[],
             mood="neutral",
             setting="unknown",
+            face_count=0,
         )
 
     @classmethod
@@ -153,10 +156,11 @@ class SceneAnalysis:
             objects=data.get("objects", []),
             mood=data.get("mood", "neutral"),
             setting=data.get("setting", "unknown"),
+            face_count=data.get("face_count", 0),
         )
 
     def to_dict(self) -> dict:
-        """Convert to dictionary for serialization and backward compatibility."""
+        """Convert to dictionary."""
         return {
             "quality": self.quality,
             "description": self.description,
@@ -167,7 +171,9 @@ class SceneAnalysis:
             "objects": self.objects,
             "mood": self.mood,
             "setting": self.setting,
+            "face_count": self.face_count,
         }
+
 
     @property
     def has_semantic_data(self) -> bool:
@@ -226,9 +232,15 @@ class SceneDetector:
                     logger.info(f"Cloud detection complete: {len(scenes)} scenes found.")
                     return scenes
                 else:
+                    if _settings.features.strict_cloud_compute:
+                        raise RuntimeError(f"Strict cloud compute enabled: Cloud scene detection failed: {result.error}")
                     logger.warning(f"Cloud detection failed: {result.error}. Falling back to local.")
             except Exception as e:
+                if _settings.features.strict_cloud_compute:
+                    raise RuntimeError(f"Strict cloud compute enabled: Cloud scene detection error: {e}")
                 logger.warning(f"Cloud detection error: {e}. Falling back to local.")
+        elif _settings.features.strict_cloud_compute:
+            raise RuntimeError("Strict cloud compute enabled: cgpu scene detection not available or disabled.")
 
         video = open_video(video_path)
         scene_manager = SceneManager()
@@ -317,41 +329,53 @@ class SceneContentAnalyzer:
         Returns:
             SceneAnalysis with quality, description, action, shot, and semantic fields
         """
+        # Always run basic CV face detection (fast, local)
+        face_count = detect_faces(video_path, time_point)
+
         if not self.enable_ai:
-            return SceneAnalysis.default()
+            result = SceneAnalysis.default()
+            result.face_count = face_count
+            return result
 
         try:
             # Extract frame
             frame_b64 = self._extract_frame_base64(video_path, time_point)
             if frame_b64 is None:
-                return SceneAnalysis(
+                result = SceneAnalysis(
                     quality="NO",
                     description="read error",
                     action=ActionLevel.LOW,
-                    shot=ShotType.MEDIUM
+                    shot=ShotType.MEDIUM,
+                    face_count=face_count
                 )
+                return result
 
             # Priority 1: cgpu/Gemini (fast, multimodal, cheap)
             if semantic:
                 result = self._analyze_cgpu(frame_b64)
                 if result:
+                    result.face_count = face_count
                     return result
 
             # Priority 2: OpenAI-compatible API with semantic prompt
             if self.openai_base and self.vision_model:
                 result = self._analyze_openai_semantic(frame_b64) if semantic else self._analyze_openai(frame_b64)
                 if result:
+                    result.face_count = face_count
                     return result
 
             # Priority 3: Ollama fallback
             result = self._analyze_ollama_semantic(frame_b64) if semantic else self._analyze_ollama(frame_b64)
             if result:
+                result.face_count = face_count
                 return result
 
         except Exception as e:
             logger.warning(f"AI Analysis failed: {e}")
 
-        return SceneAnalysis.default()
+        result = SceneAnalysis.default()
+        result.face_count = face_count
+        return result
 
     def _extract_frame_base64(self, video_path: str, time_point: float) -> Optional[str]:
         """Extract a frame and return as base64 JPEG."""
@@ -714,6 +738,47 @@ def get_histogram_cache_stats() -> dict:
 def clear_histogram_cache():
     """Clear the histogram cache (call between montage runs)."""
     _get_frame_histogram_cached.cache_clear()
+
+
+def detect_faces(video_path: str, time_sec: float) -> int:
+    """
+    Detect faces in a video frame using OpenCV Haar Cascades.
+    
+    Args:
+        video_path: Path to video file
+        time_sec: Timestamp to check
+        
+    Returns:
+        Number of faces detected
+    """
+    try:
+        cap = cv2.VideoCapture(video_path)
+        cap.set(cv2.CAP_PROP_POS_MSEC, time_sec * 1000)
+        ret, frame = cap.read()
+        cap.release()
+
+        if not ret:
+            return 0
+
+        # Load Haar Cascade (included with OpenCV)
+        # We use the default frontal face detector
+        face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        face_cascade = cv2.CascadeClassifier(face_cascade_path)
+        
+        if face_cascade.empty():
+            logger.warning("Failed to load Haar Cascade for face detection")
+            return 0
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Detect faces
+        # scaleFactor=1.1, minNeighbors=5 are standard robust settings
+        faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+        
+        return len(faces)
+    except Exception as e:
+        logger.warning(f"Face detection failed: {e}")
+        return 0
 
 
 def calculate_visual_similarity(

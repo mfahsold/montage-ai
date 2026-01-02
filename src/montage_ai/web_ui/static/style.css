@@ -536,6 +536,44 @@ input[type=range]::-webkit-slider-runnable-track {
     border-left: 4px solid var(--primary);
 }
 
+.transparency-card {
+    background: linear-gradient(120deg, rgba(13, 148, 136, 0.06), rgba(2, 132, 199, 0.05));
+}
+
+.transparency-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.transparency-block {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 0.75rem;
+}
+
+.transparency-block h3 {
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    color: var(--fg);
+}
+
+.transparency-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.85rem;
+    color: #555;
+    line-height: 1.4;
+}
+
+.transparency-list li {
+    margin-bottom: 0.35rem;
+}
+
 /* Toast Notifications */
 .toast-container {
     position: fixed;
@@ -860,4 +898,64 @@ input[type=range]::-webkit-slider-runnable-track {
     .toggle-badges {
         margin-top: 0.35rem;
     }
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    position: relative;
+    width: 90%;
+    max-width: 600px;
+    background: var(--card-bg);
+    border: var(--card-border-width) solid var(--border);
+    box-shadow: var(--shadow);
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 2px solid var(--border);
+    background: var(--bg);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.modal-body pre {
+    background: #111;
+    color: #0f0;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin-top: 1rem;
 }

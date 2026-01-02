@@ -54,6 +54,14 @@
             </div>
         </section>
 
+        <section class="voxel-card info-card transparency-card">
+            <h2>// RESPONSIBLE_AI // TRANSPARENCY</h2>
+            <div id="transparencyContent" class="transparency-grid">
+                <div class="helper">Loading transparency details...</div>
+            </div>
+            <div class="helper">Docs: docs/responsible_ai.md</div>
+        </section>
+
         <div class="layout-grid">
             <!-- Panel 1: Media Intake -->
             <section class="voxel-card">
@@ -251,5 +259,19 @@
             document.getElementById('clock').innerText = new Date().toLocaleTimeString();
         }, 1000);
     </script>
+
+    <!-- Decisions Modal -->
+    <div id="decisionsModal" class="modal" style="display: none;">
+        <div class="modal-overlay" onclick="closeDecisions()"></div>
+        <div class="modal-content voxel-card">
+            <div class="modal-header">
+                <h2>// DIRECTOR_LOG</h2>
+                <button onclick="closeDecisions()" class="voxel-btn small">CLOSE</button>
+            </div>
+            <div id="decisionsContent" class="modal-body terminal-window" style="max-height: 60vh; overflow-y: auto;">
+                <!-- Content injected here -->
+            </div>
+        </div>
+    </div>
 </body>
 </html>

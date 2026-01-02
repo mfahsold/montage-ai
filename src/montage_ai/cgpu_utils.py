@@ -158,6 +158,7 @@ def check_cgpu_gpu() -> Tuple[bool, str]:
         (success, gpu_info) tuple
     """
     try:
+        logger.info("Connecting to Cloud GPU (timeout 120s)...")
         with cgpu_slot():
             result = subprocess.run(
                 ["cgpu", "run", "nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
@@ -171,6 +172,9 @@ def check_cgpu_gpu() -> Tuple[bool, str]:
                      if 'Tesla' in l or 'T4' in l or 'A100' in l or 'MiB' in l]
             return True, lines[0] if lines else result.stdout.strip()
         return False, result.stderr
+    except subprocess.TimeoutExpired:
+        logger.warning("Cloud GPU connection timed out after 120s")
+        return False, "Timeout"
     except Exception as e:
         return False, str(e)
 
@@ -261,9 +265,11 @@ def run_cgpu_command(
     import time
 
     last_error = ""
+    start_time = time.time()
 
     for attempt in range(retries + 1):
         try:
+            logger.debug(f"Running cgpu command (attempt {attempt+1}/{retries+1}): {cmd}")
             with cgpu_slot():
                 result = subprocess.run(
                     ["cgpu", "run", cmd],
@@ -271,6 +277,9 @@ def run_cgpu_command(
                     text=True,
                     timeout=timeout  # Timeout per attempt, not total
                 )
+            
+            duration = time.time() - start_time
+            logger.debug(f"cgpu command finished in {duration:.2f}s (exit code: {result.returncode})")
 
             # Check for session invalidation errors
             if "session expired" in result.stderr.lower() or "not authenticated" in result.stderr.lower():
@@ -366,7 +375,8 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
         file_size_mb = os.path.getsize(local_path) / (1024 * 1024)
         remote_dir = os.path.dirname(remote_path)
         if remote_dir:
-            ok, _, stderr = run_cgpu_command(f"mkdir -p {remote_dir}", timeout=30)
+            # Increased timeout for mkdir as cgpu connection setup can take time
+            ok, _, stderr = run_cgpu_command(f"mkdir -p {remote_dir}", timeout=120)
             if not ok:
                 logger.error(f"   ❌ Failed to create remote directory: {stderr}")
                 return False

@@ -67,6 +67,15 @@ Useful endpoints (for automation):
 - `GET /api/jobs/{id}` – job status
 - `GET /api/download/{filename}` – download outputs
 
+## Responsible AI & Transparency
+
+- **Local-first processing** with opt-in cloud GPU/LLM
+- **No training on user footage**
+- **Decision logs** available via `EXPORT_DECISIONS=true`
+- **Transparency payload** at `GET /api/transparency`
+
+See [responsible_ai.md](responsible_ai.md) for the full policy.
+
 ## Timeline Export (OTIO/EDL)
 
 Enable during run:
@@ -112,6 +121,13 @@ CREATIVE_LOOP=true ./montage-ai.sh run hitchcock
 - **Story Arc:** Does the edit follow intro → build → climax → outro?
 
 See [configuration.md](configuration.md#creative-loop-agentic-refinement) for all options.
+
+## Shorts Workflow (Vertical Video)
+
+- **Smart Reframing**: Automatically crops horizontal footage to 9:16 vertical aspect ratio using face detection and segmented tracking.
+- **Segmented Tracking**: Stabilizes camera movement by keeping the crop window static until the subject moves significantly, preventing jitter.
+- **Auto-Captions**: Generates and burns in subtitles (requires `whisper`).
+- **Web UI Integration**: Toggle "Shorts Mode" in the Web UI for easy creation.
 
 ## Troubleshooting
 

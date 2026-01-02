@@ -1,6 +1,7 @@
 # Video Processing
 moviepy>=2.1.1,<2.3  # 2.x uses .subclipped(); 2.2.x requires pillow<12
 opencv-python-headless>=4.10.0
+mediapipe>=0.10.0  # For Smart Reframing (Face Detection)
 soundfile>=0.12.0
 Pillow>=10.0.0,<12.0  # moviepy 2.2.x constraint
 proglog>=0.1.10

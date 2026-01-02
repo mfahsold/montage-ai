@@ -504,10 +504,24 @@ def interpret_creative_prompt():
         if EDITING_INSTRUCTIONS:
             style_name = EDITING_INSTRUCTIONS['style']['name']
             logger.info(f"   ✅ Style Applied: {style_name}")
+            
+            # Save decisions for transparency/Web UI
+            job_id = os.environ.get("JOB_ID", "unknown")
+            if job_id != "unknown":
+                try:
+                    decisions_path = Path(settings.paths.output_dir) / f"decisions_{job_id}.json"
+                    with open(decisions_path, 'w') as f:
+                        json.dump(EDITING_INSTRUCTIONS, f, indent=2)
+                    logger.info(f"   📝 Director's decisions saved to {decisions_path.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to save decisions: {e}")
 
             # Show full style details in verbose mode
             if VERBOSE:
                 logger.info(f"\n📋 STYLE TEMPLATE DETAILS:")
+                if "director_commentary" in EDITING_INSTRUCTIONS:
+                    logger.info(f"   🗣️  Director's Note: {EDITING_INSTRUCTIONS['director_commentary']}")
+                
                 style = EDITING_INSTRUCTIONS.get('style', {})
                 pacing = EDITING_INSTRUCTIONS.get('pacing', {})
                 effects = EDITING_INSTRUCTIONS.get('effects', {})

@@ -26,6 +26,17 @@ User Prompt → Keyword Matching → LLM (if needed) → JSON Instructions → E
 
 ---
 
+## Responsible AI & Privacy
+
+- **Local-first:** Ollama runs on your machine; cloud backends are optional.
+- **No training on user footage or prompts.**
+- **Guardrails:** System prompts enforce scoped JSON output, validated before use.
+- **Transparency:** Decision logs can be exported for audit.
+
+See [responsible_ai.md](responsible_ai.md) for the full policy.
+
+---
+
 ## Keyword Matching (No LLM)
 
 Fast pattern recognition for common styles. Zero latency, no API costs.

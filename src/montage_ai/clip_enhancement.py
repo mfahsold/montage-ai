@@ -359,7 +359,11 @@ class ClipEnhancer:
                 if result:
                     logger.info("Cloud stabilization complete")
                     return result
-                logger.warning("Cloud stabilization failed, falling back to local...")
+                logger.warning("Cloud stabilization failed.")
+                if self.settings.features.strict_cloud_compute:
+                    raise RuntimeError("Cloud stabilization failed and STRICT_CLOUD_COMPUTE is enabled.")
+            elif self.settings.features.strict_cloud_compute:
+                raise RuntimeError("Cloud stabilization unavailable and STRICT_CLOUD_COMPUTE is enabled.")
 
         # Local stabilization
         if _check_vidstab_available():
@@ -407,7 +411,15 @@ class ClipEnhancer:
                 )
                 if result:
                     return result
+
+                if _settings.features.strict_cloud_compute:
+                    raise RuntimeError("Strict cloud compute enabled: cgpu upscaling failed.")
+
                 logger.warning("cgpu upscaling failed, falling back to local methods...")
+            elif _settings.features.strict_cloud_compute:
+                raise RuntimeError("Strict cloud compute enabled: cgpu upscaling not available.")
+        elif _settings.features.strict_cloud_compute:
+            raise RuntimeError("Strict cloud compute enabled: cgpu not enabled.")
 
         # Priority 2: Local Vulkan GPU (Real-ESRGAN)
         real_esrgan_available = self._check_realesrgan_available()

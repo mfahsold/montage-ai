@@ -21,6 +21,8 @@ Usage: ./montage-ai.sh [COMMAND] [OPTIONS]
 
 Commands:
   run [STYLE]     Create montage (default: dynamic)
+  shorts [STYLE]  Create vertical shorts (9:16) with smart reframing
+  text-edit       Text-based editing (remove fillers, edit by transcript)
   web             Start Web UI
   preview         Quick preview (fast preset)
   hq              High quality render
@@ -40,10 +42,13 @@ Styles:
 
 Options:
   --stabilize     Enable video stabilization
+  --shorts        Enable Shorts mode (9:16 vertical + smart reframing)
   --no-enhance    Disable color enhancement
   --variants N    Generate N variants
   --cgpu          Enable cgpu/Gemini for Creative Director
   --cgpu-gpu      Enable cgpu cloud GPU for upscaling
+  --cloud-only    Force ALL heavy lifting to cgpu (fails if cgpu unavailable)
+  --export        Export timeline to OTIO/EDL/XML
   --story-engine  Enable Story Engine (narrative arc optimization)
   --captions [STYLE]  Burn-in captions (styles: tiktok, youtube, minimal, karaoke, bold, cinematic)
   --isolate-voice     Clean audio via voice isolation (requires cgpu)
@@ -71,6 +76,8 @@ list_styles() {
     echo "  documentary  - Natural pacing, observational"
     echo "  minimalist   - Long takes, contemplative"
     echo "  wes_anderson - Symmetrical, whimsical"
+    echo "  vlog         - Personal, face-centric storytelling"
+    echo "  sport        - High-energy action sequences"
 }
 
 run_web() {
@@ -184,14 +191,20 @@ run_montage() {
     local CAPTIONS_STYLE="${9:-youtube}"
     local VOICE_ISOLATION="${10:-false}"
     local STORY_ENGINE="${11:-false}"
+    local STRICT_CLOUD_COMPUTE="${12:-false}"
+    local SHORTS_MODE="${13:-false}"
+    local EXPORT_TIMELINE="${14:-false}"
 
     echo "🎬 Montage AI"
     echo "   Style: $STYLE"
     echo "   Preset: $PRESET"
     echo "   Stabilize: $STABILIZE"
+    echo "   Shorts Mode: $SHORTS_MODE"
+    echo "   Export Timeline: $EXPORT_TIMELINE"
     echo "   cgpu LLM: $CGPU_ENABLED"
     echo "   cgpu GPU: $CGPU_GPU_ENABLED"
     echo "   Story Engine: $STORY_ENGINE"
+    echo "   Strict Cloud: $STRICT_CLOUD_COMPUTE"
     [ "$CAPTIONS" = "true" ] && echo "   Captions: $CAPTIONS_STYLE"
     [ "$VOICE_ISOLATION" = "true" ] && echo "   Voice Isolation: enabled"
     echo ""
@@ -215,41 +228,68 @@ run_montage() {
         -e CGPU_PORT="${CGPU_PORT:-8090}" \
         -e CGPU_MODEL="${CGPU_MODEL:-gemini-2.0-flash-exp}" \
         -e CGPU_GPU_ENABLED="$CGPU_GPU_ENABLED" \
+        -e STRICT_CLOUD_COMPUTE="$STRICT_CLOUD_COMPUTE" \
         -e ENABLE_STORY_ENGINE="$STORY_ENGINE" \
+        -e SHORTS_MODE="$SHORTS_MODE" \
+        -e EXPORT_TIMELINE="$EXPORT_TIMELINE" \
         -e CAPTIONS="$CAPTIONS" \
         -e CAPTIONS_STYLE="$CAPTIONS_STYLE" \
         -e VOICE_ISOLATION="$VOICE_ISOLATION" \
         -e TARGET_DURATION="${TARGET_DURATION:-0}" \
         -e MUSIC_START="${MUSIC_START:-0}" \
         -e MUSIC_END="${MUSIC_END:-0}" \
+        -e QUALITY_PROFILE="${QUALITY_PROFILE:-standard}" \
         montage-ai
 }
 
 # Parse arguments
 STYLE="dynamic"
 PRESET="medium"
+QUALITY_PROFILE="standard"
 STABILIZE="false"
 ENHANCE="true"
 VARIANTS="1"
 CGPU_ENABLED="false"
 CGPU_GPU_ENABLED="false"
+STRICT_CLOUD_COMPUTE="false"
+EXPORT_TIMELINE="false"
 CAPTIONS="false"
 CAPTIONS_STYLE="youtube"
 VOICE_ISOLATION="false"
 STORY_ENGINE="false"
+SHORTS_MODE="false"
 
 case "${1:-run}" in
     run)
         shift
         [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
         ;;
+    shorts)
+        SHORTS_MODE="true"
+        CAPTIONS="true"
+        CAPTIONS_STYLE="tiktok"  # Default to TikTok style for shorts
+        shift
+        [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
+        ;;
+    text-edit)
+        shift
+        echo "📝 Starting Text-Based Editor..."
+        # Override input volume to be writable for transcript generation
+        docker compose run --rm \
+            -v "$(pwd)/data/input:/data/input" \
+            -e PYTHONPATH=/app/src \
+            montage-ai python3 -m montage_ai.text_editor "$@"
+        exit 0
+        ;;
     preview)
         PRESET="fast"
+        QUALITY_PROFILE="preview"
         shift
         [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
         ;;
     hq)
         PRESET="slow"
+        QUALITY_PROFILE="high"
         STABILIZE="true"
         shift
         [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
@@ -297,10 +337,18 @@ esac
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --stabilize) STABILIZE="true"; shift ;;
+        --shorts) SHORTS_MODE="true"; shift ;;
+        --export) EXPORT_TIMELINE="true"; shift ;;
         --no-enhance) ENHANCE="false"; shift ;;
         --variants) VARIANTS="$2"; shift 2 ;;
         --cgpu) CGPU_ENABLED="true"; shift ;;
         --cgpu-gpu) CGPU_GPU_ENABLED="true"; shift ;;
+        --cloud-only)
+            CGPU_ENABLED="true"
+            CGPU_GPU_ENABLED="true"
+            STRICT_CLOUD_COMPUTE="true"
+            shift
+            ;;
         --story-engine) STORY_ENGINE="true"; shift ;;
         --captions)
             CAPTIONS="true"
@@ -314,4 +362,4 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-run_montage "$STYLE" "$PRESET" "$STABILIZE" "$ENHANCE" "$VARIANTS" "$CGPU_ENABLED" "$CGPU_GPU_ENABLED" "$CAPTIONS" "$CAPTIONS_STYLE" "$VOICE_ISOLATION" "$STORY_ENGINE"
+run_montage "$STYLE" "$PRESET" "$STABILIZE" "$ENHANCE" "$VARIANTS" "$CGPU_ENABLED" "$CGPU_GPU_ENABLED" "$CAPTIONS" "$CAPTIONS_STYLE" "$VOICE_ISOLATION" "$STORY_ENGINE" "$STRICT_CLOUD_COMPUTE" "$SHORTS_MODE" "$EXPORT_TIMELINE"

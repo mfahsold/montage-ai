@@ -1,0 +1,31 @@
+{
+    "id": "sport",
+    "name": "Sport",
+    "description": "High-energy action sequences",
+    "params": {
+        "mood": "intense",
+        "pacing": "fast",
+        "min_clip_duration": 0.5,
+        "max_clip_duration": 3.0,
+        "weights": {
+            "face_count": 0.2,
+            "action": 2.5,
+            "energy": 2.0,
+            "visual_quality": 1.0
+        },
+        "scoring_rules": {
+            "jump_cut_penalty": 20,
+            "shot_variation_bonus": 20,
+            "shot_repetition_penalty": 5,
+            "fresh_clip_bonus": 60
+        },
+        "cut_patterns": [
+            [1, 1, 2, 3, 5],
+            [1.5, 1.5, 5],
+            [2, 2, 2, 2]
+        ],
+        "preferred_shots": ["wide", "medium"],
+        "transitions": "cut",
+        "color_grade": "contrast"
+    }
+}

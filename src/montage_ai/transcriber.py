@@ -61,7 +61,14 @@ class Transcriber:
             language=language,
         )
         result = job.execute()
-        return result.output_path if result.success else None
+        
+        if result.success:
+            return result.output_path
+            
+        if self.settings.features.strict_cloud_compute:
+            raise RuntimeError(f"Strict cloud compute enabled: Transcription failed: {result.error}")
+            
+        return None
 
 
 # =============================================================================

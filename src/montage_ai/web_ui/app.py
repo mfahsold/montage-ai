@@ -198,6 +198,9 @@ def normalize_options(data: dict) -> dict:
         "upscale": get_bool('upscale'),
         "enhance": get_bool('enhance'),
         "llm_clip_selection": get_bool('llm_clip_selection'),
+        "shorts_mode": get_bool('shorts_mode'),
+        "export_width": int(opts.get('export_width', data.get('export_width', 0)) or 0),
+        "export_height": int(opts.get('export_height', data.get('export_height', 0)) or 0),
         "creative_loop": get_bool('creative_loop'),
         "story_engine": get_bool('story_engine'),
         "captions": get_bool('captions'),
@@ -447,6 +450,49 @@ def api_status():
     })
 
 
+@app.route('/api/transparency')
+def api_transparency():
+    """Return Responsible AI and transparency metadata for the UI."""
+    settings = get_settings()
+    llm = settings.llm
+
+    return jsonify({
+        "policy": {
+            "data_handling": "Local by default; optional cgpu offload when enabled.",
+            "training": "No model training on user footage.",
+            "control": "Users choose features and can export editable timelines (OTIO/EDL).",
+        },
+        "explainability": {
+            "decision_logs": "Available when EXPORT_DECISIONS=true (see /api/jobs/<id>/decisions).",
+        },
+        "llm_backends": {
+            "openai_compatible": llm.has_openai_backend,
+            "google_ai": llm.has_google_backend,
+            "cgpu": llm.cgpu_enabled,
+            "ollama": True,
+        },
+        "oss_stack": [
+            {"name": "FFmpeg", "purpose": "Encoding/decoding"},
+            {"name": "OpenCV", "purpose": "Visual analysis"},
+            {"name": "librosa", "purpose": "Audio analysis"},
+            {"name": "OpenTimelineIO", "purpose": "NLE export"},
+            {"name": "Whisper", "purpose": "Transcription"},
+            {"name": "Demucs", "purpose": "Voice isolation"},
+            {"name": "Real-ESRGAN", "purpose": "Upscaling"},
+        ],
+        "scope": [
+            "AI-assisted rough cuts from existing footage",
+            "Beat sync and story arc pacing",
+            "Professional NLE handoff via OTIO/EDL/XML",
+        ],
+        "out_of_scope": [
+            "Generative text-to-video",
+            "Full NLE timeline editing",
+            "Social hosting platform",
+        ],
+    })
+
+
 @app.route('/api/files', methods=['GET'])
 def api_list_files():
     """List uploaded files."""
@@ -528,6 +574,20 @@ def api_create_job():
         data['cgpu'] = False
         data['creative_loop'] = False
 
+        # Set 360p resolution for preview
+        if 'options' not in data:
+            data['options'] = {}
+            
+        # Check shorts mode (handle both nested and flat)
+        is_shorts = str(data['options'].get('shorts_mode', data.get('shorts_mode', 'false'))).lower() == 'true'
+        
+        if is_shorts:
+            data['options']['export_width'] = 360
+            data['options']['export_height'] = 640
+        else:
+            data['options']['export_width'] = 640
+            data['options']['export_height'] = 360
+
     # Normalize options (single source of truth for parsing/defaults/derivation)
     normalized_options = normalize_options(data)
 
@@ -586,6 +646,9 @@ def api_get_job(job_id):
     if job.get("status") == "not_found":
         return jsonify({"error": "Job not found"}), 404
     return jsonify(job)
+
+
+
 
 
 
@@ -988,4 +1051,5 @@ def api_cgpu_jobs():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

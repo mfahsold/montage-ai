@@ -1,0 +1,31 @@
+{
+    "id": "vlog",
+    "name": "Vlog",
+    "description": "Personal, face-centric storytelling style",
+    "params": {
+        "mood": "energetic",
+        "pacing": "medium",
+        "min_clip_duration": 2.0,
+        "max_clip_duration": 8.0,
+        "weights": {
+            "face_count": 2.0,
+            "action": 0.5,
+            "energy": 1.0,
+            "visual_quality": 1.5
+        },
+        "scoring_rules": {
+            "jump_cut_penalty": 50,
+            "shot_variation_bonus": 10,
+            "shot_repetition_penalty": 10,
+            "fresh_clip_bonus": 50
+        },
+        "cut_patterns": [
+            [4, 4, 4, 4],
+            [2, 2, 4, 8],
+            [8, 4, 2, 2]
+        ],
+        "preferred_shots": ["medium", "close"],
+        "transitions": "cut",
+        "color_grade": "vibrant"
+    }
+}

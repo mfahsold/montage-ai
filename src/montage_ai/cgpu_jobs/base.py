@@ -203,7 +203,8 @@ class CGPUJob(ABC):
             True if setup succeeded, False otherwise.
         """
         # Create work directory
-        success, _, stderr = run_cgpu_command(f"mkdir -p {self.remote_work_dir}")
+        # Increased timeout for mkdir as cgpu connection setup can take time
+        success, _, stderr = run_cgpu_command(f"mkdir -p {self.remote_work_dir}", timeout=120)
         if not success:
             self._error = f"Failed to create remote directory: {stderr}"
             return False
@@ -226,7 +227,9 @@ class CGPUJob(ABC):
     def cleanup(self) -> None:
         """Remove remote work directory and local temp files."""
         try:
-            run_cgpu_command(f"rm -rf {self.remote_work_dir}", timeout=30)
+            # Increased timeout for cleanup as cgpu can be slow
+            # Using 120s to be safe, as cleanup is not critical for speed
+            run_cgpu_command(f"rm -rf {self.remote_work_dir}", timeout=120)
         except Exception:
             pass  # Best effort cleanup
 

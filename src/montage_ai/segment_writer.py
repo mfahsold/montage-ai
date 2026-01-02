@@ -25,6 +25,7 @@ from pathlib import Path
 
 from .config import get_settings
 from .logger import logger
+from .core.cmd_runner import run_command, CommandError
 # Import centralized FFmpeg config (DRY)
 from .ffmpeg_config import (
     FFmpegConfig,
@@ -157,11 +158,13 @@ def ffprobe_stream_params(video_path: str) -> Optional[StreamParams]:
             "-of", "json",
             video_path
         ]
-        result = subprocess.run(
+        # Use run_command for consistent logging and error handling
+        result = run_command(
             cmd,
             capture_output=True,
-            text=True,
             timeout=_settings.processing.ffprobe_timeout,
+            check=False, # We handle returncode manually
+            log_output=False # Keep logs clean
         )
         
         if result.returncode != 0:
@@ -285,17 +288,19 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
             temp_output
         ])
 
-        result = subprocess.run(
+        result = run_command(
             cmd,
             capture_output=True,
-            text=True,
             timeout=_settings.processing.ffmpeg_long_timeout,
+            check=False,
+            log_output=False
         )
         
         if result.returncode == 0:
             os.rename(temp_output, output_path)
             return True
         else:
+            logger.error(f"   ❌ Normalization failed (code {result.returncode}): {result.stderr}")
             if os.path.exists(temp_output):
                 os.remove(temp_output)
             return False
@@ -386,11 +391,12 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
             temp_output
         ])
         
-        result = subprocess.run(
+        result = run_command(
             cmd,
             capture_output=True,
-            text=True,
             timeout=_settings.processing.ffmpeg_long_timeout,
+            check=False,
+            log_output=False
         )
         
         if result.returncode != 0:
@@ -709,11 +715,12 @@ class SegmentWriter:
                 segment_path
             ]
             
-            result = subprocess.run(
+            result = run_command(
                 cmd,
                 capture_output=True,
-                text=True,
                 timeout=_settings.processing.ffmpeg_timeout,
+                check=False,
+                log_output=False
             )
 
             if result.returncode != 0:
@@ -785,11 +792,12 @@ class SegmentWriter:
 
             config = _ffmpeg_config
             cmd = self._build_reencode_cmd(concat_list_path, segment_path, config)
-            result = subprocess.run(
+            result = run_command(
                 cmd,
                 capture_output=True,
-                text=True,
                 timeout=_settings.processing.ffmpeg_long_timeout,
+                check=False,
+                log_output=False
             )
 
             if result.returncode != 0:
@@ -806,11 +814,12 @@ class SegmentWriter:
                     cpu_config = _get_cpu_config()
                     cmd_cpu = self._build_reencode_cmd(concat_list_path, segment_path, cpu_config)
                     logger.info("   ↪️  Retrying re-encode on CPU...")
-                    result_cpu = subprocess.run(
+                    result_cpu = run_command(
                         cmd_cpu,
                         capture_output=True,
-                        text=True,
                         timeout=_settings.processing.ffmpeg_long_timeout,
+                        check=False,
+                        log_output=False
                     )
                     if result_cpu.returncode != 0:
                         cpu_log_path = self._write_ffmpeg_log(
@@ -1073,11 +1082,12 @@ class SegmentWriter:
                     actual_output
                 ])
             
-            result = subprocess.run(
+            result = run_command(
                 cmd,
                 capture_output=True,
-                text=True,
-                timeout=_settings.processing.render_timeout,
+                timeout=_settings.processing.ffmpeg_long_timeout,
+                check=False,
+                log_output=False
             )
             
             # Cleanup concat list
@@ -1192,11 +1202,12 @@ class SegmentWriter:
                 temp_output
             ])
             
-            result = subprocess.run(
+            result = run_command(
                 cmd,
                 capture_output=True,
-                text=True,
-                timeout=_settings.processing.render_timeout,
+                timeout=_settings.processing.ffmpeg_long_timeout,
+                check=False,
+                log_output=False
             )
             
             if result.returncode == 0:
@@ -1277,11 +1288,12 @@ class SegmentWriter:
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 video_path
             ]
-            result = subprocess.run(
+            result = run_command(
                 cmd,
                 capture_output=True,
-                text=True,
                 timeout=_settings.processing.ffprobe_timeout,
+                check=False,
+                log_output=False
             )
             return float(result.stdout.strip()) if result.stdout.strip() else 0.0
         except Exception:
