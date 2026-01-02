@@ -144,12 +144,19 @@ class FeatureConfig:
 
     # Shorts Workflow (Vertical Video + Smart Reframing)
     shorts_mode: bool = field(default_factory=lambda: os.environ.get("SHORTS_MODE", "false").lower() == "true")
+    reframe_mode: str = field(default_factory=lambda: os.environ.get("REFRAME_MODE", "auto"))  # auto, speaker, center, custom
 
     # 2025 P0/P1: Burn-in captions and voice isolation
     captions: bool = field(default_factory=lambda: os.environ.get("CAPTIONS", "false").lower() == "true")
-    captions_style: str = field(default_factory=lambda: os.environ.get("CAPTIONS_STYLE", "youtube"))
+    captions_style: str = field(default_factory=lambda: os.environ.get("CAPTIONS_STYLE", "tiktok"))  # tiktok, minimal, bold, karaoke
     transcription_model: str = field(default_factory=lambda: os.environ.get("TRANSCRIPTION_MODEL", "medium"))
-    voice_isolation: bool = field(default_factory=lambda: os.environ.get("VOICE_ISOLATION", "false").lower() == "true")
+    
+    # Audio Polish: Clean Audio = Voice Isolation + Denoise (single toggle)
+    # CLEAN_AUDIO is the new consolidated toggle, VOICE_ISOLATION is legacy
+    voice_isolation: bool = field(default_factory=lambda: (
+        os.environ.get("CLEAN_AUDIO", "false").lower() == "true" or
+        os.environ.get("VOICE_ISOLATION", "false").lower() == "true"
+    ))
     voice_isolation_model: str = field(default_factory=lambda: os.environ.get("VOICE_ISOLATION_MODEL", "htdemucs"))
 
     # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)

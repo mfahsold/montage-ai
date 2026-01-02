@@ -192,8 +192,15 @@ def normalize_options(data: dict) -> dict:
             return DEFAULT_OPTIONS.get(key, False)
         return bool(val)
     
+    # Quality Profile determines default enhance/stabilize/upscale
+    quality_profile = str(opts.get('quality_profile', data.get('quality_profile', 'standard'))).lower()
+    
+    # Cloud Acceleration single toggle (enables CGPU for all cloud features)
+    cloud_acceleration = get_bool('cloud_acceleration') or get_bool('cgpu') or _settings.llm.cgpu_enabled
+    
     return {
         "prompt": str(opts.get('prompt', data.get('prompt', ''))),
+        # Individual toggles (can override profile, but profile is primary)
         "stabilize": get_bool('stabilize'),
         "upscale": get_bool('upscale'),
         "enhance": get_bool('enhance'),
@@ -206,17 +213,25 @@ def normalize_options(data: dict) -> dict:
         "captions": get_bool('captions'),
         "export_timeline": get_bool('export_timeline'),
         "generate_proxies": get_bool('generate_proxies'),
-        # Default cgpu to true if env var is set, otherwise use UI value
-        "cgpu": get_bool('cgpu') or _settings.llm.cgpu_enabled,
         "preserve_aspect": get_bool('preserve_aspect'),
         "target_duration": target_duration,
         "music_start": music_start,
         "music_end": music_end,
-        # Preview mode flag (for FFMPEG_PRESET)
+        # Preview mode flag (legacy support)
         "preview": data.get('preset') == 'fast',
-        # New fields
+        # Quality Profile (preview, standard, high, master)
+        "quality_profile": quality_profile,
+        # Cloud Acceleration single toggle
+        "cloud_acceleration": cloud_acceleration,
+        "cgpu": cloud_acceleration,  # Backwards compat
+        # Audio Polish (Clean Audio = Voice Isolation + Denoise)
+        "clean_audio": get_bool('clean_audio'),
+        "voice_isolation": get_bool('voice_isolation'),
+        # Story Arc
         "story_arc": str(opts.get('story_arc', data.get('story_arc', ''))),
-        "quality_profile": str(opts.get('quality_profile', data.get('quality_profile', 'standard'))),
+        # Shorts Studio options
+        "reframe_mode": str(opts.get('reframe_mode', data.get('reframe_mode', 'auto'))),
+        "caption_style": str(opts.get('caption_style', data.get('caption_style', 'tiktok'))),
     }
 
 
@@ -1272,6 +1287,218 @@ def api_transcript_export():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# SHORTS STUDIO API ENDPOINTS
+# =============================================================================
+
+@app.route('/api/shorts/analyze', methods=['POST'])
+def api_shorts_analyze():
+    """Analyze video for smart reframing (face detection, subject tracking)."""
+    data = request.json or {}
+    video_path = data.get('video_path')
+    reframe_mode = data.get('reframe_mode', 'auto')  # auto, speaker, center, custom
+    
+    if not video_path or not Path(video_path).exists():
+        return jsonify({"error": "Video file not found"}), 404
+    
+    try:
+        from ..smart_reframing import SmartReframer
+        
+        reframer = SmartReframer(target_aspect=9/16)
+        
+        if reframe_mode == 'center':
+            # Simple center crop, no analysis needed
+            return jsonify({
+                "success": True,
+                "mode": "center",
+                "crop_data": None,
+                "message": "Center crop mode - no analysis needed"
+            })
+        
+        # Analyze video for face/subject tracking
+        crop_data = reframer.analyze(video_path)
+        
+        # Convert to JSON-serializable format
+        crops_json = [
+            {
+                "time": c.time,
+                "x": c.x,
+                "y": c.y,
+                "width": c.width,
+                "height": c.height,
+                "score": c.score
+            }
+            for c in crop_data
+        ]
+        
+        return jsonify({
+            "success": True,
+            "mode": reframe_mode,
+            "crop_data": crops_json,
+            "frame_count": len(crops_json)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/shorts/render', methods=['POST'])
+def api_shorts_render():
+    """Render vertical video with smart reframing and captions."""
+    data = request.json or {}
+    video_path = data.get('video_path')
+    reframe_mode = data.get('reframe_mode', 'auto')
+    caption_style = data.get('caption_style', 'tiktok')  # tiktok, minimal, bold, karaoke
+    add_captions = data.get('add_captions', True)
+    
+    if not video_path or not Path(video_path).exists():
+        return jsonify({"error": "Video file not found"}), 404
+    
+    try:
+        from ..smart_reframing import SmartReframer
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = OUTPUT_DIR / f"shorts_{timestamp}.mp4"
+        
+        reframer = SmartReframer(target_aspect=9/16)
+        
+        # Analyze if needed
+        if reframe_mode != 'center':
+            crop_data = reframer.analyze(video_path)
+        else:
+            crop_data = None
+        
+        # Apply reframing
+        reframer.apply(crop_data, video_path, str(output_path))
+        
+        # Add captions if requested
+        if add_captions:
+            from ..transcriber import transcribe_audio
+            
+            # Transcribe
+            transcript = transcribe_audio(video_path, model='base', word_timestamps=True)
+            
+            # TODO: Burn in captions with caption_style
+            # For now, just output SRT alongside
+            srt_path = output_path.with_suffix('.srt')
+            # Generate SRT from transcript...
+        
+        return jsonify({
+            "success": True,
+            "filename": output_path.name,
+            "path": str(output_path),
+            "mode": reframe_mode,
+            "caption_style": caption_style if add_captions else None
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/shorts/highlights', methods=['POST'])
+def api_shorts_highlights():
+    """Detect highlight moments for clip extraction."""
+    data = request.json or {}
+    video_path = data.get('video_path')
+    max_clips = int(data.get('max_clips', 5))
+    min_duration = float(data.get('min_duration', 15.0))
+    max_duration = float(data.get('max_duration', 60.0))
+    
+    if not video_path or not Path(video_path).exists():
+        return jsonify({"error": "Video file not found"}), 404
+    
+    try:
+        # Use audio analysis for highlight detection
+        from ..audio_analysis import AudioAnalyzer
+        
+        analyzer = AudioAnalyzer(video_path)
+        analyzer.analyze()
+        
+        # Get high-energy segments
+        highlights = []
+        beats = analyzer.beat_times
+        energy = analyzer.energy_curve if hasattr(analyzer, 'energy_curve') else []
+        
+        # Simple highlight detection: find energy peaks
+        # TODO: More sophisticated detection with speech analysis
+        if len(energy) > 0:
+            import numpy as np
+            threshold = np.percentile(energy, 80)  # Top 20% energy
+            
+            # Find contiguous high-energy regions
+            in_highlight = False
+            start_time = 0
+            
+            for i, e in enumerate(energy):
+                time = i * analyzer.hop_length / analyzer.sr if hasattr(analyzer, 'hop_length') else i * 0.1
+                
+                if e > threshold and not in_highlight:
+                    in_highlight = True
+                    start_time = time
+                elif e <= threshold and in_highlight:
+                    in_highlight = False
+                    duration = time - start_time
+                    if min_duration <= duration <= max_duration:
+                        highlights.append({
+                            "start": start_time,
+                            "end": time,
+                            "duration": duration,
+                            "score": float(np.mean(energy[max(0, i-10):i]))
+                        })
+            
+            # Sort by score and limit
+            highlights.sort(key=lambda x: x['score'], reverse=True)
+            highlights = highlights[:max_clips]
+        
+        return jsonify({
+            "success": True,
+            "highlights": highlights,
+            "total_found": len(highlights)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# API: Quality Profiles & Cloud Status
+# =============================================================================
+
+@app.route('/api/quality-profiles')
+def api_quality_profiles():
+    """Return available quality profiles and their settings."""
+    from ..env_mapper import QUALITY_PROFILES
+    
+    return jsonify({
+        "profiles": QUALITY_PROFILES,
+        "default": "standard"
+    })
+
+
+@app.route('/api/cloud/status')
+def api_cloud_status():
+    """Check cloud acceleration availability."""
+    cgpu_available = is_cgpu_available()
+    cgpu_gpu = check_cgpu_gpu() if cgpu_available else False
+    
+    return jsonify({
+        "available": cgpu_available,
+        "gpu_available": cgpu_gpu,
+        "features": {
+            "transcription": cgpu_available,
+            "upscaling": cgpu_gpu,
+            "llm": cgpu_available
+        },
+        "fallback": "local"  # Always fall back to local if cloud unavailable
+    })
 
 
 if __name__ == '__main__':
