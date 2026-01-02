@@ -25,7 +25,7 @@ import numpy as np
 from ..config import get_settings, Settings
 from ..logger import logger
 from ..resource_manager import get_resource_manager, ResourceManager
-from ..utils import file_exists_and_valid
+from ..utils import file_exists_and_valid, coerce_float
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 from ..timeline_exporter import export_timeline_from_montage
 from ..storytelling import StoryArc, TensionProvider, StorySolver
@@ -1282,6 +1282,13 @@ class MontageBuilder:
         else:
             self.ctx.target_duration = audio_duration
 
+        # Apply Creative Director constraints if provided (only when env didn't override)
+        if target_duration_setting <= 0 and self.ctx.editing_instructions:
+            constraints = self.ctx.editing_instructions.get("constraints", {})
+            target_override = coerce_float(constraints.get("target_duration_sec"))
+            if target_override and target_override > 0:
+                self.ctx.target_duration = min(audio_duration, target_override)
+
         if self.settings.features.verbose:
             logger.info(f"   ⏱️ Target duration: {self.ctx.target_duration:.1f}s")
 
@@ -1514,6 +1521,27 @@ class MontageBuilder:
         """Calculate beats per cut based on pacing settings."""
         from ..audio_analysis import calculate_dynamic_cut_length
 
+        min_beats = None
+        max_beats = None
+        if self.ctx.editing_instructions and tempo > 0:
+            constraints = self.ctx.editing_instructions.get("constraints", {})
+            min_clip = coerce_float(constraints.get("min_clip_duration_sec"))
+            max_clip = coerce_float(constraints.get("max_clip_duration_sec"))
+            beat_duration = 60.0 / tempo
+            if min_clip:
+                min_beats = min_clip / beat_duration
+            if max_clip:
+                max_beats = max_clip / beat_duration
+            if min_beats is not None and max_beats is not None and min_beats > max_beats:
+                min_beats, max_beats = max_beats, min_beats
+
+        def clamp_beats(beats: float) -> float:
+            if min_beats is not None:
+                beats = max(beats, min_beats)
+            if max_beats is not None:
+                beats = min(beats, max_beats)
+            return beats
+
         pacing_speed = "dynamic"
         if self.ctx.editing_instructions is not None:
             pacing_speed = self.ctx.editing_instructions.get('pacing', {}).get('speed', 'dynamic')
@@ -1537,15 +1565,15 @@ class MontageBuilder:
                 return 16 if tempo < 100 else 8
 
         if pacing_speed == "very_fast":
-            return 1
+            return clamp_beats(1)
         elif pacing_speed == "fast":
-            return 2 if tempo < 130 else 4
+            return clamp_beats(2 if tempo < 130 else 4)
         elif pacing_speed == "medium":
-            return 4
+            return clamp_beats(4)
         elif pacing_speed == "slow":
-            return 8
+            return clamp_beats(8)
         elif pacing_speed == "very_slow":
-            return 16 if tempo < 100 else 8
+            return clamp_beats(16 if tempo < 100 else 8)
         else:  # dynamic
             if self.ctx.current_pattern is None or self.ctx.pattern_idx >= len(self.ctx.current_pattern):
                 self.ctx.current_pattern = calculate_dynamic_cut_length(
@@ -1556,7 +1584,7 @@ class MontageBuilder:
 
             beats = self.ctx.current_pattern[self.ctx.pattern_idx]
             self.ctx.pattern_idx += 1
-            return beats
+            return clamp_beats(beats)
 
     def _calculate_cut_duration(
         self, beats_per_cut: float, beat_times: np.ndarray
@@ -1997,6 +2025,15 @@ class MontageBuilder:
         if not beats:
             beats = [0.0]
 
+        min_clip_duration = None
+        max_clip_duration = None
+        if self.ctx.editing_instructions:
+            constraints = self.ctx.editing_instructions.get("constraints", {})
+            min_clip_duration = coerce_float(constraints.get("min_clip_duration_sec"))
+            max_clip_duration = coerce_float(constraints.get("max_clip_duration_sec"))
+            if min_clip_duration is not None and max_clip_duration is not None and min_clip_duration > max_clip_duration:
+                min_clip_duration, max_clip_duration = max_clip_duration, min_clip_duration
+
         # Build timeline plan
         input_clips = self.ctx.video_files or self._get_files(self.ctx.input_dir, ('.mp4', '.mov', '.mkv'))
         timeline_events = solver.solve(input_clips, duration, beats)
@@ -2044,6 +2081,10 @@ class MontageBuilder:
                 end_time = duration
 
             cut_duration = max(0.5, min(end_time - start_time, duration - start_time))
+            if min_clip_duration is not None:
+                cut_duration = max(cut_duration, min_clip_duration)
+            if max_clip_duration is not None:
+                cut_duration = min(cut_duration, max_clip_duration)
             if cut_duration <= 0:
                 continue
 
