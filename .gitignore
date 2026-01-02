@@ -32,7 +32,8 @@ data/output/
 logs/
 
 # Local business documentation (not tracked)
-BACKLOG.md
+# Note: docs/BACKLOG.md IS tracked (public backlog)
+/BACKLOG.md
 docs/internal/
 docs/market_analysis.md
 # docs/roadmap/  <-- Unignored for next_steps.md
