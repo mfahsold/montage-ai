@@ -1407,7 +1407,7 @@ def api_shorts_highlights():
     data = request.json or {}
     video_path = data.get('video_path')
     max_clips = int(data.get('max_clips', 5))
-    min_duration = float(data.get('min_duration', 15.0))
+    min_duration = float(data.get('min_duration', 5.0))
     max_duration = float(data.get('max_duration', 60.0))
     
     if not video_path or not Path(video_path).exists():
@@ -1426,17 +1426,18 @@ def api_shorts_highlights():
         energy = analyzer.energy_curve if hasattr(analyzer, 'energy_curve') else []
         
         # Simple highlight detection: find energy peaks
-        # TODO: More sophisticated detection with speech analysis
         if len(energy) > 0:
             import numpy as np
-            threshold = np.percentile(energy, 80)  # Top 20% energy
+            threshold = np.percentile(energy, 75)  # Top 25% energy
             
             # Find contiguous high-energy regions
             in_highlight = False
             start_time = 0
             
+            hop_time = analyzer.hop_length / analyzer.sr if hasattr(analyzer, 'hop_length') and hasattr(analyzer, 'sr') else 0.1
+            
             for i, e in enumerate(energy):
-                time = i * analyzer.hop_length / analyzer.sr if hasattr(analyzer, 'hop_length') else i * 0.1
+                time = i * hop_time
                 
                 if e > threshold and not in_highlight:
                     in_highlight = True
@@ -1445,16 +1446,31 @@ def api_shorts_highlights():
                     in_highlight = False
                     duration = time - start_time
                     if min_duration <= duration <= max_duration:
+                        score = float(np.mean(energy[max(0, i-10):i]))
                         highlights.append({
+                            "time": start_time,  # For frontend seekTo
                             "start": start_time,
                             "end": time,
                             "duration": duration,
-                            "score": float(np.mean(energy[max(0, i-10):i]))
+                            "score": score,
+                            "type": "Energy" if score > np.percentile(energy, 90) else "Action"
                         })
             
             # Sort by score and limit
             highlights.sort(key=lambda x: x['score'], reverse=True)
             highlights = highlights[:max_clips]
+        
+        # Add beat-based highlights if we have beats
+        if len(beats) > 0 and len(highlights) < max_clips:
+            for beat in beats[::4][:max_clips - len(highlights)]:  # Every 4th beat
+                highlights.append({
+                    "time": beat,
+                    "start": beat,
+                    "end": beat + 5,
+                    "duration": 5,
+                    "score": 0.7,
+                    "type": "Beat"
+                })
         
         return jsonify({
             "success": True,
@@ -1499,6 +1515,13 @@ def api_cloud_status():
         },
         "fallback": "local"  # Always fall back to local if cloud unavailable
     })
+
+
+@app.route('/api/shorts/create', methods=['POST'])
+def api_shorts_create():
+    """Create a short video - convenience alias for render endpoint."""
+    # This is the endpoint the frontend calls
+    return api_shorts_render()
 
 
 if __name__ == '__main__':
