@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montage AI - Outcome-Based Editor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='elegant.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* V2 Streamlined UI Styles */
+        :root {
+            --accent: #7C3AED;
+            --accent-soft: rgba(124, 58, 237, 0.15);
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+        }
+
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* Quality Cards */
+        .quality-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .quality-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .quality-card {
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .quality-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .quality-card.selected {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        .quality-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .quality-name {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .quality-desc {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-bottom: 0.5rem;
+        }
+
+        .quality-time {
+            font-size: 0.75rem;
+            opacity: 0.5;
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* Output Mode Buttons */
+        .output-modes {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .output-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 1rem;
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .output-btn:hover {
+            border-color: var(--accent);
+        }
+
+        .output-btn.selected {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        .output-icon {
+            font-size: 1.25rem;
+        }
+
+        .output-name {
+            font-weight: 500;
+        }
+
+        /* Cloud Toggle */
+        .cloud-toggle-section {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(59, 130, 246, 0.1));
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .cloud-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+        }
+
+        .cloud-toggle-label.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .cloud-toggle-label input {
+            display: none;
+        }
+
+        .cloud-toggle-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .cloud-toggle-icon {
+            font-size: 2rem;
+        }
+
+        .cloud-toggle-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .cloud-toggle-status {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .cloud-toggle-switch {
+            width: 52px;
+            height: 28px;
+            background: var(--border);
+            border-radius: 14px;
+            position: relative;
+            transition: background 0.3s;
+        }
+
+        .cloud-toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.3s;
+        }
+
+        .cloud-toggle-label input:checked + .cloud-toggle-content .cloud-toggle-switch {
+            background: var(--accent);
+        }
+
+        .cloud-toggle-label input:checked + .cloud-toggle-content .cloud-toggle-switch::after {
+            transform: translateX(24px);
+        }
+
+        .cloud-features {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .cloud-feature {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            opacity: 0.8;
+        }
+
+        /* AI Features Toggle Grid */
+        .ai-features {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .ai-feature-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ai-feature-toggle:hover {
+            border-color: var(--accent);
+        }
+
+        .ai-feature-toggle input {
+            accent-color: var(--accent);
+        }
+
+        .ai-feature-toggle input:checked + .ai-feature-icon + .ai-feature-name {
+            color: var(--accent);
+        }
+
+        .ai-feature-icon {
+            font-size: 1.25rem;
+        }
+
+        .ai-feature-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        /* Run Summary */
+        .run-summary {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .summary-row:last-child {
+            border-bottom: none;
+        }
+
+        .summary-row.estimate {
+            margin-top: 0.5rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+            font-weight: 600;
+        }
+
+        .summary-label {
+            opacity: 0.7;
+        }
+
+        .summary-value {
+            font-weight: 500;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            flex: 2;
+            padding: 1rem 2rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-secondary {
+            flex: 1;
+            padding: 1rem;
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--fg);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+        }
+
+        /* Nav Links */
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .nav-link {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            color: var(--fg);
+            opacity: 0.8;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover {
+            background: var(--accent-soft);
+            opacity: 1;
+        }
+
+        .nav-link.active {
+            background: var(--accent);
+            color: white;
+            opacity: 1;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast-info { background: var(--accent); }
+        .toast-success { background: var(--success); }
+        .toast-warning { background: var(--warning); color: #000; }
+        .toast-error { background: var(--error); }
+
+        /* Job Cards */
+        .job-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .job-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .job-card.completed {
+            border-left: 3px solid var(--success);
+        }
+
+        .job-card.running {
+            border-left: 3px solid var(--accent);
+        }
+
+        .job-card.failed {
+            border-left: 3px solid var(--error);
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .job-id {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .job-status-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .job-status-badge.completed { background: var(--success); color: white; }
+        .job-status-badge.running { background: var(--accent); color: white; }
+        .job-status-badge.failed { background: var(--error); color: white; }
+        .job-status-badge.queued { background: var(--warning); color: black; }
+
+        .job-download {
+            display: inline-block;
+            margin-top: 0.5rem;
+            padding: 0.35rem 0.75rem;
+            background: var(--success);
+            color: white;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        /* Gallery Grid */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        /* File List */
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-size {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.75rem;
+            opacity: 0.6;
+        }
+
+        .no-files, .no-jobs {
+            text-align: center;
+            padding: 2rem;
+            opacity: 0.5;
+        }
+
+        /* Progress Bar */
+        .progress-bar-container {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            margin: 0.5rem 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.3s;
+        }
+
+        /* Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-container">
+                <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 48px; height: 48px;">
+                    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="none"/>
+                    <circle cx="32" cy="14" r="4" fill="currentColor"/>
+                    <circle cx="32" cy="50" r="4" fill="currentColor"/>
+                    <circle cx="14" cy="32" r="4" fill="currentColor"/>
+                    <circle cx="50" cy="32" r="4" fill="currentColor"/>
+                    <rect x="24" y="24" width="16" height="16" fill="currentColor"/>
+                </svg>
+                <div class="logo-text">
+                    <h1>Montage<span class="logo-ai">AI</span></h1>
+                    <p class="subtitle">// AI Rough Cut + Pro Handoff</p>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link active">Create</a>
+                <a href="/transcript" class="nav-link">Text Editor</a>
+                <a href="/shorts" class="nav-link">Shorts Studio</a>
+            </div>
+        </header>
+
+        <!-- Outcome: What do you want? -->
+        <section class="voxel-card">
+            <h2>📊 Quality Profile</h2>
+            <p class="helper">Choose render quality — bundles enhance/stabilize/upscale settings</p>
+            <div id="quality-cards" class="quality-cards">
+                <!-- Rendered by JS -->
+            </div>
+        </section>
+
+        <section class="voxel-card">
+            <h2>📤 Output Format</h2>
+            <p class="helper">Where is this going?</p>
+            <div id="output-modes" class="output-modes">
+                <!-- Rendered by JS -->
+            </div>
+        </section>
+
+        <div class="main-grid">
+            <!-- Left Column: Media & Style -->
+            <div>
+                <section class="voxel-card">
+                    <h2>📁 Media</h2>
+                    <div class="upload-area" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem;">Video Clips</h3>
+                            <input type="file" id="videoUpload" accept="video/*" multiple style="display: none;">
+                            <button onclick="document.getElementById('videoUpload').click()" class="btn-secondary" style="width: 100%; margin-bottom: 0.5rem;">
+                                📹 Select Videos
+                            </button>
+                            <div id="videoList" class="file-list"></div>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem;">Music Track</h3>
+                            <input type="file" id="musicUpload" accept="audio/*" style="display: none;">
+                            <button onclick="document.getElementById('musicUpload').click()" class="btn-secondary" style="width: 100%; margin-bottom: 0.5rem;">
+                                🎵 Select Music
+                            </button>
+                            <div id="musicList" class="file-list"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="voxel-card">
+                    <h2>🎬 Style & Intent</h2>
+                    <div class="form-group">
+                        <label for="style">Style Preset</label>
+                        <select id="style" class="voxel-select">
+                            <!-- Rendered by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="prompt">Creative Prompt</label>
+                        <input type="text" id="prompt" class="voxel-input" placeholder="e.g., fast cuts, 90s skateboard vibes">
+                    </div>
+                    <div class="chips">
+                        <span class="chip">Fast social cut</span>
+                        <span class="chip">Cinematic vlog</span>
+                        <span class="chip">Travel montage</span>
+                        <span class="chip">Product hype</span>
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label for="storyArc">Story Arc</label>
+                        <select id="storyArc" class="voxel-select">
+                            <!-- Rendered by JS -->
+                        </select>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Column: Settings & Actions -->
+            <div>
+                <section class="voxel-card cloud-toggle-section">
+                    <div id="cloud-toggle">
+                        <!-- Rendered by JS -->
+                    </div>
+                </section>
+
+                <section class="voxel-card">
+                    <h2>🤖 AI Features <span style="font-size: 0.75rem; opacity: 0.6;">(Optional)</span></h2>
+                    <div id="ai-features" class="ai-features">
+                        <!-- Rendered by JS -->
+                    </div>
+                </section>
+
+                <section class="voxel-card">
+                    <h2>⏱️ Duration</h2>
+                    <div class="form-group">
+                        <label>Target: <span id="durationValue">Auto</span></label>
+                        <input type="range" id="targetDuration" min="0" max="300" step="10" value="0">
+                        <div class="helper">0 = Match music length</div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
+                        <div>
+                            <label style="font-size: 0.8rem;">Music Start</label>
+                            <input type="number" id="musicStart" class="voxel-input" value="0" min="0" step="0.1">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem;">Music End</label>
+                            <input type="number" id="musicEnd" class="voxel-input" placeholder="Auto" min="0" step="0.1">
+                        </div>
+                    </div>
+                </section>
+
+                <section class="voxel-card">
+                    <h2>📋 Summary</h2>
+                    <div id="run-summary" class="run-summary">
+                        <!-- Rendered by JS -->
+                    </div>
+                    <div class="action-buttons">
+                        <button onclick="createJob()" class="btn-primary">
+                            🎬 Create Montage
+                        </button>
+                        <button onclick="createJob(true)" class="btn-secondary">
+                            ⚡ Preview
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Job Status Section -->
+        <section class="voxel-card" id="jobStatusSection" style="display: none; margin-top: 1.5rem;">
+            <h2>🔄 Processing</h2>
+            <div id="currentJobStatus" class="job-card running">
+                <div class="job-header">
+                    <span class="job-id">#-</span>
+                    <span class="job-phase">Waiting...</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" style="width: 0%"></div>
+                </div>
+                <div class="job-details">Initializing...</div>
+            </div>
+        </section>
+
+        <!-- Gallery Section -->
+        <section class="voxel-card" style="margin-top: 1.5rem;">
+            <h2>📁 Recent Outputs</h2>
+            <div id="jobList" class="gallery-grid">
+                <!-- Rendered by JS -->
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='app_v2.js') }}"></script>
+</body>
+</html>

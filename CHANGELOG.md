@@ -8,6 +8,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+#### 🆕 Transcript Editor (Descript-style)
+- **Text-based editing**: Delete words to cut video, rearrange paragraphs to reorder scenes
+- **Word-level sync**: Click any word to seek video
+- **Filler word detection**: Highlights "um", "uh", "like" for easy removal
+- **Silence removal**: Adjustable threshold for automatic gap removal
+- **Export formats**: SRT, VTT subtitle export
+- **Web UI**: New `/transcript` route with dedicated editor interface
+- **API endpoints**: `/api/transcript`, `/api/transcript/{id}`, `/api/transcript/{id}/edit`
+
+#### 📱 Shorts Studio
+- **Phone-frame preview**: Live 9:16 aspect ratio preview with safe zones
+- **Reframe modes**: Auto (AI tracking), Speaker (face detection), Center, Custom
+- **Caption styles**: TikTok, Minimal, Bold, Karaoke with live preview
+- **Highlight detection**: AI identifies best moments for clip extraction
+- **Batch export**: Extract multiple highlights in one operation
+- **Web UI**: New `/shorts` route with dedicated studio interface
+
+#### 🎚️ Quality Profiles
+- **Outcome-based selection**: Preview → Standard → High → Master
+- **Single-click configuration**: Replaces 5+ separate toggles
+- **Profile presets**:
+  - Preview: 360p, no enhancements, fast iteration
+  - Standard: 1080p, color grading (default)
+  - High: 1080p + stabilization + enhancement
+  - Master: 4K + all enhancements + AI upscaling
+- **Web UI**: New `/v2` route with profile cards
+
+#### ☁️ Cloud Acceleration
+- **Single toggle**: Consolidates CGPU, cloud transcription, LLM features
+- **Graceful fallback**: Automatic local processing if cloud unavailable
+- **Privacy-first**: Only enabled features use cloud, footage stays local by default
+
+#### 📚 Documentation & Compliance
+- **Strategic docs**: `docs/STRATEGY.md` with product vision and market analysis
+- **Roadmap**: `docs/roadmap/ROADMAP_2026.md` with 12-month development plan
+- **Backlog**: `docs/BACKLOG.md` with prioritized Epics and User Stories
+- **OSS compliance**: `THIRD_PARTY_LICENSES.md` with all dependency licenses
+- **Attribution**: `NOTICE` file for distribution compliance
+
+### Changed
+- **README.md**: Complete refresh with new positioning, feature highlights, Quality Profiles documentation
+- **docs/features.md**: Added sections for all new features, API reference
+- **CONTRIBUTING.md**: Updated with OSS license compliance requirements
+
+---
+
+## [Previous - Unreleased]
+
+### Added
 - **AI Transparency**: Added "Director's Log" to Web UI, exposing the AI's creative reasoning (pacing, mood, scene selection) for each job.
 - **Shorts Workflow (Phase 1)**
   - **Smart Reframing**: Added `SmartReframer` with segmented cropping logic to stabilize 9:16 crops from horizontal footage.

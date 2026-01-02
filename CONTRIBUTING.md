@@ -156,6 +156,55 @@ make logs           # Watch job logs
 
 ---
 
-## License Note
+## Licensing & Legal
+
+### Your Contributions
 
 By contributing, you agree your code will be licensed under the same [PolyForm Noncommercial](LICENSE) license as the project.
+
+### Third-Party Dependencies
+
+When adding new dependencies, please ensure:
+
+1. **License compatibility**: Check the dependency's license is compatible with our project
+2. **Document the license**: Add an entry to [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
+3. **LGPL compliance**: If the dependency is LGPL (like FFmpeg), ensure we're using dynamic linking
+
+**Acceptable licenses:**
+- MIT, BSD, Apache 2.0, ISC — ✅ Always OK
+- LGPL — ✅ OK with dynamic linking
+- GPL — ❌ Not compatible (copyleft)
+- Proprietary — ❌ Not acceptable
+
+**Adding a new dependency:**
+
+1. Add to `requirements.txt` or `pyproject.toml`
+2. Add entry to `THIRD_PARTY_LICENSES.md`:
+   ```markdown
+   ## Package Name
+   - **Version**: X.Y.Z
+   - **License**: MIT
+   - **URL**: https://github.com/org/package
+   - **Usage**: Brief description of how we use it
+   ```
+3. Update `NOTICE` if the license requires attribution
+
+### Model Weights
+
+For AI model weights (Real-ESRGAN, Whisper, etc.):
+- Check the model's license before inclusion
+- Document in `THIRD_PARTY_LICENSES.md` under "Model Weights"
+- Most OpenAI/Meta models are MIT/Apache 2.0 licensed
+
+---
+
+## Where to Contribute
+
+Check our [Backlog](docs/BACKLOG.md) for prioritized features:
+
+- 🔥 **High priority**: Epics marked "In Progress" or "Planned"
+- 🐛 **Bug fixes**: Issues labeled `bug` 
+- 📝 **Documentation**: Always welcome
+- 🧪 **Tests**: We can always use more coverage
+
+See [docs/STRATEGY.md](docs/STRATEGY.md) for product vision and [docs/roadmap/ROADMAP_2026.md](docs/roadmap/ROADMAP_2026.md) for the development plan.

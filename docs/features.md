@@ -2,6 +2,158 @@
 
 Everything Montage AI can do for you.
 
+> **Philosophy:** We polish pixels, we don't generate them.
+
+---
+
+## 🆕 New in 2026
+
+### Transcript Editor
+
+Edit video by editing text — inspired by Descript's revolutionary approach.
+
+**How it works:**
+1. Upload video → automatic transcription via Whisper
+2. View transcript with word-level timestamps
+3. Delete text to remove video segments
+4. Rearrange paragraphs to reorder scenes
+5. Export final cut or OTIO timeline
+
+**Features:**
+- Word-level sync with click-to-seek
+- Speaker diarization (coming soon)
+- Filler word detection ("um", "uh", "like")
+- Silence removal with adjustable threshold
+- Export transcript as SRT/VTT
+
+**Access:** Web UI at `/transcript`
+
+---
+
+### Shorts Studio
+
+Create vertical content optimized for TikTok, Instagram Reels, and YouTube Shorts.
+
+**Phone-Frame Preview:**
+- Live 9:16 aspect ratio preview
+- Safe zone overlays (title-safe, action-safe)
+- Platform-specific guides (TikTok UI, Reels UI)
+
+**Reframe Modes:**
+| Mode | Description |
+|------|-------------|
+| Auto | AI detects and follows primary subject |
+| Speaker | Face detection + tracking for talking heads |
+| Center | Simple center crop |
+| Custom | Manual positioning with keyframes |
+
+**Caption Styles:**
+- **TikTok** — White text, black stroke, bottom-aligned
+- **Minimal** — Clean sans-serif, subtle background
+- **Bold** — Large impact text, animated word-by-word
+- **Karaoke** — Highlighted current word, music-synced
+
+**Highlight Detection:**
+- AI identifies best moments based on audio energy, motion, faces
+- One-click extraction of highlights
+- Batch export multiple clips
+
+**Access:** Web UI at `/shorts`
+
+---
+
+### Quality Profiles
+
+One selection replaces multiple toggles. Choose based on your goal, not technical details.
+
+| Profile | Resolution | Enhancements | Use Case |
+|---------|------------|--------------|----------|
+| 🚀 **Preview** | 360p | None | Fast iteration, rough cut review |
+| 📺 **Standard** | 1080p | Color grading | Social media, general use |
+| ✨ **High** | 1080p | Grading + stabilization | Professional delivery |
+| 🎬 **Master** | 4K | All + AI upscaling | Broadcast, cinema, archival |
+
+**What each profile enables:**
+
+```
+Preview:   enhance=false, stabilize=false, upscale=false, resolution=360p
+Standard:  enhance=true,  stabilize=false, upscale=false, resolution=1080p
+High:      enhance=true,  stabilize=true,  upscale=false, resolution=1080p
+Master:    enhance=true,  stabilize=true,  upscale=true,  resolution=4k
+```
+
+**Usage:**
+```bash
+# CLI
+./montage-ai.sh run hitchcock --quality high
+
+# Environment variable
+QUALITY_PROFILE=master ./montage-ai.sh run
+
+# Web UI: Select from Quality Profile cards
+```
+
+---
+
+### Cloud Acceleration
+
+Single toggle for all cloud GPU features with graceful local fallback.
+
+**What it enables:**
+- AI upscaling via cloud GPU (Real-ESRGAN on H100/A100)
+- Fast transcription (Whisper large model)
+- LLM creative direction (Gemini Pro)
+
+**Fallback behavior:**
+```
+Cloud available?  → Use cloud GPU
+Cloud unavailable → Fall back to local processing
+Local GPU?        → Use Vulkan acceleration  
+CPU only?         → Use optimized CPU path
+```
+
+**Privacy guarantee:** Only enabled features use cloud. Raw footage stays local unless upscaling is enabled.
+
+**Usage:**
+```bash
+# CLI
+CLOUD_ACCELERATION=true ./montage-ai.sh run --upscale
+
+# Web UI: Toggle "Cloud Acceleration" switch
+```
+
+---
+
+## Timeline Export (Pro Handoff) {#timeline-export}
+
+Export your AI rough cut to professional NLEs for finishing.
+
+**Supported formats:**
+- **OTIO** — OpenTimelineIO, preferred for modern NLEs
+- **EDL** — Edit Decision List, legacy support
+- **CSV** — Spreadsheet review, logging
+- **JSON** — Metadata, automation
+
+**Usage:**
+```bash
+./montage-ai.sh run hitchcock --export-timeline --generate-proxies
+```
+
+**Outputs in `data/output/`:**
+- `montage.otio` — Timeline file
+- `montage.edl` — Legacy EDL
+- `montage.csv` — Cut log
+- `montage_metadata.json` — Full metadata
+- `proxies/` — Optional low-res clips for offline editing
+
+**NLE Import:**
+| NLE | Recommended Format | Notes |
+|-----|-------------------|-------|
+| DaVinci Resolve | OTIO | File → Import → Timeline |
+| Premiere Pro | OTIO or EDL | May need media relink |
+| Final Cut Pro | OTIO | Via third-party plugin |
+| Avid Media Composer | EDL | Relink originals |
+
 ---
 
 ## Core Editing
@@ -122,13 +274,68 @@ CREATIVE_LOOP=true ./montage-ai.sh run hitchcock
 
 See [configuration.md](configuration.md#creative-loop-agentic-refinement) for all options.
 
-## Shorts Workflow (Vertical Video)
+## Shorts Workflow (Vertical Video) {#shorts-workflow}
+
+> **Note:** The full Shorts Studio UI is available at `/shorts`. This section covers CLI usage.
 
 - **Smart Reframing**: Automatically crops horizontal footage to 9:16 vertical aspect ratio using face detection and segmented tracking.
 - **Segmented Tracking**: Stabilizes camera movement by keeping the crop window static until the subject moves significantly, preventing jitter.
 - **Auto-Captions**: Generates and burns in subtitles (requires `whisper`).
 - **Web UI Integration**: Toggle "Shorts Mode" in the Web UI for easy creation.
 
+**CLI usage:**
+```bash
+# Basic vertical output
+./montage-ai.sh run viral --aspect 9:16
+
+# With captions
+./montage-ai.sh run viral --aspect 9:16 --captions
+
+# High quality shorts
+./montage-ai.sh run viral --aspect 9:16 --quality high --captions
+```
+
+---
+
+## API Reference
+
+The Web UI exposes a REST API for automation:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/status` | GET | Health check |
+| `/api/files` | GET | List uploaded files |
+| `/api/upload` | POST | Upload video/music (multipart) |
+| `/api/jobs` | POST | Create montage job |
+| `/api/jobs/{id}` | GET | Job status |
+| `/api/download/{file}` | GET | Download output |
+| `/api/transcript` | POST | Start transcription |
+| `/api/transcript/{id}` | GET | Get transcript |
+| `/api/transcript/{id}/edit` | POST | Apply text edits |
+
+**Example: Create a job via API**
+```bash
+curl -X POST http://localhost:8080/api/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "style": "hitchcock",
+    "quality_profile": "high",
+    "cloud_acceleration": false,
+    "export_timeline": true
+  }'
+```
+
+---
+
 ## Troubleshooting
 
 Having issues? Check [troubleshooting.md](troubleshooting.md) for common fixes.
+
+---
+
+## See Also
+
+- [Configuration](configuration.md) — All settings explained
+- [Architecture](architecture.md) — How it works under the hood
+- [Strategy](STRATEGY.md) — Product vision and roadmap
+- [Backlog](BACKLOG.md) — Upcoming features

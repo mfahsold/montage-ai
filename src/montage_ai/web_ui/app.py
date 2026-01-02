@@ -408,8 +408,22 @@ def run_montage(job_id: str, style: str, options: dict):
 
 @app.route('/')
 def index():
-    """Main page."""
+    """Main page - use v2 if query param present."""
+    if request.args.get('v2') or request.args.get('new'):
+        return render_template('index_v2.html', version=VERSION, defaults=DEFAULT_OPTIONS)
     return render_template('index.html', version=VERSION, defaults=DEFAULT_OPTIONS)
+
+
+@app.route('/v2')
+def index_v2():
+    """New outcome-based UI."""
+    return render_template('index_v2.html', version=VERSION, defaults=DEFAULT_OPTIONS)
+
+
+@app.route('/shorts')
+def shorts_studio():
+    """Shorts Studio - vertical video creation."""
+    return render_template('shorts.html', version=VERSION)
 
 
 @app.route('/api/status')
@@ -1048,6 +1062,216 @@ def api_cgpu_jobs():
         return jsonify({"error": "CGPUJobManager not available"}), 503
 
     return jsonify(manager.stats())
+
+
+# =============================================================================
+# TRANSCRIPT API ENDPOINTS (Text-Based Editing)
+# =============================================================================
+
+# Create upload directory for transcript videos
+TRANSCRIPT_UPLOAD_DIR = Path(os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_transcript"))
+TRANSCRIPT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.route('/transcript')
+def transcript_editor():
+    """Render transcript-based text editor UI."""
+    return render_template('transcript.html')
+
+
+@app.route('/api/transcript/upload', methods=['POST'])
+def api_transcript_upload():
+    """Upload video file for transcript editing."""
+    if 'video' not in request.files:
+        return jsonify({"error": "No video file provided"}), 400
+    
+    file = request.files['video']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if not allowed_file(file.filename, {'mp4', 'mov', 'avi', 'mkv', 'webm', 'mp3', 'wav'}):
+        return jsonify({"error": "Invalid file type"}), 400
+    
+    filename = secure_filename(file.filename)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_filename = f"{timestamp}_{filename}"
+    filepath = TRANSCRIPT_UPLOAD_DIR / unique_filename
+    
+    file.save(filepath)
+    
+    return jsonify({
+        "success": True,
+        "path": str(filepath),
+        "filename": unique_filename
+    })
+
+
+@app.route('/api/transcript/video/<filename>')
+def api_transcript_video(filename):
+    """Serve uploaded video for preview."""
+    filepath = TRANSCRIPT_UPLOAD_DIR / secure_filename(filename)
+    if not filepath.exists():
+        return jsonify({"error": "File not found"}), 404
+    return send_file(filepath)
+
+
+@app.route('/api/transcript/transcribe', methods=['POST'])
+def api_transcript_transcribe():
+    """Transcribe video using Whisper (local or CGPU)."""
+    data = request.json or {}
+    video_path = data.get('video_path')
+    
+    if not video_path or not Path(video_path).exists():
+        return jsonify({"error": "Video file not found"}), 404
+    
+    try:
+        # Try CGPU first, fall back to local
+        cgpu_available = is_cgpu_available()
+        
+        if cgpu_available:
+            # Use CGPU transcription
+            from ..cgpu_jobs import TranscribeJob
+            job = TranscribeJob(
+                audio_path=video_path,
+                model=data.get('model', 'medium'),
+                output_format='json',  # Word-level timestamps
+                language=data.get('language'),
+            )
+            result = job.execute()
+            
+            if result.success and result.output_path:
+                with open(result.output_path, 'r') as f:
+                    transcript = json.load(f)
+                return jsonify({"success": True, "transcript": transcript})
+            else:
+                raise Exception(result.error or "Transcription failed")
+        else:
+            # Local transcription via whisper
+            from ..transcriber import transcribe_audio
+            
+            # Extract audio first
+            audio_path = Path(video_path).with_suffix('.wav')
+            subprocess.run([
+                'ffmpeg', '-y', '-i', video_path,
+                '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                str(audio_path)
+            ], capture_output=True, check=True)
+            
+            # Transcribe
+            result = transcribe_audio(str(audio_path), model='base', word_timestamps=True)
+            
+            # Clean up temp audio
+            audio_path.unlink(missing_ok=True)
+            
+            return jsonify({"success": True, "transcript": result})
+            
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/transcript/export', methods=['POST'])
+def api_transcript_export():
+    """Export edited transcript as video, EDL, or OTIO."""
+    data = request.json or {}
+    video_path = data.get('video_path')
+    transcript = data.get('transcript')
+    export_format = data.get('format', 'video')
+    
+    if not video_path or not transcript:
+        return jsonify({"error": "Missing video_path or transcript"}), 400
+    
+    try:
+        # Build cut list from transcript
+        from ..text_editor import TextEditor
+        
+        editor = TextEditor()
+        editor.transcript = transcript
+        
+        # Generate cut list (kept segments)
+        cut_list = editor.generate_cut_list()
+        
+        output_dir = OUTPUT_DIR
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        if export_format == 'video':
+            # Render edited video using FFmpeg
+            output_path = output_dir / f"transcript_edit_{timestamp}.mp4"
+            
+            # Build complex filter for segment concatenation
+            filter_parts = []
+            for i, segment in enumerate(cut_list):
+                filter_parts.append(
+                    f"[0:v]trim=start={segment['start']:.3f}:end={segment['end']:.3f},setpts=PTS-STARTPTS[v{i}];"
+                    f"[0:a]atrim=start={segment['start']:.3f}:end={segment['end']:.3f},asetpts=PTS-STARTPTS[a{i}]"
+                )
+            
+            v_concat = ''.join([f'[v{i}]' for i in range(len(cut_list))])
+            a_concat = ''.join([f'[a{i}]' for i in range(len(cut_list))])
+            filter_complex = ';'.join(filter_parts) + f';{v_concat}concat=n={len(cut_list)}:v=1:a=0[outv];{a_concat}concat=n={len(cut_list)}:v=0:a=1[outa]'
+            
+            cmd = [
+                'ffmpeg', '-y', '-i', video_path,
+                '-filter_complex', filter_complex,
+                '-map', '[outv]', '-map', '[outa]',
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+                '-c:a', 'aac', '-b:a', '128k',
+                str(output_path)
+            ]
+            
+            subprocess.run(cmd, capture_output=True, check=True)
+            
+            return jsonify({
+                "success": True,
+                "filename": output_path.name,
+                "path": str(output_path)
+            })
+            
+        elif export_format == 'edl':
+            # Export EDL
+            edl_path = output_dir / f"transcript_edit_{timestamp}.edl"
+            edl_content = editor.export_edl(str(video_path))
+            
+            with open(edl_path, 'w') as f:
+                f.write(edl_content)
+            
+            return jsonify({
+                "success": True,
+                "filename": edl_path.name,
+                "path": str(edl_path)
+            })
+            
+        elif export_format == 'otio':
+            # Export OTIO
+            from ..timeline_exporter import TimelineExporter
+            
+            otio_path = output_dir / f"transcript_edit_{timestamp}.otio"
+            
+            # Convert cut list to clips format for exporter
+            clips = []
+            for seg in cut_list:
+                clips.append({
+                    'source': video_path,
+                    'start_time': seg['start'],
+                    'end_time': seg['end'],
+                    'duration': seg['end'] - seg['start']
+                })
+            
+            exporter = TimelineExporter(clips, output_path=str(output_dir))
+            exporter.export_otio(str(otio_path))
+            
+            return jsonify({
+                "success": True,
+                "filename": otio_path.name,
+                "path": str(otio_path)
+            })
+        
+        else:
+            return jsonify({"error": f"Unknown format: {export_format}"}), 400
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == '__main__':

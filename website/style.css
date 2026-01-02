@@ -176,9 +176,196 @@ h1 {
     margin-top: 5px;
 }
 
+/* New sections for 2026 update */
+
+.whats-new {
+    padding: 80px 0;
+}
+
+.whats-new h2, .features h2, .profiles-section h2, .audience-section h2, .cta-section h2 {
+    text-align: center;
+    font-size: 2.5rem;
+    margin-bottom: 40px;
+}
+
+.section-subtitle {
+    text-align: center;
+    color: #94a3b8;
+    margin-bottom: 40px;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+}
+
+.feature-card.highlight-card {
+    position: relative;
+    border: 1px solid var(--accent-color);
+}
+
+.badge {
+    position: absolute;
+    top: -10px;
+    right: 20px;
+    background: var(--accent-color);
+    color: white;
+    font-size: 0.75rem;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.profiles-section {
+    padding: 80px 0;
+    background: linear-gradient(180deg, transparent, rgba(59, 130, 246, 0.05), transparent);
+}
+
+.profiles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.profile-card {
+    background-color: var(--secondary-color);
+    padding: 30px 20px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #334155;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.profile-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--primary-color);
+}
+
+.profile-card.featured {
+    border-color: var(--highlight-color);
+    box-shadow: 0 0 30px rgba(56, 189, 248, 0.2);
+}
+
+.profile-icon {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+}
+
+.profile-card h4 {
+    margin-bottom: 10px;
+}
+
+.profile-card p {
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.profile-detail {
+    display: block;
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--highlight-color);
+}
+
+.audience-section {
+    padding: 80px 0;
+}
+
+.audience-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.audience-card {
+    background-color: var(--secondary-color);
+    padding: 40px 30px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #334155;
+}
+
+.audience-card i {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+.audience-card h4 {
+    margin-bottom: 15px;
+    font-size: 1.25rem;
+}
+
+.cta-section {
+    padding: 100px 0;
+    text-align: center;
+}
+
+.cta-section p {
+    color: #94a3b8;
+    margin-bottom: 30px;
+    font-size: 1.1rem;
+}
+
+.btn.outline {
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid #334155;
+}
+
+.btn.outline:hover {
+    border-color: var(--primary-color);
+}
+
 footer {
     text-align: center;
     padding: 40px 0;
     color: #64748b;
     border-top: 1px solid #334155;
+}
+
+.footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+.footer-links a {
+    color: #94a3b8;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-links a:hover {
+    color: var(--highlight-color);
+}
+
+footer a {
+    color: var(--highlight-color);
+    text-decoration: none;
+}
+
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2rem;
+    }
+    
+    .cta-group {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .profiles-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .footer-links {
+        flex-wrap: wrap;
+    }
 }

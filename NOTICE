@@ -1,0 +1,91 @@
+NOTICES AND ATTRIBUTIONS
+
+Montage AI
+Copyright 2024-2026 Matthias Fahsold
+
+This product includes software developed by third parties.
+See THIRD_PARTY_LICENSES.md for complete license information.
+
+================================================================================
+
+CORE DEPENDENCIES
+================================================================================
+
+FFmpeg (https://ffmpeg.org/)
+Licensed under LGPL 2.1+
+Copyright the FFmpeg developers
+
+OpenCV (https://opencv.org/)
+Licensed under Apache License 2.0
+Copyright OpenCV contributors
+
+Librosa (https://librosa.org/)
+Licensed under ISC License
+Copyright Brian McFee et al.
+
+OpenAI Whisper (https://github.com/openai/whisper)
+Licensed under MIT License
+Copyright 2022 OpenAI
+
+Demucs (https://github.com/facebookresearch/demucs)
+Licensed under MIT License
+Copyright Meta Platforms, Inc. and affiliates
+
+Real-ESRGAN (https://github.com/xinntao/Real-ESRGAN)
+Licensed under BSD 3-Clause License
+Copyright Xintao Wang
+
+OpenTimelineIO (https://github.com/AcademySoftwareFoundation/OpenTimelineIO)
+Licensed under Apache License 2.0
+Copyright Contributors to the OpenTimelineIO project
+
+================================================================================
+
+WEB FRAMEWORK
+================================================================================
+
+Flask (https://flask.palletsprojects.com/)
+Licensed under BSD 3-Clause License
+Copyright Pallets
+
+================================================================================
+
+MACHINE LEARNING
+================================================================================
+
+PyTorch (https://pytorch.org/)
+Licensed under BSD 3-Clause License
+Copyright Facebook, Inc. and its affiliates
+
+NumPy (https://numpy.org/)
+Licensed under BSD 3-Clause License
+Copyright NumPy Developers
+
+================================================================================
+
+FONTS
+================================================================================
+
+Space Grotesk (https://fonts.google.com/specimen/Space+Grotesk)
+Licensed under SIL Open Font License 1.1
+
+Inter (https://rsms.me/inter/)
+Licensed under SIL Open Font License 1.1
+
+Space Mono (https://fonts.google.com/specimen/Space+Mono)
+Licensed under SIL Open Font License 1.1
+
+================================================================================
+
+DISCLAIMER
+================================================================================
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.
+
+For full license texts, see THIRD_PARTY_LICENSES.md and the LICENSE file
+in the root directory of this distribution.
+
+================================================================================
