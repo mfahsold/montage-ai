@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Any
 
 from .creative_director import (
     CreativeDirector,
+    PROMPT_GUARDRAILS,
 )
 from .config import get_settings
 
@@ -155,6 +156,8 @@ CRITICAL RULES:
 4. Approve if satisfaction >= 0.8 and no critical issues
 5. Maximum 3 iterations recommended (don't be too picky)
 """
+
+EVALUATOR_SYSTEM_PROMPT = f"{EVALUATOR_SYSTEM_PROMPT}\n{PROMPT_GUARDRAILS}"
 
 
 # =============================================================================
