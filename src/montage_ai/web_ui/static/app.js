@@ -12,18 +12,20 @@ let systemStatus = {};
 // =============================================================================
 
 const TOGGLE_CONFIG = [
-    { id: 'enhance', label: 'Enhance', desc: 'Color/sharpness tweak.', default: false, badges: [{ type: 'quality', text: 'Quality+' }] },
-    { id: 'stabilize', label: 'Stabilize', desc: 'Reduce camera shake.', default: false, badges: [{ type: 'quality', text: 'Quality+' }, { type: 'cost', text: 'Slower' }] },
-    { id: 'upscale', label: 'Upscale', desc: 'AI 4x upscaling.', default: false, badges: [{ type: 'quality', text: 'Quality++' }, { type: 'cost', text: 'GPU Heavy' }] },
-    { id: 'cgpu', label: 'Cloud GPU', desc: 'Offload to cloud.', default: false, badges: [{ type: 'info', text: 'Remote' }] },
-    { id: 'shorts_mode', label: 'Shorts Mode', desc: '9:16 Vertical + Smart Crop.', default: false, badges: [{ type: 'info', text: 'TikTok/Reels' }, { type: 'quality', text: 'AI Reframing' }] },
-    { id: 'llm_clip_selection', label: 'LLM Clip Selection', desc: 'Semantic scene analysis.', default: false, badges: [{ type: 'quality', text: 'Smart Cuts' }] },
-    { id: 'creative_loop', label: 'Creative Loop', desc: 'LLM refines cuts iteratively.', default: false, badges: [{ type: 'quality', text: 'Agentic' }, { type: 'cost', text: '2-3x Time' }] },
-    { id: 'story_engine', label: 'Story Engine', desc: 'Narrative tension-based editing.', default: false, badges: [{ type: 'quality', text: 'Cinematic' }] },
-    { id: 'captions', label: 'Burn-in Captions', desc: 'Auto-transcribed subtitles.', default: false, badges: [{ type: 'info', text: 'Social Ready' }, { type: 'cost', text: 'cgpu' }] },
-    { id: 'export_timeline', label: 'Export Timeline', desc: 'OTIO/EDL for NLEs.', default: false, badges: [{ type: 'info', text: 'Resolve/Premiere' }] },
-    { id: 'generate_proxies', label: 'Generate Proxies', desc: 'Faster NLE editing.', default: false, badges: [{ type: 'cost', text: 'Extra Files' }] },
-    { id: 'preserve_aspect', label: 'Preserve Aspect', desc: 'Letterbox vs crop.', default: false, badges: [{ type: 'info', text: 'Safe Area' }] }
+    // Core toggles (always visible)
+    { id: 'shorts_mode', label: 'Shorts Mode', desc: '9:16 Vertical + Smart Crop.', default: false, category: 'core', badges: [{ type: 'info', text: 'TikTok/Reels' }, { type: 'quality', text: 'AI Reframing' }] },
+    { id: 'captions', label: 'Burn-in Captions', desc: 'Auto-transcribed subtitles.', default: false, category: 'core', badges: [{ type: 'info', text: 'Social Ready' }] },
+    { id: 'export_timeline', label: 'Export Timeline', desc: 'OTIO/EDL for NLEs.', default: false, category: 'core', badges: [{ type: 'info', text: 'Resolve/Premiere' }] },
+    { id: 'cloud_acceleration', label: 'Cloud Acceleration', desc: 'Offload AI tasks to cloud GPU (upscaling, transcription, LLM).', default: false, category: 'core', badges: [{ type: 'info', text: 'Auto-Fallback' }] },
+    
+    // Advanced AI features (collapsible)
+    { id: 'llm_clip_selection', label: 'LLM Clip Selection', desc: 'Semantic scene analysis.', default: false, category: 'advanced', badges: [{ type: 'quality', text: 'Smart Cuts' }, { type: 'cost', text: 'LLM Cost' }] },
+    { id: 'creative_loop', label: 'Creative Loop', desc: 'LLM refines cuts iteratively.', default: false, category: 'advanced', badges: [{ type: 'quality', text: 'Agentic' }, { type: 'cost', text: '2-3x Time' }] },
+    { id: 'story_engine', label: 'Story Engine', desc: 'Narrative tension-based editing.', default: false, category: 'advanced', badges: [{ type: 'quality', text: 'Cinematic' }] },
+    
+    // Pro export options (collapsible)
+    { id: 'generate_proxies', label: 'Generate Proxies', desc: 'Faster NLE editing.', default: false, category: 'pro', badges: [{ type: 'cost', text: 'Extra Files' }] },
+    { id: 'preserve_aspect', label: 'Preserve Aspect', desc: 'Letterbox vs crop.', default: false, category: 'pro', badges: [{ type: 'info', text: 'Safe Area' }] }
 ];
 
 // Pipeline phases for progress display
@@ -47,12 +49,36 @@ const STORY_ARC_PRESETS = [
     { id: 'constant', name: 'Constant', desc: 'Flat energy (music videos)' }
 ];
 
-// Quality profile presets
+// Quality profile presets (strategy-aligned with clear value props)
 const QUALITY_PROFILES = [
-    { id: 'preview', name: 'Preview', desc: 'Fast render, lower quality' },
-    { id: 'standard', name: 'Standard', desc: 'Balanced (default)' },
-    { id: 'high', name: 'High', desc: 'Slow render, high quality' },
-    { id: 'master', name: 'Master', desc: 'Archive quality (HEVC)' }
+    { 
+        id: 'preview', 
+        name: '🚀 Preview', 
+        desc: '360p Fast Iteration',
+        details: 'No enhancements. Quick rough cut review.',
+        settings: { enhance: false, stabilize: false, upscale: false, resolution: '360p' }
+    },
+    { 
+        id: 'standard', 
+        name: '📺 Standard', 
+        desc: '1080p Social Media',
+        details: 'Color grading. General use.',
+        settings: { enhance: true, stabilize: false, upscale: false, resolution: '1080p' }
+    },
+    { 
+        id: 'high', 
+        name: '✨ High', 
+        desc: '1080p Professional',
+        details: 'Grading + stabilization. Pro delivery.',
+        settings: { enhance: true, stabilize: true, upscale: false, resolution: '1080p' }
+    },
+    { 
+        id: 'master', 
+        name: '🎬 Master', 
+        desc: '4K Broadcast',
+        details: 'All enhancements + AI upscaling. Cinema, archival.',
+        settings: { enhance: true, stabilize: true, upscale: true, resolution: '4k' }
+    }
 ];
 
 // File validation config
@@ -163,15 +189,67 @@ function renderQualitySelector() {
     const container = document.getElementById('qualityProfile-container');
     if (!container) return;
 
+    // Render as visual cards instead of dropdown (strategy: outcome-based UI)
     container.innerHTML = `
-        <label for="qualityProfile">Quality Profile</label>
-        <select id="qualityProfile" class="voxel-select">
-            ${QUALITY_PROFILES.map(qp =>
-                `<option value="${qp.id}" ${qp.id === 'standard' ? 'selected' : ''}>${qp.name} - ${qp.desc}</option>`
-            ).join('')}
-        </select>
-        <div class="helper">Higher quality = slower render. Master uses HEVC codec.</div>
+        <label style="display: block; margin-bottom: 0.75rem; font-weight: 600;">Quality Profile</label>
+        <div class="quality-profile-cards" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+            ${QUALITY_PROFILES.map(qp => `
+                <div class="quality-card ${qp.id === 'standard' ? 'selected' : ''}" 
+                     data-profile="${qp.id}"
+                     onclick="selectQualityProfile('${qp.id}')"
+                     style="
+                         background: var(--card-bg, #1a1a24);
+                         border: 2px solid var(--border, #2a2a3a);
+                         border-radius: 10px;
+                         padding: 1rem;
+                         cursor: pointer;
+                         transition: all 0.2s;
+                         text-align: center;
+                     ">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">${qp.name.split(' ')[0]}</div>
+                    <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${qp.name.substring(qp.name.indexOf(' ') + 1)}</div>
+                    <div style="font-size: 0.75rem; opacity: 0.7; margin-bottom: 0.5rem;">${qp.desc}</div>
+                    <div style="font-size: 0.7rem; opacity: 0.5;">${qp.details}</div>
+                </div>
+            `).join('')}
+        </div>
+        <input type="hidden" id="qualityProfile" value="standard">
+        <div class="helper">Choose based on your output goal. Higher quality = longer processing time.</div>
     `;
+
+    // Add styles for selected state
+    const style = document.createElement('style');
+    style.textContent = `
+        .quality-card:hover {
+            border-color: #7C3AED !important;
+            transform: translateY(-2px);
+        }
+        .quality-card.selected {
+            border-color: #7C3AED !important;
+            background: rgba(124, 58, 237, 0.15) !important;
+        }
+    `;
+    if (!document.querySelector('#quality-card-styles')) {
+        style.id = 'quality-card-styles';
+        document.head.appendChild(style);
+    }
+}
+
+function selectQualityProfile(profileId) {
+    // Update hidden input
+    const input = document.getElementById('qualityProfile');
+    if (input) input.value = profileId;
+
+    // Update UI selection
+    document.querySelectorAll('.quality-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    document.querySelector(`[data-profile="${profileId}"]`)?.classList.add('selected');
+
+    // Update run summary
+    updateRunSummary();
+    
+    showToast(`Quality profile: ${QUALITY_PROFILES.find(q => q.id === profileId)?.name}`, 'info');
 }
 
 function initPromptChips() {
@@ -194,27 +272,74 @@ function renderToggles() {
     const container = document.getElementById('toggles-container');
     if (!container) return;
 
-    container.innerHTML = TOGGLE_CONFIG.map(toggle => {
-        const badgesHtml = toggle.badges?.map(b =>
-            `<span class="toggle-badge ${b.type}">${b.text}</span>`
-        ).join('') || '';
+    // Separate toggles by category
+    const coreToggles = TOGGLE_CONFIG.filter(t => t.category === 'core');
+    const advancedToggles = TOGGLE_CONFIG.filter(t => t.category === 'advanced');
+    const proToggles = TOGGLE_CONFIG.filter(t => t.category === 'pro');
 
-        return `
-            <label class="checkbox-item-enhanced">
-                <input type="checkbox" id="${toggle.id}" ${getDefaultValue(toggle.id) ? 'checked' : ''}>
-                <div class="toggle-content">
-                    <div class="toggle-label">${toggle.label}</div>
-                    <div class="toggle-desc">${toggle.desc}</div>
-                    ${badgesHtml ? `<div class="toggle-badges">${badgesHtml}</div>` : ''}
+    const renderToggleGroup = (toggles) => {
+        return toggles.map(toggle => {
+            const badgesHtml = toggle.badges?.map(b =>
+                `<span class="toggle-badge ${b.type}">${b.text}</span>`
+            ).join('') || '';
+
+            return `
+                <label class="checkbox-item-enhanced">
+                    <input type="checkbox" id="${toggle.id}" ${getDefaultValue(toggle.id) ? 'checked' : ''}>
+                    <div class="toggle-content">
+                        <div class="toggle-label">${toggle.label}</div>
+                        <div class="toggle-desc">${toggle.desc}</div>
+                        ${badgesHtml ? `<div class="toggle-badges">${badgesHtml}</div>` : ''}
+                    </div>
+                </label>
+            `;
+        }).join('');
+    };
+
+    container.innerHTML = `
+        <div style="margin-bottom: 1.5rem;">
+            ${renderToggleGroup(coreToggles)}
+        </div>
+        
+        <details style="margin-bottom: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; padding: 0.5rem; background: rgba(124,58,237,0.1); border-radius: 6px; margin-bottom: 0.75rem;">
+                🤖 Advanced AI Features (Optional)
+            </summary>
+            <div style="padding-left: 1rem;">
+                ${renderToggleGroup(advancedToggles)}
+                <div class="helper" style="margin-top: 0.5rem; font-size: 0.8rem;">
+                    ⚠️ These features use LLM and increase processing time. Enable for maximum quality.
                 </div>
-            </label>
-        `;
-    }).join('');
+            </div>
+        </details>
+        
+        ${proToggles.length > 0 ? `
+        <details style="margin-bottom: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; padding: 0.5rem; background: rgba(16,185,129,0.1); border-radius: 6px; margin-bottom: 0.75rem;">
+                🎬 Pro Export Options
+            </summary>
+            <div style="padding-left: 1rem;">
+                ${renderToggleGroup(proToggles)}
+            </div>
+        </details>
+        ` : ''}
+    `;
 
     // Attach listeners for summary updates
     container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
         cb.addEventListener('change', updateRunSummary);
     });
+    
+    // Handle cloud acceleration toggle specially (replaces old cgpu toggle)
+    const cloudAccelToggle = document.getElementById('cloud_acceleration');
+    if (cloudAccelToggle) {
+        cloudAccelToggle.addEventListener('change', (e) => {
+            // When cloud acceleration is enabled, inform backend
+            if (e.target.checked) {
+                showToast('Cloud Acceleration: Enables AI upscaling, fast transcription, LLM direction with auto-fallback', 'info');
+            }
+        });
+    }
 }
 
 function updateRunSummary() {
@@ -393,19 +518,35 @@ function buildJobPayload() {
     const getVal = (id) => document.getElementById(id)?.value;
     const getCheck = (id) => document.getElementById(id)?.checked || false;
 
+    // Get quality profile and extract settings
+    const qualityProfile = getVal('qualityProfile') || 'standard';
+    const profileSettings = QUALITY_PROFILES.find(p => p.id === qualityProfile)?.settings || {};
+
     const jobData = {
         style: getVal('style') || 'dynamic',
         prompt: getVal('prompt') || '',
         target_duration: parseFloat(getVal('targetDuration')) || 0,
         music_start: parseFloat(getVal('musicStart')) || 0,
         music_end: getVal('musicEnd') ? parseFloat(getVal('musicEnd')) : null,
-        // New fields
         story_arc: getVal('storyArc') || '',
-        quality_profile: getVal('qualityProfile') || 'standard'
+        quality_profile: qualityProfile
     };
 
+    // Apply quality profile settings
+    jobData.enhance = profileSettings.enhance || false;
+    jobData.stabilize = profileSettings.stabilize || false;
+    jobData.upscale = profileSettings.upscale || false;
+
+    // Handle cloud acceleration toggle (replaces old cgpu/cgpu_gpu toggles)
+    const cloudAcceleration = getCheck('cloud_acceleration');
+    jobData.cgpu = cloudAcceleration;  // Enable LLM features
+    jobData.cgpu_gpu = cloudAcceleration && jobData.upscale;  // Only use GPU cloud if upscaling
+
+    // Add other toggles (except old enhance/stabilize/upscale/cgpu which are now in quality profile)
     TOGGLE_CONFIG.forEach(toggle => {
-        jobData[toggle.id] = getCheck(toggle.id);
+        if (toggle.id !== 'cloud_acceleration') {  // Skip our consolidated toggle
+            jobData[toggle.id] = getCheck(toggle.id);
+        }
     });
 
     return jobData;
@@ -424,17 +565,17 @@ function validateBeforeJob() {
         return false;
     }
 
-    // Check cgpu status if enabled
-    const cgpuEnabled = document.getElementById('cgpu')?.checked;
-    if (cgpuEnabled && systemStatus.cgpu === 'unavailable') {
-        showToast('Cloud GPU enabled but not available - will use local processing', 'warning');
+    // Check cloud acceleration status if enabled
+    const cloudAccelEnabled = document.getElementById('cloud_acceleration')?.checked;
+    if (cloudAccelEnabled && systemStatus.cgpu === 'unavailable') {
+        showToast('Cloud Acceleration enabled but unavailable - will auto-fallback to local processing', 'warning');
     }
 
     // Check GPU encoder status for heavy operations
-    const upscaleEnabled = document.getElementById('upscale')?.checked;
-    const stabilizeEnabled = document.getElementById('stabilize')?.checked;
-    if ((upscaleEnabled || stabilizeEnabled) && systemStatus.gpu === 'unknown') {
-        showToast('GPU encoder not detected - heavy operations may be slow', 'info');
+    const qualityProfile = document.getElementById('qualityProfile')?.value;
+    const isHeavyProfile = qualityProfile === 'high' || qualityProfile === 'master';
+    if (isHeavyProfile && systemStatus.gpu === 'unknown') {
+        showToast('GPU encoder not detected - high quality profiles may be slow', 'info');
     }
 
     return true;

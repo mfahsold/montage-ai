@@ -31,6 +31,7 @@ Commands:
   cgpu-start      Start cgpu serve (Gemini LLM API)
   cgpu-stop       Stop cgpu serve
   cgpu-status     Check cgpu status
+  cgpu-test       Test cgpu connection
 
 Styles:
   dynamic         Position-aware pacing (default)
@@ -122,8 +123,8 @@ cgpu_start() {
     echo "🚀 Starting cgpu serve..."
     PORT=${CGPU_PORT:-8090}
     # Bind to 0.0.0.0 to allow access from Docker containers
-    # Unset GOOGLE_API_KEY to avoid conflict with GEMINI_API_KEY in gemini-cli
-    (unset GOOGLE_API_KEY; exec cgpu serve --host 0.0.0.0 --port "$PORT") &
+    # Ensure both keys are set for robustness (gemini-cli sometimes demands GEMINI_API_KEY)
+    (export GEMINI_API_KEY="${GEMINI_API_KEY:-$GOOGLE_API_KEY}"; exec cgpu serve --host 0.0.0.0 --port "$PORT" > /tmp/cgpu.log 2>&1) &
     echo $! > "$CGPU_PID_FILE"
     sleep 2
     
@@ -214,7 +215,7 @@ run_montage() {
         cgpu_start || echo "⚠️ Continuing without cgpu..."
         # Unset GOOGLE_API_KEY to avoid conflict with cgpu's GEMINI_API_KEY
         # gemini-cli throws error if both are present
-        unset GOOGLE_API_KEY
+        # unset GOOGLE_API_KEY
         CGPU_ENABLED="true"  # Enable cgpu if any feature needs it
     fi
 
@@ -226,7 +227,7 @@ run_montage() {
         -e NUM_VARIANTS="$VARIANTS" \
         -e CGPU_ENABLED="$CGPU_ENABLED" \
         -e CGPU_PORT="${CGPU_PORT:-8090}" \
-        -e CGPU_MODEL="${CGPU_MODEL:-gemini-2.0-flash-exp}" \
+        -e CGPU_MODEL="${CGPU_MODEL:-gemini-2.0-flash}" \
         -e CGPU_GPU_ENABLED="$CGPU_GPU_ENABLED" \
         -e STRICT_CLOUD_COMPUTE="$STRICT_CLOUD_COMPUTE" \
         -e ENABLE_STORY_ENGINE="$STORY_ENGINE" \
@@ -322,6 +323,10 @@ case "${1:-run}" in
         ;;
     cgpu-status)
         cgpu_status
+        exit 0
+        ;;
+    cgpu-test)
+        CGPU_HOST=localhost python3 scripts/test_cgpu_connection.py
         exit 0
         ;;
     help|--help|-h)

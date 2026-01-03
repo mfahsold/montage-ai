@@ -584,7 +584,7 @@ class CreativeDirector:
         try:
             # cgpu serve (Gemini) via OpenAI Responses API
             response = self.cgpu_client.responses.create(
-                model=os.environ.get("CGPU_MODEL", "gemini-2.0-flash-exp"),
+                model=os.environ.get("CGPU_MODEL", "gemini-2.0-flash"),
                 instructions=self.system_prompt,
                 input=user_prompt,
             )
@@ -605,6 +605,12 @@ class CreativeDirector:
                 
         except Exception as e:
             logger.warning(f"cgpu/Gemini error: {e}")
+            
+            # Fallback to Google AI if available
+            if self.llm_config.has_google_backend:
+                logger.info("Falling back to Google AI...")
+                return self._query_google_ai(user_prompt)
+
             # Fallback to Ollama if cgpu fails
             logger.info("Falling back to Ollama...")
             return self._query_ollama(user_prompt)

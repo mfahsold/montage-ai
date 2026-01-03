@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montage AI - AI Rough Cut + Social-Ready Output + Pro Handoff</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #7C3AED;
+            --accent-soft: rgba(124, 58, 237, 0.15);
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --bg: #0a0a0f;
+            --card-bg: #1a1a24;
+            --border: #2a2a3a;
+            --fg: #e0e0e8;
+            --muted: #8a8a9a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent), #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            color: var(--muted);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .version {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+
+        /* Workflow Cards Grid */
+        .workflows {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        @media (max-width: 1024px) {
+            .workflows {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .workflow-card {
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .workflow-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(124, 58, 237, 0.2);
+        }
+
+        .workflow-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), #a78bfa);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .workflow-card:hover::before {
+            opacity: 1;
+        }
+
+        .workflow-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .workflow-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .workflow-subtitle {
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-bottom: 1rem;
+        }
+
+        .workflow-features {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .workflow-features li {
+            padding: 0.4rem 0;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .workflow-features li::before {
+            content: '→';
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .workflow-btn {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .workflow-btn:hover {
+            background: #6d28d9;
+        }
+
+        /* Feature Highlights */
+        .features-section {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .features-section h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .feature-item {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+        }
+
+        .feature-content h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .feature-content p {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        /* Differentiators */
+        .differentiators {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .differentiators {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .diff-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .diff-card h3 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent);
+        }
+
+        .diff-card p {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Montage<span style="color: var(--accent)">AI</span></h1>
+            <p class="tagline">Edit like text. Cut like music. Deliver like a pro.</p>
+            <p class="version">v{{ version }} // AI Rough Cut + Social-Ready Output + Pro Handoff</p>
+        </header>
+
+        <!-- Strategic Positioning -->
+        <div class="differentiators">
+            <div class="diff-card">
+                <h3>🏠 Local-First</h3>
+                <p>Privacy-first processing. Cloud optional.</p>
+            </div>
+            <div class="diff-card">
+                <h3>⚡ Fast Preview</h3>
+                <p>&lt;3 min to first rough cut</p>
+            </div>
+            <div class="diff-card">
+                <h3>✨ Polish, Don't Generate</h3>
+                <p>We refine your footage, not create it</p>
+            </div>
+            <div class="diff-card">
+                <h3>🎬 Pro Handoff</h3>
+                <p>OTIO/EDL export to any NLE</p>
+            </div>
+        </div>
+
+        <!-- Main Workflows -->
+        <div class="workflows">
+            <!-- Montage Creator -->
+            <div class="workflow-card" onclick="window.location.href='/montage'">
+                <span class="workflow-icon">🎬</span>
+                <h2 class="workflow-title">Montage Creator</h2>
+                <p class="workflow-subtitle">Beat-sync + Story Arc + Style Presets</p>
+                <ul class="workflow-features">
+                    <li>AI rough cut automation</li>
+                    <li>Beat-synced to music</li>
+                    <li>Story arc shaping</li>
+                    <li>Style presets (Hitchcock, MTV, Documentary)</li>
+                    <li>Quality profiles (Preview → Master)</li>
+                </ul>
+                <a href="/montage" class="workflow-btn">Start Creating</a>
+            </div>
+
+            <!-- Transcript Editor -->
+            <div class="workflow-card" onclick="window.location.href='/transcript'">
+                <span class="workflow-icon">📝</span>
+                <h2 class="workflow-title">Transcript Editor</h2>
+                <p class="workflow-subtitle">Text = Cut. Click words = Remove clips.</p>
+                <ul class="workflow-features">
+                    <li>Edit video by editing text</li>
+                    <li>Auto-transcription (Whisper)</li>
+                    <li>Word-level timestamps</li>
+                    <li>Filler word removal (um, uh, like)</li>
+                    <li>Export EDL/OTIO/Video</li>
+                </ul>
+                <a href="/transcript" class="workflow-btn">Edit Text</a>
+            </div>
+
+            <!-- Shorts Studio -->
+            <div class="workflow-card" onclick="window.location.href='/shorts'">
+                <span class="workflow-icon">📱</span>
+                <h2 class="workflow-title">Shorts Studio</h2>
+                <p class="workflow-subtitle">9:16 Vertical + Smart Reframe + Captions</p>
+                <ul class="workflow-features">
+                    <li>Smart reframe to vertical (9:16)</li>
+                    <li>Auto-captions (TikTok, YouTube styles)</li>
+                    <li>Highlight detection MVP</li>
+                    <li>Face/subject tracking</li>
+                    <li>Social-ready output</li>
+                </ul>
+                <a href="/shorts" class="workflow-btn">Create Shorts</a>
+            </div>
+        </div>
+
+        <!-- Feature Highlights -->
+        <div class="features-section">
+            <h2>Core Features</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">🎵</div>
+                    <div class="feature-content">
+                        <h3>Beat-Sync Montage</h3>
+                        <p>Cuts automatically sync to music beats using librosa audio analysis</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🎨</div>
+                    <div class="feature-content">
+                        <h3>Style Templates</h3>
+                        <p>7 built-in styles: Dynamic, Hitchcock, MTV, Action, Documentary, Minimalist, Wes Anderson</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">⚙️</div>
+                    <div class="feature-content">
+                        <h3>Quality Profiles</h3>
+                        <p>One click: Preview (fast), Standard, High (stabilized), Master (4K+upscale)</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">☁️</div>
+                    <div class="feature-content">
+                        <h3>Cloud Acceleration</h3>
+                        <p>Optional cloud GPU for AI upscaling, transcription, LLM direction with auto-fallback</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔊</div>
+                    <div class="feature-content">
+                        <h3>Audio Polish</h3>
+                        <p>Voice isolation + noise reduction in one click</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📤</div>
+                    <div class="feature-content">
+                        <h3>Pro Export</h3>
+                        <p>OTIO/EDL timeline export for DaVinci Resolve, Premiere Pro, Final Cut</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🤖</div>
+                    <div class="feature-content">
+                        <h3>Smart Clip Selection</h3>
+                        <p>LLM-powered semantic scene analysis and intelligent clip selection</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔒</div>
+                    <div class="feature-content">
+                        <h3>Privacy-First</h3>
+                        <p>Local processing default. Raw footage never leaves your machine unless you enable cloud</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>
+                <strong>Montage AI</strong> — Local-first AI Post-Production Assistant<br>
+                <a href="https://github.com/mfahsold/montage-ai" target="_blank">GitHub</a> · 
+                <a href="/docs/features.html">Features</a> · 
+                <a href="/docs/getting-started.html">Getting Started</a> · 
+                <a href="/docs/responsible_ai.html">Responsible AI</a>
+            </p>
+            <p style="margin-top: 1rem; font-size: 0.75rem; opacity: 0.6;">
+                We polish pixels, we don't generate them.
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

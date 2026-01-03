@@ -423,15 +423,22 @@ def run_montage(job_id: str, style: str, options: dict):
 
 @app.route('/')
 def index():
-    """Main page - use v2 if query param present."""
-    if request.args.get('v2') or request.args.get('new'):
-        return render_template('index_v2.html', version=VERSION, defaults=DEFAULT_OPTIONS)
+    """Main landing page with workflow selection (strategy-aligned UI)."""
+    # Use strategy-aligned landing page by default
+    if request.args.get('legacy'):
+        return render_template('index.html', version=VERSION, defaults=DEFAULT_OPTIONS)
+    return render_template('index_strategy.html', version=VERSION)
+
+
+@app.route('/montage')
+def montage_creator():
+    """Montage Creator - beat-sync, story arc, style presets."""
     return render_template('index.html', version=VERSION, defaults=DEFAULT_OPTIONS)
 
 
 @app.route('/v2')
 def index_v2():
-    """New outcome-based UI."""
+    """Outcome-based UI (v2 prototype)."""
     return render_template('index_v2.html', version=VERSION, defaults=DEFAULT_OPTIONS)
 
 
