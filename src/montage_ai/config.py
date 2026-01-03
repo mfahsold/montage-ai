@@ -209,7 +209,7 @@ class LLMConfig:
     cgpu_gpu_enabled: bool = field(default_factory=lambda: os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true")
     cgpu_host: str = field(default_factory=lambda: os.environ.get("CGPU_HOST", "127.0.0.1"))
     cgpu_port: int = field(default_factory=lambda: int(os.environ.get("CGPU_PORT", "5021")))
-    cgpu_model: str = field(default_factory=lambda: os.environ.get("CGPU_MODEL", "gemini-2.5-flash"))
+    cgpu_model: str = field(default_factory=lambda: os.environ.get("CGPU_MODEL", "gemini-2.0-flash"))
     cgpu_output_dir: str = field(default_factory=lambda: os.environ.get("CGPU_OUTPUT_DIR", ""))
     cgpu_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_TIMEOUT", "1200")))
     cgpu_max_concurrency: int = field(default_factory=lambda: int(os.environ.get("CGPU_MAX_CONCURRENCY", "1")))

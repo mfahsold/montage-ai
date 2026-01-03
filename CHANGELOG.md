@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **cgpu Integration**: Fixed API key propagation issue where `GOOGLE_API_KEY` was being unset, causing 502 errors.
+- **Creative Director**: Added robust fallback logic (cgpu -> Google AI -> Ollama) to ensure generation continues even if primary backend fails.
+- **Environment Config**: Updated `.env` and `montage-ai.sh` to correctly handle Google API keys for the cgpu wrapper.
+
 ### Added
 
 #### 🆕 Transcript Editor (Descript-style) - FULLY WIRED
