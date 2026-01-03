@@ -85,6 +85,7 @@ The central orchestrator that executes the editing pipeline in phases:
 |--------|---------|
 | `audio_analysis.py` | Beat detection, tempo extraction, energy profiling (librosa + FFmpeg fallback) |
 | `scene_analysis.py` | Scene detection, content analysis, visual similarity with LRU cache |
+| `smart_reframing.py` | 9:16 conversion using Convex Optimization (L2) for cinematic camera paths |
 | `video_metadata.py` | Technical metadata extraction (ffprobe wrapper) |
 | `clip_enhancement.py` | Stabilization, upscaling, color matching (Local/Cloud hybrid) |
 | `ffmpeg_config.py` | GPU encoder detection (NVENC/VAAPI/QSV), encoding parameters |
@@ -93,6 +94,7 @@ The central orchestrator that executes the editing pipeline in phases:
 
 | Optimization | Implementation | Impact |
 |--------------|----------------|--------|
+| **Preview Pipeline** | Low-res (360p) + Ultrafast preset | 10x faster iteration loop |
 | **LRU Histogram Cache** | `@lru_cache` for frame extraction | 91% cache hit rate, 2-3x faster clip selection |
 | **Parallel Scene Detection** | `ThreadPoolExecutor(max_workers=4)` | 3-4x speedup on multi-core |
 | **FFmpeg Beat Detection** | `silencedetect` + `ebur128` filters | Works without librosa (Python 3.12 compat) |

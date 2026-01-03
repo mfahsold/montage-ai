@@ -515,6 +515,10 @@
                             <span class="icon">✋</span>
                             <span class="label">Manual</span>
                         </button>
+                        <button class="reframe-btn" onclick="visualizeReframing()" id="visualizeBtn" style="grid-column: span 2;">
+                            <span class="icon">👁️</span>
+                            <span class="label">Preview AI Crop</span>
+                        </button>
                     </div>
                 </div>
 
@@ -549,6 +553,10 @@
                     <div class="toggle-row">
                         <span class="toggle-label">Detect Highlights</span>
                         <div class="toggle-switch" onclick="toggleHighlights(this)" id="highlightsToggle"></div>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label">Audio Polish (Voice Isolation)</span>
+                        <div class="toggle-switch" onclick="toggleAudioPolish(this)" id="audioPolishToggle"></div>
                     </div>
                 </div>
 
@@ -681,6 +689,7 @@
             showSafeZones: true,
             autoCaptions: true,
             detectHighlights: false,
+            audioPolish: false,
             platform: 'tiktok',
             duration: 60
         };
@@ -723,6 +732,11 @@
         function toggleHighlights(el) {
             el.classList.toggle('active');
             currentSettings.detectHighlights = el.classList.contains('active');
+        }
+
+        function toggleAudioPolish(el) {
+            el.classList.toggle('active');
+            currentSettings.audioPolish = el.classList.contains('active');
         }
 
         function loadVideo(input) {
@@ -890,6 +904,71 @@
             toast.textContent = message;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
+        }
+
+        let cropData = [];
+        let originalWidth = 0;
+
+        async function visualizeReframing() {
+            if (!videoPath) {
+                showToast('Load a video first', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('visualizeBtn');
+            btn.classList.add('selected');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="icon">⏳</span><span class="label">Analyzing...</span>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/shorts/visualize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_path: videoPath })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    cropData = data.crops;
+                    originalWidth = data.original_width;
+                    showToast('Analysis complete! Playing preview...', 'success');
+                    
+                    // Start playback
+                    const video = document.getElementById('videoPlayer');
+                    video.play();
+                    
+                    // Enable tracking
+                    video.ontimeupdate = updateCropPreview;
+                } else {
+                    showToast('Analysis failed: ' + data.error, 'error');
+                }
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                setTimeout(() => btn.classList.remove('selected'), 2000);
+            }
+        }
+
+        function updateCropPreview() {
+            if (!cropData.length || !originalWidth) return;
+            
+            const video = document.getElementById('videoPlayer');
+            const t = video.currentTime;
+            
+            // Find closest crop frame
+            const frame = cropData.reduce((prev, curr) => 
+                Math.abs(curr.time - t) < Math.abs(prev.time - t) ? curr : prev
+            );
+            
+            if (frame) {
+                // Calculate center percentage
+                const centerX = frame.x + frame.width / 2;
+                const percentX = (centerX / originalWidth) * 100;
+                
+                // Apply to object-position
+                video.style.objectPosition = `${percentX}% 50%`;
+            }
         }
     </script>
 </body>

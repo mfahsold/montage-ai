@@ -1,6 +1,6 @@
 # Montage AI – Strategic Product Document
 
-**Version:** 2.1
+**Version:** 2.2
 **Date:** January 2026
 **Classification:** Public
 
@@ -55,45 +55,56 @@ Montage AI ist ein **local-first, privacy-first** Post-Production-Assistent, der
 
 ---
 
-## Implementation Snapshot
+## Implementation Snapshot (Codebase Reality)
 
 | Feature | Status | Details |
 |---------|--------|---------|
-| **Text-based Editing** | ⚠️ Backend Ready | `text_editor.py` implementiert, CLI ready. **Web UI fehlt.** |
-| **Shorts/Reframing** | ✅ MVP | `smart_reframing.py` integriert in `montage_builder.py`. |
-| **Captions** | ✅ Core | Transcription + Burn-in in `editor.py`, UI Toggle vorhanden. |
-| **Voice Isolation** | ✅ CGPU Job | `voice_isolation.py` vorhanden, integriert in Builder. |
-| **Pro-Export** | 📋 Planned | OTIO dokumentiert, Roadmap-Scope verankert. |
+| **Preview Pipeline** | ✅ Ready | `ffmpeg_config.py` hat Preview-Preset (360p, ultrafast). Basis für Preview-First-UX. |
+| **Text-based Editing** | ⚠️ Partial | `transcript.html` liefert Word-Level-Edits & Export. Preview-Flow ist Stub. |
+| **Shorts/Reframing** | ⚠️ Partial | `shorts.html` hat UI für Safe-Zones & Styles. Render-Logik teilweise Stub. |
+| **Pro-Export** | ✅ Core | `timeline_exporter.py` unterstützt OTIO/EDL. Integration in Transcript Editor fertig. |
+| **Audio-Polish** | ⚠️ Stub | Toggle vorhanden, aber Implementierung (Voice Isolation) muss stabilisiert werden. |
 
 ---
 
-## Fokus Features (Next Steps)
+## Fokus Features (Q1 Priorities)
 
-### 1. Text-based Editing UI
-- Transcript-Panel im Web UI
-- Klick-to-Cut
-- Filler-Removal
-- Segment-Tags
-- Preview + OTIO/EDL Export direkt aus Transcript-Schnitt
+### 1. Transcript Editor Produktisierung
+- **Live-Preview (360p):** Sofortiges Feedback bei Text-Löschung.
+- **Word-Level-Cut-List:** Apply/Undo Stack.
+- **Filler-Removal:** Automatische Erkennung und Entfernung von "äh", "um".
+- **Pro-Export:** OTIO/EDL direkt aus dem Textschnitt (Done).
 
-### 2. Shorts-Pipeline 2.0
-- Face/Subject-Tracking
-- Segmentierte Crops
-- Motion-Smoothing
-- Caption-Styles (TikTok/YouTube/Karaoke) mit Live-Preview
+### 2. Shorts Studio 2.0
+- **Smart-Reframe v2:** Subject Tracking + Motion Smoothing (via `scipy` Optimierung).
+- **Caption-Styles:** Echte Styles (TikTok/Bold/Karaoke) mit Live-Preview.
+- **Highlight-Detection:** MVP für automatische Clip-Vorschläge.
 
-### 3. Highlight Detection MVP
-- Hooks/Peaks aus Audio-Energy + Speech-Phrases
-- Score-basierte Vorschlaege mit manueller Bestaetigung
+### 3. Preview-First Pipeline
+- **Default-Preview:** Sofort nach Upload generieren (360p).
+- **Klarer ETA:** Progress-Bar für Preview vs. Final Render.
+- **Upscale:** Nur in High/Master Profilen (via Real-ESRGAN).
 
-### 4. Audio-Polish
-- Voice-Isolation + Noise-Reduction als ein "Clean Audio"-Schalter
-- SNR-Check, Fallback auf Original
+### 4. Pro Handoff Pack
+- **OTIO-Export:** Standard für DaVinci/Premiere.
+- **Proxies:** Automatische Generierung für smooth Editing.
+- **Relink-README:** Anleitung für den Import im NLE.
 
-### 5. Preview-first & Quality-Profile
-- Automatisch 360p/30s Preview
-- 1-Click Final Render
-- Profile buendeln Enhance/Stabilize/Upscale
+### 5. Audio-Polish
+- **Clean Audio Toggle:** Voice Isolation + Denoise.
+- **SNR-Check:** Fallback auf Original bei Artefakten.
+
+---
+
+## UI/UX Vision: "Outcome Studio"
+
+Weg vom "Toggle-Friedhof" hin zu klaren Workflows:
+
+1.  **Transcript-First Tri-Pane:** Video + Text + Beat/Story-Timeline.
+2.  **Kinetische Beat-Timeline:** Energy-Curve und Story-Arc als Overlay.
+3.  **Shorts-Studio als "Phone-Rig":** Crop-Path-Overlay, Safe-Zones, Caption-Composer.
+4.  **Preview vs Final:** Bewusster Schritt, schneller A/B-Vergleich.
+5.  **Typo & Motion:** Cyber-NLE-Look, aber hochwertig (Click-to-Cut Sounding).
 
 ---
 

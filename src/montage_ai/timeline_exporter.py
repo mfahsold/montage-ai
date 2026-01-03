@@ -261,8 +261,14 @@ class TimelineExporter:
             # Use proxy if available, otherwise original
             media_path = clip_data.proxy_path or clip_data.source_path
 
-            # Create media reference
-            media_ref = otio.schema.ExternalReference(target_url=f"file://{media_path}")
+            # Create media reference (Robust URI handling)
+            try:
+                target_url = Path(media_path).absolute().as_uri()
+            except Exception:
+                # Fallback for weird paths
+                target_url = f"file://{os.path.abspath(media_path)}"
+            
+            media_ref = otio.schema.ExternalReference(target_url=target_url)
 
             # Create source range (what part of the source file to use)
             source_range = otio.opentime.TimeRange(
@@ -292,7 +298,12 @@ class TimelineExporter:
             video_track.append(otio_clip)
 
         # Add audio track
-        audio_ref = otio.schema.ExternalReference(target_url=f"file://{timeline.audio_path}")
+        try:
+            audio_url = Path(timeline.audio_path).absolute().as_uri()
+        except Exception:
+            audio_url = f"file://{os.path.abspath(timeline.audio_path)}"
+
+        audio_ref = otio.schema.ExternalReference(target_url=audio_url)
         audio_clip = otio.schema.Clip(
             name=os.path.basename(timeline.audio_path),
             media_reference=audio_ref,

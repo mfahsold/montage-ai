@@ -1228,13 +1228,21 @@ class MontageBuilder:
         # Override for Preview Mode (Low Res)
         if self.settings.encoding.quality_profile == "preview":
             logger.info("   ⚡ Preview Mode enabled: Forcing low resolution (360p)")
+            
+            # Import constants
+            from ..ffmpeg_config import PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_CRF, PREVIEW_PRESET
+            
             if profile.orientation == "vertical" or self.settings.features.shorts_mode:
-                profile.width = 360
-                profile.height = 640
+                profile.width = PREVIEW_HEIGHT  # 360
+                profile.height = PREVIEW_WIDTH  # 640
             else:
-                profile.width = 640
-                profile.height = 360
+                profile.width = PREVIEW_WIDTH   # 640
+                profile.height = PREVIEW_HEIGHT # 360
             profile.reason = "preview_mode"
+            
+            # Update encoding settings for speed
+            self.settings.encoding.crf = PREVIEW_CRF
+            self.settings.encoding.preset = PREVIEW_PRESET
 
         # determine_output_profile returns an OutputProfile dataclass
         self.ctx.output_profile = OutputProfile(

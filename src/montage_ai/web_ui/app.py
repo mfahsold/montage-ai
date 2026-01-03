@@ -1268,32 +1268,21 @@ def api_transcript_export():
             })
             
         elif export_format == 'otio':
-            # Export OTIO
-            from ..timeline_exporter import TimelineExporter
-            
+            # Export OTIO using TextEditor method (which uses TimelineExporter)
             otio_path = output_dir / f"transcript_edit_{timestamp}.otio"
             
-            # Get cut list from TextEditor
-            cut_list = editor.get_cut_list()
-            
-            # Convert to clips format for exporter
-            clips = []
-            for region in cut_list:
-                clips.append({
-                    'source': video_path,
-                    'start_time': region.start,
-                    'end_time': region.end,
-                    'duration': region.end - region.start
+            try:
+                editor.export_otio(str(otio_path))
+                
+                return jsonify({
+                    "success": True,
+                    "filename": otio_path.name,
+                    "path": str(otio_path)
                 })
-            
-            exporter = TimelineExporter(clips, output_path=str(output_dir))
-            exporter.export_otio(str(otio_path))
-            
-            return jsonify({
-                "success": True,
-                "filename": otio_path.name,
-                "path": str(otio_path)
-            })
+            except RuntimeError as e:
+                return jsonify({"success": False, "error": f"OTIO export failed: {str(e)}"}), 500
+            except Exception as e:
+                return jsonify({"success": False, "error": str(e)}), 500
         
         else:
             return jsonify({"error": f"Unknown format: {export_format}"}), 400
@@ -1393,6 +1382,53 @@ def api_shorts_analyze():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route('/api/shorts/visualize', methods=['POST'])
+def shorts_visualize():
+    """Analyze video for smart reframing and return crop data."""
+    try:
+        data = request.json
+        video_path = data.get('video_path')
+        
+        if not video_path or not os.path.exists(video_path):
+            return jsonify({'error': 'Video not found'}), 404
+            
+        from ..smart_reframing import SmartReframer
+        from dataclasses import asdict
+        import cv2
+        
+        # Get video dimensions
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+             return jsonify({'error': 'Could not open video'}), 500
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+
+        # Initialize reframer
+        reframer = SmartReframer(target_aspect=9/16)
+        
+        # Analyze
+        crop_windows = reframer.analyze(video_path)
+        
+        # Convert to JSON-serializable format
+        results = [asdict(cw) for cw in crop_windows]
+        
+        # Downsample for frontend performance if too many frames
+        # Return max 500 points to keep payload light
+        step = max(1, len(results) // 500)
+        results = results[::step]
+            
+        return jsonify({
+            'success': True,
+            'crops': results,
+            'original_width': width,
+            'original_height': height
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/shorts/render', methods=['POST'])
 def api_shorts_render():
     """Render vertical video with smart reframing and captions."""
@@ -1403,11 +1439,52 @@ def api_shorts_render():
     add_captions = data.get('autoCaptions', data.get('add_captions', True))
     platform = data.get('platform', 'tiktok')
     duration = int(data.get('duration', 60))
+    audio_polish = data.get('audioPolish', False)
     
     if not video_path or not Path(video_path).exists():
         return jsonify({"error": "Video file not found"}), 404
     
     try:
+        # Apply Audio Polish if requested
+        if audio_polish:
+            try:
+                from ..cgpu_jobs import VoiceIsolationJob
+                from ..cgpu_utils import is_cgpu_available
+                
+                if is_cgpu_available():
+                    job = VoiceIsolationJob(
+                        audio_path=video_path,
+                        model="htdemucs",
+                        two_stems=True,
+                        keep_all_stems=True
+                    )
+                    result = job.execute()
+                    
+                    if result.success and result.metadata.get("stems", {}).get("vocals"):
+                        vocals_path = result.metadata["stems"]["vocals"]
+                        # Create a temp video with replaced audio
+                        timestamp_polish = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        polished_video_path = OUTPUT_DIR / f"shorts_polished_{timestamp_polish}.mp4"
+                        
+                        # Use ffmpeg to replace audio
+                        cmd = [
+                            "ffmpeg", "-y",
+                            "-i", video_path,
+                            "-i", vocals_path,
+                            "-c:v", "copy",
+                            "-c:a", "aac",
+                            "-map", "0:v:0",
+                            "-map", "1:a:0",
+                            str(polished_video_path)
+                        ]
+                        subprocess.run(cmd, check=True, capture_output=True)
+                        
+                        # Update video_path to point to the polished version
+                        video_path = str(polished_video_path)
+            except Exception as e:
+                print(f"Audio polish failed: {e}")
+                # Continue with original audio
+
         from ..smart_reframing import SmartReframer
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -33,6 +33,14 @@ from typing import Dict, Any, List, Optional, Set, Tuple
 from .ffmpeg_config import get_config
 from .logger import logger
 
+# Import Timeline Exporter for Pro Handoff
+try:
+    from .timeline_exporter import TimelineExporter, Timeline, Clip
+    TIMELINE_EXPORTER_AVAILABLE = True
+except ImportError:
+    TIMELINE_EXPORTER_AVAILABLE = False
+    logger.warning("TimelineExporter not available")
+
 
 @dataclass
 class Word:
@@ -726,6 +734,7 @@ class TextEditor:
     def export_edl(self, output_path: str) -> str:
         """
         Export Edit Decision List for NLE import.
+        Uses TimelineExporter for robust CMX 3600 generation.
 
         Args:
             output_path: Output EDL file path
@@ -733,6 +742,98 @@ class TextEditor:
         Returns:
             Path to EDL file
         """
+        if not TIMELINE_EXPORTER_AVAILABLE:
+            logger.warning("TimelineExporter not available, falling back to legacy EDL export")
+            return self._export_edl_legacy(output_path)
+
+        # Convert to Timeline object
+        timeline = self._create_timeline(project_name="text_edit_export")
+        
+        # Export
+        exporter = TimelineExporter(output_dir=os.path.dirname(output_path))
+        result = exporter.export_timeline(
+            timeline,
+            generate_proxies=False,
+            export_otio=False,
+            export_edl=True,
+            export_xml=False,
+            export_csv=False
+        )
+        
+        # Move/Rename if necessary (TimelineExporter generates its own name)
+        generated_edl = result.get('edl')
+        if generated_edl and generated_edl != output_path:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            os.rename(generated_edl, output_path)
+            return output_path
+        
+        return generated_edl or output_path
+
+    def export_otio(self, output_path: str) -> str:
+        """
+        Export OpenTimelineIO file for DaVinci/Premiere.
+
+        Args:
+            output_path: Output OTIO file path
+
+        Returns:
+            Path to OTIO file
+        """
+        if not TIMELINE_EXPORTER_AVAILABLE:
+            raise RuntimeError("TimelineExporter not available")
+
+        timeline = self._create_timeline(project_name="text_edit_export")
+        exporter = TimelineExporter(output_dir=os.path.dirname(output_path))
+        
+        result = exporter.export_timeline(
+            timeline,
+            generate_proxies=False,
+            export_otio=True,
+            export_edl=False,
+            export_xml=False,
+            export_csv=False
+        )
+        
+        generated_otio = result.get('otio')
+        if generated_otio and generated_otio != output_path:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            os.rename(generated_otio, output_path)
+            return output_path
+            
+        return generated_otio or output_path
+
+    def _create_timeline(self, project_name: str) -> 'Timeline':
+        """Convert current edit state to a Timeline object."""
+        cut_list = self.get_cut_list()
+        clips = []
+        
+        current_timeline_time = 0.0
+        
+        for region in cut_list:
+            duration = region.end - region.start
+            
+            clips.append(Clip(
+                source_path=str(self.video_path),
+                start_time=region.start,
+                duration=duration,
+                timeline_start=current_timeline_time,
+                metadata={
+                    "text_content": " ".join(w.text for w in self.get_words_in_range(region.start, region.end))
+                }
+            ))
+            current_timeline_time += duration
+            
+        return Timeline(
+            clips=clips,
+            audio_path=str(self.video_path), # Use video as audio source
+            total_duration=current_timeline_time,
+            project_name=project_name
+        )
+
+    def _export_edl_legacy(self, output_path: str) -> str:
+        """Legacy EDL export (fallback)."""
         cut_list = self.get_cut_list()
         if not cut_list:
             raise ValueError("No content to export")
@@ -911,15 +1012,18 @@ if __name__ == "__main__":
     interactive = "--interactive" in args
     stats_only = "--stats" in args
     edl_export = None
+    otio_export = None
 
     for i, arg in enumerate(args):
         if arg == "--export-edl" and i + 1 < len(args):
             edl_export = args[i + 1]
+        elif arg == "--export-otio" and i + 1 < len(args):
+            otio_export = args[i + 1]
 
     # Find output path (first non-flag argument)
     output = None
     for arg in args:
-        if not arg.startswith("--") and arg != edl_export:
+        if not arg.startswith("--") and arg != edl_export and arg != otio_export:
             output = arg
             break
 
@@ -964,8 +1068,16 @@ if __name__ == "__main__":
 
             if edl_export:
                 editor.export_edl(edl_export)
+                print(f"   ✅ Exported EDL: {edl_export}")
 
-            if output or not edl_export:
+            if otio_export:
+                try:
+                    editor.export_otio(otio_export)
+                    print(f"   ✅ Exported OTIO: {otio_export}")
+                except Exception as e:
+                    print(f"   ❌ OTIO Export failed: {e}")
+
+            if output or (not edl_export and not otio_export):
                 if output is None:
                     output = str(Path(video).parent / f"{Path(video).stem}_edited.mp4")
                 result = editor.export(output)

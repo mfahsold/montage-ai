@@ -394,6 +394,14 @@ def get_moviepy_params(crf: Optional[int] = None, preset: Optional[str] = None) 
     return get_config().moviepy_params(crf=crf, preset=preset)
 
 
+def get_preview_video_params() -> List[str]:
+    """
+    Get FFmpeg video encoding parameters for preview generation.
+    Uses lower quality and faster preset for rapid feedback.
+    """
+    return get_config().video_params(crf=PREVIEW_CRF, preset=PREVIEW_PRESET)
+
+
 def print_gpu_status():
     """
     Print GPU encoder availability status.
@@ -437,6 +445,11 @@ __all__ = [
     "STANDARD_CRF",
     "STANDARD_AUDIO_CODEC",
     "STANDARD_AUDIO_BITRATE",
+    # Preview Constants
+    "PREVIEW_WIDTH",
+    "PREVIEW_HEIGHT",
+    "PREVIEW_CRF",
+    "PREVIEW_PRESET",
     # GPU detection
     "get_best_gpu_encoder",
     "print_gpu_status",
@@ -446,4 +459,5 @@ __all__ = [
     # Convenience functions
     "get_ffmpeg_video_params",
     "get_moviepy_params",
+    "get_preview_video_params",
 ]

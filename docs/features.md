@@ -47,6 +47,11 @@ Create vertical content optimized for TikTok, Instagram Reels, and YouTube Short
 | Center | Simple center crop |
 | Custom | Manual positioning with keyframes |
 
+**Smart Reframing Engine:**
+- **Cinematic Path Planning:** Uses convex optimization (L2 regularization) to simulate professional camera operation.
+- **Physics-Based Smoothing:** Minimizes velocity and acceleration changes for fluid motion.
+- **Subject Awareness:** Keeps subjects in the "golden zone" while avoiding jerky movements.
+
 **Caption Styles:**
 - **TikTok** — White text, black stroke, bottom-aligned
 - **Minimal** — Clean sans-serif, subtle background
@@ -68,7 +73,7 @@ One selection replaces multiple toggles. Choose based on your goal, not technica
 
 | Profile | Resolution | Enhancements | Use Case |
 |---------|------------|--------------|----------|
-| 🚀 **Preview** | 360p | None | Fast iteration, rough cut review |
+| 🚀 **Preview** | 360p | None | Fast iteration (Ultrafast preset) |
 | 📺 **Standard** | 1080p | Color grading | Social media, general use |
 | ✨ **High** | 1080p | Grading + stabilization | Professional delivery |
 | 🎬 **Master** | 4K | All + AI upscaling | Broadcast, cinema, archival |
@@ -76,7 +81,7 @@ One selection replaces multiple toggles. Choose based on your goal, not technica
 **What each profile enables:**
 
 ```
-Preview:   enhance=false, stabilize=false, upscale=false, resolution=360p
+Preview:   enhance=false, stabilize=false, upscale=false, resolution=360p, preset=ultrafast
 Standard:  enhance=true,  stabilize=false, upscale=false, resolution=1080p
 High:      enhance=true,  stabilize=true,  upscale=false, resolution=1080p
 Master:    enhance=true,  stabilize=true,  upscale=true,  resolution=4k

@@ -23,7 +23,7 @@ Based on the "PwC-like" Strategy Update (Jan 2026).
 
 ### Epic 2: Preview-First Pipeline (Priority: High)
 **Goal:** Shift from "render everything" to "fast preview, then final render".
-- [ ] **Story 2.1: Low-Res Preview Job**
+- [x] **Story 2.1: Low-Res Preview Job**
   - Create a fast render profile (360p, low bitrate).
   - Update `montage-ai.sh` / `editor.py` to support `--preview` flag efficiently.
 - [ ] **Story 2.2: Web UI Preview Player**
@@ -71,6 +71,21 @@ Based on the "PwC-like" Strategy Update (Jan 2026).
   - Implement basic noise gate/reduction in `editor.py` (ffmpeg filters).
 
 ### Epic 7: Pro Export Pack (Priority: Low)
-- [ ] **Story 7.1: OTIO Export UI**
+- [x] **Story 7.1: OTIO Export UI**
   - Add "Export to Premiere/Resolve" button.
   - Generate `.otio` file alongside `.mp4`.
+
+## 90-Day Plan (Compressed)
+
+| Week | Focus | Deliverable |
+|------|-------|-------------|
+| **0-4** | **Foundation** | Transcript Editor Preview-Flow, Doku-Sync, Telemetrie. |
+| **5-8** | **Growth** | Shorts Studio 2.0 (Reframe v2 + Caption Styles + Highlight MVP). |
+| **9-12** | **Pro** | Pro Handoff Pack + Audio Polish + Performance Targets. |
+
+## Kern-KPIs
+
+1.  **Time-to-First-Preview:** < 2-3 Min (Success Rate > 95%)
+2.  **Transcript-Editing-Adoption:** > 40% der Sessions
+3.  **Shorts-Creation-Cycle:** < 10 Min
+4.  **Audio-Improvement-Rate:** > 70% (SNR-Check)
