@@ -264,7 +264,9 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
         vf_chain = _append_hwupload_vf(vf_chain, config)
 
         # Atomic write: write to .tmp first, then rename
-        temp_output = f"{output_path}.tmp"
+        # Fix: preserve extension for ffmpeg format detection
+        ext = os.path.splitext(output_path)[1]
+        temp_output = f"{output_path}.tmp{ext}"
 
         cmd = ["ffmpeg", "-y"]
         if config.is_gpu_accelerated:
@@ -364,7 +366,9 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
         )
         
         # Atomic write: write to .tmp first, then rename
-        temp_output = f"{output_path}.tmp"
+        # Fix: preserve extension for ffmpeg format detection
+        ext = os.path.splitext(output_path)[1]
+        temp_output = f"{output_path}.tmp{ext}"
 
         cmd = ["ffmpeg", "-y"]
         if config.is_gpu_accelerated:
@@ -1034,11 +1038,16 @@ class SegmentWriter:
                 # Check if we should force re-encode (NORMALIZE_CLIPS=true) or use stream copy
                 if _settings.encoding.normalize_clips:
                     logger.info("   🔄 Re-encoding final output (CFR enforcement)...")
+                    
+                    # Refresh target codec from config in case it changed or was init early
+                    current_target_codec = _ffmpeg_config.codec
+                    logger.info(f"   🎥 Final Encode: codec={current_target_codec} profile={TARGET_PROFILE} pix_fmt={TARGET_PIX_FMT}")
+
                     cmd.extend(_video_params_for_target(
                         _ffmpeg_config,
                         crf=self.ffmpeg_crf,
                         preset=self.ffmpeg_preset,
-                        target_codec=TARGET_CODEC,
+                        target_codec=current_target_codec,
                         target_profile=TARGET_PROFILE,
                         target_level=TARGET_LEVEL,
                         target_pix_fmt=TARGET_PIX_FMT,
@@ -1172,7 +1181,9 @@ class SegmentWriter:
             )
 
             # Atomic write: write to .tmp first, then rename
-            temp_output = f"{output_path}.tmp"
+            # Fix: preserve extension for ffmpeg format detection
+            ext = os.path.splitext(output_path)[1]
+            temp_output = f"{output_path}.tmp{ext}"
 
             cmd = ["ffmpeg", "-y"]
             if config.is_gpu_accelerated:

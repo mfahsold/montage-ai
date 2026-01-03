@@ -24,6 +24,14 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict
 from pathlib import Path
 
+# Mathematical optimization for smooth camera paths
+try:
+    from scipy import sparse
+    from scipy.sparse.linalg import spsolve
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+
 from .logger import logger
 from .core.cmd_runner import run_command
 
@@ -45,6 +53,65 @@ class CropWindow:
     height: int
     score: float  # Confidence score of the subject
 
+class CinematicPathPlanner:
+    """
+    Solves for an optimal camera path using convex optimization (L2 regularization).
+    Minimizes: Distance to Subject + Velocity (Shake) + Acceleration (Jerk).
+    
+    Cost Function:
+    J(x) = Σ(x_t - c_t)² + λ1 * Σ(x_t - x_{t-1})² + λ2 * Σ(x_t - 2x_{t-1} + x_{t-2})²
+    """
+    
+    def __init__(self, lambda_smooth: float = 500.0, lambda_trend: float = 50.0):
+        self.lambda_smooth = lambda_smooth # Penalizes velocity (keeps camera still)
+        self.lambda_trend = lambda_trend   # Penalizes acceleration (smooths starts/stops)
+
+    def solve(self, raw_centers: List[int]) -> List[int]:
+        """
+        Solve the linear system to find the optimal path.
+        """
+        if not SCIPY_AVAILABLE:
+            logger.warning("Scipy not available. Falling back to simple moving average.")
+            return self._fallback_smooth(raw_centers)
+            
+        n = len(raw_centers)
+        if n < 3:
+            return raw_centers
+
+        # Construct sparse matrices
+        # Identity matrix (Data term)
+        I = sparse.eye(n)
+        
+        # First difference matrix (Velocity term)
+        # [ -1  1  0 ... ]
+        # [  0 -1  1 ... ]
+        D1 = sparse.diags([-1, 1], [0, 1], shape=(n-1, n))
+        
+        # Second difference matrix (Acceleration term)
+        # [  1 -2  1  0 ... ]
+        # [  0  1 -2  1 ... ]
+        D2 = sparse.diags([1, -2, 1], [0, 1, 2], shape=(n-2, n))
+        
+        # Construct the linear system (A * x = b)
+        # Derivative of Cost Function set to 0:
+        # (I + λ1*D1.T*D1 + λ2*D2.T*D2) * x = raw_centers
+        
+        A = I + self.lambda_smooth * (D1.T @ D1) + self.lambda_trend * (D2.T @ D2)
+        b = np.array(raw_centers)
+        
+        # Solve
+        try:
+            smoothed_path = spsolve(A, b)
+            return [int(x) for x in smoothed_path]
+        except Exception as e:
+            logger.error(f"Optimization failed: {e}. Using fallback.")
+            return self._fallback_smooth(raw_centers)
+
+    def _fallback_smooth(self, data: List[int], window: int = 15) -> List[int]:
+        """Simple moving average fallback."""
+        return [int(x) for x in np.convolve(data, np.ones(window)/window, mode='same')]
+
+
 class SmartReframer:
     """
     Intelligent video reframing engine.
@@ -53,6 +120,7 @@ class SmartReframer:
     def __init__(self, target_aspect: float = 9/16, smoothing_window: int = 15):
         self.target_aspect = target_aspect
         self.smoothing_window = smoothing_window
+        self.path_planner = CinematicPathPlanner(lambda_smooth=100.0, lambda_trend=10.0)
         
         if MP_AVAILABLE:
             self.mp_face_detection = mp.solutions.face_detection
@@ -84,7 +152,11 @@ class SmartReframer:
         target_width, target_height = self._calculate_crop_dims(width, height)
         
         crops = []
+        raw_centers = []
         frame_idx = 0
+        
+        # Track last known good position to handle dropouts
+        last_center_x = width // 2
         
         while True:
             ret, frame = cap.read()
@@ -96,7 +168,7 @@ class SmartReframer:
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = self.face_detector.process(rgb_frame)
             
-            center_x = width // 2
+            center_x = last_center_x # Default to last known
             score = 0.0
             
             if results.detections:
@@ -108,15 +180,15 @@ class SmartReframer:
                 face_center_x = int((bbox.xmin + bbox.width / 2) * width)
                 center_x = face_center_x
                 score = largest_face.score[0]
+                last_center_x = center_x # Update last known
             
-            # Clamp crop window within frame
-            x = max(0, min(width - target_width, center_x - target_width // 2))
-            y = (height - target_height) // 2 # Always center vertically for now
+            raw_centers.append(center_x)
             
+            # Placeholder crop (will be updated after smoothing)
             crops.append(CropWindow(
                 time=frame_idx / fps,
-                x=int(x),
-                y=int(y),
+                x=0, # To be filled
+                y=int((height - target_height) // 2),
                 width=target_width,
                 height=target_height,
                 score=score
@@ -128,8 +200,22 @@ class SmartReframer:
 
         cap.release()
         
-        # Smooth the camera movement
-        return self._smooth_crops(crops)
+        # Apply Cinematic Path Planning (Global Optimization)
+        logger.info("Optimizing camera path...")
+        smoothed_centers = self.path_planner.solve(raw_centers)
+        
+        # Update crops with smoothed centers
+        for i, crop in enumerate(crops):
+            # Clamp to frame boundaries
+            center = smoothed_centers[i]
+            x = max(0, min(width - target_width, center - target_width // 2))
+            crop.x = int(x)
+            
+        return crops
+
+    def _fallback_smooth(self, data: List[int], window: int = 15) -> List[int]:
+        """Simple moving average fallback."""
+        return [int(x) for x in np.convolve(data, np.ones(window)/window, mode='same')]
 
     def _calculate_crop_dims(self, src_w: int, src_h: int) -> Tuple[int, int]:
         """Calculate crop dimensions maintaining target aspect ratio."""
@@ -158,21 +244,6 @@ class SmartReframer:
             CropWindow(time=i/fps, x=x, y=y, width=target_w, height=target_h, score=0.0)
             for i in range(total_frames)
         ]
-
-    def _smooth_crops(self, crops: List[CropWindow]) -> List[CropWindow]:
-        """Apply moving average smoothing to x-coordinates."""
-        if not crops:
-            return []
-            
-        xs = [c.x for c in crops]
-        # Simple moving average
-        window = self.smoothing_window
-        smoothed_xs = np.convolve(xs, np.ones(window)/window, mode='same')
-        
-        for i, c in enumerate(crops):
-            c.x = int(smoothed_xs[i])
-            
-        return crops
 
     def _segment_crops(self, crops: List[CropWindow], min_segment_duration: float = 2.0) -> List[Dict]:
         """

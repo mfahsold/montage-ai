@@ -18,6 +18,8 @@ spec:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: cgpu
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       initContainers:
         - name: cgpu-credentials-init
           image: ghcr.io/mfahsold/montage-ai:latest

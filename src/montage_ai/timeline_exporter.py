@@ -744,6 +744,31 @@ class TimelineExporter:
 
         # Move exported files into package directory
         import shutil
+        
+        # Create media directory and copy raw footage
+        media_dir = os.path.join(package_dir, "media")
+        os.makedirs(media_dir, exist_ok=True)
+        
+        # Copy video clips
+        copied_files = set()
+        for clip in timeline.clips:
+            if clip.source_path and os.path.exists(clip.source_path):
+                if clip.source_path not in copied_files:
+                    try:
+                        shutil.copy2(clip.source_path, media_dir)
+                        copied_files.add(clip.source_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to copy media {clip.source_path}: {e}")
+
+        # Copy audio
+        if timeline.audio_path and os.path.exists(timeline.audio_path):
+             if timeline.audio_path not in copied_files:
+                try:
+                    shutil.copy2(timeline.audio_path, media_dir)
+                    copied_files.add(timeline.audio_path)
+                except Exception as e:
+                    logger.warning(f"Failed to copy audio {timeline.audio_path}: {e}")
+
         for key, file_path in exported_files.items():
             if key == 'package': continue
             if os.path.exists(file_path):

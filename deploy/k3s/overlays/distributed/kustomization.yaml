@@ -11,15 +11,19 @@ kind: Kustomization
 
 namespace: montage-ai
 
-# Use local registry instead of ghcr.io
+# Use ghcr.io
 images:
   - name: ghcr.io/mfahsold/montage-ai
-    newName: localhost:5000/montage-ai
     newTag: latest
 
 resources:
   - ../../base
   - nfs-pvc.yaml
+
+configMapGenerator:
+  - name: montage-builder-patch
+    files:
+      - montage_builder.py
 
 patches:
   # Use JSON 6902 patch to REPLACE volumes (not add)
@@ -75,6 +79,15 @@ patches:
             hostPath:
               path: /dev/dri
               type: DirectoryOrCreate
+          - name: code-patch
+            configMap:
+              name: montage-builder-patch
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts/-
+        value:
+          name: code-patch
+          mountPath: /app/src/montage_ai/core/montage_builder.py
+          subPath: montage_builder.py
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
@@ -85,3 +98,83 @@ patches:
         value:
           name: USE_GPU
           value: "prefer"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CGPU_ENABLED
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CGPU_TIMEOUT
+          value: "1800"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: QUALITY_PROFILE
+          value: "master"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CUT_STYLE
+          value: "documentary"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CREATIVE_PROMPT
+          value: "Create a cinematic documentary trailer. Use slow pacing, dramatic music, and focus on visual storytelling. Color grade for a cinematic look."
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OUTPUT_CODEC
+          value: "libx265"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OUTPUT_PIX_FMT
+          value: "yuv420p10le"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OUTPUT_PROFILE
+          value: "main10"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: UPSCALE
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: STABILIZE
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: ENHANCE
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: COLORLEVELS
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: LUMA_NORMALIZE
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CLEAN_AUDIO
+          value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: EXPORT_WIDTH
+          value: "3840"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: EXPORT_HEIGHT
+          value: "2160"

@@ -1,7 +1,7 @@
 # Montage AI – Strategic Product Document
 
-**Version:** 2.0  
-**Date:** January 2026  
+**Version:** 2.1
+**Date:** January 2026
 **Classification:** Public
 
 ---
@@ -42,415 +42,99 @@ Montage AI ist ein **local-first, privacy-first** Post-Production-Assistent, der
 | Audio-Polish wird AI-Feature | [DaVinci Resolve](https://www.blackmagicdesign.com/products/davinciresolve) | Voice Isolation integrieren |
 | Short-Form Reichweite | [TikTok 1B+ MAU](https://newsroom.tiktok.com/en-us/1-billion-people-on-tiktok) | Shorts als Wachstumsdriver |
 
-### Wettbewerbslandschaft
+---
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    VIDEO EDITING LANDSCAPE                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  FULL NLEs                    AI-ASSISTED                        │
-│  ┌─────────────┐             ┌─────────────┐                    │
-│  │ Premiere    │             │ Descript    │                    │
-│  │ DaVinci     │             │ CapCut Pro  │                    │
-│  │ Final Cut   │             │ Runway      │                    │
-│  └─────────────┘             └─────────────┘                    │
-│         │                           │                            │
-│         │    ┌─────────────────┐   │                            │
-│         └───►│  MONTAGE AI     │◄──┘                            │
-│              │ "Rough Cut Hub" │                                 │
-│              │ Local + Fast    │                                 │
-│              └────────┬────────┘                                 │
-│                       │                                          │
-│              ┌────────▼────────┐                                 │
-│              │  SHORTS TOOLS   │                                 │
-│              │ OpusClip, Munch │                                 │
-│              │ Vizard, Klap    │                                 │
-│              └─────────────────┘                                 │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Strategic Positioning
+
+**Claim:** "Montage AI = schneller AI rough cut + social-ready output + pro handoff", klar abgegrenzt von Full-NLEs.
+
+- **Differenzierung:** Local-first/privacy + Geschwindigkeit bis zum ersten Cut; Cloud nur als Boost, nicht Pflicht.
+- **Zielsegmente:** Creator/Marketing-Teams mit hohem Clip-Volumen; Pro-Editoren, die Rough Cuts importieren.
+- **Produktstory:** "Editiere wie Text, schneide wie Musik, liefere wie ein Pro" verbindet Transcript + Beat-Sync + OTIO.
+- **Go-to-market:** Fokus auf Output-Qualitaet (Captions, Reframe, Audio), nicht auf generative Gimmicks.
 
 ---
 
-## Zielgruppen
+## Implementation Snapshot
 
-### Primär: Creator & Marketing Teams
-- **Profil:** Hoher Content-Output, Budget-sensitiv, brauchen Geschwindigkeit
-- **Pain Points:** Zu viel Footage, zu wenig Zeit, repetitive Schnitte
-- **Value Prop:** "1 Stunde Footage → 10 Social Clips in 30 Minuten"
-
-### Sekundär: Professional Editors
-- **Profil:** Nutzen Premiere/DaVinci, brauchen Rough Cuts
-- **Pain Points:** Rough Cut Overhead, Selektionsaufwand
-- **Value Prop:** "AI Rough Cut importieren, nur noch Fine-Tuning"
-
-### Tertiär: Indie Filmmakers
-- **Profil:** Solo oder Kleinteam, limited Resources
-- **Pain Points:** Kein Budget für Editor, Zeit für alles andere
-- **Value Prop:** "Professionelle Rough Cuts ohne Editing-Team"
+| Feature | Status | Details |
+|---------|--------|---------|
+| **Text-based Editing** | ⚠️ Backend Ready | `text_editor.py` implementiert, CLI ready. **Web UI fehlt.** |
+| **Shorts/Reframing** | ✅ MVP | `smart_reframing.py` integriert in `montage_builder.py`. |
+| **Captions** | ✅ Core | Transcription + Burn-in in `editor.py`, UI Toggle vorhanden. |
+| **Voice Isolation** | ✅ CGPU Job | `voice_isolation.py` vorhanden, integriert in Builder. |
+| **Pro-Export** | 📋 Planned | OTIO dokumentiert, Roadmap-Scope verankert. |
 
 ---
 
-## Produktstrategie
+## Fokus Features (Next Steps)
 
-### Brand Story
-> *"Editiere wie Text, schneide wie Musik, liefere wie ein Pro."*
+### 1. Text-based Editing UI
+- Transcript-Panel im Web UI
+- Klick-to-Cut
+- Filler-Removal
+- Segment-Tags
+- Preview + OTIO/EDL Export direkt aus Transcript-Schnitt
 
-Diese Tagline verbindet unsere drei Kernfeatures:
-1. **Transcript-basiertes Editing** – Text = Video
-2. **Beat-Sync Montage** – Musik = Rhythmus
-3. **OTIO/EDL Export** – Pro = Handoff
+### 2. Shorts-Pipeline 2.0
+- Face/Subject-Tracking
+- Segmentierte Crops
+- Motion-Smoothing
+- Caption-Styles (TikTok/YouTube/Karaoke) mit Live-Preview
 
-### Feature-Priorisierung
+### 3. Highlight Detection MVP
+- Hooks/Peaks aus Audio-Energy + Speech-Phrases
+- Score-basierte Vorschlaege mit manueller Bestaetigung
 
-#### ✅ IN SCOPE (Kernprodukt)
+### 4. Audio-Polish
+- Voice-Isolation + Noise-Reduction als ein "Clean Audio"-Schalter
+- SNR-Check, Fallback auf Original
 
-| Feature | Status | Priorität |
-|---------|--------|-----------|
-| Text-based Editing UI | MVP Ready | P0 |
-| Shorts Studio | MVP Ready | P0 |
-| Beat-Sync Montage | Production | P0 |
-| Smart Clip Selection | Production | P1 |
-| Auto-Captions | Production | P1 |
-| Voice Isolation | Integrated | P1 |
-| OTIO/EDL Export | Production | P1 |
-| Preview-first Pipeline | Production | P0 |
-| Quality Profiles | Implemented | P1 |
-
-#### ❌ OUT OF SCOPE (Bewusste Abgrenzung)
-
-| Feature | Grund | Alternative |
-|---------|-------|-------------|
-| Full Timeline Editing | Pro NLEs bedienen | OTIO Export |
-| Generative Video/Avatare | "Polish, don't generate" | - |
-| Social Publishing | Partner-Integrationen | Export-Formate |
-| Cloud-only Rendering | Privacy-first | Optional Offload |
-| Multicam Editing | NLE Feature | Single-Track Focus |
-| Compositing/VFX | Spezialisierte Tools | - |
-
-### Feature Consolidation
-
-Bestehende Features werden in **Outcome-basierte Bundles** zusammengefasst:
-
-```
-VORHER (Toggle-Friedhof):          NACHHER (Outcome-Flows):
-┌─────────────────────────┐        ┌─────────────────────────┐
-│ □ Enhance               │        │ Quality Profile         │
-│ □ Stabilize             │   ──►  │ ○ Preview (360p, fast)  │
-│ □ Upscale               │        │ ○ Standard (1080p)      │
-│ □ CGPU                  │        │ ○ High (+ Stabilize)    │
-│ □ LLM Selection         │        │ ○ Master (4K + All)     │
-│ □ Creative Loop         │        └─────────────────────────┘
-│ □ Story Engine          │        
-│ □ Captions              │        ┌─────────────────────────┐
-│ □ Export Timeline       │        │ Cloud Acceleration      │
-│ □ Generate Proxies      │   ──►  │ [====== ON ======]      │
-│ □ Preserve Aspect       │        │ Auto-fallback to local  │
-└─────────────────────────┘        └─────────────────────────┘
-```
-
----
-
-## UI/UX Strategie
-
-### Design Principles
-
-1. **Outcome-First:** Nutzer wählen Ziel, nicht Toggles
-2. **Preview-Default:** Jeder Workflow startet mit schneller Vorschau
-3. **Progressive Disclosure:** Erweiterte Optionen versteckt
-4. **Decision Transparency:** AI-Entscheidungen sichtbar machen
-
-### Neue UI-Struktur
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  MONTAGE AI                           [Create] [Text] [Shorts]  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │   MONTAGE       │  │   TRANSCRIPT    │  │   SHORTS        │ │
-│  │   Creator       │  │   Editor        │  │   Studio        │ │
-│  │                 │  │                 │  │                 │ │
-│  │   Beat-sync     │  │   Text = Cut    │  │   9:16 + Auto   │ │
-│  │   Story Arc     │  │   Click words   │  │   Reframe       │ │
-│  │   Style Presets │  │   Remove filler │  │   Captions      │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │ Quality: [Preview ○] [Standard ●] [High ○] [Master ○]       ││
-│  │ Cloud:   [═══════════ ON ═══════════]                       ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                  │
-│  [════════════════ CREATE MONTAGE ════════════════]             │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Visual System
-
-| Element | Spezifikation |
-|---------|---------------|
-| Typography | Space Grotesk (Headlines), Inter (Body) |
-| Colors | Deep Purple (#7C3AED) Accent, Dark Mode Default |
-| Motion | Kinetic Entrance, Subtle Hover States |
-| Texture | Subtle Gradients, Noise Overlays |
-
----
-
-## Technische Architektur
-
-### System Overview
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                         MONTAGE AI                                │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │   Web UI    │    │    CLI      │    │   Python    │          │
-│  │  (Flask)    │    │  (Typer)    │    │   API       │          │
-│  └──────┬──────┘    └──────┬──────┘    └──────┬──────┘          │
-│         │                  │                  │                   │
-│         └──────────────────┼──────────────────┘                   │
-│                            │                                      │
-│  ┌─────────────────────────▼─────────────────────────┐           │
-│  │              CORE ENGINE                           │           │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ │           │
-│  │  │ Editor  │ │Montage  │ │ Scene   │ │ Audio   │ │           │
-│  │  │  .py    │ │Builder  │ │Analysis │ │Analysis │ │           │
-│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ │           │
-│  └───────────────────────┬───────────────────────────┘           │
-│                          │                                        │
-│  ┌───────────────────────▼───────────────────────────┐           │
-│  │              PROCESSING LAYER                      │           │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ │           │
-│  │  │ FFmpeg  │ │ Whisper │ │ OpenCV  │ │ Librosa │ │           │
-│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ │           │
-│  └───────────────────────┬───────────────────────────┘           │
-│                          │                                        │
-│  ┌───────────────────────▼───────────────────────────┐           │
-│  │           OPTIONAL: CLOUD ACCELERATION             │           │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ │           │
-│  │  │ CGPU    │ │ Voice   │ │Upscale  │ │ Render  │ │           │
-│  │  │ Utils   │ │Isolation│ │ Job     │ │ Job     │ │           │
-│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ │           │
-│  └───────────────────────────────────────────────────┘           │
-│                                                                   │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### OSS Stack
-
-| Component | Library | License | Purpose |
-|-----------|---------|---------|---------|
-| Video Processing | FFmpeg | LGPL/GPL | Encoding, Decoding, Filters |
-| Audio Analysis | Librosa | ISC | Beat Detection, Energy |
-| Computer Vision | OpenCV | Apache 2.0 | Scene Detection, Face Detection |
-| Transcription | Whisper | MIT | Speech-to-Text |
-| Voice Isolation | Demucs | MIT | Source Separation |
-| Upscaling | Real-ESRGAN | BSD | AI Upscaling |
-| Timeline Export | OpenTimelineIO | Apache 2.0 | NLE Interchange |
-| Web Framework | Flask | BSD | Web UI |
+### 5. Preview-first & Quality-Profile
+- Automatisch 360p/30s Preview
+- 1-Click Final Render
+- Profile buendeln Enhance/Stabilize/Upscale
 
 ---
 
 ## Roadmap 12 Monate
 
 ### Phase 1: Foundation (0-4 Wochen)
-- [x] Transcript-UI im Web
-- [x] Preview-first Pipeline
-- [x] Toggle-Konsolidierung (Quality Profiles)
-- [x] Cloud Acceleration Single-Toggle
-- [x] New Landing Page with Three Workflows
-- [x] Quality Profile Visual Cards
-- [x] Reorganized Toggle Categories (Core/Advanced/Pro)
-- [ ] Onboarding Flow verbessern
-- [ ] Error Handling & User Feedback
+- Transcript-UI
+- Preview-first Pipeline
+- Toggle-Konsolidierung
+- Besseres Onboarding
 
-### Phase 2: Shorts Focus (5-12 Wochen)
-- [x] Shorts Studio UI
-- [ ] Smart Reframe Upgrade (Motion Smoothing)
-- [ ] Caption Styles (TikTok/YouTube/Karaoke)
-- [ ] Highlight Detection MVP
-- [ ] Face/Subject Tracking verbessern
+### Phase 2: Growth (5-12 Wochen)
+- Shorts Studio
+- Smart-Reframe-Upgrade
+- Captions-Styles
+- Highlight-Detection MVP
 
-### Phase 3: Audio & Pro (3-6 Monate)
-- [ ] Audio Polish ("Clean Audio" Toggle)
-- [ ] Voice Isolation + Denoise Bundle
-- [ ] Pro Export Pack (OTIO + Proxies + Relink)
-- [ ] Batch Processing für Clips
-- [ ] Decision Logs Export
+### Phase 3: Pro (3-6 Monate)
+- Audio-Polish (Voice Isolation + Denoise)
+- Pro-Export-Pack (OTIO+Proxies+Relink)
 
-### Phase 4: Scale (6-12 Monate)
-- [ ] Creative Loop v2 (iteratives Verbessern)
-- [ ] Style Ecosystem (Community Presets)
-- [ ] Performance Optimierung
-- [ ] Plugin Architecture
-- [ ] Enterprise Features (Team, API)
+### Phase 4: Ecosystem (6-12 Monate)
+- Creative Loop v2
+- Style-Ecosystem/Marketplace
+- Performance-Optimierung und Reliability
 
 ---
 
-## KPIs & Metriken
+## UI/UX Vision
 
-### Performance KPIs
-
-| Metrik | Ziel | Messung |
-|--------|------|---------|
-| Time-to-Preview | <3 Min bei 10 Min Input | Automatisch |
-| Time-to-Export | <10 Min bei 10 Min Input | Automatisch |
-| Preview Acceptance | >70% ohne Änderung | User Action |
-
-### Quality KPIs
-
-| Metrik | Ziel | Messung |
-|--------|------|---------|
-| Caption WER | <10% | Stichprobe |
-| Reframe Accuracy | >90% Subjects in Frame | Stichprobe |
-| Export Success | >99% | Automatisch |
-| NLE Relink Success | >95% | User Feedback |
-
-### Adoption KPIs
-
-| Metrik | Ziel | Messung |
-|--------|------|---------|
-| Shorts Output/Session | >3 | Automatisch |
-| Captions Adoption | >60% | Feature Usage |
-| Cloud Acceleration Usage | >40% (wenn verfügbar) | Feature Usage |
-| Return Users (7-day) | >30% | Analytics |
+- **Transcript-first Layout:** Split-View (Video + Text), Wort-Highlights, One-click Cuts.
+- **Energy/Beat Timeline:** Sichtbare Beat-Marker + Story-Arc-Kurve.
+- **Shorts Studio:** Phone-Frame, Safe-Area-Guides, Crop-Path-Overlay.
+- **Style-Moodboard:** Preset-Cards mit Farbfeld, Rhythmus-Label, Sample-Frames.
+- **Visual System:** Mutige Typo, kinetische Einstiegsmotion, subtile Texturen.
 
 ---
 
 ## Risiken & Mitigation
 
-| Risiko | Wahrscheinlichkeit | Impact | Mitigation |
-|--------|-------------------|--------|------------|
-| Reframe-Fehler sichtbar | Mittel | Hoch | Live-Preview, Manual Override |
-| Caption-Qualität variiert | Hoch | Mittel | Edit-Option, WER-Monitoring |
-| Performance auf Consumer HW | Hoch | Hoch | Preview-first, Proxy-System |
-| UI-Komplexität steigt | Mittel | Mittel | Outcome-Flows, Defaults |
-| Wettbewerber kopieren Features | Hoch | Mittel | Speed + Privacy Differenzierung |
-| Datenschutz-Bedenken | Niedrig | Hoch | Local-first, Transparency Panel |
-
----
-
-## Appendix
-
-### A. Competitive Feature Matrix
-
-| Feature | Montage AI | Descript | OpusClip | Premiere |
-|---------|-----------|----------|----------|----------|
-| Local Processing | ✅ | ❌ | ❌ | ✅ |
-| Text-based Editing | ✅ | ✅ | ❌ | ✅ |
-| Beat Sync | ✅ | ❌ | ❌ | ❌ |
-| Smart Reframe | ✅ | ✅ | ✅ | ✅ |
-| Auto Shorts | ✅ | ❌ | ✅ | ❌ |
-| OTIO Export | ✅ | ❌ | ❌ | ✅ |
-| Voice Isolation | ✅ | ✅ | ❌ | ❌ |
-| Free Tier | ✅ | Limited | Limited | ❌ |
-
-### B. Technology Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Local-first | Yes | Privacy, Speed, Offline |
-| Python Backend | Yes | ML Ecosystem, Rapid Dev |
-| FFmpeg Core | Yes | Industry Standard, Robust |
-| Whisper for ASR | Yes | Quality, Open Source |
-| Flask Web UI | Yes | Simple, Sufficient |
-
-### C. Glossary
-
-- **Rough Cut:** Erste Schnittversion ohne Fine-Tuning
-- **OTIO:** OpenTimelineIO – Interchange Format für NLEs
-- **EDL:** Edit Decision List – Legacy aber weit verbreitet
-- **Smart Reframe:** AI-basiertes Cropping für vertikale Formate
-- **Beat Sync:** Schnitte auf Musik-Beats ausrichten
-- **Story Arc:** Dramaturgische Spannungskurve
-
----
-
-## Implementation Notes (Januar 2026)
-
-### Phase 1 Completed Items
-
-#### UI Consolidation (Strategy-Aligned)
-
-**Landing Page** (`/` route → `index_strategy.html`):
-- Three clear workflow cards: Montage Creator, Transcript Editor, Shorts Studio
-- Strategic positioning badges: Local-First, Fast Preview, Polish Don't Generate, Pro Handoff
-- Feature highlights grid with 8 core features
-- Modern design with Space Grotesk typography and purple accent (#7C3AED)
-- Responsive grid layout for mobile
-
-**Quality Profiles** (Outcome-Based):
-```
-🚀 Preview   → 360p, no enhancements, fast iteration (<3 min)
-📺 Standard  → 1080p, color grading, social media ready
-✨ High      → 1080p, grading + stabilization, professional delivery
-🎬 Master    → 4K, all enhancements + AI upscaling, broadcast quality
-```
-- Rendered as visual cards instead of dropdown
-- Click to select, clear visual feedback
-- Automatically sets enhance/stabilize/upscale flags
-- Integrated into job payload generation
-
-**Cloud Acceleration** (Consolidated):
-- Single toggle replaces old cgpu, cgpu_gpu, separate LLM toggles
-- Auto-enables: LLM features, AI upscaling, fast transcription
-- Graceful fallback to local processing on unavailability
-- Backend mapping: `cloud_acceleration` → `cgpu=true` + `cgpu_gpu=true` (when upscaling)
-
-**Toggle Reorganization**:
-- **Core** (always visible): Shorts Mode, Captions, Export Timeline, Cloud Acceleration
-- **Advanced AI** (collapsible): LLM Clip Selection, Creative Loop, Story Engine
-- **Pro Export** (collapsible): Generate Proxies, Preserve Aspect
-- Removed individual enhance/stabilize/upscale toggles (now in Quality Profiles)
-
-#### Routes Structure
-
-```
-GET /              → Landing page (index_strategy.html)
-GET /?legacy       → Legacy full-featured UI (index.html)
-GET /montage       → Montage Creator (index.html - beat-sync, story arc)
-GET /transcript    → Transcript Editor (transcript.html - text-based editing)
-GET /shorts        → Shorts Studio (shorts.html - vertical video)
-GET /v2            → Prototype UI (index_v2.html)
-```
-
-#### Technical Implementation
-
-**Quality Profile Settings Mapping**:
-```javascript
-{
-  preview:  { enhance: false, stabilize: false, upscale: false, resolution: '360p' },
-  standard: { enhance: true,  stabilize: false, upscale: false, resolution: '1080p' },
-  high:     { enhance: true,  stabilize: true,  upscale: false, resolution: '1080p' },
-  master:   { enhance: true,  stabilize: true,  upscale: true,  resolution: '4k' }
-}
-```
-
-**Cloud Acceleration Logic**:
-```javascript
-const cloudAcceleration = getCheck('cloud_acceleration');
-jobData.cgpu = cloudAcceleration;  // Enable LLM features
-jobData.cgpu_gpu = cloudAcceleration && jobData.upscale;  // GPU only if upscaling
-```
-
-### Next Steps
-
-**Immediate (Phase 1 completion)**:
-- [ ] Add time estimates to quality profile cards (Preview: <3 min, Standard: ~5 min, etc.)
-- [ ] Implement preview-first workflow as default
-- [ ] Add tooltips explaining each quality profile
-- [ ] Improve mobile responsiveness for workflow cards
-
-**Phase 2 Priority**:
-- [ ] Caption styles selector in Shorts Studio
-- [ ] Highlight detection MVP with audio energy + speech analysis
-- [ ] Phone-frame preview overlay with safe zones
-- [ ] Better error handling and user feedback
-
----
-
-*Document maintained by Montage AI Team. Last updated: January 2026.*
+- **Reframe/Caption-Fehler:** Live-Preview, manuelle Override-Griffe.
+- **Performance:** Preview-first, Proxy-Generierung, GPU-Auto-Detect.
+- **UI-Komplexitaet:** Outcome-Flows, Progressive Disclosure.
+- **Wettbewerb:** Fokus auf zuverlaessigen Rough-cut + Pro-Handoff.

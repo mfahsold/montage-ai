@@ -314,7 +314,7 @@ class CaptionBurner:
             f"bordercolor={config.bordercolor}",
             f"x={config.x_expr}",
             f"y={config.y_expr}",
-            f"enable='between(t,{segment.start},{segment.end})'"
+            f"enable='between(t,{segment.start:.3f},{segment.end:.3f})'"
         ]
 
         if config.fontfile:

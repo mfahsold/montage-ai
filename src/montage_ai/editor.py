@@ -20,6 +20,7 @@ Version: 0.2.0 (Natural Language Control)
 """
 
 import os
+import shutil
 import random
 import json
 import time
@@ -833,6 +834,24 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
             final_output = result.output_path
             if _settings.features.captions:
                 final_output = _apply_captions(final_output, _settings)
+
+            # Organize output into project folder
+            if result.project_package_path and os.path.exists(result.project_package_path):
+                try:
+                    # Move final video
+                    if final_output and os.path.exists(final_output):
+                        dest = os.path.join(result.project_package_path, os.path.basename(final_output))
+                        shutil.move(final_output, dest)
+                        final_output = dest
+                        logger.info(f"   📦 Moved video to project package: {dest}")
+                    
+                    # Copy log file if it exists
+                    log_file = os.path.join(_settings.paths.output_dir, "render.log")
+                    if os.path.exists(log_file):
+                        shutil.copy2(log_file, result.project_package_path)
+                        logger.info(f"   📝 Copied log to project package")
+                except Exception as e:
+                    logger.warning(f"   ⚠️ Failed to organize project files: {e}")
 
             return final_output
         else:

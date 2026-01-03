@@ -26,6 +26,7 @@ Commands:
   web             Start Web UI
   preview         Quick preview (fast preset)
   hq              High quality render
+  retrieve        Retrieve results from cluster
   list            List available styles
   build           Build Docker image
   cgpu-start      Start cgpu serve (Gemini LLM API)
@@ -327,6 +328,10 @@ case "${1:-run}" in
         ;;
     cgpu-test)
         CGPU_HOST=localhost python3 scripts/test_cgpu_connection.py
+        exit 0
+        ;;
+    retrieve)
+        python3 scripts/retrieve_results.py
         exit 0
         ;;
     help|--help|-h)

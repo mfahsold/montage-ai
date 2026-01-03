@@ -51,6 +51,12 @@ STANDARD_HEIGHT_HORIZONTAL = 1080
 STANDARD_WIDTH_VERTICAL = 1080
 STANDARD_HEIGHT_VERTICAL = 1920
 
+# Preview presets (Low latency, low res for fast feedback)
+PREVIEW_WIDTH = 640
+PREVIEW_HEIGHT = 360  # 360p
+PREVIEW_CRF = 28      # Lower quality
+PREVIEW_PRESET = "ultrafast"
+
 # Encoding defaults
 STANDARD_FPS = 30
 STANDARD_PIX_FMT = "yuv420p"
