@@ -262,6 +262,9 @@ VORHER (Toggle-Friedhof):          NACHHER (Outcome-Flows):
 - [x] Preview-first Pipeline
 - [x] Toggle-Konsolidierung (Quality Profiles)
 - [x] Cloud Acceleration Single-Toggle
+- [x] New Landing Page with Three Workflows
+- [x] Quality Profile Visual Cards
+- [x] Reorganized Toggle Categories (Core/Advanced/Pro)
 - [ ] Onboarding Flow verbessern
 - [ ] Error Handling & User Feedback
 
@@ -364,6 +367,89 @@ VORHER (Toggle-Friedhof):          NACHHER (Outcome-Flows):
 - **Smart Reframe:** AI-basiertes Cropping für vertikale Formate
 - **Beat Sync:** Schnitte auf Musik-Beats ausrichten
 - **Story Arc:** Dramaturgische Spannungskurve
+
+---
+
+## Implementation Notes (Januar 2026)
+
+### Phase 1 Completed Items
+
+#### UI Consolidation (Strategy-Aligned)
+
+**Landing Page** (`/` route → `index_strategy.html`):
+- Three clear workflow cards: Montage Creator, Transcript Editor, Shorts Studio
+- Strategic positioning badges: Local-First, Fast Preview, Polish Don't Generate, Pro Handoff
+- Feature highlights grid with 8 core features
+- Modern design with Space Grotesk typography and purple accent (#7C3AED)
+- Responsive grid layout for mobile
+
+**Quality Profiles** (Outcome-Based):
+```
+🚀 Preview   → 360p, no enhancements, fast iteration (<3 min)
+📺 Standard  → 1080p, color grading, social media ready
+✨ High      → 1080p, grading + stabilization, professional delivery
+🎬 Master    → 4K, all enhancements + AI upscaling, broadcast quality
+```
+- Rendered as visual cards instead of dropdown
+- Click to select, clear visual feedback
+- Automatically sets enhance/stabilize/upscale flags
+- Integrated into job payload generation
+
+**Cloud Acceleration** (Consolidated):
+- Single toggle replaces old cgpu, cgpu_gpu, separate LLM toggles
+- Auto-enables: LLM features, AI upscaling, fast transcription
+- Graceful fallback to local processing on unavailability
+- Backend mapping: `cloud_acceleration` → `cgpu=true` + `cgpu_gpu=true` (when upscaling)
+
+**Toggle Reorganization**:
+- **Core** (always visible): Shorts Mode, Captions, Export Timeline, Cloud Acceleration
+- **Advanced AI** (collapsible): LLM Clip Selection, Creative Loop, Story Engine
+- **Pro Export** (collapsible): Generate Proxies, Preserve Aspect
+- Removed individual enhance/stabilize/upscale toggles (now in Quality Profiles)
+
+#### Routes Structure
+
+```
+GET /              → Landing page (index_strategy.html)
+GET /?legacy       → Legacy full-featured UI (index.html)
+GET /montage       → Montage Creator (index.html - beat-sync, story arc)
+GET /transcript    → Transcript Editor (transcript.html - text-based editing)
+GET /shorts        → Shorts Studio (shorts.html - vertical video)
+GET /v2            → Prototype UI (index_v2.html)
+```
+
+#### Technical Implementation
+
+**Quality Profile Settings Mapping**:
+```javascript
+{
+  preview:  { enhance: false, stabilize: false, upscale: false, resolution: '360p' },
+  standard: { enhance: true,  stabilize: false, upscale: false, resolution: '1080p' },
+  high:     { enhance: true,  stabilize: true,  upscale: false, resolution: '1080p' },
+  master:   { enhance: true,  stabilize: true,  upscale: true,  resolution: '4k' }
+}
+```
+
+**Cloud Acceleration Logic**:
+```javascript
+const cloudAcceleration = getCheck('cloud_acceleration');
+jobData.cgpu = cloudAcceleration;  // Enable LLM features
+jobData.cgpu_gpu = cloudAcceleration && jobData.upscale;  // GPU only if upscaling
+```
+
+### Next Steps
+
+**Immediate (Phase 1 completion)**:
+- [ ] Add time estimates to quality profile cards (Preview: <3 min, Standard: ~5 min, etc.)
+- [ ] Implement preview-first workflow as default
+- [ ] Add tooltips explaining each quality profile
+- [ ] Improve mobile responsiveness for workflow cards
+
+**Phase 2 Priority**:
+- [ ] Caption styles selector in Shorts Studio
+- [ ] Highlight detection MVP with audio energy + speech analysis
+- [ ] Phone-frame preview overlay with safe zones
+- [ ] Better error handling and user feedback
 
 ---
 
