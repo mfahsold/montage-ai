@@ -393,6 +393,7 @@ class TextEditor:
         removed_words = 0
         total_duration = 0.0
         removed_duration = 0.0
+        removed_segments = sum(1 for seg in self.segments if all(w.removed for w in seg.words) if seg.words)
 
         for seg in self.segments:
             for word in seg.words:
@@ -403,12 +404,15 @@ class TextEditor:
                     removed_duration += word.duration
 
         return {
+            "total_segments": len(self.segments),
+            "removed_segments": removed_segments,
             "total_words": total_words,
             "removed_words": removed_words,
             "kept_words": total_words - removed_words,
             "total_duration": total_duration,
             "removed_duration": removed_duration,
             "kept_duration": total_duration - removed_duration,
+            "time_saved_seconds": removed_duration,
             "removal_percentage": (removed_words / total_words * 100) if total_words else 0
         }
 
