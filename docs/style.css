@@ -564,8 +564,9 @@ footer {
 
 .showcase-content h3 {
     font-size: 1rem;
-    margin-top: 0.25rem;
+    margin-top: 1rem;
     margin-bottom: 0.5rem;
+    padding-left: 0.25rem;
 }
 
 .feature-highlight {
