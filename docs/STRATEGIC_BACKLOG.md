@@ -42,13 +42,13 @@ Based on the "PwC-like" Strategy Update (Jan 2026).
 
 ### Epic 4: Shorts Studio (Priority: High)
 **Goal:** Dedicated workflow for vertical video.
-- [ ] **Story 4.1: Vertical Player Layout**
+- [x] **Story 4.1: Vertical Player Layout**
   - Add a "Shorts Mode" to the UI with 9:16 player container.
   - Show safe-area overlays (TikTok/Reels UI zones).
-- [ ] **Story 4.2: Smart Reframe Visualization**
+- [x] **Story 4.2: Smart Reframe Visualization**
   - Visualize the crop path (where the camera is panning) over the original footage.
   - Allow manual adjustment of the crop center.
-- [ ] **Story 4.3: Caption Styles**
+- [x] **Story 4.3: Caption Styles**
   - Add style picker for captions (Karaoke, Minimal, Bold).
   - Live preview of caption rendering (using CSS/Canvas overlay before burning).
 
@@ -64,7 +64,7 @@ Based on the "PwC-like" Strategy Update (Jan 2026).
 ## Phase 3: Pro (3-6 Months)
 
 ### Epic 6: Audio Polish (Priority: Medium)
-- [ ] **Story 6.1: Voice Isolation Integration**
+- [x] **Story 6.1: Voice Isolation Integration**
   - Expose the cgpu `voice_isolation.py` job in the UI.
   - Add "Clean Audio" toggle.
 - [ ] **Story 6.2: Noise Reduction**

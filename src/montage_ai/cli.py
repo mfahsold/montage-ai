@@ -72,16 +72,14 @@ def run(style: Optional[str], stabilize: bool, upscale: bool, cgpu: bool, varian
         # But we wrap it nicely
         with Progress(
             SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
+            TextColumn("[bold blue]{task.description}"),
             transient=True,
             console=console
         ) as progress:
-            progress.add_task(description="Initializing Docker environment...", total=None)
-            # In a real scenario we might stream output, but for now let's just run it
-            # subprocess.run(cmd, env=env_vars) 
-            # Actually, we want to see the output.
-            pass
-        
+            task = progress.add_task(description="Initializing Docker environment...", total=None)
+            time.sleep(1) # Give user a moment to see the spinner
+            
+        console.print("[dim]Passing control to container...[/]")
         subprocess.run(cmd, env=env_vars)
         
     else:
@@ -95,8 +93,15 @@ def run(style: Optional[str], stabilize: bool, upscale: bool, cgpu: bool, varian
 def web():
     """Start the Web UI."""
     console = get_console()
-    console.print("🚀 Starting Web UI...")
-    console.print("   Open [link=http://localhost:8080]http://localhost:8080[/link] in your browser")
+    from rich.panel import Panel
+    
+    console.print(Panel.fit(
+        "[bold green]🚀 Montage AI Web UI[/]\n\n"
+        "Access the Creative Console at:\n"
+        "[link=http://localhost:8080]http://localhost:8080[/link]",
+        border_style="green"
+    ))
+    
     subprocess.run(["docker", "compose", "-f", "docker-compose.web.yml", "up"])
 
 @cli.command()

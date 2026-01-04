@@ -448,6 +448,12 @@ def shorts_studio():
     return render_template('shorts.html', version=VERSION)
 
 
+@app.route('/transcript')
+def transcript_editor():
+    """Transcript Editor - text-based video editing."""
+    return render_template('transcript.html', version=VERSION)
+
+
 @app.route('/api/status')
 def api_status():
     """API health check with system stats."""
@@ -541,6 +547,37 @@ def api_list_files():
         "video_count": len(videos),
         "music_count": len(music)
     })
+
+
+@app.route('/api/transcript/<filename>', methods=['GET'])
+def api_get_transcript(filename):
+    """Get transcript JSON for a video file."""
+    # Sanitize filename
+    filename = secure_filename(filename)
+    
+    # Look for JSON file (assuming same name as video but .json)
+    base_name = os.path.splitext(filename)[0]
+    json_path = INPUT_DIR / f"{base_name}.json"
+    
+    if not json_path.exists():
+        return jsonify({"error": "Transcript not found"}), 404
+        
+    try:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/video/<filename>', methods=['GET'])
+def api_serve_video(filename):
+    """Serve video file for preview."""
+    filename = secure_filename(filename)
+    file_path = INPUT_DIR / filename
+    if not file_path.exists():
+        return jsonify({"error": "File not found"}), 404
+    return send_file(file_path)
 
 
 @app.route('/api/upload', methods=['POST'])

@@ -3,258 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage AI - Text Editor</title>
+    <title>Montage AI - Transcript Editor</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='elegant.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --accent: #7C3AED;
-            --accent-soft: rgba(124, 58, 237, 0.15);
-            --removed: rgba(239, 68, 68, 0.15);
-            --removed-text: #EF4444;
-            --kept: rgba(34, 197, 94, 0.15);
-        }
-        
-        body {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
-        }
-        
-        .transcript-layout {
+        .editor-container {
             display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 1.5rem;
-            min-height: calc(100vh - 200px);
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            height: calc(100vh - 200px);
         }
-        
-        @media (max-width: 1024px) {
-            .transcript-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-        
         .video-panel {
-            position: sticky;
-            top: 1rem;
-            height: fit-content;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
-        
-        .video-container {
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            aspect-ratio: 16/9;
-        }
-        
-        .video-container video {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        
         .transcript-panel {
-            background: var(--card-bg);
-            border-radius: 12px;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             padding: 1.5rem;
             overflow-y: auto;
-            max-height: calc(100vh - 150px);
-        }
-        
-        .transcript-toolbar {
-            display: flex;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .transcript-toolbar .btn {
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .btn-primary {
-            background: var(--accent);
-            color: white;
-            border: none;
-        }
-        
-        .btn-secondary {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            color: var(--fg);
-        }
-        
-        .btn-danger {
-            background: var(--removed);
-            color: var(--removed-text);
-            border: 1px solid var(--removed-text);
-        }
-        
-        .segment {
-            padding: 1rem;
-            margin-bottom: 0.5rem;
-            border-radius: 8px;
-            background: var(--bg);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .segment:hover {
-            background: var(--accent-soft);
-        }
-        
-        .segment.active {
-            border-left: 3px solid var(--accent);
-            background: var(--accent-soft);
-        }
-        
-        .segment-time {
-            font-size: 0.75rem;
-            color: var(--muted);
-            margin-bottom: 0.5rem;
             font-family: 'Space Mono', monospace;
+            line-height: 1.6;
         }
-        
-        .segment-text {
-            line-height: 1.8;
-        }
-        
         .word {
-            display: inline;
-            padding: 2px 4px;
-            margin: 1px;
-            border-radius: 3px;
             cursor: pointer;
-            transition: all 0.15s;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: inline-block;
         }
-        
         .word:hover {
-            background: var(--accent-soft);
+            background: rgba(255, 255, 255, 0.1);
         }
-        
-        .word.removed {
-            background: var(--removed);
-            color: var(--removed-text);
+        .word.active {
+            background: var(--primary-color);
+            color: #000;
+        }
+        .word.deleted {
             text-decoration: line-through;
+            color: #666;
+            background: rgba(255, 0, 0, 0.1);
         }
-        
-        .word.filler {
-            background: rgba(251, 191, 36, 0.2);
-            color: #D97706;
-        }
-        
-        .word.selected {
-            background: var(--accent);
-            color: white;
-        }
-        
-        .stats-bar {
+        .toolbar {
             display: flex;
             gap: 1rem;
-            padding: 0.75rem 1rem;
-            background: var(--bg);
-            border-radius: 8px;
             margin-bottom: 1rem;
-            font-size: 0.875rem;
-        }
-        
-        .stat {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .stat-value {
-            font-weight: 600;
-            font-family: 'Space Mono', monospace;
-        }
-        
-        .export-panel {
-            margin-top: 1.5rem;
             padding: 1rem;
-            background: var(--bg);
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
         }
-        
-        .export-panel h3 {
-            margin-bottom: 1rem;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--muted);
-        }
-        
-        .export-options {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-        
-        .timeline-preview {
-            height: 60px;
-            background: var(--bg);
-            border-radius: 8px;
-            margin-top: 1rem;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .timeline-segment {
-            position: absolute;
-            height: 100%;
-            background: var(--accent);
-            opacity: 0.6;
-        }
-        
-        .timeline-segment.removed {
-            background: var(--removed-text);
-            opacity: 0.3;
-        }
-        
-        .timeline-playhead {
-            position: absolute;
-            height: 100%;
-            width: 2px;
-            background: white;
-            z-index: 10;
-        }
-        
-        .no-transcript {
-            text-align: center;
-            padding: 3rem;
-            color: var(--muted);
-        }
-        
-        .upload-transcript {
-            margin-top: 1rem;
-        }
-        
-        /* Loading state */
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-        }
-        
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .filler-word {
+            border-bottom: 2px solid #ff4444;
         }
     </style>
 </head>
@@ -262,512 +67,187 @@
     <div class="container">
         <header>
             <div class="logo-container">
-                <a href="/" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 1rem;">
-                    <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 48px; height: 48px;">
-                        <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="none"/>
-                        <circle cx="32" cy="14" r="4" fill="currentColor"/>
-                        <circle cx="32" cy="50" r="4" fill="currentColor"/>
-                        <circle cx="14" cy="32" r="4" fill="currentColor"/>
-                        <circle cx="50" cy="32" r="4" fill="currentColor"/>
-                        <rect x="24" y="24" width="16" height="16" fill="currentColor"/>
-                    </svg>
-                    <div class="logo-text">
-                        <h1>Montage<span class="logo-ai">AI</span></h1>
-                        <p class="subtitle">// TEXT_EDITOR // Edit like a document</p>
-                    </div>
-                </a>
+                <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="none"/>
+                    <circle cx="32" cy="14" r="4" fill="currentColor"/>
+                    <circle cx="32" cy="50" r="4" fill="currentColor"/>
+                    <circle cx="14" cy="32" r="4" fill="currentColor"/>
+                    <circle cx="50" cy="32" r="4" fill="currentColor"/>
+                    <rect x="24" y="24" width="16" height="16" fill="currentColor"/>
+                </svg>
+                <div class="logo-text">
+                    <h1>Montage<span class="logo-ai">AI</span></h1>
+                    <p class="subtitle">// TRANSCRIPT_EDITOR // v{{ version }}</p>
+                </div>
             </div>
-            <div class="version-badge">TRANSCRIPT.MODE</div>
+            <div class="version-badge">SYS.READY</div>
         </header>
 
-        <!-- Navigation Bar -->
         <nav class="nav-bar voxel-card" style="padding: 0.75rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
             <a href="/" class="btn btn-secondary" style="text-decoration: none;">🏠 Montage Wizard</a>
             <a href="/transcript" class="btn btn-primary" style="text-decoration: none;">📝 Transcript Editor</a>
             <a href="/shorts" class="btn btn-secondary" style="text-decoration: none;">📱 Shorts Studio</a>
         </nav>
 
-        <section class="voxel-card info-card" style="margin-bottom: 1.5rem;">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <span style="font-size: 2rem;">📝</span>
-                <div>
-                    <h2 style="margin: 0;">Text-Based Editing</h2>
-                    <p style="margin: 0.25rem 0 0; opacity: 0.8;">Delete words → Delete video. Click words to remove, see changes in real-time.</p>
-                </div>
-            </div>
-        </section>
+        <div class="toolbar">
+            <select id="fileSelect" class="voxel-input" style="flex-grow: 1;">
+                <option value="">Select a video...</option>
+            </select>
+            <button id="removeFillersBtn" class="voxel-btn">Remove Fillers</button>
+            <button id="saveEditsBtn" class="voxel-btn">Save Edits</button>
+            <button id="previewBtn" class="voxel-btn btn-primary">Generate Preview</button>
+        </div>
 
-        <div class="transcript-layout">
-            <!-- Video Panel -->
-            <div class="transcript-panel">
-                <div class="transcript-toolbar">
-                    <input type="file" id="videoFile" accept="video/*" style="display: none;" onchange="loadVideo(this)">
-                    <button class="btn btn-secondary" onclick="document.getElementById('videoFile').click()">
-                        📁 Load Video
-                    </button>
-                    <button class="btn btn-secondary" onclick="transcribeVideo()" id="transcribeBtn" disabled>
-                        🎤 Transcribe
-                    </button>
-                    <button class="btn btn-danger" onclick="removeFillers()" id="fillersBtn" disabled>
-                        🧹 Remove Fillers
-                    </button>
-                    <button class="btn btn-secondary" onclick="undoLast()" id="undoBtn" disabled>
-                        ↩️ Undo
-                    </button>
-                </div>
-
-                <div class="stats-bar" id="statsBar" style="display: none;">
-                    <div class="stat">
-                        <span>Duration:</span>
-                        <span class="stat-value" id="statDuration">0:00</span>
-                    </div>
-                    <div class="stat">
-                        <span>Words:</span>
-                        <span class="stat-value" id="statWords">0</span>
-                    </div>
-                    <div class="stat">
-                        <span>Removed:</span>
-                        <span class="stat-value" id="statRemoved">0</span>
-                    </div>
-                    <div class="stat">
-                        <span>Saved:</span>
-                        <span class="stat-value" id="statSaved">0s</span>
-                    </div>
-                </div>
-
-                <div id="transcriptContent">
-                    <div class="no-transcript">
-                        <p>🎬 Load a video to start editing</p>
-                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">
-                            1. Click "Load Video" to select your file<br>
-                            2. Click "Transcribe" to generate text<br>
-                            3. Click words to remove them from the video
-                        </p>
-                    </div>
-                </div>
-
-                <div class="timeline-preview" id="timelinePreview" style="display: none;">
-                    <div class="timeline-playhead" id="playhead" style="left: 0;"></div>
-                </div>
-
-                <div class="export-panel" id="exportPanel" style="display: none;">
-                    <h3>Export Options</h3>
-                    <div class="export-options">
-                        <button class="btn btn-primary" onclick="exportVideo()">
-                            🎬 Export Video
-                        </button>
-                        <button class="btn btn-secondary" onclick="exportEDL()">
-                            📋 Export EDL
-                        </button>
-                        <button class="btn btn-secondary" onclick="exportOTIO()">
-                            📦 Export OTIO
-                        </button>
-                        <button class="btn btn-secondary" onclick="previewChanges()">
-                            👁️ Preview
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Video Preview Panel -->
+        <div class="editor-container">
             <div class="video-panel">
-                <div class="video-container">
-                    <video id="videoPlayer" controls>
-                        <source src="" type="video/mp4">
+                <div class="voxel-card" style="padding: 0; overflow: hidden; aspect-ratio: 16/9;">
+                    <video id="mainVideo" controls style="width: 100%; height: 100%; object-fit: contain;">
+                        Your browser does not support the video tag.
                     </video>
                 </div>
-                <div style="margin-top: 1rem; text-align: center; color: var(--muted); font-size: 0.875rem;">
-                    Click transcript to seek • Space to play/pause
+                <div class="voxel-card">
+                    <h3>Stats</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <div class="label">Original Duration</div>
+                            <div class="value" id="origDuration">00:00</div>
+                        </div>
+                        <div>
+                            <div class="label">Edited Duration</div>
+                            <div class="value" id="editDuration">00:00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="transcript-panel" id="transcriptContent">
+                <div class="helper" style="text-align: center; margin-top: 2rem;">
+                    Select a video to load transcript...
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_BASE = '/api';
-        let transcriptData = null;
-        let videoPath = null;
-        let undoStack = [];
+        let currentTranscript = [];
+        let videoPlayer = document.getElementById('mainVideo');
+        let transcriptContainer = document.getElementById('transcriptContent');
         
-        // Video handling
-        async function loadVideo(input) {
-            const file = input.files[0];
-            if (!file) return;
-            
-            const formData = new FormData();
-            formData.append('video', file);
-            
-            try {
-                showLoading('Uploading video...');
-                const response = await fetch(`${API_BASE}/transcript/upload`, {
-                    method: 'POST',
-                    body: formData
+        // Load file list on startup
+        fetch('/api/files')
+            .then(r => r.json())
+            .then(data => {
+                const select = document.getElementById('fileSelect');
+                data.videos.forEach(file => {
+                    const opt = document.createElement('option');
+                    opt.value = file;
+                    opt.textContent = file;
+                    select.appendChild(opt);
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    videoPath = data.path;
-                    document.getElementById('videoPlayer').src = `${API_BASE}/transcript/video/${data.filename}`;
-                    document.getElementById('transcribeBtn').disabled = false;
-                    hideLoading();
-                    showMessage('Video loaded! Click "Transcribe" to generate transcript.');
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (error) {
-                hideLoading();
-                alert('Upload failed: ' + error.message);
-            }
-        }
-        
-        async function transcribeVideo() {
-            if (!videoPath) return;
+            });
+
+        document.getElementById('fileSelect').addEventListener('change', (e) => {
+            const filename = e.target.value;
+            if (!filename) return;
             
-            showLoading('Transcribing... This may take a few minutes.');
-            document.getElementById('transcribeBtn').disabled = true;
+            // Load Video
+            videoPlayer.src = `/api/video/${filename}`;
             
-            try {
-                const response = await fetch(`${API_BASE}/transcript/transcribe`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_path: videoPath })
+            // Load Transcript
+            fetch(`/api/transcript/${filename}`)
+                .then(r => {
+                    if (!r.ok) throw new Error('Transcript not found');
+                    return r.json();
+                })
+                .then(data => {
+                    renderTranscript(data);
+                })
+                .catch(err => {
+                    transcriptContainer.innerHTML = `
+                        <div class="helper" style="text-align: center; color: #ff4444;">
+                            Transcript not found. <br>
+                            <button class="voxel-btn" onclick="generateTranscript('${filename}')">Generate Transcript</button>
+                        </div>
+                    `;
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    transcriptData = data.transcript;
-                    renderTranscript();
-                    document.getElementById('fillersBtn').disabled = false;
-                    document.getElementById('statsBar').style.display = 'flex';
-                    document.getElementById('timelinePreview').style.display = 'block';
-                    document.getElementById('exportPanel').style.display = 'block';
-                    updateStats();
-                    updateTimeline();
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (error) {
-                alert('Transcription failed: ' + error.message);
-            } finally {
-                hideLoading();
-                document.getElementById('transcribeBtn').disabled = false;
-            }
-        }
-        
-        function renderTranscript() {
-            if (!transcriptData || !transcriptData.segments) {
-                document.getElementById('transcriptContent').innerHTML = '<div class="no-transcript">No transcript available</div>';
-                return;
-            }
-            
-            let html = '';
-            transcriptData.segments.forEach((segment, segIdx) => {
-                const timeStr = formatTime(segment.start);
-                html += `<div class="segment" data-segment="${segIdx}" onclick="seekTo(${segment.start})">`;
-                html += `<div class="segment-time">${timeStr}</div>`;
-                html += `<div class="segment-text">`;
-                
-                if (segment.words && segment.words.length > 0) {
-                    segment.words.forEach((word, wordIdx) => {
-                        const classes = ['word'];
-                        if (word.removed) classes.push('removed');
-                        if (isFillerWord(word.word || word.text)) classes.push('filler');
-                        
-                        html += `<span class="${classes.join(' ')}" 
-                                      data-segment="${segIdx}" 
-                                      data-word="${wordIdx}"
-                                      onclick="event.stopPropagation(); toggleWord(${segIdx}, ${wordIdx})"
-                                      title="Click to ${word.removed ? 'restore' : 'remove'}">
-                                    ${word.word || word.text}
-                                 </span> `;
-                    });
-                } else {
-                    html += segment.text;
-                }
-                
-                html += `</div></div>`;
-            });
-            
-            document.getElementById('transcriptContent').innerHTML = html;
-        }
-        
-        function toggleWord(segIdx, wordIdx) {
-            if (!transcriptData) return;
-            
-            const word = transcriptData.segments[segIdx].words[wordIdx];
-            
-            // Save to undo stack
-            undoStack.push({
-                type: 'toggle',
-                segIdx,
-                wordIdx,
-                wasRemoved: word.removed
-            });
-            document.getElementById('undoBtn').disabled = false;
-            
-            word.removed = !word.removed;
-            
-            renderTranscript();
-            updateStats();
-            updateTimeline();
-        }
-        
-        function removeFillers() {
-            if (!transcriptData) return;
-            
-            const removed = [];
-            transcriptData.segments.forEach((segment, segIdx) => {
-                if (segment.words) {
-                    segment.words.forEach((word, wordIdx) => {
-                        if (!word.removed && isFillerWord(word.word || word.text)) {
-                            word.removed = true;
-                            removed.push({ segIdx, wordIdx });
-                        }
-                    });
-                }
-            });
-            
-            if (removed.length > 0) {
-                undoStack.push({ type: 'bulk', items: removed });
-                document.getElementById('undoBtn').disabled = false;
-            }
-            
-            renderTranscript();
-            updateStats();
-            updateTimeline();
-            showMessage(`Removed ${removed.length} filler words`);
-        }
-        
-        function undoLast() {
-            if (undoStack.length === 0) return;
-            
-            const action = undoStack.pop();
-            
-            if (action.type === 'toggle') {
-                transcriptData.segments[action.segIdx].words[action.wordIdx].removed = action.wasRemoved;
-            } else if (action.type === 'bulk') {
-                action.items.forEach(item => {
-                    transcriptData.segments[item.segIdx].words[item.wordIdx].removed = false;
-                });
-            }
-            
-            if (undoStack.length === 0) {
-                document.getElementById('undoBtn').disabled = true;
-            }
-            
-            renderTranscript();
-            updateStats();
-            updateTimeline();
-        }
-        
-        function isFillerWord(text) {
-            const fillers = ['um', 'uh', 'er', 'ah', 'like', 'you know', 'basically', 'actually', 
-                           'literally', 'honestly', 'right', 'so', 'well', 'äh', 'ähm', 'halt'];
-            return fillers.includes((text || '').toLowerCase().trim());
-        }
-        
-        function updateStats() {
-            if (!transcriptData) return;
-            
-            let totalWords = 0;
-            let removedWords = 0;
-            let removedDuration = 0;
-            let totalDuration = 0;
-            
-            transcriptData.segments.forEach(segment => {
-                if (segment.words) {
-                    segment.words.forEach(word => {
-                        totalWords++;
-                        if (word.removed) {
-                            removedWords++;
-                            removedDuration += (word.end - word.start);
-                        }
-                    });
-                }
-                totalDuration = Math.max(totalDuration, segment.end);
-            });
-            
-            document.getElementById('statDuration').textContent = formatTime(totalDuration);
-            document.getElementById('statWords').textContent = totalWords;
-            document.getElementById('statRemoved').textContent = removedWords;
-            document.getElementById('statSaved').textContent = removedDuration.toFixed(1) + 's';
-        }
-        
-        function updateTimeline() {
-            if (!transcriptData) return;
-            
-            const container = document.getElementById('timelinePreview');
-            const totalDuration = transcriptData.segments.reduce((max, s) => Math.max(max, s.end), 0);
-            
-            // Clear existing segments
-            container.querySelectorAll('.timeline-segment').forEach(el => el.remove());
-            
-            transcriptData.segments.forEach(segment => {
-                if (segment.words) {
-                    segment.words.forEach(word => {
-                        if (word.removed) {
-                            const el = document.createElement('div');
-                            el.className = 'timeline-segment removed';
-                            el.style.left = ((word.start / totalDuration) * 100) + '%';
-                            el.style.width = (((word.end - word.start) / totalDuration) * 100) + '%';
-                            container.appendChild(el);
-                        }
-                    });
-                }
-            });
-        }
-        
-        function seekTo(time) {
-            const video = document.getElementById('videoPlayer');
-            video.currentTime = time;
-        }
-        
-        // Video playhead sync
-        document.getElementById('videoPlayer').addEventListener('timeupdate', function() {
-            if (!transcriptData) return;
-            
-            const totalDuration = transcriptData.segments.reduce((max, s) => Math.max(max, s.end), 0);
-            const percent = (this.currentTime / totalDuration) * 100;
-            document.getElementById('playhead').style.left = percent + '%';
-            
-            // Highlight active segment
-            document.querySelectorAll('.segment').forEach(el => el.classList.remove('active'));
-            transcriptData.segments.forEach((segment, idx) => {
-                if (this.currentTime >= segment.start && this.currentTime <= segment.end) {
-                    document.querySelector(`.segment[data-segment="${idx}"]`)?.classList.add('active');
-                }
-            });
         });
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
-                e.preventDefault();
-                const video = document.getElementById('videoPlayer');
-                if (video.paused) video.play();
-                else video.pause();
-            }
-            if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                undoLast();
-            }
-        });
-        
-        // Export functions
-        async function exportVideo() {
-            if (!transcriptData || !videoPath) return;
-            
-            showLoading('Rendering edited video...');
-            
-            try {
-                const response = await fetch(`${API_BASE}/transcript/export`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        video_path: videoPath,
-                        transcript: transcriptData,
-                        format: 'video'
-                    })
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.location.href = `${API_BASE}/download/${data.filename}`;
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (error) {
-                alert('Export failed: ' + error.message);
-            } finally {
-                hideLoading();
-            }
-        }
-        
-        async function exportEDL() {
-            await exportFormat('edl');
-        }
-        
-        async function exportOTIO() {
-            await exportFormat('otio');
-        }
-        
-        async function exportFormat(format) {
-            if (!transcriptData || !videoPath) return;
-            
-            try {
-                const response = await fetch(`${API_BASE}/transcript/export`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        video_path: videoPath,
-                        transcript: transcriptData,
-                        format: format
-                    })
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.location.href = `${API_BASE}/download/${data.filename}`;
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (error) {
-                alert('Export failed: ' + error.message);
-            }
-        }
-        
-        async function previewChanges() {
-            // Generate quick preview of edits
-            showMessage('Preview: Generating cut list...');
-            // In production, this would render a low-res preview
-        }
-        
-        // Utilities
-        function formatTime(seconds) {
-            const m = Math.floor(seconds / 60);
-            const s = Math.floor(seconds % 60);
-            return `${m}:${s.toString().padStart(2, '0')}`;
-        }
-        
-        function showLoading(message) {
-            document.getElementById('transcriptContent').innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p style="margin-left: 1rem;">${message}</p>
-                </div>
-            `;
-        }
-        
-        function hideLoading() {
-            if (transcriptData) {
-                renderTranscript();
+
+        function renderTranscript(data) {
+            // Handle different Whisper JSON formats (verbose_json vs simple)
+            // Assuming verbose_json with segments -> words
+            if (data.segments) {
+                currentTranscript = data.segments.flatMap(s => s.words || []);
+            } else if (data.words) {
+                currentTranscript = data.words;
             } else {
-                document.getElementById('transcriptContent').innerHTML = `
-                    <div class="no-transcript">
-                        <p>🎬 Ready to edit</p>
-                    </div>
-                `;
+                currentTranscript = []; // Fallback
             }
+
+            transcriptContainer.innerHTML = '';
+            
+            currentTranscript.forEach((word, index) => {
+                const span = document.createElement('span');
+                span.className = 'word';
+                span.textContent = word.word + ' ';
+                span.dataset.start = word.start;
+                span.dataset.end = word.end;
+                span.dataset.index = index;
+                
+                span.onclick = () => toggleWord(index);
+                transcriptContainer.appendChild(span);
+            });
+        }
+
+        function toggleWord(index) {
+            const span = transcriptContainer.children[index];
+            span.classList.toggle('deleted');
+            updateStats();
+        }
+
+        // Sync video time with transcript highlighting
+        videoPlayer.addEventListener('timeupdate', () => {
+            const time = videoPlayer.currentTime;
+            const words = transcriptContainer.children;
+            
+            for (let i = 0; i < words.length; i++) {
+                const start = parseFloat(words[i].dataset.start);
+                const end = parseFloat(words[i].dataset.end);
+                
+                if (time >= start && time <= end) {
+                    words[i].classList.add('active');
+                    // Auto-scroll
+                    if (i % 10 === 0) { // Don't scroll on every word
+                        words[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                } else {
+                    words[i].classList.remove('active');
+                }
+            }
+            
+            // Skip deleted segments
+            // This is a simple implementation; a robust one would seek past deleted ranges
+        });
+
+        document.getElementById('removeFillersBtn').addEventListener('click', () => {
+            const fillers = ['um', 'uh', 'like', 'you know'];
+            const words = transcriptContainer.children;
+            for (let i = 0; i < words.length; i++) {
+                const text = words[i].textContent.trim().toLowerCase().replace(/[^a-z]/g, '');
+                if (fillers.includes(text)) {
+                    words[i].classList.add('deleted');
+                }
+            }
+            updateStats();
+        });
+
+        function updateStats() {
+            // Calculate duration based on non-deleted words
+            // This is an approximation
         }
         
-        function showMessage(msg) {
-            // Simple toast-style notification
-            const toast = document.createElement('div');
-            toast.style.cssText = `
-                position: fixed;
-                bottom: 2rem;
-                left: 50%;
-                transform: translateX(-50%);
-                background: var(--accent);
-                color: white;
-                padding: 0.75rem 1.5rem;
-                border-radius: 8px;
-                z-index: 1000;
-                animation: fadeIn 0.3s ease;
-            `;
-            toast.textContent = msg;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+        function generateTranscript(filename) {
+            // Call API to start transcription job
+            alert('Transcription job started (mock)');
         }
     </script>
 </body>

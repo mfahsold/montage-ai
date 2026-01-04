@@ -2,6 +2,14 @@
 # Montage AI - Simple CLI
 set -e
 
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
 # Load environment variables from .env if present
 if [ -f .env ]; then
     # Export variables so they are available to child processes (like cgpu serve)
@@ -15,34 +23,34 @@ CGPU_PID_FILE="/tmp/cgpu_serve.pid"
 
 show_help() {
     cat << EOF
-Montage AI - Video Montage Creator
+${CYAN}Montage AI${NC} - Video Montage Creator
 
-Usage: ./montage-ai.sh [COMMAND] [OPTIONS]
+${YELLOW}Usage:${NC} ./montage-ai.sh [COMMAND] [OPTIONS]
 
-Commands:
-  run [STYLE]     Create montage (default: dynamic)
-  shorts [STYLE]  Create vertical shorts (9:16) with smart reframing
-  text-edit       Text-based editing (remove fillers, edit by transcript)
-  web             Start Web UI
-  preview         Quick preview (fast preset)
-  hq              High quality render
-  retrieve        Retrieve results from cluster
-  list            List available styles
-  build           Build Docker image
-  cgpu-start      Start cgpu serve (Gemini LLM API)
-  cgpu-stop       Stop cgpu serve
-  cgpu-status     Check cgpu status
-  cgpu-test       Test cgpu connection
+${YELLOW}Commands:${NC}
+  ${GREEN}run${NC} [STYLE]     Create montage (default: dynamic)
+  ${GREEN}shorts${NC} [STYLE]  Create vertical shorts (9:16) with smart reframing
+  ${GREEN}text-edit${NC}       Text-based editing (remove fillers, edit by transcript)
+  ${GREEN}web${NC}             Start Web UI
+  ${GREEN}preview${NC}         Quick preview (fast preset, 360p)
+  ${GREEN}hq${NC}              High quality render (1080p/4K)
+  ${GREEN}retrieve${NC}        Retrieve results from cluster
+  ${GREEN}list${NC}            List available styles
+  ${GREEN}build${NC}           Build Docker image
+  ${GREEN}cgpu-start${NC}      Start cgpu serve (Gemini LLM API)
+  ${GREEN}cgpu-stop${NC}       Stop cgpu serve
+  ${GREEN}cgpu-status${NC}     Check cgpu status
+  ${GREEN}cgpu-test${NC}       Test cgpu connection
 
-Styles:
-  dynamic         Position-aware pacing (default)
-  hitchcock       Suspense - slow build, fast climax
-  mtv             Fast 1-2 beat cuts
-  action          Michael Bay rapid cuts
-  documentary     Natural, observational
-  minimalist      Long contemplative takes
+${YELLOW}Styles:${NC}
+  ${CYAN}dynamic${NC}         Position-aware pacing (default)
+  ${CYAN}hitchcock${NC}       Suspense - slow build, fast climax
+  ${CYAN}mtv${NC}             Fast 1-2 beat cuts
+  ${CYAN}action${NC}          Michael Bay rapid cuts
+  ${CYAN}documentary${NC}     Natural, observational
+  ${CYAN}minimalist${NC}      Long contemplative takes
 
-Options:
+${YELLOW}Options:${NC}
   --stabilize     Enable video stabilization
   --shorts        Enable Shorts mode (9:16 vertical + smart reframing)
   --no-enhance    Disable color enhancement
@@ -55,10 +63,10 @@ Options:
   --captions [STYLE]  Burn-in captions (styles: tiktok, youtube, minimal, karaoke, bold, cinematic)
   --isolate-voice     Clean audio via voice isolation (requires cgpu)
 
-Examples:
+${YELLOW}Examples:${NC}
   ./montage-ai.sh run                    # Default dynamic style
   ./montage-ai.sh run hitchcock          # Hitchcock suspense
-  ./montage-ai.sh preview mtv            # Quick MTV preview
+  ./montage-ai.sh preview mtv            # Quick MTV preview (360p)
   ./montage-ai.sh hq documentary         # High quality documentary
   ./montage-ai.sh run --stabilize        # With stabilization
   ./montage-ai.sh run --cgpu             # Use Gemini via cgpu
@@ -70,26 +78,26 @@ EOF
 }
 
 list_styles() {
-    echo "Available Styles:"
-    echo "  dynamic      - Position-aware pacing (intro→build→climax→outro)"
-    echo "  hitchcock    - Slow build-up, explosive climax"
-    echo "  mtv          - Fast 1-2 beat cuts, high energy"
-    echo "  action       - Michael Bay rapid cuts"
-    echo "  documentary  - Natural pacing, observational"
-    echo "  minimalist   - Long takes, contemplative"
-    echo "  wes_anderson - Symmetrical, whimsical"
-    echo "  vlog         - Personal, face-centric storytelling"
-    echo "  sport        - High-energy action sequences"
+    echo -e "${YELLOW}Available Styles:${NC}"
+    echo -e "  ${CYAN}dynamic${NC}      - Position-aware pacing (intro→build→climax→outro)"
+    echo -e "  ${CYAN}hitchcock${NC}    - Slow build-up, explosive climax"
+    echo -e "  ${CYAN}mtv${NC}          - Fast 1-2 beat cuts, high energy"
+    echo -e "  ${CYAN}action${NC}       - Michael Bay rapid cuts"
+    echo -e "  ${CYAN}documentary${NC}  - Natural pacing, observational"
+    echo -e "  ${CYAN}minimalist${NC}   - Long takes, contemplative"
+    echo -e "  ${CYAN}wes_anderson${NC} - Symmetrical, whimsical"
+    echo -e "  ${CYAN}vlog${NC}         - Personal, face-centric storytelling"
+    echo -e "  ${CYAN}sport${NC}        - High-energy action sequences"
 }
 
 run_web() {
-    echo "🚀 Starting Web UI..."
+    echo -e "${GREEN}🚀 Starting Web UI...${NC}"
     
     # Auto-start cgpu serve (since Web UI defaults to using it)
-    cgpu_start || echo "⚠️ Continuing without cgpu..."
+    cgpu_start || echo -e "${YELLOW}⚠️ Continuing without cgpu...${NC}"
 
-    echo "   Open http://localhost:8080 in your browser"
-    echo "   ℹ️  If using Ollama on Linux, run: OLLAMA_HOST=0.0.0.0 ollama serve"
+    echo -e "   Open ${BLUE}http://localhost:8080${NC} in your browser"
+    echo -e "   ℹ️  If using Ollama on Linux, run: ${CYAN}OLLAMA_HOST=0.0.0.0 ollama serve${NC}"
     # Pass arguments like --build to docker compose
     docker compose -f docker-compose.web.yml up "$@"
 }
@@ -97,7 +105,7 @@ run_web() {
 run_script() {
     local SCRIPT="$1"
     shift
-    echo "🚀 Running script: $SCRIPT"
+    echo -e "${GREEN}🚀 Running script: $SCRIPT${NC}"
     docker compose run --rm \
         --entrypoint "" \
         -v "$(pwd)/scripts:/app/scripts" \

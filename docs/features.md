@@ -51,6 +51,12 @@ Create vertical content optimized for TikTok, Instagram Reels, and YouTube Short
 - **Cinematic Path Planning:** Uses convex optimization (L2 regularization) to simulate professional camera operation.
 - **Physics-Based Smoothing:** Minimizes velocity and acceleration changes for fluid motion.
 - **Subject Awareness:** Keeps subjects in the "golden zone" while avoiding jerky movements.
+- **AI Crop Visualization:** Preview the AI's tracking path in real-time before rendering.
+
+**Audio Polish (Voice Isolation):**
+- **Studio Quality:** Uses `demucs` (via cgpu) to isolate vocals from background noise and music.
+- **Clean Speech:** Ensures dialogue is crisp and clear, even in noisy environments.
+- **One-Click:** Toggle "Audio Polish" in the Shorts Studio to apply automatically.
 
 **Caption Styles:**
 - **TikTok** — White text, black stroke, bottom-aligned
