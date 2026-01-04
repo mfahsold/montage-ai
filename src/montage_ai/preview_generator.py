@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
 
 from .logger import logger
+from .ffmpeg_utils import build_ffmpeg_cmd
 from .ffmpeg_config import (
     PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_CRF, PREVIEW_PRESET,
     STANDARD_AUDIO_CODEC, STANDARD_AUDIO_BITRATE
@@ -85,20 +86,19 @@ class PreviewGenerator:
         concat_part = f"{inputs}concat=n={len(limited_segments)}:v=1:a=1[outv][outa]"
         filter_complex += concat_part
         
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = build_ffmpeg_cmd([
             "-threads", "0",  # Use all available CPU cores
             "-i", source_path,
             "-filter_complex", filter_complex,
             "-map", "[outv]", "-map", "[outa]",
-            "-c:v", "libx264", 
+            "-c:v", "libx264",
             "-preset", PREVIEW_PRESET,  # ultrafast
             "-tune", "zerolatency",  # Minimize latency
             "-crf", str(PREVIEW_CRF),
             "-c:a", STANDARD_AUDIO_CODEC, "-b:a", STANDARD_AUDIO_BITRATE,
             "-movflags", "+faststart",  # Enable streaming
             str(output_path)
-        ]
+        ])
         
         logger.info(f"Generating transcript preview ({len(limited_segments)} segments, max {self.max_duration}s): {output_path}")
         try:
@@ -178,20 +178,19 @@ class PreviewGenerator:
                     f"scale={PREVIEW_HEIGHT*9//16}:{PREVIEW_HEIGHT}"
                 )
             
-            cmd = [
-                "ffmpeg", "-y",
+            cmd = build_ffmpeg_cmd([
                 "-threads", "0",  # Use all available cores
                 "-t", str(self.max_duration),  # Limit preview duration
                 "-i", source_path,
                 "-vf", crop_filter,
-                "-c:v", "libx264", 
-                "-preset", PREVIEW_PRESET, 
+                "-c:v", "libx264",
+                "-preset", PREVIEW_PRESET,
                 "-tune", "zerolatency",
                 "-crf", str(PREVIEW_CRF),
                 "-c:a", STANDARD_AUDIO_CODEC, "-b:a", STANDARD_AUDIO_BITRATE,
                 "-movflags", "+faststart",
                 str(output_path)
-            ]
+            ])
             
             logger.info(f"Generating shorts preview (max {self.max_duration}s): {output_path}")
             subprocess.run(cmd, check=True, capture_output=True, timeout=60)

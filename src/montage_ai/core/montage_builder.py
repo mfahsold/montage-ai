@@ -27,6 +27,7 @@ from ..logger import logger
 from ..resource_manager import get_resource_manager, ResourceManager
 from ..style_templates import get_style_template
 from ..utils import file_exists_and_valid, coerce_float
+from ..ffmpeg_utils import build_ffmpeg_cmd
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 from ..timeline_exporter import export_timeline_from_montage
 from ..storytelling import StoryArc, TensionProvider, StorySolver
@@ -130,104 +131,160 @@ class ClipMetadata:
 
 
 @dataclass
-class MontageContext:
-    """
-    Encapsulates all state for a montage job.
-
-    Replaces the dozens of local variables flowing through create_montage().
-    All mutable state is stored here, making the pipeline stages pure functions
-    that take context and return results.
-    """
-    # Job identification
-    job_id: str
-    variant_id: int
-
-    # Settings (immutable reference)
-    settings: Settings
-
-    # Paths
+class MontagePaths:
     input_dir: Path
     music_dir: Path
     assets_dir: Path
     output_dir: Path
     temp_dir: Path
 
-    # Feature flags (may be modified by Creative Director)
+
+@dataclass
+class MontageFeatures:
     stabilize: bool = False
     upscale: bool = False
     enhance: bool = False
 
-    # Creative Director instructions (JSON from LLM)
+
+@dataclass
+class MontageCreative:
     editing_instructions: Optional[Dict[str, Any]] = None
-
-    # Semantic query for clip selection (Phase 2: Semantic Storytelling)
     semantic_query: Optional[str] = None
-
-    # B-Roll Plan (Epic 2: AI B-Roll)
     broll_plan: Optional[List[Dict[str, Any]]] = None
+    style_params: Dict[str, Any] = field(default_factory=dict)
 
-    # Audio analysis results
+
+@dataclass
+class MontageMedia:
     audio_result: Optional[AudioAnalysisResult] = None
-
-    # Scene detection results
     all_scenes: List[SceneInfo] = field(default_factory=list)
-    all_scenes_dicts: List[Dict[str, Any]] = field(default_factory=list)  # Legacy format
+    all_scenes_dicts: List[Dict[str, Any]] = field(default_factory=list)
     video_files: List[str] = field(default_factory=list)
-
-    # Output profile
     output_profile: Optional[OutputProfile] = None
 
-    # Timeline state
+
+@dataclass
+class MontageTimeline:
     target_duration: float = 0.0
     current_time: float = 0.0
     beat_idx: int = 0
     cut_number: int = 0
     estimated_total_cuts: int = 0
-
-    # Clip metadata for timeline export
     clips_metadata: List[ClipMetadata] = field(default_factory=list)
-
-    # Cut pattern state (for dynamic pacing)
     current_pattern: Optional[List[float]] = None
     pattern_idx: int = 0
-
-    # Previous clip state (for continuity rules)
     last_used_path: Optional[str] = None
     last_shot_type: Optional[str] = None
     last_clip_end_time: Optional[float] = None
-
-    # Crossfade settings
     enable_xfade: bool = False
     xfade_duration: float = 0.3
 
-    # Style params
-    style_params: Dict[str, Any] = field(default_factory=dict)
 
-    # Rendering
+@dataclass
+class MontageRender:
     output_filename: Optional[str] = None
     render_duration: float = 0.0
     logo_path: Optional[str] = None
     exported_files: Optional[Dict[str, str]] = None
 
-    # Timing
+
+@dataclass
+class MontageTiming:
     start_time: float = field(default_factory=time.time)
+
+
+_LEGACY_ATTR_MAP = {
+    "input_dir": ("paths", "input_dir"),
+    "music_dir": ("paths", "music_dir"),
+    "assets_dir": ("paths", "assets_dir"),
+    "output_dir": ("paths", "output_dir"),
+    "temp_dir": ("paths", "temp_dir"),
+    "stabilize": ("features", "stabilize"),
+    "upscale": ("features", "upscale"),
+    "enhance": ("features", "enhance"),
+    "editing_instructions": ("creative", "editing_instructions"),
+    "semantic_query": ("creative", "semantic_query"),
+    "broll_plan": ("creative", "broll_plan"),
+    "style_params": ("creative", "style_params"),
+    "audio_result": ("media", "audio_result"),
+    "all_scenes": ("media", "all_scenes"),
+    "all_scenes_dicts": ("media", "all_scenes_dicts"),
+    "video_files": ("media", "video_files"),
+    "output_profile": ("media", "output_profile"),
+    "target_duration": ("timeline", "target_duration"),
+    "current_time": ("timeline", "current_time"),
+    "beat_idx": ("timeline", "beat_idx"),
+    "cut_number": ("timeline", "cut_number"),
+    "estimated_total_cuts": ("timeline", "estimated_total_cuts"),
+    "clips_metadata": ("timeline", "clips_metadata"),
+    "current_pattern": ("timeline", "current_pattern"),
+    "pattern_idx": ("timeline", "pattern_idx"),
+    "last_used_path": ("timeline", "last_used_path"),
+    "last_shot_type": ("timeline", "last_shot_type"),
+    "last_clip_end_time": ("timeline", "last_clip_end_time"),
+    "enable_xfade": ("timeline", "enable_xfade"),
+    "xfade_duration": ("timeline", "xfade_duration"),
+    "output_filename": ("render", "output_filename"),
+    "render_duration": ("render", "render_duration"),
+    "logo_path": ("render", "logo_path"),
+    "exported_files": ("render", "exported_files"),
+    "start_time": ("timing", "start_time"),
+}
+
+
+@dataclass
+class MontageContext:
+    """
+    Encapsulates all state for a montage job.
+
+    Groups related state into cohesive sub-objects, while preserving legacy
+    attribute access for a gradual migration.
+    """
+    job_id: str
+    variant_id: int
+    settings: Settings
+    paths: MontagePaths
+    features: MontageFeatures = field(default_factory=MontageFeatures)
+    creative: MontageCreative = field(default_factory=MontageCreative)
+    media: MontageMedia = field(default_factory=MontageMedia)
+    timeline: MontageTimeline = field(default_factory=MontageTimeline)
+    render: MontageRender = field(default_factory=MontageRender)
+    timing: MontageTiming = field(default_factory=MontageTiming)
+
+    def __getattr__(self, name: str):
+        mapping = _LEGACY_ATTR_MAP.get(name)
+        if mapping:
+            group, field_name = mapping
+            return getattr(getattr(self, group), field_name)
+        raise AttributeError(f"{type(self).__name__} has no attribute {name!r}")
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        mapping = _LEGACY_ATTR_MAP.get(name)
+        if mapping:
+            group, field_name = mapping
+            if group in self.__dict__:
+                setattr(getattr(self, group), field_name, value)
+                if name in self.__dict__:
+                    object.__delattr__(self, name)
+                return
+        object.__setattr__(self, name, value)
 
     def reset_timeline_state(self):
         """Reset timeline state for a fresh pass."""
-        self.current_time = 0.0
-        self.beat_idx = 0
-        self.cut_number = 0
-        self.clips_metadata = []
-        self.current_pattern = None
-        self.pattern_idx = 0
-        self.last_used_path = None
-        self.last_shot_type = None
-        self.last_clip_end_time = None
+        self.timeline.current_time = 0.0
+        self.timeline.beat_idx = 0
+        self.timeline.cut_number = 0
+        self.timeline.clips_metadata = []
+        self.timeline.current_pattern = None
+        self.timeline.pattern_idx = 0
+        self.timeline.last_used_path = None
+        self.timeline.last_shot_type = None
+        self.timeline.last_clip_end_time = None
 
     def get_story_position(self) -> float:
         """Get current position in story arc (0-1)."""
-        if self.target_duration > 0:
-            return self.current_time / self.target_duration
+        if self.timeline.target_duration > 0:
+            return self.timeline.current_time / self.timeline.target_duration
         return 0.0
 
     def get_story_phase(self) -> str:
@@ -249,7 +306,7 @@ class MontageContext:
 
     def elapsed_time(self) -> float:
         """Time since job started."""
-        return time.time() - self.start_time
+        return time.time() - self.timing.start_time
 
 
 @dataclass
@@ -294,8 +351,7 @@ def process_clip_task(
     # 1. Extract subclip
     if settings.encoding.extract_reencode:
         target_fps = output_profile.fps if output_profile else 24.0
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = build_ffmpeg_cmd([
             "-ss", str(clip_start),
             "-i", scene_path,
             "-t", str(cut_duration),
@@ -306,17 +362,16 @@ def process_clip_task(
             "-pix_fmt", settings.encoding.pix_fmt,
             "-an",
             temp_clip_path,
-        ]
+        ])
     else:
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = build_ffmpeg_cmd([
             "-ss", str(clip_start),
             "-i", scene_path,
             "-t", str(cut_duration),
             "-c", "copy",
             "-avoid_negative_ts", "1",
             temp_clip_path
-        ]
+        ])
     result = subprocess.run(
         cmd,
         capture_output=True,
@@ -448,7 +503,7 @@ def process_clip_task(
             vf = vf_chain
             if cfg and cfg.hwupload_filter:
                 vf = f"{vf_chain},{cfg.hwupload_filter}"
-            cmd = ["ffmpeg", "-y"]
+            cmd = build_ffmpeg_cmd([])
             if cfg and cfg.is_gpu_accelerated:
                 cmd.extend(cfg.hwaccel_input_params())
             cmd.extend([
@@ -570,15 +625,21 @@ class MontageBuilder:
             job_id=self.settings.job_id,
             variant_id=self.variant_id,
             settings=self.settings,
-            input_dir=self.settings.paths.input_dir,
-            music_dir=self.settings.paths.music_dir,
-            assets_dir=self.settings.paths.assets_dir,
-            output_dir=self.settings.paths.output_dir,
-            temp_dir=self.settings.paths.temp_dir,
-            stabilize=self.settings.features.stabilize,
-            upscale=self.settings.features.upscale,
-            enhance=self.settings.features.enhance,
-            editing_instructions=self.editing_instructions,
+            paths=MontagePaths(
+                input_dir=self.settings.paths.input_dir,
+                music_dir=self.settings.paths.music_dir,
+                assets_dir=self.settings.paths.assets_dir,
+                output_dir=self.settings.paths.output_dir,
+                temp_dir=self.settings.paths.temp_dir,
+            ),
+            features=MontageFeatures(
+                stabilize=self.settings.features.stabilize,
+                upscale=self.settings.features.upscale,
+                enhance=self.settings.features.enhance,
+            ),
+            creative=MontageCreative(
+                editing_instructions=self.editing_instructions,
+            ),
         )
 
     # =========================================================================
@@ -1847,212 +1908,225 @@ class MontageBuilder:
 
         return score
 
-    def _select_clip(
-        self,
-        available_footage,
-        current_energy: float,
-        unique_videos: int
-    ) -> Tuple[Optional[Dict[str, Any]], float]:
-        """Score and select the best clip for this cut."""
-        from ..scene_analysis import calculate_visual_similarity, detect_motion_blur
-        from ..clip_selector import ClipCandidate
-
-        # Convert to scene dicts for scoring
-        valid_scenes = [
-            s for s in self.ctx.all_scenes_dicts
-            if id(s) in [c.clip_id for c in available_footage]
+    def _get_candidate_scenes(self, available_footage) -> List[Dict[str, Any]]:
+        clip_ids = {c.clip_id for c in available_footage}
+        return [
+            scene for scene in self.ctx.media.all_scenes_dicts
+            if id(scene) in clip_ids
         ]
 
-        if not valid_scenes:
-            return None, 0
+    def _resolve_scoring_rules(self) -> Dict[str, float]:
+        scoring_rules = self.ctx.creative.style_params.get("scoring_rules", {})
+        return {
+            "fresh_clip_bonus": scoring_rules.get("fresh_clip_bonus", 50),
+            "jump_cut_penalty": scoring_rules.get("jump_cut_penalty", 50),
+            "shot_variation_bonus": scoring_rules.get("shot_variation_bonus", 10),
+            "shot_repetition_penalty": scoring_rules.get("shot_repetition_penalty", 10),
+        }
 
-        candidates = valid_scenes[:20]
-        best_score = -1000
-        selected_scene = candidates[0]
+    def _get_current_music_section(self):
+        audio = self.ctx.media.audio_result
+        if not audio or not audio.sections:
+            return None
+        current_time = self.ctx.timeline.current_time
+        for section in audio.sections:
+            if section.start_time <= current_time < section.end_time:
+                return section
+        return None
 
-        # Get scoring rules from style or defaults
-        scoring_rules = self.ctx.style_params.get("scoring_rules", {})
-        fresh_clip_bonus = scoring_rules.get("fresh_clip_bonus", 50)
-        jump_cut_penalty = scoring_rules.get("jump_cut_penalty", 50)
-        shot_variation_bonus = scoring_rules.get("shot_variation_bonus", 10)
-        shot_repetition_penalty = scoring_rules.get("shot_repetition_penalty", 10)
+    def _score_usage_and_story_phase(
+        self,
+        footage_clip: Any,
+        current_energy: float,
+        fresh_clip_bonus: float,
+    ) -> float:
+        score = 0.0
+        if not footage_clip:
+            return score
 
-        # Determine current music section
-        current_section = None
-        if self.ctx.audio_result and self.ctx.audio_result.sections:
-            for section in self.ctx.audio_result.sections:
-                if section.start_time <= self.ctx.current_time < section.end_time:
-                    current_section = section
-                    break
+        if footage_clip.usage_count == 0:
+            score += fresh_clip_bonus
+        elif footage_clip.usage_count == 1:
+            score += (fresh_clip_bonus * 0.4)
+        else:
+            score -= footage_clip.usage_count * 10
 
-        for scene in candidates:
-            score = 0
+        phase = self.ctx.get_story_phase()
+        if phase == "intro" and current_energy < 0.4:
+            score += 15
+        elif phase == "build" and 0.4 <= current_energy < 0.7:
+            score += 15
+        elif phase == "climax" and current_energy >= 0.7:
+            score += 15
+        elif phase == "outro" and current_energy < 0.5:
+            score += 15
 
-            # Rule 1: Fresh clips bonus
-            scene_id = id(scene)
-            footage_clip = next((c for c in available_footage if c.clip_id == scene_id), None)
-            if footage_clip:
-                if footage_clip.usage_count == 0:
-                    score += fresh_clip_bonus
-                elif footage_clip.usage_count == 1:
-                    score += (fresh_clip_bonus * 0.4)
-                else:
-                    score -= footage_clip.usage_count * 10
+        return score
 
-                # Story arc phase matching
-                story_position = self.ctx.get_story_position()
-                phase = self.ctx.get_story_phase()
-                if phase == "intro" and current_energy < 0.4:
-                    score += 15
-                elif phase == "build" and 0.4 <= current_energy < 0.7:
-                    score += 15
-                elif phase == "climax" and current_energy >= 0.7:
-                    score += 15
-                elif phase == "outro" and current_energy < 0.5:
-                    score += 15
+    def _score_jump_cut(
+        self, scene_path: str, unique_videos: int, jump_cut_penalty: float
+    ) -> float:
+        if scene_path != self.ctx.timeline.last_used_path:
+            return 0.0
+        if unique_videos > 1:
+            return -jump_cut_penalty
+        return -(jump_cut_penalty * 0.1)
 
-            # Rule 2: Avoid jump cuts
-            if scene['path'] == self.ctx.last_used_path:
-                if unique_videos > 1:
-                    score -= jump_cut_penalty
-                else:
-                    score -= (jump_cut_penalty * 0.1)
+    @staticmethod
+    def _score_action_energy(
+        meta: Dict[str, Any],
+        current_energy: float,
+        current_section: Any,
+    ) -> float:
+        score = 0.0
+        action = meta.get('action', 'medium')
+        if current_energy > 0.6 and action == 'high':
+            score += 20
+        if current_energy < 0.4 and action == 'low':
+            score += 20
 
-            # Rule 3: AI Content Matching
-            meta = scene.get('meta', {})
-            action = meta.get('action', 'medium')
-            shot = meta.get('shot', 'medium')
+        if current_section:
+            if current_section.energy_level == "high" and action == "high":
+                score += 25
+            elif current_section.energy_level == "low" and action == "low":
+                score += 25
 
-            if current_energy > 0.6 and action == 'high':
-                score += 20
-            if current_energy < 0.4 and action == 'low':
-                score += 20
-            
-            # Rule 3.5: Section Energy Matching (Pacing Curves)
-            if current_section:
-                if current_section.energy_level == "high" and action == "high":
-                    score += 25
-                elif current_section.energy_level == "low" and action == "low":
-                    score += 25
+        return score
 
-            # Rule 3.6: Style Weights & Preferences (Abstracted)
-            style_params = self.ctx.style_params
-            if style_params:
-                score += self._apply_style_scoring(meta, style_params)
+    def _score_style_preferences(self, meta: Dict[str, Any]) -> float:
+        style_params = self.ctx.creative.style_params
+        if not style_params:
+            return 0.0
+        return self._apply_style_scoring(meta, style_params)
 
-            # Rule 4: Shot Variation
-            if self.ctx.last_shot_type and shot == self.ctx.last_shot_type:
-                score -= shot_repetition_penalty
-            else:
-                score += shot_variation_bonus
+    def _score_shot_variation(
+        self,
+        shot: str,
+        shot_variation_bonus: float,
+        shot_repetition_penalty: float,
+    ) -> float:
+        if self.ctx.timeline.last_shot_type and shot == self.ctx.timeline.last_shot_type:
+            return -shot_repetition_penalty
+        return shot_variation_bonus
 
-            # Rule 5: Match cut detection
-            if self.ctx.last_clip_end_time is not None and self.ctx.last_used_path is not None:
-                try:
-                    similarity = calculate_visual_similarity(
-                        self.ctx.last_used_path, self.ctx.last_clip_end_time,
-                        scene['path'], scene['start']
-                    )
-                    if similarity > 0.7:
-                        score += 30
-                except Exception:
-                    pass
+    def _score_match_cut(self, scene: Dict[str, Any], similarity_fn) -> float:
+        if self.ctx.timeline.last_clip_end_time is None or not self.ctx.timeline.last_used_path:
+            return 0.0
 
-            # Rule 6: Semantic matching (Phase 2: Semantic Storytelling)
-            if self.ctx.semantic_query and (meta.get('tags') or meta.get('caption')):
-                try:
-                    from ..semantic_matcher import get_semantic_matcher
-                    matcher = get_semantic_matcher()
-                    if matcher.is_available:
-                        sem_result = matcher.match_query_to_clip(self.ctx.semantic_query, meta)
-                        # Up to +40 points for strong semantic match
-                        score += int(sem_result.overall_score * 40)
-                except Exception:
-                    pass
-
-            # Rule 7: B-Roll Plan Matching (Epic 2)
-            if self.ctx.broll_plan:
-                # Find active segment
-                active_segment = None
-                for seg in self.ctx.broll_plan:
-                    if seg.get("start_time", 0) <= self.ctx.current_time < seg.get("end_time", 99999):
-                        active_segment = seg
-                        break
-                
-                if active_segment:
-                    # Check if this scene is one of the suggestions
-                    is_suggested = False
-                    for sug in active_segment.get("suggestions", []):
-                        if sug.get("clip") == scene["path"]:
-                            is_suggested = True
-                            # Boost score significantly if it's a direct suggestion
-                            score += 100
-                            break
-                    
-                    # If not a direct suggestion, check semantic match with segment text
-                    if not is_suggested and (meta.get('tags') or meta.get('caption')):
-                        try:
-                            from ..semantic_matcher import get_semantic_matcher
-                            matcher = get_semantic_matcher()
-                            if matcher.is_available:
-                                sem_result = matcher.match_query_to_clip(active_segment["segment"], meta)
-                                score += int(sem_result.overall_score * 50)
-                        except Exception:
-                            pass
-
-            # Randomness factor
-            score += random.randint(-15, 15)
-            scene['_heuristic_score'] = score
-
-        # --- INTELLIGENT SELECTION (DRY/KISS) ---
-        if self._intelligent_selector:
-            # Convert to ClipCandidate objects
-            clip_candidates = []
-            for s in candidates:
-                clip_candidates.append(ClipCandidate(
-                    path=s['path'],
-                    start_time=s['start'],
-                    duration=s['duration'],
-                    heuristic_score=int(s.get('_heuristic_score', 0)),
-                    metadata=s.get('meta', {})
-                ))
-
-            # Build context
-            prev_clips = []
-            if self.ctx.last_used_path:
-                # Minimal context from what we have
-                prev_meta = {'shot': self.ctx.last_shot_type}
-                prev_clips.append({'meta': prev_meta})
-
-            context = {
-                'current_energy': current_energy,
-                'position': self.ctx.get_story_phase(),
-                'previous_clips': prev_clips,
-                'beat_position': self.ctx.beat_idx
-            }
-
-            # Select best clip
-            best_candidate, reason = self._intelligent_selector.select_best_clip(
-                clip_candidates,
-                context,
-                top_n=5
+        try:
+            similarity = similarity_fn(
+                self.ctx.timeline.last_used_path,
+                self.ctx.timeline.last_clip_end_time,
+                scene['path'],
+                scene['start'],
             )
+            if similarity > 0.7:
+                return 30.0
+        except Exception:
+            pass
+        return 0.0
 
-            # Find the original scene dict
-            selected_scene = next(
-                (s for s in candidates 
-                 if s['path'] == best_candidate.path and s['start'] == best_candidate.start_time), 
-                candidates[0]
+    def _score_semantic_match(self, meta: Dict[str, Any]) -> float:
+        if not self.ctx.creative.semantic_query:
+            return 0.0
+        if not (meta.get('tags') or meta.get('caption')):
+            return 0.0
+
+        try:
+            from ..semantic_matcher import get_semantic_matcher
+            matcher = get_semantic_matcher()
+            if matcher.is_available:
+                sem_result = matcher.match_query_to_clip(self.ctx.creative.semantic_query, meta)
+                return int(sem_result.overall_score * 40)
+        except Exception:
+            return 0.0
+        return 0.0
+
+    def _score_broll_match(self, scene: Dict[str, Any], meta: Dict[str, Any]) -> float:
+        if not self.ctx.creative.broll_plan:
+            return 0.0
+
+        active_segment = None
+        current_time = self.ctx.timeline.current_time
+        for seg in self.ctx.creative.broll_plan:
+            if seg.get("start_time", 0) <= current_time < seg.get("end_time", 99999):
+                active_segment = seg
+                break
+
+        if not active_segment:
+            return 0.0
+
+        for sug in active_segment.get("suggestions", []):
+            if sug.get("clip") == scene["path"]:
+                return 100.0
+
+        if not (meta.get('tags') or meta.get('caption')):
+            return 0.0
+
+        try:
+            from ..semantic_matcher import get_semantic_matcher
+            matcher = get_semantic_matcher()
+            if matcher.is_available:
+                sem_result = matcher.match_query_to_clip(active_segment["segment"], meta)
+                return int(sem_result.overall_score * 50)
+        except Exception:
+            return 0.0
+        return 0.0
+
+    def _select_with_intelligent_selector(
+        self,
+        candidates: List[Dict[str, Any]],
+        current_energy: float,
+    ) -> Tuple[Dict[str, Any], float]:
+        from ..clip_selector import ClipCandidate
+
+        clip_candidates = [
+            ClipCandidate(
+                path=scene['path'],
+                start_time=scene['start'],
+                duration=scene['duration'],
+                heuristic_score=int(scene.get('_heuristic_score', 0)),
+                metadata=scene.get('meta', {}),
             )
-            best_score = best_candidate.heuristic_score
+            for scene in candidates
+        ]
 
-            if "LLM" in reason:
-                logger.info(f"   🧠 {reason}")
-            
-            return selected_scene, best_score
-        # ----------------------------------------
+        prev_clips = []
+        if self.ctx.timeline.last_used_path:
+            prev_meta = {'shot': self.ctx.timeline.last_shot_type}
+            prev_clips.append({'meta': prev_meta})
 
-        # Probabilistic selection from top candidates (Fallback)
+        context = {
+            'current_energy': current_energy,
+            'position': self.ctx.get_story_phase(),
+            'previous_clips': prev_clips,
+            'beat_position': self.ctx.timeline.beat_idx,
+        }
+
+        best_candidate, reason = self._intelligent_selector.select_best_clip(
+            clip_candidates,
+            context,
+            top_n=5,
+        )
+
+        selected_scene = next(
+            (
+                scene for scene in candidates
+                if scene['path'] == best_candidate.path
+                and scene['start'] == best_candidate.start_time
+            ),
+            candidates[0],
+        )
+
+        if "LLM" in reason:
+            logger.info(f"   🧠 {reason}")
+
+        return selected_scene, best_candidate.heuristic_score
+
+    @staticmethod
+    def _select_probabilistic(
+        candidates: List[Dict[str, Any]],
+    ) -> Tuple[Optional[Dict[str, Any]], float]:
         candidates.sort(key=lambda x: x.get('_heuristic_score', -1000), reverse=True)
         top_n = min(3, len(candidates))
         if top_n > 0:
@@ -2061,8 +2135,61 @@ class MontageBuilder:
             weights = [c.get('_heuristic_score', 0) - min_score + 10 for c in top_candidates]
             selected_scene = random.choices(top_candidates, weights=weights, k=1)[0]
             best_score = selected_scene.get('_heuristic_score', 0)
+            return selected_scene, best_score
+        return None, 0.0
 
-        return selected_scene, best_score
+    def _select_clip(
+        self,
+        available_footage,
+        current_energy: float,
+        unique_videos: int
+    ) -> Tuple[Optional[Dict[str, Any]], float]:
+        """Score and select the best clip for this cut."""
+        from ..scene_analysis import calculate_visual_similarity
+
+        valid_scenes = self._get_candidate_scenes(available_footage)
+        if not valid_scenes:
+            return None, 0
+
+        candidates = valid_scenes[:20]
+        scoring_rules = self._resolve_scoring_rules()
+        current_section = self._get_current_music_section()
+        clip_map = {c.clip_id: c for c in available_footage}
+
+        for scene in candidates:
+            meta = scene.get('meta', {})
+            shot = meta.get('shot', 'medium')
+
+            footage_clip = clip_map.get(id(scene))
+            score = 0.0
+            score += self._score_usage_and_story_phase(
+                footage_clip,
+                current_energy,
+                scoring_rules["fresh_clip_bonus"],
+            )
+            score += self._score_jump_cut(
+                scene['path'],
+                unique_videos,
+                scoring_rules["jump_cut_penalty"],
+            )
+            score += self._score_action_energy(meta, current_energy, current_section)
+            score += self._score_style_preferences(meta)
+            score += self._score_shot_variation(
+                shot,
+                scoring_rules["shot_variation_bonus"],
+                scoring_rules["shot_repetition_penalty"],
+            )
+            score += self._score_match_cut(scene, calculate_visual_similarity)
+            score += self._score_semantic_match(meta)
+            score += self._score_broll_match(scene, meta)
+
+            score += random.randint(-15, 15)
+            scene['_heuristic_score'] = score
+
+        if self._intelligent_selector:
+            return self._select_with_intelligent_selector(candidates, current_energy)
+
+        return self._select_probabilistic(candidates)
 
     def _process_and_add_clip(
         self,

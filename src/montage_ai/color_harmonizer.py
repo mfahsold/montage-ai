@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Tuple
 from pathlib import Path
 
+from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
 
 @dataclass
 class ColorProfile:
@@ -107,8 +108,7 @@ class ColorHarmonizer:
 
         filter_chain = ",".join(filters)
 
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = build_ffmpeg_cmd([
             "-i", input_path,
             "-vf", filter_chain,
             "-c:v", "libx264",
@@ -117,7 +117,7 @@ class ColorHarmonizer:
             "-pix_fmt", "yuv420p",
             "-c:a", "copy",
             output_path
-        ]
+        ])
 
         try:
             result = subprocess.run(
@@ -197,14 +197,13 @@ class ColorHarmonizer:
         # Extract first frame and analyze
         try:
             # Use signalstats filter for video analysis
-            cmd = [
-                "ffprobe",
+            cmd = build_ffprobe_cmd([
                 "-v", "error",
                 "-select_streams", "v:0",
                 "-show_entries", "stream=avg_frame_rate",
                 "-of", "csv=p=0",
                 video_path
-            ]
+            ])
 
             result = subprocess.run(
                 cmd,
@@ -254,8 +253,7 @@ class ColorHarmonizer:
 
         filter_chain = ",".join(filters)
 
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = build_ffmpeg_cmd([
             "-i", source_path,
             "-vf", filter_chain,
             "-c:v", "libx264",
@@ -264,7 +262,7 @@ class ColorHarmonizer:
             "-pix_fmt", "yuv420p",
             "-c:a", "copy",
             output_path
-        ]
+        ])
 
         try:
             result = subprocess.run(

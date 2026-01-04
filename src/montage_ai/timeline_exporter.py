@@ -27,6 +27,7 @@ from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
 
 from .logger import logger
+from .ffmpeg_utils import build_ffmpeg_cmd
 
 VERSION = "0.1.0"
 
@@ -224,7 +225,7 @@ class TimelineExporter:
             return proxy_path
 
         # Base command
-        cmd = ["ffmpeg", "-y", "-i", source_path]
+        cmd = build_ffmpeg_cmd(["-i", source_path])
 
         # Format specific settings
         if format == "prores":

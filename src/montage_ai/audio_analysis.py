@@ -24,6 +24,7 @@ import numpy as np
 from .config import get_settings
 from .logger import logger
 from .core.cmd_runner import run_command, CommandError
+from .ffmpeg_utils import build_ffmpeg_cmd
 from .video_metadata import probe_duration
 
 _settings = get_settings()
@@ -311,11 +312,14 @@ def _ffmpeg_detect_onsets(audio_path: str, duration: float) -> List[float]:
     """
     # Use silencedetect to find quiet gaps, then infer onsets
     # Silence threshold: -35dB, minimum duration: 0.05s (50ms)
-    cmd = [
-        "ffmpeg", "-i", audio_path,
-        "-af", f"silencedetect=n={_settings.audio.silence_threshold}:d={_settings.audio.min_silence_duration}",
-        "-f", "null", "-"
-    ]
+    cmd = build_ffmpeg_cmd(
+        [
+            "-i", audio_path,
+            "-af", f"silencedetect=n={_settings.audio.silence_threshold}:d={_settings.audio.min_silence_duration}",
+            "-f", "null", "-"
+        ],
+        overwrite=False
+    )
 
     try:
         result = run_command(
@@ -353,11 +357,14 @@ def _ffmpeg_analyze_loudness(audio_path: str, duration: float) -> Tuple[np.ndarr
         (times_array, loudness_array) - loudness in LUFS
     """
     # Use ebur128 with metadata output for momentary loudness
-    cmd = [
-        "ffmpeg", "-i", audio_path,
-        "-af", "ebur128=metadata=1:peak=true",
-        "-f", "null", "-"
-    ]
+    cmd = build_ffmpeg_cmd(
+        [
+            "-i", audio_path,
+            "-af", "ebur128=metadata=1:peak=true",
+            "-f", "null", "-"
+        ],
+        overwrite=False
+    )
 
     try:
         result = run_command(
@@ -522,11 +529,14 @@ def _ffmpeg_estimate_tempo(audio_path: str, duration: float) -> Tuple[float, np.
     # Fallback: Use volumedetect for basic heuristic
     print(f"   ⚠️ Insufficient peaks detected, using volumedetect fallback...")
 
-    cmd = [
-        "ffmpeg", "-i", audio_path,
-        "-af", "volumedetect",
-        "-f", "null", "-"
-    ]
+    cmd = build_ffmpeg_cmd(
+        [
+            "-i", audio_path,
+            "-af", "volumedetect",
+            "-f", "null", "-"
+        ],
+        overwrite=False
+    )
 
     try:
         result = run_command(
@@ -590,14 +600,14 @@ def _ffmpeg_analyze_energy(audio_path: str, duration: float) -> Tuple[np.ndarray
         tmp_path = tmp.name
 
     try:
-        cmd = [
-            "ffmpeg", "-y", "-i", audio_path,
+        cmd = build_ffmpeg_cmd([
+            "-i", audio_path,
             "-ar", str(sample_rate),  # Resample
             "-ac", "1",               # Mono
             "-f", "s16le",            # 16-bit signed little-endian
             "-acodec", "pcm_s16le",
             tmp_path
-        ]
+        ])
 
         result = run_command(
             cmd,
@@ -651,11 +661,14 @@ def _ffmpeg_analyze_energy(audio_path: str, duration: float) -> Tuple[np.ndarray
     except Exception as e:
         print(f"   ⚠️ FFmpeg energy extraction failed: {e}")
         # Fallback: synthetic curve based on volumedetect
-        cmd_vol = [
-            "ffmpeg", "-i", audio_path,
-            "-af", "volumedetect",
-            "-f", "null", "-"
-        ]
+        cmd_vol = build_ffmpeg_cmd(
+            [
+                "-i", audio_path,
+                "-af", "volumedetect",
+                "-f", "null", "-"
+            ],
+            overwrite=False
+        )
         try:
             result_vol = run_command(
                 cmd_vol,

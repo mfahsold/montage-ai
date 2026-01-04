@@ -24,12 +24,14 @@ from werkzeug.utils import secure_filename
 from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
 from ..core.hardware import get_best_hwaccel
 from ..auto_reframe import AutoReframeEngine
+from ..ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
 from ..audio_analysis import remove_filler_words
 from ..transcriber import Transcriber
 
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
 from ..logger import logger
+from .job_options import normalize_options, apply_preview_preset, apply_finalize_overrides
 
 # Job phase tracking models
 from .models import JobPhase, PIPELINE_PHASES
@@ -165,91 +167,6 @@ def get_job_status(job_id: str) -> dict:
     """Get status of a job."""
     job = job_store.get_job(job_id)
     return job if job else {"status": "not_found"}
-
-
-def normalize_options(data: dict) -> dict:
-    """Normalize and validate job options from API request.
-    
-    Single source of truth for option parsing, type casting, and defaults.
-    Automatically derives MUSIC_END from TARGET_DURATION if not explicitly set.
-    
-    Args:
-        data: Raw request data (may have nested 'options' or flat structure)
-        
-    Returns:
-        Normalized options dict with consistent types
-    """
-    # Support both nested and flat structure (backwards compatible)
-    opts = data.get('options', {})
-    
-    # Parse with defaults and type casting
-    target_duration = float(opts.get('target_duration', data.get('target_duration', 0)) or 0)
-    music_start = float(opts.get('music_start', data.get('music_start', 0)) or 0)
-    music_end_raw = opts.get('music_end', data.get('music_end', None))
-    
-    # Convert music_end to float if provided
-    music_end = float(music_end_raw) if music_end_raw is not None else None
-    
-    # AUTO-DERIVE: If target_duration is set but music_end is not,
-    # derive music_end from music_start + target_duration
-    # This ensures the audio is trimmed to match the target video length
-    if target_duration > 0 and music_end is None:
-        music_end = music_start + target_duration
-    
-    # Clamp values to sensible ranges
-    target_duration = max(0, min(target_duration, 3600))  # 0-1h
-    music_start = max(0, music_start)
-    if music_end is not None:
-        music_end = max(music_start + 1, music_end)  # At least 1s after start
-    
-    # Helper to get boolean with centralized default
-    def get_bool(key: str) -> bool:
-        val = opts.get(key, data.get(key))
-        if val is None:
-            return DEFAULT_OPTIONS.get(key, False)
-        return bool(val)
-    
-    # Quality Profile determines default enhance/stabilize/upscale
-    quality_profile = str(opts.get('quality_profile', data.get('quality_profile', 'standard'))).lower()
-    
-    # Cloud Acceleration single toggle (enables CGPU for all cloud features)
-    cloud_acceleration = get_bool('cloud_acceleration') or get_bool('cgpu') or _settings.llm.cgpu_enabled
-    
-    return {
-        "prompt": str(opts.get('prompt', data.get('prompt', ''))),
-        # Individual toggles (can override profile, but profile is primary)
-        "stabilize": get_bool('stabilize'),
-        "upscale": get_bool('upscale'),
-        "enhance": get_bool('enhance'),
-        "llm_clip_selection": get_bool('llm_clip_selection'),
-        "shorts_mode": get_bool('shorts_mode'),
-        "export_width": int(opts.get('export_width', data.get('export_width', 0)) or 0),
-        "export_height": int(opts.get('export_height', data.get('export_height', 0)) or 0),
-        "creative_loop": get_bool('creative_loop'),
-        "story_engine": get_bool('story_engine'),
-        "captions": get_bool('captions'),
-        "export_timeline": get_bool('export_timeline'),
-        "generate_proxies": get_bool('generate_proxies'),
-        "preserve_aspect": get_bool('preserve_aspect'),
-        "target_duration": target_duration,
-        "music_start": music_start,
-        "music_end": music_end,
-        # Preview mode flag (legacy support)
-        "preview": data.get('preset') == 'fast',
-        # Quality Profile (preview, standard, high, master)
-        "quality_profile": quality_profile,
-        # Cloud Acceleration single toggle
-        "cloud_acceleration": cloud_acceleration,
-        "cgpu": cloud_acceleration,  # Backwards compat
-        # Audio Polish (Clean Audio = Voice Isolation + Denoise)
-        "clean_audio": get_bool('clean_audio'),
-        "voice_isolation": get_bool('voice_isolation'),
-        # Story Arc
-        "story_arc": str(opts.get('story_arc', data.get('story_arc', ''))),
-        # Shorts Studio options
-        "reframe_mode": str(opts.get('reframe_mode', data.get('reframe_mode', 'auto'))),
-        "caption_style": str(opts.get('caption_style', data.get('caption_style', 'tiktok'))),
-    }
 
 
 
@@ -645,33 +562,10 @@ def api_create_job():
     job_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Handle Quick Preview override
-    is_preview = data.get('preset') == 'fast'
-    if is_preview:
-        data['style'] = 'dynamic'  # Force dynamic for speed
-        data['target_duration'] = min(data.get('target_duration', 30) or 30, 30)  # Cap at 30s
-        # Disable heavy features
-        data['upscale'] = False
-        data['stabilize'] = False
-        data['enhance'] = False
-        data['cgpu'] = False
-        data['creative_loop'] = False
-
-        # Set 360p resolution for preview
-        if 'options' not in data:
-            data['options'] = {}
-            
-        # Check shorts mode (handle both nested and flat)
-        is_shorts = str(data['options'].get('shorts_mode', data.get('shorts_mode', 'false'))).lower() == 'true'
-        
-        if is_shorts:
-            data['options']['export_width'] = 360
-            data['options']['export_height'] = 640
-        else:
-            data['options']['export_width'] = 640
-            data['options']['export_height'] = 360
+    data = apply_preview_preset(data)
 
     # Normalize options (single source of truth for parsing/defaults/derivation)
-    normalized_options = normalize_options(data)
+    normalized_options = normalize_options(data, DEFAULT_OPTIONS, _settings)
 
     # Create job with normalized options and structured phase tracking
     job = {
@@ -721,18 +615,7 @@ def api_finalize_job(job_id):
         return jsonify({"error": "Job not found"}), 404
         
     # 2. Create new job options based on original
-    # Deep copy to avoid modifying original
-    import copy
-    new_options = copy.deepcopy(original_job['options'])
-    
-    # Upgrade settings for High Quality
-    new_options['quality_profile'] = 'high'
-    new_options['preview'] = False
-    new_options['export_width'] = 1920
-    new_options['export_height'] = 1080
-    new_options['upscale'] = True
-    new_options['stabilize'] = True
-    new_options['enhance'] = True
+    new_options = apply_finalize_overrides(original_job['options'])
     
     # 3. Create new job
     new_job_id = f"{job_id}_hq"
@@ -1588,11 +1471,12 @@ def api_transcript_transcribe():
             
             # Extract audio first
             audio_path = video_path.with_suffix('.wav')
-            subprocess.run([
-                'ffmpeg', '-y', '-i', str(video_path),
+            cmd = build_ffmpeg_cmd([
+                '-i', str(video_path),
                 '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
                 str(audio_path)
-            ], capture_output=True, check=True)
+            ])
+            subprocess.run(cmd, capture_output=True, check=True)
             
             # Transcribe
             transcript = transcribe_audio(str(audio_path), model='base', word_timestamps=True)
@@ -1943,8 +1827,7 @@ def api_shorts_render():
                         polished_video_path = OUTPUT_DIR / f"shorts_polished_{timestamp_polish}.mp4"
                         
                         # Use ffmpeg to replace audio
-                        cmd = [
-                            "ffmpeg", "-y",
+                        cmd = build_ffmpeg_cmd([
                             "-i", video_path,
                             "-i", vocals_path,
                             "-c:v", "copy",
@@ -1952,7 +1835,7 @@ def api_shorts_render():
                             "-map", "0:v:0",
                             "-map", "1:a:0",
                             str(polished_video_path)
-                        ]
+                        ])
                         subprocess.run(cmd, check=True, capture_output=True)
                         
                         # Update video_path to point to the polished version
@@ -2304,13 +2187,16 @@ def api_audio_clean():
                 ",compand=attacks=0.3:decays=0.8:points=-80/-900|-45/-15|-27/-9|0/-7:soft-knee=6:gain=3"  # Light compression
             )
             
-            cmd = [
-                'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
-                '-i', str(input_path),
-                '-af', noise_reduction_filter,
-                '-acodec', 'pcm_s16le',  # High quality WAV
-                str(output_path)
-            ]
+            cmd = build_ffmpeg_cmd(
+                [
+                    '-i', str(input_path),
+                    '-af', noise_reduction_filter,
+                    '-acodec', 'pcm_s16le',  # High quality WAV
+                    str(output_path)
+                ],
+                hide_banner=True,
+                loglevel="error"
+            )
             
             subprocess.run(cmd, check=True, capture_output=True)
         else:
@@ -2355,21 +2241,24 @@ def api_audio_analyze():
     
     try:
         # Extract audio stats using FFmpeg
-        cmd = [
-            'ffprobe', '-v', 'quiet',
+        cmd = build_ffprobe_cmd([
+            '-v', 'quiet',
             '-print_format', 'json',
             '-show_format', '-show_streams',
             '-select_streams', 'a:0',
             str(audio_path)
-        ]
+        ])
         result = subprocess.run(cmd, capture_output=True, text=True)
         probe_data = json.loads(result.stdout) if result.stdout else {}
         
         # Get loudness stats
-        loudness_cmd = [
-            'ffmpeg', '-y', '-hide_banner', '-i', str(audio_path),
-            '-af', 'volumedetect', '-f', 'null', '/dev/null'
-        ]
+        loudness_cmd = build_ffmpeg_cmd(
+            [
+                '-hide_banner', '-i', str(audio_path),
+                '-af', 'volumedetect', '-f', 'null', '/dev/null'
+            ],
+            overwrite=True
+        )
         loudness_result = subprocess.run(loudness_cmd, capture_output=True, text=True, timeout=30)
         
         # Parse volume stats from stderr

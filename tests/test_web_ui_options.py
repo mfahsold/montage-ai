@@ -2,10 +2,12 @@
 Tests for Web UI Options Normalization and Queue Logic
 """
 
-import pytest
-import json
-from unittest.mock import patch, MagicMock
-from src.montage_ai.web_ui.app import normalize_options, app
+from src.montage_ai.config import get_settings
+from src.montage_ai.web_ui.app import DEFAULT_OPTIONS
+from src.montage_ai.web_ui.job_options import normalize_options
+
+
+SETTINGS = get_settings()
 
 # =============================================================================
 # normalize_options Tests
@@ -14,7 +16,7 @@ from src.montage_ai.web_ui.app import normalize_options, app
 def test_normalize_options_defaults():
     """Test that defaults are applied correctly when input is empty."""
     data = {}
-    opts = normalize_options(data)
+    opts = normalize_options(data, DEFAULT_OPTIONS, SETTINGS)
     
     assert opts['target_duration'] == 0
     assert opts['music_start'] == 0
@@ -34,7 +36,7 @@ def test_normalize_options_flat_structure():
         'stabilize': 'true',
         'prompt': 'test prompt'
     }
-    opts = normalize_options(data)
+    opts = normalize_options(data, DEFAULT_OPTIONS, SETTINGS)
     
     assert opts['target_duration'] == 60.0
     assert opts['music_start'] == 10.0
@@ -49,7 +51,7 @@ def test_normalize_options_nested_structure():
             'upscale': True
         }
     }
-    opts = normalize_options(data)
+    opts = normalize_options(data, DEFAULT_OPTIONS, SETTINGS)
     
     assert opts['target_duration'] == 30.0
     assert opts['upscale'] is True
@@ -60,7 +62,7 @@ def test_normalize_options_music_end_derivation():
         'target_duration': 45,
         'music_start': 5
     }
-    opts = normalize_options(data)
+    opts = normalize_options(data, DEFAULT_OPTIONS, SETTINGS)
     
     # Should be start + duration = 5 + 45 = 50
     assert opts['music_end'] == 50.0
@@ -72,7 +74,7 @@ def test_normalize_options_music_end_explicit():
         'music_start': 5,
         'music_end': 100
     }
-    opts = normalize_options(data)
+    opts = normalize_options(data, DEFAULT_OPTIONS, SETTINGS)
     
     assert opts['music_end'] == 100.0
 
@@ -83,7 +85,7 @@ def test_normalize_options_clamping():
         'music_start': -5,       # Should be 0
         'music_end': 2           # Should be > start (if start is 0, end > 0)
     }
-    opts = normalize_options(data)
+    opts = normalize_options(data, DEFAULT_OPTIONS, SETTINGS)
     
     assert opts['target_duration'] == 0
     assert opts['music_start'] == 0
@@ -95,26 +97,18 @@ def test_normalize_options_clamping():
         'music_start': 10,
         'music_end': 5  # Should be clamped to start + 1 = 11
     }
-    opts2 = normalize_options(data2)
+    opts2 = normalize_options(data2, DEFAULT_OPTIONS, SETTINGS)
     assert opts2['music_end'] == 11.0
 
 # =============================================================================
 # Queue Robustness Tests
 # =============================================================================
 
-@pytest.fixture
-def client():
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
-
-@patch('src.montage_ai.web_ui.app.q')
-@patch('src.montage_ai.web_ui.app.job_store')
-def test_job_submission_queues_job(mock_job_store, mock_q, client):
+def test_job_submission_queues_job(client, mock_redis_and_rq):
     """Test that submitting a job adds it to the store and the queue."""
     # Setup
-    mock_job_store.create_job.return_value = None
-    mock_q.enqueue.return_value = None
+    mock_job_store = mock_redis_and_rq['job_store']
+    mock_q = mock_redis_and_rq['q']
     
     # Action
     res = client.post('/api/jobs', json={'style': 'test', 'options': {}})
@@ -126,18 +120,15 @@ def test_job_submission_queues_job(mock_job_store, mock_q, client):
     
     # Verify arguments
     args, _ = mock_job_store.create_job.call_args
-    job_id = args[0]
     job_data = args[1]
     assert job_data['status'] == 'queued'
     assert job_data['style'] == 'test'
 
-@patch('src.montage_ai.web_ui.app.q')
-@patch('src.montage_ai.web_ui.app.job_store')
-def test_multiple_job_submission(mock_job_store, mock_q, client):
+def test_multiple_job_submission(client, mock_redis_and_rq):
     """Test that multiple jobs can be submitted without blocking."""
     # Setup
-    mock_job_store.create_job.return_value = None
-    mock_q.enqueue.return_value = None
+    mock_job_store = mock_redis_and_rq['job_store']
+    mock_q = mock_redis_and_rq['q']
     
     # Action
     res1 = client.post('/api/jobs', json={'style': 'job1'})

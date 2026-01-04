@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple
 
 from .ffmpeg_config import get_config
+from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
 from .logger import logger
 
 # Import Timeline Exporter for Pro Handoff
@@ -131,15 +132,13 @@ class TextEditor:
     def video_duration(self) -> float:
         """Get video duration via ffprobe."""
         if self._video_duration is None:
-            result = subprocess.run(
-                [
-                    "ffprobe", "-v", "quiet",
-                    "-show_entries", "format=duration",
-                    "-of", "json",
-                    str(self.video_path)
-                ],
-                capture_output=True, text=True
-            )
+            cmd = build_ffprobe_cmd([
+                "-v", "quiet",
+                "-show_entries", "format=duration",
+                "-of", "json",
+                str(self.video_path)
+            ])
+            result = subprocess.run(cmd, capture_output=True, text=True)
             data = json.loads(result.stdout)
             self._video_duration = float(data["format"]["duration"])
         return self._video_duration
@@ -676,7 +675,7 @@ class TextEditor:
             output_video_label = "[outv_hw]"
         
         # Build command
-        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+        cmd = build_ffmpeg_cmd([], hide_banner=True, loglevel="error")
         
         # Add hardware decoding args if applicable
         if config.is_gpu_accelerated:
@@ -750,18 +749,19 @@ class TextEditor:
             af_filter = f"afade=t=in:st=0:d={fade_in},afade=t=out:st={duration - fade_out}:d={fade_out}"
 
             # Extract segment with audio fades
-            cmd = [
-                "ffmpeg", "-y",
-                "-hide_banner", "-loglevel", "error",
-                "-ss", str(region.start),
-                "-i", str(self.video_path),
-                "-t", str(duration),
-                "-c:v", "copy",  # Copy video (no re-encode)
-                "-af", af_filter,  # Apply audio crossfades
-                "-c:a", "aac",
-                "-b:a", "192k",
-                seg_file
-            ]
+            cmd = build_ffmpeg_cmd(
+                [
+                    "-hide_banner", "-loglevel", "error",
+                    "-ss", str(region.start),
+                    "-i", str(self.video_path),
+                    "-t", str(duration),
+                    "-c:v", "copy",  # Copy video (no re-encode)
+                    "-af", af_filter,  # Apply audio crossfades
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    seg_file
+                ]
+            )
             subprocess.run(cmd, check=True)
 
         # Create concat file
@@ -771,18 +771,19 @@ class TextEditor:
                 f.write(f"file '{seg_file}'\n")
 
         # Concatenate all segments
-        cmd = [
-            "ffmpeg", "-y",
-            "-hide_banner", "-loglevel", "error",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", concat_file,
-            "-c:v", codec,
-            "-crf", str(crf),
-            "-preset", preset,
-            "-c:a", "copy",  # Audio already faded
-            output_path
-        ]
+        cmd = build_ffmpeg_cmd(
+            [
+                "-hide_banner", "-loglevel", "error",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_file,
+                "-c:v", codec,
+                "-crf", str(crf),
+                "-preset", preset,
+                "-c:a", "copy",  # Audio already faded
+                output_path
+            ]
+        )
 
         logger.info(f"   Rendering (fallback)...")
         subprocess.run(cmd, check=True)

@@ -34,6 +34,7 @@ from .ffmpeg_config import (
 )
 from .logger import logger
 from .core.cmd_runner import run_command, CommandError
+from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
 
 
 _settings = get_settings()
@@ -121,7 +122,7 @@ def _check_vidstab_available() -> bool:
 
     try:
         result = run_command(
-            ["ffmpeg", "-filters"],
+            build_ffmpeg_cmd(["-filters"], overwrite=False),
             capture_output=True,
             timeout=_settings.processing.ffmpeg_short_timeout,
             check=False
@@ -307,8 +308,7 @@ class ClipEnhancer:
         # Use fewer threads per job when running in parallel
         threads_per_job = "2" if self.parallel_enhance else self.ffmpeg_threads
 
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = build_ffmpeg_cmd([
             "-threads", threads_per_job,
             "-i", input_path,
             "-vf", filters,
@@ -316,7 +316,7 @@ class ClipEnhancer:
             "-preset", self.ffmpeg_preset,
             "-crf", str(self.settings.encoding.crf),
             "-threads", threads_per_job,
-        ]
+        ])
 
         if self.output_profile:
             cmd.extend(["-profile:v", self.output_profile])
@@ -512,7 +512,7 @@ class ClipEnhancer:
 
                     output_path = os.path.join(output_dir, f"matched_{os.path.basename(clip_path)}")
 
-                    cmd = ["ffmpeg", "-y", "-i", clip_path, "-vf", filter_str]
+                    cmd = build_ffmpeg_cmd(["-i", clip_path, "-vf", filter_str])
                     cmd.extend(["-c:v", self.output_codec, "-preset", "fast", "-crf", "18"])
                     if self.output_profile:
                         cmd.extend(["-profile:v", self.output_profile])
@@ -565,12 +565,15 @@ class ClipEnhancer:
             brightnesses = []
 
             for t in sample_points:
-                analyze_cmd = [
-                    "ffmpeg", "-ss", str(t), "-i", input_path,
-                    "-vframes", "1",
-                    "-vf", "signalstats=stat=tout+vrep+brng,metadata=print:file=-",
-                    "-f", "null", "-"
-                ]
+                analyze_cmd = build_ffmpeg_cmd(
+                    [
+                        "-ss", str(t), "-i", input_path,
+                        "-vframes", "1",
+                        "-vf", "signalstats=stat=tout+vrep+brng,metadata=print:file=-",
+                        "-f", "null", "-"
+                    ],
+                    overwrite=False
+                )
                 result = run_command(
                     analyze_cmd,
                     timeout=self.ffmpeg_short_timeout,
@@ -622,13 +625,12 @@ class ClipEnhancer:
         try:
             # PASS 1: Motion Analysis
             logger.info("Pass 1/2: Analyzing motion...")
-            cmd_detect = [
-                "ffmpeg", "-y",
+            cmd_detect = build_ffmpeg_cmd([
                 "-threads", self.ffmpeg_threads,
                 "-i", input_path,
                 "-vf", f"vidstabdetect=shakiness=5:accuracy=15:result={transform_file}",
                 "-f", "null", "-"
-            ]
+            ])
 
             result = run_command(
                 cmd_detect,
@@ -642,15 +644,14 @@ class ClipEnhancer:
 
             # PASS 2: Apply Stabilization
             logger.info("Pass 2/2: Applying stabilization...")
-            cmd_transform = [
-                "ffmpeg", "-y",
+            cmd_transform = build_ffmpeg_cmd([
                 "-threads", self.ffmpeg_threads,
                 "-i", input_path,
                 "-vf", f"vidstabtransform=input={transform_file}:smoothing=30:crop=black:zoom=0:interpol=bicubic",
                 "-c:v", self.output_codec,
                 "-preset", "fast",
                 "-crf", "18",
-            ]
+            ])
 
             if self.output_profile:
                 cmd_transform.extend(["-profile:v", self.output_profile])
@@ -691,15 +692,14 @@ class ClipEnhancer:
         """
         Fallback stabilization using FFmpeg's built-in deshake filter.
         """
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = build_ffmpeg_cmd([
             "-threads", self.ffmpeg_threads,
             "-i", input_path,
             "-vf", "deshake=rx=32:ry=32:blocksize=8:contrast=125",
             "-c:v", self.output_codec,
             "-preset", "fast",
             "-crf", "20",
-        ]
+        ])
 
         if self.output_profile:
             cmd.extend(["-profile:v", self.output_profile])
@@ -779,7 +779,7 @@ class ClipEnhancer:
                 vf_filter = None
 
             # Extract frames with rotation correction
-            extract_cmd = ["ffmpeg", "-i", input_path]
+            extract_cmd = build_ffmpeg_cmd(["-i", input_path])
             if vf_filter:
                 extract_cmd += ["-vf", vf_filter]
             extract_cmd += ["-q:v", "2", f"{frame_dir}/frame_%08d.jpg"]
@@ -799,12 +799,12 @@ class ClipEnhancer:
             run_command(upscale_cmd, check=True)
 
             # Get original FPS
-            fps_cmd = [
-                "ffprobe", "-v", "error", "-select_streams", "v:0",
+            fps_cmd = build_ffprobe_cmd([
+                "-v", "error", "-select_streams", "v:0",
                 "-show_entries", "stream=r_frame_rate",
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 input_path
-            ]
+            ])
             fps_str = subprocess.check_output(fps_cmd).decode().strip()
 
             if '/' in fps_str:
@@ -815,11 +815,11 @@ class ClipEnhancer:
                 fps_arg = fps_str
 
             # Reassemble video
-            esrgan_cmd = [
-                "ffmpeg", "-y", "-framerate", fps_arg,
+            esrgan_cmd = build_ffmpeg_cmd([
+                "-framerate", fps_arg,
                 "-i", f"{out_frame_dir}/frame_%08d.png",
                 "-c:v", self.output_codec, "-crf", str(self.upscale_crf)
-            ]
+            ])
             if self.output_profile:
                 esrgan_cmd.extend(["-profile:v", self.output_profile])
             if self.output_level:
@@ -847,11 +847,11 @@ class ClipEnhancer:
         """
         try:
             # Get original dimensions with rotation handling
-            probe_cmd = [
-                "ffprobe", "-v", "error", "-select_streams", "v:0",
+            probe_cmd = build_ffprobe_cmd([
+                "-v", "error", "-select_streams", "v:0",
                 "-show_entries", "stream=width,height:stream_side_data=rotation",
                 "-of", "json", input_path
-            ]
+            ])
             probe_output = subprocess.check_output(probe_cmd).decode().strip()
             probe_data = json.loads(probe_output)
             stream = probe_data.get('streams', [{}])[0]
@@ -878,14 +878,13 @@ class ClipEnhancer:
                 f"cas=0.4"
             )
 
-            ffmpeg_cmd = [
-                "ffmpeg", "-y",
+            ffmpeg_cmd = build_ffmpeg_cmd([
                 "-i", input_path,
                 "-vf", filter_chain,
                 "-c:v", self.output_codec,
                 "-preset", "slow",
                 "-crf", str(self.upscale_crf),
-            ]
+            ])
 
             if self.output_profile:
                 ffmpeg_cmd.extend(["-profile:v", self.output_profile])
@@ -904,12 +903,12 @@ class ClipEnhancer:
     def _extract_middle_frame(self, video_path: str, output_path: str) -> bool:
         """Extract a frame from the middle of a video for color analysis."""
         try:
-            probe_cmd = [
-                "ffprobe", "-v", "error",
+            probe_cmd = build_ffprobe_cmd([
+                "-v", "error",
                 "-show_entries", "format=duration",
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 video_path
-            ]
+            ])
             result = run_command(
                 probe_cmd,
                 capture_output=True,
@@ -919,14 +918,13 @@ class ClipEnhancer:
             duration = float(result.stdout.strip()) if result.stdout.strip() else 1.0
 
             middle = duration / 2
-            extract_cmd = [
-                "ffmpeg", "-y",
+            extract_cmd = build_ffmpeg_cmd([
                 "-ss", str(middle),
                 "-i", video_path,
                 "-vframes", "1",
                 "-q:v", "2",
                 output_path
-            ]
+            ])
             run_command(
                 extract_cmd,
                 check=True,

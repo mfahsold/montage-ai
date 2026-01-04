@@ -31,6 +31,7 @@ import tempfile
 from .config import get_settings
 from .core.cmd_runner import run_command
 from .video_metadata import probe_metadata
+from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
 from .ffmpeg_config import COLOR_PRESETS, LUT_FILES
 import shutil
 from dataclasses import dataclass, field
@@ -303,12 +304,17 @@ class FFmpegToolkit:
     
     def _run_ffmpeg(self, args: List[str], capture_output: bool = True) -> subprocess.CompletedProcess:
         """Run FFmpeg command with standard options."""
-        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"] + args
+        cmd = build_ffmpeg_cmd(
+            args,
+            overwrite=True,
+            hide_banner=True,
+            loglevel="error",
+        )
         return run_command(cmd, capture_output=capture_output, check=False)
     
     def _run_ffprobe(self, args: List[str]) -> subprocess.CompletedProcess:
         """Run FFprobe command."""
-        cmd = ["ffprobe", "-v", "quiet"] + args
+        cmd = build_ffprobe_cmd(args, verbosity="quiet")
         return run_command(cmd, capture_output=True, check=False)
     
     def _extract_frames(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -787,4 +793,3 @@ def _color_grade(preset: str):
     preset mapping only.
     """
     return COLOR_PRESETS.get(preset)
-

@@ -26,6 +26,7 @@ from pathlib import Path
 from .config import get_settings
 from .logger import logger
 from .core.cmd_runner import run_command, CommandError
+from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
 # Import centralized FFmpeg config (DRY)
 from .ffmpeg_config import (
     FFmpegConfig,
@@ -151,13 +152,13 @@ def ffprobe_stream_params(video_path: str) -> Optional[StreamParams]:
     Returns StreamParams for validation before concat.
     """
     try:
-        cmd = [
-            "ffprobe", "-v", "quiet",
+        cmd = build_ffprobe_cmd([
+            "-v", "quiet",
             "-select_streams", "v:0",
             "-show_entries", "stream=width,height,r_frame_rate,pix_fmt,codec_name,profile:format=duration",
             "-of", "json",
             video_path
-        ]
+        ])
         # Use run_command for consistent logging and error handling
         result = run_command(
             cmd,
@@ -272,7 +273,7 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
         ext = os.path.splitext(output_path)[1]
         temp_output = f"{output_path}.tmp{ext}"
 
-        cmd = ["ffmpeg", "-y"]
+        cmd = build_ffmpeg_cmd([])
         if config.is_gpu_accelerated:
             cmd.extend(config.hwaccel_input_params())
         cmd.extend([
@@ -374,7 +375,7 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
         ext = os.path.splitext(output_path)[1]
         temp_output = f"{output_path}.tmp{ext}"
 
-        cmd = ["ffmpeg", "-y"]
+        cmd = build_ffmpeg_cmd([])
         if config.is_gpu_accelerated:
             cmd.extend(config.hwaccel_input_params())
         cmd.extend([
@@ -543,7 +544,7 @@ class SegmentWriter:
         )
         vf_chain = _append_hwupload_vf(vf_chain, config)
 
-        cmd = ["ffmpeg", "-y"]
+        cmd = build_ffmpeg_cmd([])
         if config.is_gpu_accelerated:
             cmd.extend(config.hwaccel_input_params())
         cmd.extend([
@@ -714,14 +715,13 @@ class SegmentWriter:
                     f.write(f"file '{escaped_path}'\n")
             
             # FFmpeg concat demuxer with -c copy (no re-encoding, very fast)
-            cmd = [
-                "ffmpeg", "-y",
+            cmd = build_ffmpeg_cmd([
                 "-f", "concat",
                 "-safe", "0",
                 "-i", concat_list_path,
                 "-c", "copy",  # Stream copy - no re-encoding!
                 segment_path
-            ]
+            ])
             
             result = run_command(
                 cmd,
@@ -1029,15 +1029,14 @@ class SegmentWriter:
 
                 af_chain = ",".join(af_filters)
 
-                cmd = [
-                    "ffmpeg", "-y",
+                cmd = build_ffmpeg_cmd([
                     "-f", "concat",
                     "-safe", "0",
                     "-i", concat_list_path,
                     "-i", audio_path,
                     "-map", "0:v",
                     "-map", "1:a",
-                ]
+                ])
 
                 # Check if we should force re-encode (NORMALIZE_CLIPS=true) or use stream copy
                 if _settings.encoding.normalize_clips:
@@ -1069,12 +1068,11 @@ class SegmentWriter:
                 ])
             else:
                 # Just concatenate video
-                cmd = [
-                    "ffmpeg", "-y",
+                cmd = build_ffmpeg_cmd([
                     "-f", "concat",
                     "-safe", "0",
                     "-i", concat_list_path,
-                ]
+                ])
 
                 if _settings.encoding.normalize_clips:
                     logger.info("   🔄 Re-encoding final output (CFR enforcement)...")
@@ -1189,7 +1187,7 @@ class SegmentWriter:
             ext = os.path.splitext(output_path)[1]
             temp_output = f"{output_path}.tmp{ext}"
 
-            cmd = ["ffmpeg", "-y"]
+            cmd = build_ffmpeg_cmd([])
             if config.is_gpu_accelerated:
                 cmd.extend(config.hwaccel_input_params())
             cmd.extend([
@@ -1297,12 +1295,12 @@ class SegmentWriter:
     def _get_video_duration(self, video_path: str) -> float:
         """Get video duration using ffprobe."""
         try:
-            cmd = [
-                "ffprobe", "-v", "error",
+            cmd = build_ffprobe_cmd([
+                "-v", "error",
                 "-show_entries", "format=duration",
                 "-of", "default=noprint_wrappers=1:nokey=1",
                 video_path
-            ]
+            ])
             result = run_command(
                 cmd,
                 capture_output=True,

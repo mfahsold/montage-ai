@@ -3,6 +3,7 @@ import subprocess
 import json
 from pathlib import Path
 from ...cgpu_utils import is_cgpu_available
+from ...ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
 
 analysis_bp = Blueprint('analysis', __name__, url_prefix='/api')
 
@@ -19,21 +20,24 @@ def api_audio_analyze():
     
     try:
         # Extract audio stats using FFmpeg
-        cmd = [
-            'ffprobe', '-v', 'quiet',
+        cmd = build_ffprobe_cmd([
+            '-v', 'quiet',
             '-print_format', 'json',
             '-show_format', '-show_streams',
             '-select_streams', 'a:0',
             str(audio_path)
-        ]
+        ])
         result = subprocess.run(cmd, capture_output=True, text=True)
         probe_data = json.loads(result.stdout) if result.stdout else {}
         
         # Get loudness stats
-        loudness_cmd = [
-            'ffmpeg', '-y', '-hide_banner', '-i', str(audio_path),
-            '-af', 'volumedetect', '-f', 'null', '/dev/null'
-        ]
+        loudness_cmd = build_ffmpeg_cmd(
+            [
+                '-hide_banner', '-i', str(audio_path),
+                '-af', 'volumedetect', '-f', 'null', '/dev/null'
+            ],
+            overwrite=True
+        )
         loudness_result = subprocess.run(loudness_cmd, capture_output=True, text=True, timeout=30)
         
         # Parse volume stats from stderr

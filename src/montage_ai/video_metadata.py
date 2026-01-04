@@ -21,6 +21,7 @@ import numpy as np
 
 from .config import get_settings
 from .logger import logger
+from .ffmpeg_utils import build_ffprobe_cmd
 from .ffmpeg_config import (
     get_config as get_ffmpeg_config,
     STANDARD_WIDTH_VERTICAL as DEFAULT_STANDARD_WIDTH,
@@ -301,13 +302,13 @@ def probe_metadata(video_path: str, timeout: Optional[int] = None) -> Optional[V
         VideoMetadata object or None if extraction fails
     """
     try:
-        cmd = [
-            "ffprobe", "-v", "error",
+        cmd = build_ffprobe_cmd([
+            "-v", "error",
             "-select_streams", "v:0",
             "-show_entries", "stream=width,height,codec_name,pix_fmt,r_frame_rate,avg_frame_rate,bit_rate:stream_side_data=rotation:format=duration,bit_rate",
             "-of", "json",
             video_path
-        ]
+        ])
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -373,12 +374,12 @@ def probe_duration(media_path: str, timeout: Optional[int] = None) -> float:
         Duration in seconds, or 0.0 if failed
     """
     try:
-        cmd = [
-            "ffprobe", "-v", "error",
+        cmd = build_ffprobe_cmd([
+            "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
             media_path
-        ]
+        ])
         result = subprocess.run(
             cmd,
             capture_output=True,

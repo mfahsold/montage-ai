@@ -32,6 +32,7 @@ from pathlib import Path
 
 from .config import settings
 from .logger import logger
+from .ffmpeg_utils import build_ffmpeg_cmd
 
 # Disable TQDM progress bars globally - they create chaotic output when mixed with logs
 # This affects librosa, moviepy, and any other library using tqdm
@@ -604,11 +605,11 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
         except Exception as exc:
             logger.warning(f"MCP clip failed, falling back to local ffmpeg: {exc}")
 
-    cmd_extract = [
-        "ffmpeg", "-y", "-ss", str(start), "-i", input_path,
+    cmd_extract = build_ffmpeg_cmd([
+        "-ss", str(start), "-i", input_path,
         "-t", str(duration), "-c:v", OUTPUT_CODEC, "-preset", FFMPEG_PRESET,
         "-c:a", "copy", output_path
-    ]
+    ])
     try:
         subprocess.run(cmd_extract, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:

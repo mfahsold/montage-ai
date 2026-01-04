@@ -34,6 +34,7 @@ except ImportError:
 
 from .logger import logger
 from .core.cmd_runner import run_command
+from .ffmpeg_utils import build_ffmpeg_cmd
 
 # Try importing MediaPipe, but don't crash if missing (optional dependency)
 try:
@@ -461,13 +462,12 @@ class AutoReframeEngine:
             x = (width - target_w) // 2
             y = (height - target_h) // 2
             
-            cmd = [
-                "ffmpeg", "-y",
+            cmd = build_ffmpeg_cmd([
                 "-i", input_path,
                 "-vf", f"crop={target_w}:{target_h}:{x}:{y}",
                 "-c:a", "copy",
                 output_path
-            ]
+            ])
             run_command(cmd)
             return
 
@@ -482,13 +482,12 @@ class AutoReframeEngine:
         # If only one segment, simple crop
         if len(segments) == 1:
             seg = segments[0]
-            cmd = [
-                "ffmpeg", "-y",
+            cmd = build_ffmpeg_cmd([
                 "-i", input_path,
                 "-vf", f"crop={seg['w']}:{seg['h']}:{seg['x']}:{seg['y']}",
                 "-c:a", "copy",
                 output_path
-            ]
+            ])
             run_command(cmd)
             return
 
@@ -508,15 +507,14 @@ class AutoReframeEngine:
             
         filter_complex += f"{inputs}concat=n={len(segments)}:v=1:a=0[outv]"
         
-        cmd = [
-            "ffmpeg", "-y",
+        cmd = build_ffmpeg_cmd([
             "-i", input_path,
             "-filter_complex", filter_complex,
             "-map", "[outv]",
-            "-map", "0:a?", # Map audio if exists
+            "-map", "0:a?",  # Map audio if exists
             "-c:a", "copy",
             output_path
-        ]
+        ])
         
         run_command(cmd)
 

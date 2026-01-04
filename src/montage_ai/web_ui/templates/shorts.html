@@ -760,6 +760,8 @@
         function toggleHighlights(el) {
             el.classList.toggle('active');
             currentSettings.detectHighlights = el.classList.contains('active');
+            setHighlightsPanelVisible(currentSettings.detectHighlights || highlightsData.length > 0);
+            client.saveState({ detectHighlights: currentSettings.detectHighlights });
         }
 
         function toggleAudioPolish(el) {
@@ -906,6 +908,12 @@
             analyzeCrops();
         }
 
+        function setHighlightsPanelVisible(show) {
+            const panel = document.getElementById('highlightsPanel');
+            if (!panel) return;
+            panel.classList.toggle('hidden-block', !show);
+        }
+
         // ============================================================
         // HIGHLIGHTS DETECTION (Wired to /api/shorts/highlights)
         // ============================================================
@@ -953,7 +961,16 @@
                 renderHighlights(highlightsData);
                 
                 // Save to session state
-                client.saveState({ highlights: highlightsData });
+                const toggle = document.getElementById('highlightsToggle');
+                if (toggle && !toggle.classList.contains('active')) {
+                    toggle.classList.add('active');
+                    currentSettings.detectHighlights = true;
+                }
+                setHighlightsPanelVisible(true);
+                client.saveState({
+                    highlights: highlightsData,
+                    detectHighlights: currentSettings.detectHighlights
+                });
                 
                 client.showToast(`Found ${highlightsData.length} highlights`, 'success');
 
@@ -999,9 +1016,23 @@
         const originalOnStateChange = client.onStateChange;
         client.onStateChange = (state) => {
             if (originalOnStateChange) originalOnStateChange(state);
+            if (typeof state.detectHighlights === 'boolean') {
+                const toggle = document.getElementById('highlightsToggle');
+                if (toggle) {
+                    toggle.classList.toggle('active', state.detectHighlights);
+                    currentSettings.detectHighlights = state.detectHighlights;
+                }
+                setHighlightsPanelVisible(state.detectHighlights || highlightsData.length > 0);
+            }
             if (state.highlights) {
                 highlightsData = state.highlights;
                 renderHighlights(highlightsData);
+                const toggle = document.getElementById('highlightsToggle');
+                if (toggle && !toggle.classList.contains('active')) {
+                    toggle.classList.add('active');
+                    currentSettings.detectHighlights = true;
+                }
+                setHighlightsPanelVisible(true);
             }
         };
 

@@ -22,6 +22,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
+from .ffmpeg_utils import build_ffmpeg_cmd
+
 
 class CaptionStyle(Enum):
     """Predefined caption styles for different platforms."""
@@ -452,17 +454,18 @@ class CaptionBurner:
         filter_chain = self._build_filter_chain(segments)
 
         # Run FFmpeg
-        cmd = [
-            "ffmpeg", "-y",
-            "-hide_banner", "-loglevel", "error",
-            "-i", str(video),
-            "-vf", filter_chain,
-            "-c:v", codec,
-            "-crf", str(crf),
-            "-preset", preset,
-            "-c:a", "copy",
-            output_path
-        ]
+        cmd = build_ffmpeg_cmd(
+            [
+                "-hide_banner", "-loglevel", "error",
+                "-i", str(video),
+                "-vf", filter_chain,
+                "-c:v", codec,
+                "-crf", str(crf),
+                "-preset", preset,
+                "-c:a", "copy",
+                output_path
+            ]
+        )
 
         print(f"   Burning captions ({self.style.value} style)...")
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -503,16 +506,17 @@ class CaptionBurner:
         style = self._get_ass_style() if force_style is None else force_style
         subtitle_filter = f"subtitles={srt_path}:force_style='{style}'"
 
-        cmd = [
-            "ffmpeg", "-y",
-            "-hide_banner", "-loglevel", "error",
-            "-i", str(video),
-            "-vf", subtitle_filter,
-            "-c:v", "libx264",
-            "-crf", "23",
-            "-c:a", "copy",
-            output_path
-        ]
+        cmd = build_ffmpeg_cmd(
+            [
+                "-hide_banner", "-loglevel", "error",
+                "-i", str(video),
+                "-vf", subtitle_filter,
+                "-c:v", "libx264",
+                "-crf", "23",
+                "-c:a", "copy",
+                output_path
+            ]
+        )
 
         print(f"   Burning captions (subtitles filter)...")
         result = subprocess.run(cmd, capture_output=True, text=True)

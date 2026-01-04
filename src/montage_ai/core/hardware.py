@@ -24,6 +24,8 @@ import shutil
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
+from ..ffmpeg_utils import build_ffmpeg_cmd
+
 @dataclass
 class HWConfig:
     type: str  # 'cpu', 'nvenc', 'nvmpi', 'vaapi', 'videotoolbox', 'qsv'
@@ -79,10 +81,16 @@ def _has_vaapi() -> bool:
             env["LIBVA_DRIVER_NAME"] = driver
             try:
                 result = subprocess.run(
-                    ["ffmpeg", "-hide_banner", "-init_hw_device",
-                     "vaapi=va:/dev/dri/renderD128", "-f", "lavfi",
-                     "-i", "color=black:s=64x64:d=0.1",
-                     "-c:v", "h264_vaapi", "-f", "null", "-"],
+                    build_ffmpeg_cmd(
+                        [
+                            "-init_hw_device", "vaapi=va:/dev/dri/renderD128",
+                            "-f", "lavfi",
+                            "-i", "color=black:s=64x64:d=0.1",
+                            "-c:v", "h264_vaapi", "-f", "null", "-",
+                        ],
+                        overwrite=False,
+                        hide_banner=True,
+                    ),
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     env=env,
@@ -107,7 +115,7 @@ def _check_ffmpeg_encoder(encoder_name: str) -> bool:
     """Check if local ffmpeg supports a specific encoder."""
     try:
         result = subprocess.run(
-            ["ffmpeg", "-encoders"], 
+            build_ffmpeg_cmd(["-encoders"], overwrite=False, hide_banner=True),
             capture_output=True, 
             text=True
         )
