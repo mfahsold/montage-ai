@@ -6,6 +6,7 @@
     <title>Montage AI - Outcome-Based Editor</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='elegant.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ui-utils.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:wght@400;500;600&display=swap" rel="stylesheet">
@@ -509,7 +510,7 @@
     <div class="container">
         <header>
             <div class="logo-container">
-                <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 48px; height: 48px;">
+                <svg class="logo-svg icon-48" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="none"/>
                     <circle cx="32" cy="14" r="4" fill="currentColor"/>
                     <circle cx="32" cy="50" r="4" fill="currentColor"/>
@@ -551,19 +552,19 @@
             <div>
                 <section class="voxel-card">
                     <h2>📁 Media</h2>
-                    <div class="upload-area" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="upload-area grid-2-lg">
                         <div>
-                            <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem;">Video Clips</h3>
-                            <input type="file" id="videoUpload" accept="video/*" multiple style="display: none;">
-                            <button onclick="document.getElementById('videoUpload').click()" class="btn-secondary" style="width: 100%; margin-bottom: 0.5rem;">
+                            <h3 class="heading-sm">Video Clips</h3>
+                            <input type="file" id="videoUpload" accept="video/*" multiple class="hidden-input" aria-label="Select video clips">
+                            <button onclick="document.getElementById('videoUpload').click()" class="btn-secondary w-100 mb-05">
                                 📹 Select Videos
                             </button>
                             <div id="videoList" class="file-list"></div>
                         </div>
                         <div>
-                            <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem;">Music Track</h3>
-                            <input type="file" id="musicUpload" accept="audio/*" style="display: none;">
-                            <button onclick="document.getElementById('musicUpload').click()" class="btn-secondary" style="width: 100%; margin-bottom: 0.5rem;">
+                            <h3 class="heading-sm">Music Track</h3>
+                            <input type="file" id="musicUpload" accept="audio/*" class="hidden-input" aria-label="Select music track">
+                            <button onclick="document.getElementById('musicUpload').click()" class="btn-secondary w-100 mb-05">
                                 🎵 Select Music
                             </button>
                             <div id="musicList" class="file-list"></div>
@@ -589,7 +590,7 @@
                         <span class="chip">Travel montage</span>
                         <span class="chip">Product hype</span>
                     </div>
-                    <div class="form-group" style="margin-top: 1rem;">
+                    <div class="form-group mt-1">
                         <label for="storyArc">Story Arc</label>
                         <select id="storyArc" class="voxel-select">
                             <!-- Rendered by JS -->
@@ -607,7 +608,7 @@
                 </section>
 
                 <section class="voxel-card">
-                    <h2>🤖 AI Features <span style="font-size: 0.75rem; opacity: 0.6;">(Optional)</span></h2>
+                    <h2>🤖 AI Features <span class="label-mini">(Optional)</span></h2>
                     <div id="ai-features" class="ai-features">
                         <!-- Rendered by JS -->
                     </div>
@@ -616,17 +617,17 @@
                 <section class="voxel-card">
                     <h2>⏱️ Duration</h2>
                     <div class="form-group">
-                        <label>Target: <span id="durationValue">Auto</span></label>
-                        <input type="range" id="targetDuration" min="0" max="300" step="10" value="0">
+                        <label for="targetDuration">Target: <span id="durationValue">Auto</span></label>
+                        <input type="range" id="targetDuration" min="0" max="300" step="10" value="0" aria-label="Target duration seconds">
                         <div class="helper">0 = Match music length</div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
+                    <div class="grid-2 mt-05">
                         <div>
-                            <label style="font-size: 0.8rem;">Music Start</label>
+                            <label class="label-small" for="musicStart">Music Start</label>
                             <input type="number" id="musicStart" class="voxel-input" value="0" min="0" step="0.1">
                         </div>
                         <div>
-                            <label style="font-size: 0.8rem;">Music End</label>
+                            <label class="label-small" for="musicEnd">Music End</label>
                             <input type="number" id="musicEnd" class="voxel-input" placeholder="Auto" min="0" step="0.1">
                         </div>
                     </div>
@@ -650,7 +651,7 @@
         </div>
 
         <!-- Job Status Section -->
-        <section class="voxel-card" id="jobStatusSection" style="display: none; margin-top: 1.5rem;">
+        <section class="voxel-card hidden-block mt-15" id="jobStatusSection">
             <h2>🔄 Processing</h2>
             <div id="currentJobStatus" class="job-card running">
                 <div class="job-header">
@@ -658,14 +659,14 @@
                     <span class="job-phase">Waiting...</span>
                 </div>
                 <div class="progress-bar-container">
-                    <div class="progress-bar" style="width: 0%"></div>
+                    <div class="progress-bar w-0"></div>
                 </div>
                 <div class="job-details">Initializing...</div>
             </div>
         </section>
 
         <!-- Gallery Section -->
-        <section class="voxel-card" style="margin-top: 1.5rem;">
+        <section class="voxel-card mt-15">
             <h2>📁 Recent Outputs</h2>
             <div id="jobList" class="gallery-grid">
                 <!-- Rendered by JS -->

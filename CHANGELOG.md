@@ -8,11 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+
 - **cgpu Integration**: Fixed API key propagation issue where `GOOGLE_API_KEY` was being unset, causing 502 errors.
 - **Creative Director**: Added robust fallback logic (cgpu -> Google AI -> Ollama) to ensure generation continues even if primary backend fails.
 - **Environment Config**: Updated `.env` and `montage-ai.sh` to correctly handle Google API keys for the cgpu wrapper.
+- **Web UI**: Removed all inline styles in favor of shared `ui-utils.css` for maintainability
+- **Accessibility**: Added proper `aria-label` and `for` attributes to all form inputs across templates
+- **Markdownlint**: Fixed all documentation formatting issues (headings, lists, tables, fences)
 
 ### Added
+
+- **OTIO Documentation**: Added common failure modes section to [OTIO_VERIFICATION.md](docs/OTIO_VERIFICATION.md)
+- **Regression Test**: Added `test_otio_schema_version_strict` to lock OTIO schema at `Timeline.1`
+- **Shared CSS Utilities**: Created `ui-utils.css` with reusable layout, spacing, and component classes
 
 #### 🆕 Transcript Editor (Descript-style) - FULLY WIRED
 - **Live Preview Flow**: Auto-generates 360p preview 2 seconds after edits (Story 1.1)
@@ -71,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### 📚 Documentation & Compliance
 - **Strategic docs**: `docs/STRATEGY.md` with product vision and market analysis
 - **Roadmap**: `docs/roadmap/ROADMAP_2026.md` with 12-month development plan
-- **Backlog**: `docs/BACKLOG.md` with prioritized Epics and User Stories
+- **Backlog**: `docs/STRATEGIC_BACKLOG.md` with prioritized Epics and User Stories
 - **GitHub Pages**: Poly-Chrome design matching webapp aesthetic
 - **OSS compliance**: `THIRD_PARTY_LICENSES.md` with all dependency licenses
 

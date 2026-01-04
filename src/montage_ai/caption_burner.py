@@ -332,12 +332,78 @@ class CaptionBurner:
 
         return ":".join(parts)
 
+    def _build_karaoke_filters(
+        self,
+        segment: CaptionSegment,
+        config: StyleConfig
+    ) -> List[str]:
+        """
+        Build Karaoke-style word-by-word highlighting filters.
+        
+        Returns list of drawtext filters - one base layer + one highlight layer per word.
+        """
+        if not segment.words or len(segment.words) == 0:
+            # Fallback to regular caption if no word timing
+            return [self._build_drawtext_filter(segment, config)]
+        
+        filters = []
+        
+        # Base layer: Full sentence in default color (gray)
+        base_text = escape_ffmpeg_text(segment.text)
+        base_parts = [
+            f"drawtext=text='{base_text}'",
+            f"fontsize={config.fontsize}",
+            f"fontcolor='gray'",
+            f"borderw={config.borderw}",
+            f"bordercolor={config.bordercolor}",
+            f"x={config.x_expr}",
+            f"y={config.y_expr}",
+            f"enable='between(t,{segment.start:.3f},{segment.end:.3f})'"
+        ]
+        filters.append(":".join(base_parts))
+        
+        # Highlight layer: Each word in highlight color during its timing
+        for i, word_data in enumerate(segment.words):
+            word_text = escape_ffmpeg_text(word_data.get('word', '').strip())
+            if not word_text:
+                continue
+                
+            word_start = word_data.get('start', segment.start)
+            word_end = word_data.get('end', segment.end)
+            
+            # Calculate word position offset (approximate)
+            # This is a simple approach - word appears at same X as full text
+            # For perfect positioning, would need to measure text width per word
+            
+            word_parts = [
+                f"drawtext=text='{word_text}'",
+                f"fontsize={config.fontsize}",
+                f"fontcolor={config.fontcolor}",  # Highlight color (yellow)
+                f"borderw={config.borderw}",
+                f"bordercolor={config.bordercolor}",
+                f"x={config.x_expr}",
+                f"y={config.y_expr}",
+                f"enable='between(t,{word_start:.3f},{word_end:.3f})'"
+            ]
+            
+            filters.append(":".join(word_parts))
+        
+        return filters
+
     def _build_filter_chain(self, segments: List[CaptionSegment]) -> str:
         """Build complete FFmpeg filter chain for all segments."""
         filters = []
-        for segment in segments:
-            filter_str = self._build_drawtext_filter(segment, self.config)
-            filters.append(filter_str)
+        
+        # Check if Karaoke style (word-by-word)
+        if self.style == CaptionStyle.KARAOKE:
+            for segment in segments:
+                karaoke_filters = self._build_karaoke_filters(segment, self.config)
+                filters.extend(karaoke_filters)
+        else:
+            # Standard styles: one filter per segment
+            for segment in segments:
+                filter_str = self._build_drawtext_filter(segment, self.config)
+                filters.append(filter_str)
 
         return ",".join(filters)
 

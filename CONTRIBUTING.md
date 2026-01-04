@@ -200,7 +200,7 @@ For AI model weights (Real-ESRGAN, Whisper, etc.):
 
 ## Where to Contribute
 
-Check our [Backlog](docs/BACKLOG.md) for prioritized features:
+Check our [Backlog](docs/STRATEGIC_BACKLOG.md) for prioritized features:
 
 - 🔥 **High priority**: Epics marked "In Progress" or "Planned"
 - 🐛 **Bug fixes**: Issues labeled `bug` 

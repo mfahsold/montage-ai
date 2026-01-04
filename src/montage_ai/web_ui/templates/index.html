@@ -6,6 +6,7 @@
     <title>Montage AI - Creative Console</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='elegant.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ui-utils.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -34,21 +35,21 @@
         </header>
 
         <!-- Progress Bar (Hidden by default) -->
-        <div id="global-progress-bar" class="progress-container" style="display: none; margin-bottom: 1.5rem;">
-            <div class="progress-header" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.8rem;">
+        <div id="global-progress-bar" class="progress-container progress-hidden mb-15">
+            <div class="progress-header progress-header-row">
                 <span id="progress-label">PROCESSING...</span>
                 <span id="progress-eta">ETA: --:--</span>
             </div>
-            <div class="progress-track" style="background: var(--border-color); height: 4px; border-radius: 2px; overflow: hidden;">
-                <div id="progress-fill" class="progress-fill" style="background: var(--primary); width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+            <div class="progress-track">
+                <div id="progress-fill" class="progress-fill progress-fill-default"></div>
             </div>
         </div>
 
         <!-- Navigation Bar -->
-        <nav class="nav-bar voxel-card" style="padding: 0.75rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
-            <a href="/" class="btn btn-primary" style="text-decoration: none;">🏠 Montage Wizard</a>
-            <a href="/transcript" class="btn btn-secondary" style="text-decoration: none;">📝 Transcript Editor</a>
-            <a href="/shorts" class="btn btn-secondary" style="text-decoration: none;">📱 Shorts Studio</a>
+        <nav class="nav-bar voxel-card nav-inline">
+            <a href="/" class="btn btn-primary link-clean">🏠 Montage Wizard</a>
+            <a href="/transcript" class="btn btn-secondary link-clean">📝 Transcript Editor</a>
+            <a href="/shorts" class="btn btn-secondary link-clean">📱 Shorts Studio</a>
         </nav>
 
         <section class="voxel-card info-card">
@@ -77,7 +78,7 @@
             <div id="transparencyContent" class="transparency-grid">
                 <div class="helper">Loading transparency details...</div>
             </div>
-            <div class="helper">Docs: <a href="https://github.com/codeai/montage-ai/blob/main/docs/responsible_ai.md" target="_blank" style="color: inherit;">docs/responsible_ai.md</a></div>
+            <div class="helper">Docs: <a href="https://github.com/codeai/montage-ai/blob/main/docs/responsible_ai.md" target="_blank" rel="noopener" class="link-clean">docs/responsible_ai.md</a></div>
         </section>
 
         <div class="layout-grid">
@@ -91,21 +92,21 @@
                     <div class="upload-box">
                         <h3>Video Clips</h3>
                         <p class="helper">Drop multiple clips. Longer clips are auto-segmented.</p>
-                        <input type="file" id="videoUpload" accept="video/*" multiple class="hidden">
+                        <input type="file" id="videoUpload" accept="video/*" multiple class="hidden" aria-label="Select video clips">
                         <button onclick="document.getElementById('videoUpload').click()" class="voxel-btn">Select Videos</button>
                         <div id="videoList" class="file-list"></div>
                     </div>
                     <div class="upload-box">
                         <h3>Music Track</h3>
                         <p class="helper">One track drives beat sync. MP3/WAV recommended.</p>
-                        <input type="file" id="musicUpload" accept="audio/*" class="hidden">
+                        <input type="file" id="musicUpload" accept="audio/*" class="hidden" aria-label="Select music track">
                         <button onclick="document.getElementById('musicUpload').click()" class="voxel-btn">Select Music</button>
                         <div id="musicList" class="file-list"></div>
                     </div>
                 </div>
-                <div class="text-center" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                <div class="text-center flex-column flex-center gap-05">
                     <button onclick="refreshFiles()" class="voxel-btn">⟳ Refresh Library</button>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; opacity: 0.9;">
+                    <label class="checkbox-inline ml-0">
                         <input type="checkbox" id="autoPreview" checked>
                         <span>Auto-generate 360p preview after upload</span>
                     </label>
@@ -143,7 +144,7 @@
                     <span class="chip">Emotional journey</span>
                     <span class="chip">High energy action</span>
                 </div>
-                <div id="storyArc-container" class="form-group" style="margin-top: 1rem;">
+                <div id="storyArc-container" class="form-group mt-1">
                     <!-- Rendered by JS -->
                 </div>
             </section>
@@ -160,20 +161,20 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Target Duration <span id="durationValue">Auto</span></label>
-                    <input type="range" id="targetDuration" min="0" max="300" step="10" value="0">
+                    <label for="targetDuration">Target Duration <span id="durationValue">Auto</span></label>
+                    <input type="range" id="targetDuration" min="0" max="300" step="10" value="0" aria-label="Target duration seconds">
                     <div class="helper">0 = match music length. Adjust to trim or shorten.</div>
                 </div>
 
                 <div class="form-group">
                     <label>Music Trim (seconds)</label>
-                    <div style="display: flex; gap: 10px;">
-                        <div style="flex: 1;">
-                            <label for="musicStart" style="font-size: 0.8em;">Start</label>
+                    <div class="flex-row gap-10">
+                        <div class="flex-1">
+                            <label for="musicStart" class="label-small">Start</label>
                             <input type="number" id="musicStart" class="voxel-input" value="0" min="0" step="0.1">
                         </div>
-                        <div style="flex: 1;">
-                            <label for="musicEnd" style="font-size: 0.8em;">End (optional)</label>
+                        <div class="flex-1">
+                            <label for="musicEnd" class="label-small">End (optional)</label>
                             <input type="number" id="musicEnd" class="voxel-input" placeholder="Auto" min="0" step="0.1">
                         </div>
                     </div>
@@ -184,11 +185,11 @@
                     <!-- Dynamically rendered by app.js -->
                 </div>
 
-                <div id="run-summary" class="run-summary" style="margin-top: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.03); border-radius: 8px; font-size: 0.9rem;">
+                <div id="run-summary" class="run-summary panel-soft mt-15">
                     <!-- Dynamic summary -->
                 </div>
 
-                <div class="text-center mt-4" style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+                <div class="text-center mt-4 flex-row flex-center gap-075 flex-wrap">
                     <button onclick="createJob()" class="voxel-btn primary">
                         Create Montage
                     </button>
@@ -196,7 +197,7 @@
                         Quick Preview
                     </button>
                 </div>
-                <div class="text-center mt-4" style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; opacity: 0.8;">
+                <div class="text-center mt-4 flex-row flex-center gap-05 flex-wrap opacity-80">
                     <button onclick="savePreset()" class="voxel-btn small" title="Save current settings to browser">
                         Save Preset
                     </button>
@@ -217,7 +218,7 @@
                     <label for="brollQuery">Search Query</label>
                     <input type="text" id="brollQuery" class="voxel-input" placeholder="e.g., energetic action scene, golden hour wide shot">
                 </div>
-                <div class="text-center" style="display: flex; gap: 0.5rem; justify-content: center;">
+                <div class="text-center flex-row flex-center gap-05">
                     <button onclick="analyzeFootage()" class="voxel-btn">
                         ⟳ Analyze Footage
                     </button>
@@ -225,11 +226,11 @@
                         🔍 Search
                     </button>
                 </div>
-                <div id="brollResults" class="terminal-output" style="display: none; margin-top: 1rem; padding: 0.5rem; border: 1px dashed var(--muted);"></div>
+                <div id="brollResults" class="terminal-output hidden-block dashed-box mt-1"></div>
             </section>
         </div>
 
-        <section class="job-status-container" id="jobStatusSection" style="display: none;">
+        <section class="job-status-container hidden-block" id="jobStatusSection">
             <div class="job-status-header">
                 <span>> SYSTEM_MONITOR</span>
                 <span id="clock">00:00:00</span>
@@ -244,7 +245,7 @@
                             <span class="job-phase">WAITING</span>
                         </div>
                         <div class="progress-bar-container">
-                            <div class="progress-bar" style="width: 0%"></div>
+                            <div class="progress-bar w-0"></div>
                         </div>
                         <div class="job-details">
                             Initializing system...
@@ -283,14 +284,14 @@
     </script>
 
     <!-- Decisions Modal -->
-    <div id="decisionsModal" class="modal" style="display: none;">
+    <div id="decisionsModal" class="modal hidden-block">
         <div class="modal-overlay" onclick="closeDecisions()"></div>
         <div class="modal-content voxel-card">
             <div class="modal-header">
                 <h2>// DIRECTOR_LOG</h2>
                 <button onclick="closeDecisions()" class="voxel-btn small">CLOSE</button>
             </div>
-            <div id="decisionsContent" class="modal-body terminal-window" style="max-height: 60vh; overflow-y: auto;">
+            <div id="decisionsContent" class="modal-body terminal-window modal-body-scroll">
                 <!-- Content injected here -->
             </div>
         </div>

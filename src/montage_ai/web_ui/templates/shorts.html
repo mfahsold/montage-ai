@@ -6,6 +6,7 @@
     <title>Montage AI - Shorts Studio</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='elegant.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ui-utils.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -317,6 +318,12 @@
             font-family: 'Space Mono', monospace;
         }
 
+        .highlight-placeholder {
+            text-align: center;
+            padding: 1rem;
+            font-size: 0.85rem;
+        }
+
         /* Timeline Strip */
         .timeline-strip {
             /* Inherits voxel-card styles */
@@ -425,7 +432,7 @@
     <div class="container">
         <header>
             <div class="logo-container">
-                <a href="/" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 1rem;">
+                <a href="/" class="link-clean flex-row">
                     <div class="logo-icon">M</div>
                     <div class="logo-text">
                         <h1>Montage<span class="logo-ai">AI</span></h1>
@@ -440,18 +447,18 @@
         </header>
 
         <!-- Navigation Bar -->
-        <nav class="voxel-card" style="padding: 0.75rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
-            <a href="/" class="voxel-btn voxel-btn-secondary" style="text-decoration: none;">🏠 Montage Wizard</a>
-            <a href="/transcript" class="voxel-btn voxel-btn-secondary" style="text-decoration: none;">📝 Transcript Editor</a>
-            <a href="/shorts" class="voxel-btn voxel-btn-primary" style="text-decoration: none;">📱 Shorts Studio</a>
+        <nav class="voxel-card nav-inline">
+            <a href="/" class="voxel-btn voxel-btn-secondary link-clean">🏠 Montage Wizard</a>
+            <a href="/transcript" class="voxel-btn voxel-btn-secondary link-clean">📝 Transcript Editor</a>
+            <a href="/shorts" class="voxel-btn voxel-btn-primary link-clean">📱 Shorts Studio</a>
         </nav>
 
-        <section class="voxel-card info-card" style="margin-bottom: 1.5rem;">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <span style="font-size: 2rem;">📱</span>
+        <section class="voxel-card info-card info-card-spacing">
+            <div class="flex-row">
+                <span class="icon-xl">📱</span>
                 <div>
-                    <h2 style="margin: 0;">Shorts Studio</h2>
-                    <p style="margin: 0.25rem 0 0; opacity: 0.8;">Create vertical videos for TikTok, Reels, and Shorts. Smart reframing keeps subjects in frame.</p>
+                    <h2 class="info-card-heading">Shorts Studio</h2>
+                    <p class="info-card-subtext">Create vertical videos for TikTok, Reels, and Shorts. Smart reframing keeps subjects in frame.</p>
                 </div>
             </div>
         </section>
@@ -529,48 +536,48 @@
 
                 <div class="settings-group">
                     <h3>📁 Source</h3>
-                    <input type="file" id="videoInput" accept="video/*" style="display: none;" onchange="loadVideo(this)">
-                    <button class="voxel-btn voxel-btn-secondary" style="width: 100%; border: 2px dashed var(--border);" onclick="document.getElementById('videoInput').click()">
+                    <input type="file" id="videoInput" accept="video/*" class="hidden-input" aria-label="Select source video" onchange="loadVideo(this)">
+                    <button class="voxel-btn voxel-btn-secondary btn-dashed-full" onclick="document.getElementById('videoInput').click()">
                         📹 Select Video
                     </button>
                 </div>
             </div>
 
             <!-- Center: Source Monitor -->
-            <div class="voxel-card" style="display: flex; flex-direction: column; padding: 1rem; height: fit-content;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">Source Monitor</h3>
-                    <span id="timeDisplay" style="font-family: 'Space Mono'; opacity: 0.7;">00:00 / 00:00</span>
+            <div class="voxel-card panel-stack">
+                <div class="panel-header">
+                    <h3 class="info-card-heading">Source Monitor</h3>
+                    <span id="timeDisplay" class="text-mono-faint">00:00 / 00:00</span>
                 </div>
                 
-                <div style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden;">
-                    <video id="sourcePlayer" style="width: 100%; height: 100%; object-fit: contain;" playsinline>
+                <div class="video-shell">
+                    <video id="sourcePlayer" class="video-contained">
                         <source src="" type="video/mp4">
                     </video>
-                    <canvas id="overlayCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
+                    <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
                 </div>
 
-                <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center;">
-                    <button onclick="seekBackward()" class="voxel-btn" style="padding: 0.5rem 1rem;">⏪ -5s</button>
-                    <button onclick="playPause()" class="voxel-btn" style="padding: 0.5rem 2rem;" id="playBtn">▶️ Play</button>
-                    <button onclick="seekForward()" class="voxel-btn" style="padding: 0.5rem 1rem;">⏩ +5s</button>
+                <div class="control-row">
+                    <button onclick="seekBackward()" class="voxel-btn btn-compact">⏪ -5s</button>
+                    <button onclick="playPause()" class="voxel-btn btn-wide" id="playBtn">▶️ Play</button>
+                    <button onclick="seekForward()" class="voxel-btn btn-compact">⏩ +5s</button>
                 </div>
                 
                 <!-- Timeline Strip moved here -->
-                <div class="voxel-card timeline-strip" style="width: 100%; margin-top: 1rem;">
+                <div class="voxel-card timeline-strip timeline-wrapper">
                     <div class="timeline-bar" id="timelineBar"></div>
                 </div>
             </div>
 
             <!-- Right Panel: Phone Preview -->
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <h3 style="margin-bottom: 1rem;">Result Preview</h3>
+            <div class="preview-col">
+                <h3 class="preview-heading">Result Preview</h3>
                 <div class="phone-frame">
                     <div class="phone-notch"></div>
                     <div class="phone-screen">
                         <!-- We simulate the crop by using object-fit and object-position on the source video, 
                              or by using a canvas. For preview, let's use a second video element synced. -->
-                        <video id="previewPlayer" loop muted playsinline style="object-fit: cover;">
+                        <video id="previewPlayer" loop muted class="video-cover">
                             <source src="" type="video/mp4">
                         </video>
                         <div class="safe-zone-overlay visible" id="safeZoneOverlay">
@@ -585,51 +592,34 @@
             </div>
         </div>
 
-        <!-- Hidden Highlights Panel for now (or move to bottom) -->
-        <div style="display: none;">
+        <!-- Highlights Panel -->
+        <div class="hidden-block" id="highlightsPanel">
                 <div class="settings-group">
                     <h3>⚡ Detected Highlights</h3>
                     <div class="highlights-list" id="highlightsList">
-                        <div class="highlight-item" onclick="seekTo(0)">
-                            <span class="highlight-time">0:00</span>
-                            <span class="highlight-type">Start</span>
-                            <span class="highlight-score">-</span>
-                        </div>
-                        <div class="highlight-item" onclick="seekTo(15)">
-                            <span class="highlight-time">0:15</span>
-                            <span class="highlight-type">Action</span>
-                            <span class="highlight-score">0.85</span>
-                        </div>
-                        <div class="highlight-item" onclick="seekTo(32)">
-                            <span class="highlight-time">0:32</span>
-                            <span class="highlight-type">Face</span>
-                            <span class="highlight-score">0.92</span>
-                        </div>
-                        <div class="highlight-item" onclick="seekTo(48)">
-                            <span class="highlight-time">0:48</span>
-                            <span class="highlight-type">Energy</span>
-                            <span class="highlight-score">0.78</span>
+                        <div class="highlight-placeholder" id="highlightsPlaceholder">
+                            <span style="opacity: 0.6;">Load a video and click "Detect" to find highlights</span>
                         </div>
                     </div>
-                    <button onclick="detectHighlights()" class="voxel-btn" style="width: 100%; margin-top: 0.5rem;">
+                    <button onclick="detectHighlights()" class="voxel-btn w-100 mt-05" id="detectHighlightsBtn">
                         🔍 Detect Highlights
                     </button>
                 </div>
 
                 <div class="settings-group">
                     <h3>📐 Output</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <div class="grid-2">
                         <div>
-                            <label style="font-size: 0.75rem; opacity: 0.7;">Platform</label>
-                            <select class="voxel-select" id="platformSelect" style="width: 100%;">
+                            <label class="label-small" for="platformSelect">Platform</label>
+                            <select class="voxel-select w-100" id="platformSelect">
                                 <option value="tiktok">TikTok</option>
                                 <option value="reels">Instagram Reels</option>
                                 <option value="shorts">YouTube Shorts</option>
                             </select>
                         </div>
                         <div>
-                            <label style="font-size: 0.75rem; opacity: 0.7;">Duration</label>
-                            <select class="voxel-select" id="durationSelect" style="width: 100%;">
+                            <label class="label-small" for="durationSelect">Duration</label>
+                            <select class="voxel-select w-100" id="durationSelect">
                                 <option value="15">15 sec</option>
                                 <option value="30">30 sec</option>
                                 <option value="60" selected>60 sec</option>
@@ -639,11 +629,11 @@
                     </div>
                 </div>
 
-                <button onclick="createShort()" class="voxel-btn voxel-btn-primary" style="width: 100%; margin-top: 1rem;">
+                <button onclick="createShort()" class="voxel-btn voxel-btn-primary w-100 mt-1">
                     🎬 Create Short
                 </button>
 
-                <button onclick="exportSettings()" class="voxel-btn voxel-btn-secondary" style="width: 100%; margin-top: 0.5rem;">
+                <button onclick="exportSettings()" class="voxel-btn voxel-btn-secondary w-100 mt-05">
                     💾 Export Settings
                 </button>
             </div>
@@ -915,6 +905,105 @@
             }
             analyzeCrops();
         }
+
+        // ============================================================
+        // HIGHLIGHTS DETECTION (Wired to /api/shorts/highlights)
+        // ============================================================
+        let highlightsData = [];
+
+        async function detectHighlights() {
+            if (!client.sessionId) {
+                client.showToast('Load a video first', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('detectHighlightsBtn');
+            const list = document.getElementById('highlightsList');
+            
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Detecting...';
+            list.innerHTML = '<div class="highlight-placeholder"><span style="opacity: 0.6;">Analyzing audio and video...</span></div>';
+
+            try {
+                // Get video path from session
+                const mainAsset = client.state?.assets?.find(a => a.type === 'video');
+                if (!mainAsset) {
+                    throw new Error('No video loaded');
+                }
+
+                const response = await fetch('/api/shorts/highlights', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_path: mainAsset.path,
+                        max_clips: 5,
+                        min_duration: 5.0,
+                        max_duration: 60.0,
+                        include_speech: true
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Detection failed');
+                }
+
+                highlightsData = data.highlights || [];
+                renderHighlights(highlightsData);
+                
+                // Save to session state
+                client.saveState({ highlights: highlightsData });
+                
+                client.showToast(`Found ${highlightsData.length} highlights`, 'success');
+
+            } catch (e) {
+                console.error('Highlight detection error:', e);
+                list.innerHTML = '<div class="highlight-placeholder"><span style="color: #EF4444;">Detection failed. Try again.</span></div>';
+                client.showToast('Highlight detection failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Detect Highlights';
+            }
+        }
+
+        function renderHighlights(highlights) {
+            const list = document.getElementById('highlightsList');
+            
+            if (!highlights || highlights.length === 0) {
+                list.innerHTML = '<div class="highlight-placeholder"><span style="opacity: 0.6;">No highlights detected</span></div>';
+                return;
+            }
+
+            // Sort by score descending
+            const sorted = [...highlights].sort((a, b) => b.score - a.score);
+            
+            list.innerHTML = sorted.map(h => `
+                <div class="highlight-item" onclick="seekTo(${h.time})" title="${h.label || ''}">
+                    <span class="highlight-time">${formatTime(h.time)}</span>
+                    <span class="highlight-type">${h.type || 'Moment'}</span>
+                    <span class="highlight-score">${(h.score || 0).toFixed(2)}</span>
+                </div>
+            `).join('');
+        }
+
+        // Load highlights from session state if available
+        function loadCachedHighlights() {
+            if (client.state?.highlights) {
+                highlightsData = client.state.highlights;
+                renderHighlights(highlightsData);
+            }
+        }
+
+        // Hook into state changes
+        const originalOnStateChange = client.onStateChange;
+        client.onStateChange = (state) => {
+            if (originalOnStateChange) originalOnStateChange(state);
+            if (state.highlights) {
+                highlightsData = state.highlights;
+                renderHighlights(highlightsData);
+            }
+        };
 
         async function generatePreviewVideo() {
             if (!client.sessionId) {

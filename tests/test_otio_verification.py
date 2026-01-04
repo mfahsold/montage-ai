@@ -353,6 +353,18 @@ def test_otio_schema_version(temp_dir, sample_timeline):
     assert schema.startswith('Timeline.')
 
 
+def test_otio_schema_version_strict(temp_dir, sample_timeline):
+    """Regression: ensure OTIO schema remains at Timeline.1 for compatibility."""
+    exporter = TimelineExporter(output_dir=temp_dir)
+    otio_path = exporter._export_otio(sample_timeline)
+
+    with open(otio_path, 'r') as f:
+        data = json.load(f)
+
+    schema = data.get('OTIO_SCHEMA')
+    assert schema == 'Timeline.1', f"Unexpected OTIO schema version: {schema}"
+
+
 def test_otio_roundtrip_compatibility(temp_dir, sample_timeline):
     """Test that exported OTIO can be read back without errors."""
     exporter = TimelineExporter(output_dir=temp_dir)

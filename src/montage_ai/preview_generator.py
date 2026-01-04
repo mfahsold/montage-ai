@@ -3,6 +3,12 @@ Preview Generator
 
 Generates fast, low-resolution previews for the Transcript Editor and Shorts Studio.
 Prioritizes speed over quality (360p, ultrafast preset).
+
+Performance optimizations:
+- Uses ultrafast preset with -tune zerolatency for minimum encode time
+- Limits preview duration (first 30s by default)
+- Uses multi-threading (-threads 0)
+- Enables faststart for quick playback
 """
 
 import os
@@ -18,14 +24,24 @@ from .ffmpeg_config import (
     STANDARD_AUDIO_CODEC, STANDARD_AUDIO_BITRATE
 )
 
+# Maximum preview duration in seconds (for speed)
+MAX_PREVIEW_DURATION = 30.0
+
 class PreviewGenerator:
-    def __init__(self, output_dir: str):
+    def __init__(self, output_dir: str, max_duration: float = MAX_PREVIEW_DURATION):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.max_duration = max_duration
 
     def generate_transcript_preview(self, source_path: str, segments: List[Tuple[float, float]], output_filename: str) -> str:
         """
         Generate a preview by concatenating kept segments.
+        
+        Performance optimized:
+        - Caps total duration at max_duration
+        - Uses multi-threading
+        - Uses zerolatency tuning
+        - Adds faststart flag for streaming
         
         Args:
             source_path: Path to source video.
@@ -37,48 +53,60 @@ class PreviewGenerator:
         """
         output_path = self.output_dir / output_filename
         
-        # Create a temporary concat file for ffmpeg
-        # We use the 'concat demuxer' approach which is fastest but requires same codecs.
-        # Since we are re-encoding for preview anyway (to downscale), we might need complex filter.
-        # Actually, for preview, we want to re-encode to 360p anyway.
+        # Limit segments to fit within max_duration
+        limited_segments = []
+        total_duration = 0.0
+        
+        for start, end in segments:
+            seg_duration = end - start
+            if total_duration + seg_duration > self.max_duration:
+                # Trim this segment to fit
+                remaining = self.max_duration - total_duration
+                if remaining > 0.5:  # Minimum meaningful segment
+                    limited_segments.append((start, start + remaining))
+                break
+            limited_segments.append((start, end))
+            total_duration += seg_duration
+        
+        if not limited_segments:
+            # Fallback: at least first 5 seconds
+            limited_segments = [(0, min(5.0, self.max_duration))]
         
         # Construct complex filter for trimming and concatenation
-        # [0:v]trim=start=0:end=10,setpts=PTS-STARTPTS,scale=640:360[v0];
-        # [0:a]atrim=start=0:end=10,asetpts=PTS-STARTPTS[a0];
-        # ...
-        # [v0][a0][v1][a1]...concat=n=N:v=1:a=1[outv][outa]
-        
-        # Limit number of segments to avoid command line length limits?
-        # For very long edits, this might be an issue. 
-        # But for a preview, it's usually fine.
-        
         filter_complex = ""
-        inputs = []
         
-        for i, (start, end) in enumerate(segments):
+        for i, (start, end) in enumerate(limited_segments):
             # Video trim + scale
             filter_complex += f"[0:v]trim=start={start}:end={end},setpts=PTS-STARTPTS,scale={PREVIEW_WIDTH}:{PREVIEW_HEIGHT}[v{i}];"
             # Audio trim
             filter_complex += f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{i}];"
-            inputs.append(f"[v{i}][a{i}]")
-            
-        concat_part = "".join(inputs) + f"concat=n={len(segments)}:v=1:a=1[outv][outa]"
+        
+        inputs = "".join([f"[v{i}][a{i}]" for i in range(len(limited_segments))])
+        concat_part = f"{inputs}concat=n={len(limited_segments)}:v=1:a=1[outv][outa]"
         filter_complex += concat_part
         
         cmd = [
             "ffmpeg", "-y",
+            "-threads", "0",  # Use all available CPU cores
             "-i", source_path,
             "-filter_complex", filter_complex,
             "-map", "[outv]", "-map", "[outa]",
-            "-c:v", "libx264", "-preset", PREVIEW_PRESET, "-crf", str(PREVIEW_CRF),
+            "-c:v", "libx264", 
+            "-preset", PREVIEW_PRESET,  # ultrafast
+            "-tune", "zerolatency",  # Minimize latency
+            "-crf", str(PREVIEW_CRF),
             "-c:a", STANDARD_AUDIO_CODEC, "-b:a", STANDARD_AUDIO_BITRATE,
+            "-movflags", "+faststart",  # Enable streaming
             str(output_path)
         ]
         
-        logger.info(f"Generating transcript preview: {output_path}")
+        logger.info(f"Generating transcript preview ({len(limited_segments)} segments, max {self.max_duration}s): {output_path}")
         try:
-            subprocess.run(cmd, check=True, capture_output=True)
+            result = subprocess.run(cmd, check=True, capture_output=True, timeout=60)  # 60s timeout
             return str(output_path)
+        except subprocess.TimeoutExpired:
+            logger.error("FFmpeg preview generation timed out")
+            raise RuntimeError("Preview generation timed out")
         except subprocess.CalledProcessError as e:
             logger.error(f"FFmpeg preview generation failed: {e.stderr.decode()}")
             raise RuntimeError(f"Preview generation failed: {e.stderr.decode()}")
@@ -152,15 +180,21 @@ class PreviewGenerator:
             
             cmd = [
                 "ffmpeg", "-y",
+                "-threads", "0",  # Use all available cores
+                "-t", str(self.max_duration),  # Limit preview duration
                 "-i", source_path,
                 "-vf", crop_filter,
-                "-c:v", "libx264", "-preset", PREVIEW_PRESET, "-crf", str(PREVIEW_CRF),
+                "-c:v", "libx264", 
+                "-preset", PREVIEW_PRESET, 
+                "-tune", "zerolatency",
+                "-crf", str(PREVIEW_CRF),
                 "-c:a", STANDARD_AUDIO_CODEC, "-b:a", STANDARD_AUDIO_BITRATE,
+                "-movflags", "+faststart",
                 str(output_path)
             ]
             
-            logger.info(f"Generating shorts preview: {output_path}")
-            subprocess.run(cmd, check=True, capture_output=True)
+            logger.info(f"Generating shorts preview (max {self.max_duration}s): {output_path}")
+            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
             return str(output_path)
 
         except subprocess.CalledProcessError as e:

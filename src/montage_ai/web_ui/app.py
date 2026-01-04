@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from collections import deque
 from typing import Optional
-from flask import Flask, render_template, request, jsonify, send_file, Response, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_file, Response, send_from_directory, redirect, url_for
 from werkzeug.utils import secure_filename
 
 from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
@@ -289,8 +289,9 @@ def montage_creator():
 
 @app.route('/v2')
 def index_v2():
-    """Outcome-based UI (v2 prototype)."""
-    return render_template('index_v2.html', version=VERSION, defaults=DEFAULT_OPTIONS)
+    """Outcome-based UI (v2) - DEPRECATED. Redirect to main landing."""
+    # v2 features merged into index_strategy.html. Redirect for backwards compat.
+    return redirect(url_for('index'))
 
 
 @app.route('/shorts')
@@ -2408,7 +2409,7 @@ def api_audio_analyze():
         if is_cgpu_available():
             recommendations.append("Voice isolation available via cloud acceleration")
         
-        return jsonify({
+        response_data = {
             "success": True,
             "analysis": {
                 "mean_volume": round(mean_volume, 1),
@@ -2420,7 +2421,40 @@ def api_audio_analyze():
             },
             "recommendations": recommendations,
             "clean_audio_available": True
-        })
+        }
+        
+        # If timeline data requested (energy curve + beats)
+        include_timeline = data.get('include_timeline', True)  # Default true for backwards compat
+        if include_timeline:
+            try:
+                from ..audio_analysis import get_beat_times, analyze_music_energy
+                from ..video_metadata import probe_duration
+                
+                duration = probe_duration(str(audio_path))
+                
+                # Get beats
+                beat_info = get_beat_times(str(audio_path), verbose=False)
+                beats_list = beat_info.beat_times.tolist() if hasattr(beat_info.beat_times, 'tolist') else list(beat_info.beat_times)
+                
+                # Get energy curve (downsample for frontend performance)
+                energy_profile = analyze_music_energy(str(audio_path), verbose=False)
+                energy_list = energy_profile.rms.tolist() if hasattr(energy_profile.rms, 'tolist') else list(energy_profile.rms)
+                
+                # Downsample energy to max 500 points
+                if len(energy_list) > 500:
+                    step = len(energy_list) // 500
+                    energy_list = energy_list[::step]
+                
+                response_data["energy"] = energy_list
+                response_data["beats"] = beats_list[:100]  # Cap at 100 beats
+                response_data["duration"] = duration
+                response_data["tempo"] = beat_info.tempo
+                
+            except Exception as timeline_err:
+                logger.warning(f"Timeline data extraction failed: {timeline_err}")
+                # Don't fail the whole request, just skip timeline data
+        
+        return jsonify(response_data)
         
     except Exception as e:
         import traceback

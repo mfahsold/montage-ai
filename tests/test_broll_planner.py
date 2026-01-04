@@ -12,36 +12,52 @@ from montage_ai.broll_planner import split_script, format_plan, BRollSuggestion
 
 
 class TestSplitScript(unittest.TestCase):
-    """Test script splitting functionality."""
+    """Test script splitting functionality (regex fallback)."""
 
-    def test_split_simple_sentences(self):
-        """Split script on sentence boundaries."""
+    @patch('montage_ai.broll_planner.CreativeDirector')
+    def test_split_simple_sentences(self, mock_director):
+        """Split script on sentence boundaries (regex fallback)."""
+        # Force regex fallback by making LLM return None
+        mock_director.return_value.plan_broll.return_value = None
+        
         script = "The athlete trains hard. Victory celebration follows."
         segments = split_script(script)
         self.assertEqual(len(segments), 2)
         self.assertIn("athlete trains hard", segments[0]["text"])
 
-    def test_split_with_exclamation(self):
-        """Handle exclamation marks as sentence boundaries."""
+    @patch('montage_ai.broll_planner.CreativeDirector')
+    def test_split_with_exclamation(self, mock_director):
+        """Handle exclamation marks as sentence boundaries (regex fallback)."""
+        mock_director.return_value.plan_broll.return_value = None
+        
         script = "Action scene! Drama unfolds! Suspense builds!"
         segments = split_script(script)
         self.assertEqual(len(segments), 3)
 
-    def test_split_with_question(self):
-        """Handle question marks as sentence boundaries."""
+    @patch('montage_ai.broll_planner.CreativeDirector')
+    def test_split_with_question(self, mock_director):
+        """Handle question marks as sentence boundaries (regex fallback)."""
+        mock_director.return_value.plan_broll.return_value = None
+        
         script = "What happens next? Nobody knows the answer."
         segments = split_script(script)
         self.assertEqual(len(segments), 2)
 
-    def test_filter_short_segments(self):
+    @patch('montage_ai.broll_planner.CreativeDirector')
+    def test_filter_short_segments(self, mock_director):
         """Filter out segments shorter than 4 characters."""
+        mock_director.return_value.plan_broll.return_value = None
+        
         script = "Go. Run fast through the forest."
         segments = split_script(script)
         # "Go" is too short, should be filtered
         self.assertEqual(len(segments), 1)
 
-    def test_empty_input(self):
+    @patch('montage_ai.broll_planner.CreativeDirector')
+    def test_empty_input(self, mock_director):
         """Handle empty input gracefully."""
+        mock_director.return_value.plan_broll.return_value = None
+        
         segments = split_script("")
         self.assertEqual(segments, [])
 

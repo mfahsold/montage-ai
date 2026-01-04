@@ -486,6 +486,16 @@ footer {
 
 .footer-links a:hover { color: var(--primary); }
 
+.comparison-link-block {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.comparison-link {
+    color: #0ff;
+    text-decoration: underline;
+}
+
 .copyright {
     font-size: 0.75rem;
     margin-bottom: 0.5rem;

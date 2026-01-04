@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ui-utils.css') }}">
     <style>
         :root {
             --accent: #7C3AED;
@@ -283,7 +284,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Montage<span style="color: var(--accent)">AI</span></h1>
+            <h1>Montage<span class="text-accent">AI</span></h1>
             <p class="tagline">Edit like text. Cut like music. Deliver like a pro.</p>
             <p class="version">v{{ version }} // AI Rough Cut + Social-Ready Output + Pro Handoff</p>
         </header>
@@ -422,12 +423,12 @@
         <footer>
             <p>
                 <strong>Montage AI</strong> — Local-first AI Post-Production Assistant<br>
-                <a href="https://github.com/mfahsold/montage-ai" target="_blank">GitHub</a> · 
+                <a href="https://github.com/mfahsold/montage-ai" target="_blank" rel="noopener">GitHub</a> · 
                 <a href="/docs/features.html">Features</a> · 
                 <a href="/docs/getting-started.html">Getting Started</a> · 
                 <a href="/docs/responsible_ai.html">Responsible AI</a>
             </p>
-            <p style="margin-top: 1rem; font-size: 0.75rem; opacity: 0.6;">
+            <p class="mt-1 label-mini">
                 We polish pixels, we don't generate them.
             </p>
         </footer>

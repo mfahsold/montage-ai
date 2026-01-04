@@ -1,0 +1,226 @@
+/* Shared utility styles for Montage AI web UI */
+
+.link-clean {
+    text-decoration: none;
+    color: inherit;
+}
+
+.flex-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.flex-1 { flex: 1; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.flex-column { display: flex; flex-direction: column; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-05 { gap: 0.5rem; }
+.gap-075 { gap: 0.75rem; }
+.gap-1 { gap: 1rem; }
+.gap-10 { gap: 10px; }
+
+.label-mini { font-size: 0.75rem; opacity: 0.6; }
+.heading-sm { font-size: 0.9rem; margin-bottom: 0.5rem; }
+.icon-48 { width: 48px; height: 48px; }
+.nav-inline {
+    padding: 0.75rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 1rem;
+.mt-15 { margin-top: 1.5rem; }
+    justify-content: center;
+}
+
+.info-card-spacing { margin-bottom: 1.5rem; }
+.info-card-heading { margin: 0; }
+.info-card-subtext { margin: 0.25rem 0 0; opacity: 0.8; }
+.icon-xl { font-size: 2rem; }
+
+.hidden-input { display: none; }
+
+.btn-dashed-full {
+    width: 100%;
+    border: 2px dashed var(--border);
+}
+
+.panel-stack {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    height: fit-content;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.text-mono-faint {
+    font-family: 'Space Mono', monospace;
+    opacity: 0.7;
+}
+
+.video-shell {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.video-frame {
+    padding: 0;
+    overflow: hidden;
+    aspect-ratio: 16/9;
+}
+
+.video-contained {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.control-row {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.btn-compact { padding: 0.5rem 1rem; }
+.btn-wide { padding: 0.5rem 2rem; }
+
+.timeline-wrapper { width: 100%; margin-top: 1rem; }
+
+.preview-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.preview-heading { margin-bottom: 1rem; }
+.video-cover { object-fit: cover; }
+
+.hidden-block { display: none; }
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.grid-2-lg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.label-small { font-size: 0.75rem; opacity: 0.7; }
+.text-faint-sm { font-size: 0.9rem; opacity: 0.7; }
+.text-accent { color: var(--accent); }
+.w-100 { width: 100%; }
+.w-0 { width: 0%; }
+.mt-05 { margin-top: 0.5rem; }
+.mt-1 { margin-top: 1rem; }
+.mb-05 { margin-bottom: 0.5rem; }
+.mb-1 { margin-bottom: 1rem; }
+.mb-15 { margin-bottom: 1.5rem; }
+.ml-05 { margin-left: 0.5rem; }
+.ml-0 { margin-left: 0; }
+.opacity-80 { opacity: 0.8; }
+
+.helper-centered {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.helper-error { color: red; }
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    min-width: 160px;
+    z-index: 1;
+    border-radius: 4px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+
+.dropdown-content a {
+    color: var(--text-primary);
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+}
+
+.checkbox-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-left: 1rem;
+}
+
+.progress-hidden { display: none; }
+.progress-header-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+}
+
+.progress-track {
+    background: var(--border-color);
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill-default {
+    background: var(--primary);
+    width: 0%;
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.dashed-box {
+    padding: 0.5rem;
+    border: 1px dashed var(--muted);
+}
+
+.panel-soft {
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.modal-hidden { display: none; }
+
+.modal-body-scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+}
