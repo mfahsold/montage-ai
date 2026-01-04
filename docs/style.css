@@ -540,13 +540,14 @@ footer {
 
 .showcase-content {
     position: relative;
-    min-width: 0; /* Prevents grid blowout */
+    min-width: 0;
+    padding-top: 1.5rem;
 }
 
 .feature-number {
     position: absolute;
-    top: -0.75rem;
-    left: -0.75rem;
+    top: -1.25rem;
+    left: -1rem;
     background: var(--primary);
     color: white;
     font-size: 1.25rem;
@@ -562,11 +563,16 @@ footer {
     z-index: 1;
 }
 
+.showcase-content {
+    position: relative;
+    min-width: 0;
+    padding-top: 1.5rem; /* Space for badge */
+}
+
 .showcase-content h3 {
     font-size: 1rem;
-    margin-top: 1rem;
+    margin-top: 0;
     margin-bottom: 0.5rem;
-    padding-left: 0.25rem;
 }
 
 .feature-highlight {
