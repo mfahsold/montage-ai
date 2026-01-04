@@ -297,6 +297,132 @@ def _run_cloud_analysis(audio_path: str) -> Optional[dict]:
 
 
 # =============================================================================
+# Audio Quality Validation (SNR Estimation)
+# =============================================================================
+
+@dataclass
+class AudioQuality:
+    """Audio quality assessment results."""
+    snr_db: float
+    mean_volume_db: float
+    max_volume_db: float
+    is_usable: bool
+    quality_tier: str  # "excellent", "good", "acceptable", "poor", "unusable"
+
+    @property
+    def warning(self) -> Optional[str]:
+        if self.quality_tier == "unusable":
+            return f"Audio quality too low (SNR: {self.snr_db:.1f}dB). Consider re-recording."
+        elif self.quality_tier == "poor":
+            return f"Low audio quality (SNR: {self.snr_db:.1f}dB). Results may be unreliable."
+        return None
+
+
+def estimate_audio_snr(audio_path: str) -> AudioQuality:
+    """
+    Estimate Signal-to-Noise Ratio (SNR) of audio file.
+
+    Uses FFmpeg to detect noise floor during silent sections
+    and compare to peak signal level.
+
+    Returns:
+        AudioQuality with SNR estimate and usability assessment
+    """
+    # Step 1: Get volume statistics
+    cmd_vol = build_ffmpeg_cmd(
+        ["-i", audio_path, "-af", "volumedetect", "-f", "null", "-"],
+        overwrite=False
+    )
+
+    mean_vol = -20.0
+    max_vol = -10.0
+
+    try:
+        result = run_command(
+            cmd_vol,
+            capture_output=True,
+            timeout=_settings.processing.analysis_timeout,
+            check=False
+        )
+        for line in result.stderr.split('\n'):
+            if 'mean_volume:' in line:
+                mean_vol = float(line.split('mean_volume:')[1].split('dB')[0].strip())
+            elif 'max_volume:' in line:
+                max_vol = float(line.split('max_volume:')[1].split('dB')[0].strip())
+    except Exception:
+        pass
+
+    # Step 2: Estimate noise floor from silence
+    # Use silencedetect to find quiet sections, then measure their RMS
+    cmd_silence = build_ffmpeg_cmd(
+        [
+            "-i", audio_path,
+            "-af", "silencedetect=n=-50dB:d=0.1,astats=metadata=1",
+            "-f", "null", "-"
+        ],
+        overwrite=False
+    )
+
+    noise_floor_db = -60.0  # Default assumption
+
+    try:
+        result = run_command(
+            cmd_silence,
+            capture_output=True,
+            timeout=_settings.processing.analysis_timeout,
+            check=False
+        )
+        # Look for RMS level during silent sections
+        # If we find very low RMS values, that's our noise floor
+        rms_values = []
+        for line in result.stderr.split('\n'):
+            if 'RMS level dB' in line:
+                try:
+                    rms = float(line.split('RMS level dB:')[1].strip().split()[0])
+                    if rms < -30:  # Only consider quiet sections
+                        rms_values.append(rms)
+                except (ValueError, IndexError):
+                    pass
+
+        if rms_values:
+            noise_floor_db = max(rms_values)  # Highest "quiet" level is noise floor
+    except Exception:
+        pass
+
+    # Step 3: Calculate SNR
+    # SNR = Peak Signal Level - Noise Floor
+    snr_db = max_vol - noise_floor_db
+
+    # Clamp to reasonable range
+    snr_db = max(0, min(60, snr_db))
+
+    # Step 4: Quality classification
+    if snr_db >= 40:
+        tier = "excellent"
+        usable = True
+    elif snr_db >= 25:
+        tier = "good"
+        usable = True
+    elif snr_db >= 15:
+        tier = "acceptable"
+        usable = True
+    elif snr_db >= 8:
+        tier = "poor"
+        usable = True
+    else:
+        tier = "unusable"
+        usable = False
+
+    return AudioQuality(
+        snr_db=snr_db,
+        mean_volume_db=mean_vol,
+        max_volume_db=max_vol,
+        is_usable=usable,
+        quality_tier=tier
+    )
+
+
+# =============================================================================
 # FFmpeg Fallback (bare-metal, no Python dependencies)
 # =============================================================================
 

@@ -36,6 +36,112 @@ from .logger import logger
 from .core.cmd_runner import run_command
 from .ffmpeg_utils import build_ffmpeg_cmd
 
+
+# =============================================================================
+# Kalman Filter for Subject Tracking Smoothing
+# =============================================================================
+
+class SubjectKalmanFilter:
+    """
+    1D Kalman filter for smoothing subject position tracking.
+
+    State: [position, velocity]
+    Measurement: position only
+
+    Provides smoother transitions than moving average, especially when
+    detections are lost (prediction step extrapolates motion).
+    """
+
+    def __init__(
+        self,
+        process_noise: float = 1.0,
+        measurement_noise: float = 10.0,
+        initial_position: float = 0.0
+    ):
+        # State: [position, velocity]
+        self.x = np.array([initial_position, 0.0])
+
+        # State covariance
+        self.P = np.eye(2) * 100.0
+
+        # State transition matrix (position += velocity * dt, dt=1 frame)
+        self.F = np.array([[1, 1], [0, 1]])
+
+        # Measurement matrix (we only observe position)
+        self.H = np.array([[1, 0]])
+
+        # Process noise covariance (how much we expect state to change)
+        self.Q = np.array([
+            [process_noise, 0],
+            [0, process_noise * 0.1]  # velocity noise is smaller
+        ])
+
+        # Measurement noise covariance
+        self.R = np.array([[measurement_noise]])
+
+    def predict(self) -> float:
+        """Predict next state (position)."""
+        self.x = self.F @ self.x
+        self.P = self.F @ self.P @ self.F.T + self.Q
+        return self.x[0]
+
+    def update(self, measurement: float) -> float:
+        """Update state with new measurement."""
+        # Kalman gain
+        S = self.H @ self.P @ self.H.T + self.R
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+
+        # Update state
+        y = np.array([measurement]) - self.H @ self.x  # Innovation
+        self.x = self.x + (K @ y).flatten()
+
+        # Update covariance
+        I = np.eye(2)
+        self.P = (I - K @ self.H) @ self.P
+
+        return self.x[0]
+
+    @staticmethod
+    def smooth_sequence(
+        raw_centers: List[int],
+        process_noise: float = 1.0,
+        measurement_noise: float = 10.0
+    ) -> List[int]:
+        """
+        Smooth a sequence of positions using forward-backward Kalman filtering.
+
+        This achieves similar results to convex optimization but without scipy.
+        """
+        if len(raw_centers) < 2:
+            return raw_centers
+
+        # Forward pass
+        forward_kf = SubjectKalmanFilter(
+            process_noise=process_noise,
+            measurement_noise=measurement_noise,
+            initial_position=raw_centers[0]
+        )
+        forward_estimates = []
+        forward_covariances = []
+
+        for z in raw_centers:
+            forward_kf.predict()
+            forward_kf.update(z)
+            forward_estimates.append(forward_kf.x.copy())
+            forward_covariances.append(forward_kf.P.copy())
+
+        # Backward pass (RTS smoother)
+        n = len(raw_centers)
+        smoothed = [np.zeros(2) for _ in range(n)]
+        smoothed[-1] = forward_estimates[-1]
+
+        for i in range(n - 2, -1, -1):
+            P_pred = forward_kf.F @ forward_covariances[i] @ forward_kf.F.T + forward_kf.Q
+            C = forward_covariances[i] @ forward_kf.F.T @ np.linalg.inv(P_pred)
+            smoothed[i] = forward_estimates[i] + C @ (smoothed[i + 1] - forward_kf.F @ forward_estimates[i])
+
+        return [int(s[0]) for s in smoothed]
+
 # Try importing MediaPipe, but don't crash if missing (optional dependency)
 try:
     import mediapipe as mp
@@ -141,36 +247,23 @@ class CameraMotionOptimizer:
             return self._fallback_smooth(raw_centers, constraints)
 
     def _fallback_smooth(self, data: List[int], constraints: Dict[int, int] = None, window: int = 15) -> List[int]:
-        """Simple moving average fallback with edge padding."""
+        """Kalman filter fallback for smooth camera paths (when scipy unavailable)."""
         if not data:
             return []
-        
-        # If constraints exist, overwrite data at those points (naive approach)
-        # A better approach would be linear interpolation between keyframes, blended with data.
-        # For now, just hard overwrite before smoothing.
-        working_data = np.array(data, dtype=float)
+
+        # Apply constraints by blending with original data
+        working_data = list(data)
         if constraints:
             for idx, target in constraints.items():
                 if 0 <= idx < len(working_data):
                     working_data[idx] = target
-        
-        # Adjust window for short clips
-        if len(working_data) < window:
-            window = max(1, len(working_data))
-            
-        # Pad edges to avoid zero-assumption dropoff
-        pad_width = window // 2
-        padded = np.pad(working_data, pad_width, mode='edge')
-        
-        smoothed = np.convolve(padded, np.ones(window)/window, mode='valid')
-        
-        # Ensure length matches input exactly (handle odd/even window mismatch)
-        if len(smoothed) < len(working_data):
-             smoothed = np.pad(smoothed, (0, len(working_data) - len(smoothed)), mode='edge')
-        elif len(smoothed) > len(working_data):
-             smoothed = smoothed[:len(working_data)]
-            
-        return [int(x) for x in smoothed]
+
+        # Use Kalman filter for smoother results than moving average
+        return SubjectKalmanFilter.smooth_sequence(
+            working_data,
+            process_noise=1.0 / self.lambda_smooth,  # Lower λ = more smoothing
+            measurement_noise=10.0
+        )
 
 
 class AutoReframeEngine:

@@ -83,7 +83,11 @@ class Monitor:
         # Performance tracking
         self.phase_times: Dict[str, float] = {}
         self.phase_start: Optional[float] = None
-        
+
+        # KPI tracking
+        self.kpis: Dict[str, float] = {}
+        self.feature_usage: Dict[str, bool] = {}
+
         self._setup_tee()
         self._print_header()
         self._start_mem_probe()
@@ -377,10 +381,57 @@ class Monitor:
     def log_timing(self, operation: str, duration_ms: float):
         """Log operation timing"""
         self._log(
-            LogLevel.METRIC, 
-            "timing", 
+            LogLevel.METRIC,
+            "timing",
             f"{operation}",
             duration_ms=duration_ms
+        )
+
+    # ==================== KPI TRACKING ====================
+
+    def log_time_to_first_preview(self, duration_s: float):
+        """
+        Track Time-to-First-Preview KPI.
+
+        This is a critical SLA metric: how long from job submission
+        until the user sees their first preview frame.
+        """
+        self.kpis["time_to_first_preview_s"] = duration_s
+        self._log(
+            LogLevel.METRIC,
+            "kpi:ttfp",
+            f"Time-to-First-Preview: {duration_s:.2f}s",
+            {"target_s": 30.0, "met": duration_s <= 30.0}
+        )
+
+    def log_feature_usage(self, features: Dict[str, bool]):
+        """
+        Track which features are enabled for analytics.
+
+        Args:
+            features: Dict of feature_name -> enabled (e.g., {"stabilize": True})
+        """
+        self.feature_usage.update(features)
+        enabled = [k for k, v in features.items() if v]
+        if enabled:
+            self._log(
+                LogLevel.INFO,
+                "feature_usage",
+                f"Enabled: {', '.join(enabled)}"
+            )
+
+    def log_render_kpi(self, input_duration_s: float, render_time_s: float):
+        """
+        Track render efficiency KPI (realtime factor).
+
+        A factor < 1.0 means faster than realtime.
+        """
+        factor = render_time_s / input_duration_s if input_duration_s > 0 else 0
+        self.kpis["render_realtime_factor"] = factor
+        self._log(
+            LogLevel.METRIC,
+            "kpi:render",
+            f"Render {input_duration_s:.1f}s video in {render_time_s:.1f}s ({factor:.2f}x realtime)"
         )
     
     def log_progress(self, current: int, total: int, item: str = "items"):
@@ -613,7 +664,18 @@ class Monitor:
             for name, values in self.metrics.items():
                 avg = sum(values) / len(values)
                 logger.info(f"      • {name}: avg={avg:.2f}, count={len(values)}")
-        
+
+        # KPI summaries
+        if self.kpis:
+            logger.info(f"\n   🎯 KPIs:")
+            for name, value in self.kpis.items():
+                logger.info(f"      • {name}: {value:.2f}")
+
+        # Feature usage
+        if self.feature_usage:
+            enabled = [k for k, v in self.feature_usage.items() if v]
+            logger.info(f"\n   🔧 Features: {', '.join(enabled) if enabled else 'none'}")
+
         logger.info("=" * 70 + "\n")
     
     def export_json(self, filepath: str):
@@ -622,6 +684,8 @@ class Monitor:
             "job_id": self.job_id,
             "total_duration_s": time.time() - self.start_time,
             "phase_times_ms": self.phase_times,
+            "kpis": self.kpis,
+            "feature_usage": self.feature_usage,
             "decisions": self.decisions,
             "metrics": self.metrics,
             "events": [asdict(e) for e in self.events]

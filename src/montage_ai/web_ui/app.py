@@ -192,22 +192,12 @@ app.register_blueprint(analysis_bp)
 @app.route('/')
 def index():
     """Main landing page with workflow selection (strategy-aligned UI)."""
-    # Use strategy-aligned landing page by default
-    if request.args.get('legacy'):
-        return render_template('index.html', version=VERSION, defaults=DEFAULT_OPTIONS)
     return render_template('index_strategy.html', version=VERSION)
 
 
 @app.route('/montage')
 def montage_creator():
-    """Montage Creator - beat-sync, story arc, style presets."""
-    return render_template('index.html', version=VERSION, defaults=DEFAULT_OPTIONS)
-
-
-@app.route('/v2')
-def index_v2():
-    """Outcome-based UI (v2) - DEPRECATED. Redirect to main landing."""
-    # v2 features merged into index_strategy.html. Redirect for backwards compat.
+    """Montage Creator - redirects to main landing."""
     return redirect(url_for('index'))
 
 

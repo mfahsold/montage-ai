@@ -34,7 +34,7 @@ from .ffmpeg_config import (
 )
 from .logger import logger
 from .core.cmd_runner import run_command, CommandError
-from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
+from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd, build_video_encoding_args
 
 
 _settings = get_settings()
@@ -312,17 +312,17 @@ class ClipEnhancer:
             "-threads", threads_per_job,
             "-i", input_path,
             "-vf", filters,
-            "-c:v", self.output_codec,
-            "-preset", self.ffmpeg_preset,
-            "-crf", str(self.settings.encoding.crf),
             "-threads", threads_per_job,
         ])
-
-        if self.output_profile:
-            cmd.extend(["-profile:v", self.output_profile])
-        if self.output_level:
-            cmd.extend(["-level", self.output_level])
-        cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
+        cmd.extend(build_video_encoding_args(
+            codec=self.output_codec,
+            preset=self.ffmpeg_preset,
+            crf=self.settings.encoding.crf,
+            profile=self.output_profile,
+            level=self.output_level,
+            pix_fmt=self.output_pix_fmt,
+        ))
+        cmd.append(output_path)
 
         try:
             run_command(cmd, check=True)
@@ -513,12 +513,15 @@ class ClipEnhancer:
                     output_path = os.path.join(output_dir, f"matched_{os.path.basename(clip_path)}")
 
                     cmd = build_ffmpeg_cmd(["-i", clip_path, "-vf", filter_str])
-                    cmd.extend(["-c:v", self.output_codec, "-preset", "fast", "-crf", "18"])
-                    if self.output_profile:
-                        cmd.extend(["-profile:v", self.output_profile])
-                    if self.output_level:
-                        cmd.extend(["-level", self.output_level])
-                    cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
+                    cmd.extend(build_video_encoding_args(
+                        codec=self.output_codec,
+                        preset="fast",
+                        crf=18,
+                        profile=self.output_profile,
+                        level=self.output_level,
+                        pix_fmt=self.output_pix_fmt,
+                    ))
+                    cmd.append(output_path)
 
                     run_command(cmd, check=True, timeout=self.ffmpeg_timeout)
                     results[clip_path] = output_path
@@ -696,16 +699,16 @@ class ClipEnhancer:
             "-threads", self.ffmpeg_threads,
             "-i", input_path,
             "-vf", "deshake=rx=32:ry=32:blocksize=8:contrast=125",
-            "-c:v", self.output_codec,
-            "-preset", "fast",
-            "-crf", "20",
         ])
-
-        if self.output_profile:
-            cmd.extend(["-profile:v", self.output_profile])
-        if self.output_level:
-            cmd.extend(["-level", self.output_level])
-        cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
+        cmd.extend(build_video_encoding_args(
+            codec=self.output_codec,
+            preset="fast",
+            crf=20,
+            profile=self.output_profile,
+            level=self.output_level,
+            pix_fmt=self.output_pix_fmt,
+        ))
+        cmd.append(output_path)
 
         try:
             run_command(
@@ -818,13 +821,17 @@ class ClipEnhancer:
             esrgan_cmd = build_ffmpeg_cmd([
                 "-framerate", fps_arg,
                 "-i", f"{out_frame_dir}/frame_%08d.png",
-                "-c:v", self.output_codec, "-crf", str(self.upscale_crf)
             ])
-            if self.output_profile:
-                esrgan_cmd.extend(["-profile:v", self.output_profile])
-            if self.output_level:
-                esrgan_cmd.extend(["-level", self.output_level])
-            esrgan_cmd.extend(["-pix_fmt", self.output_pix_fmt, output_path])
+            esrgan_cmd.extend(build_video_encoding_args(
+                codec=self.output_codec,
+                preset="medium",
+                crf=self.upscale_crf,
+                profile=self.output_profile,
+                level=self.output_level,
+                pix_fmt=self.output_pix_fmt,
+                audio_copy=False,  # No audio in frame sequence
+            ))
+            esrgan_cmd.append(output_path)
 
             run_command(esrgan_cmd, check=True)
 
@@ -881,16 +888,16 @@ class ClipEnhancer:
             ffmpeg_cmd = build_ffmpeg_cmd([
                 "-i", input_path,
                 "-vf", filter_chain,
-                "-c:v", self.output_codec,
-                "-preset", "slow",
-                "-crf", str(self.upscale_crf),
             ])
-
-            if self.output_profile:
-                ffmpeg_cmd.extend(["-profile:v", self.output_profile])
-            if self.output_level:
-                ffmpeg_cmd.extend(["-level", self.output_level])
-            ffmpeg_cmd.extend(["-pix_fmt", self.output_pix_fmt, "-c:a", "copy", output_path])
+            ffmpeg_cmd.extend(build_video_encoding_args(
+                codec=self.output_codec,
+                preset="slow",
+                crf=self.upscale_crf,
+                profile=self.output_profile,
+                level=self.output_level,
+                pix_fmt=self.output_pix_fmt,
+            ))
+            ffmpeg_cmd.append(output_path)
 
             run_command(ffmpeg_cmd, check=True)
             logger.info("FFmpeg upscaling complete")
