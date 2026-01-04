@@ -19,6 +19,7 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from .logger import logger
 from .config import get_settings
+from .creative_director import CreativeDirector
 
 # Reuse video_agent for semantic search (DRY)
 try:
@@ -32,6 +33,7 @@ except ImportError:
 class BRollSuggestion:
     """Single B-roll suggestion for a script segment."""
     segment_text: str
+    keywords: List[str]
     clip_path: str
     start_time: float
     end_time: float
@@ -41,6 +43,7 @@ class BRollSuggestion:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "segment": self.segment_text,
+            "keywords": self.keywords,
             "clip": self.clip_path,
             "start": self.start_time,
             "end": self.end_time,
@@ -49,15 +52,31 @@ class BRollSuggestion:
         }
 
 
-def split_script(script: str) -> List[str]:
-    """Split script into searchable segments.
-
-    KISS: Split on sentences. No complex NLP.
+def split_script(script: str) -> List[Dict[str, Any]]:
     """
-    # Split on sentence endings
+    Split script into searchable segments using LLM if available,
+    falling back to simple sentence splitting.
+    """
+    try:
+        director = CreativeDirector()
+        plan = director.plan_broll(script)
+        if plan and "segments" in plan:
+            logger.info(f"LLM B-roll planning successful: {len(plan['segments'])} segments")
+            return plan["segments"]
+    except Exception as e:
+        logger.warning(f"LLM B-roll planning failed, falling back to regex: {e}")
+
+    # Fallback: Split on sentence endings
     segments = re.split(r'[.!?]+', script)
-    # Clean and filter empty
-    return [s.strip() for s in segments if s.strip() and len(s.strip()) > 3]
+    return [
+        {
+            "text": s.strip(),
+            "keywords": [w for w in s.strip().split() if len(w) > 4],  # Simple keyword extraction
+            "mood": "neutral",
+            "estimated_duration": len(s.strip().split()) / 2.5  # Approx 150 wpm
+        }
+        for s in segments if s.strip() and len(s.strip()) > 3
+    ]
 
 
 def plan_broll(
@@ -98,17 +117,29 @@ def plan_broll(
         for vf in video_files:
             agent.analyze_video(str(vf))
 
-    # Split script into segments
+    # 1. Parse script into segments (LLM or Regex)
     segments = split_script(script)
     logger.info(f"Split script into {len(segments)} segments")
 
     # Get suggestions for each segment
     results = []
-    for segment in segments:
-        matches = agent.caption_retrieval(segment, top_k=top_k)
+    for seg in segments:
+        # Handle both dict (LLM) and str (legacy fallback if split_script returns strings)
+        if isinstance(seg, str):
+            text = seg
+            keywords = []
+        else:
+            text = seg["text"]
+            keywords = seg.get("keywords", [])
+        
+        # Search query: combine text and keywords
+        query = f"{text} {' '.join(keywords)}"
+        
+        matches = agent.caption_retrieval(query, top_k=top_k)
 
         segment_result = {
-            "segment": segment,
+            "segment": text,
+            "keywords": keywords,
             "suggestions": []
         }
 

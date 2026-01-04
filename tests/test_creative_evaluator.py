@@ -133,6 +133,7 @@ class TestMontageEvaluation:
         evaluation = MontageEvaluation(
             satisfaction_score=0.75,
             summary="Good but needs work",
+            approve_for_render=False,
         )
         assert evaluation.satisfaction_score == 0.75
         assert evaluation.approve_for_render == False
@@ -141,15 +142,15 @@ class TestMontageEvaluation:
 
     def test_needs_refinement(self):
         # Low score, not approved -> needs refinement
-        eval1 = MontageEvaluation(satisfaction_score=0.6, approve_for_render=False)
+        eval1 = MontageEvaluation(satisfaction_score=0.6, approve_for_render=False, summary="Needs work")
         assert eval1.needs_refinement == True
 
         # High score, approved -> no refinement needed
-        eval2 = MontageEvaluation(satisfaction_score=0.9, approve_for_render=True)
+        eval2 = MontageEvaluation(satisfaction_score=0.9, approve_for_render=True, summary="Good")
         assert eval2.needs_refinement == False
 
         # Low score but approved -> no refinement needed
-        eval3 = MontageEvaluation(satisfaction_score=0.6, approve_for_render=True)
+        eval3 = MontageEvaluation(satisfaction_score=0.6, approve_for_render=True, summary="Okay")
         assert eval3.needs_refinement == False
 
     def test_critical_issues(self):
@@ -161,6 +162,8 @@ class TestMontageEvaluation:
         evaluation = MontageEvaluation(
             satisfaction_score=0.5,
             issues=issues,
+            summary="Critical issues found",
+            approve_for_render=False,
         )
         critical = evaluation.critical_issues
         assert len(critical) == 1
@@ -329,6 +332,8 @@ class TestCreativeEvaluatorRefineInstructions:
 
         evaluation = MontageEvaluation(
             satisfaction_score=0.6,
+            summary="Needs adjustments",
+            approve_for_render=False,
             adjustments=[
                 EditingAdjustment(
                     target="pacing.speed",
@@ -452,6 +457,7 @@ class TestConvenienceFunctions:
         mock_evaluator.evaluate.return_value = MontageEvaluation(
             satisfaction_score=0.9,
             approve_for_render=True,
+            summary="Great job",
         )
         mock_evaluator_class.return_value = mock_evaluator
 
@@ -483,6 +489,7 @@ class TestIntegration:
         # First evaluation - needs refinement
         first_eval = MontageEvaluation(
             satisfaction_score=0.6,
+            summary="Needs refinement",
             issues=[EditingIssue(type="pacing", severity="moderate", description="Too fast")],
             adjustments=[
                 EditingAdjustment(
@@ -504,6 +511,7 @@ class TestIntegration:
         # Second evaluation - approved
         second_eval = MontageEvaluation(
             satisfaction_score=0.9,
+            summary="Approved",
             issues=[],
             adjustments=[],
             approve_for_render=True,

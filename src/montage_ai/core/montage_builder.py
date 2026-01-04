@@ -427,14 +427,21 @@ def process_clip_task(
         vf_filters = [
             f"scale={output_profile.width}:{output_profile.height}:force_original_aspect_ratio=decrease",
             f"pad={output_profile.width}:{output_profile.height}:(ow-iw)/2:(oh-ih)/2",
+            "setsar=1",  # Ensure square pixels
         ]
         if getattr(settings.features, "colorlevels", True):
             vf_filters.append(
                 "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:"
                 "rimax=0.922:gimax=0.922:bimax=0.922"
             )
-        if getattr(settings.features, "luma_normalize", True):
-            vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
+        
+        # Ensure output pixel format matches encoder expectation
+        if output_profile.pix_fmt:
+            vf_filters.append(f"format={output_profile.pix_fmt}")
+
+        # Removed 'normalize' filter to prevent RGB conversion errors
+        # if getattr(settings.features, "luma_normalize", True):
+        #     vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
         vf_chain = ",".join(vf_filters)
 
         def run_normalize(cfg, params, label: str) -> bool:
@@ -461,6 +468,8 @@ def process_clip_task(
             if result.returncode == 0 and file_exists_and_valid(final_clip_path):
                 return True
             err_lines = (result.stderr or "").strip().splitlines()
+            # Log full error for debugging
+            logger.warning(f"Normalize ({label}) failed details:\n{result.stderr}")
             err = err_lines[-1] if err_lines else "unknown error"
             logger.warning(f"Normalize ({label}) failed: {err}")
             if os.path.exists(final_clip_path):
@@ -1846,6 +1855,7 @@ class MontageBuilder:
     ) -> Tuple[Optional[Dict[str, Any]], float]:
         """Score and select the best clip for this cut."""
         from ..scene_analysis import calculate_visual_similarity, detect_motion_blur
+        from ..clip_selector import ClipCandidate
 
         # Convert to scene dicts for scoring
         valid_scenes = [
@@ -1994,7 +2004,55 @@ class MontageBuilder:
             score += random.randint(-15, 15)
             scene['_heuristic_score'] = score
 
-        # Probabilistic selection from top candidates
+        # --- INTELLIGENT SELECTION (DRY/KISS) ---
+        if self._intelligent_selector:
+            # Convert to ClipCandidate objects
+            clip_candidates = []
+            for s in candidates:
+                clip_candidates.append(ClipCandidate(
+                    path=s['path'],
+                    start_time=s['start'],
+                    duration=s['duration'],
+                    heuristic_score=int(s.get('_heuristic_score', 0)),
+                    metadata=s.get('meta', {})
+                ))
+
+            # Build context
+            prev_clips = []
+            if self.ctx.last_used_path:
+                # Minimal context from what we have
+                prev_meta = {'shot': self.ctx.last_shot_type}
+                prev_clips.append({'meta': prev_meta})
+
+            context = {
+                'current_energy': current_energy,
+                'position': self.ctx.get_story_phase(),
+                'previous_clips': prev_clips,
+                'beat_position': self.ctx.beat_idx
+            }
+
+            # Select best clip
+            best_candidate, reason = self._intelligent_selector.select_best_clip(
+                clip_candidates,
+                context,
+                top_n=5
+            )
+
+            # Find the original scene dict
+            selected_scene = next(
+                (s for s in candidates 
+                 if s['path'] == best_candidate.path and s['start'] == best_candidate.start_time), 
+                candidates[0]
+            )
+            best_score = best_candidate.heuristic_score
+
+            if "LLM" in reason:
+                logger.info(f"   🧠 {reason}")
+            
+            return selected_scene, best_score
+        # ----------------------------------------
+
+        # Probabilistic selection from top candidates (Fallback)
         candidates.sort(key=lambda x: x.get('_heuristic_score', -1000), reverse=True)
         top_n = min(3, len(candidates))
         if top_n > 0:

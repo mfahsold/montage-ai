@@ -19,7 +19,7 @@ class TestSplitScript(unittest.TestCase):
         script = "The athlete trains hard. Victory celebration follows."
         segments = split_script(script)
         self.assertEqual(len(segments), 2)
-        self.assertIn("athlete trains hard", segments[0])
+        self.assertIn("athlete trains hard", segments[0]["text"])
 
     def test_split_with_exclamation(self):
         """Handle exclamation marks as sentence boundaries."""
@@ -78,6 +78,7 @@ class TestBRollSuggestion(unittest.TestCase):
         """Convert suggestion to dictionary."""
         suggestion = BRollSuggestion(
             segment_text="test",
+            keywords=["test"],
             clip_path="/data/clip.mp4",
             start_time=0.0,
             end_time=5.0,
@@ -85,6 +86,7 @@ class TestBRollSuggestion(unittest.TestCase):
         )
         d = suggestion.to_dict()
         self.assertEqual(d["segment"], "test")
+        self.assertEqual(d["keywords"], ["test"])
         self.assertEqual(d["clip"], "/data/clip.mp4")
         self.assertEqual(d["score"], 0.8)
 

@@ -20,7 +20,7 @@ data:
   OPENAI_VISION_MODEL: ""  # Leave empty unless a vision model is available
   
   # Option 2: Ollama (local fallback)
-  OLLAMA_HOST: ""
+  OLLAMA_HOST: "http://ollama.montage-ai.svc.cluster.local:11434"
   OLLAMA_MODEL: "llava"
   DIRECTOR_MODEL: "llama3.1:70b"
   

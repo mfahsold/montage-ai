@@ -90,9 +90,14 @@
         </nav>
 
         <div class="toolbar">
-            <select id="fileSelect" class="voxel-input" style="flex-grow: 1;">
-                <option value="">Select a video...</option>
-            </select>
+            <input type="file" id="videoInput" accept="video/*" style="display: none;" onchange="loadVideo(this)">
+            <button class="voxel-btn voxel-btn-secondary" onclick="document.getElementById('videoInput').click()">
+                📹 Select Video
+            </button>
+            <span id="currentFilename" style="margin-left: 0.5rem; opacity: 0.7; font-size: 0.9rem;"></span>
+            
+            <div style="flex-grow: 1;"></div>
+
             <button id="removeFillersBtn" class="voxel-btn">Remove Fillers</button>
             <button id="undoBtn" class="voxel-btn" disabled>Undo</button>
             <button id="redoBtn" class="voxel-btn" disabled>Redo</button>
@@ -141,7 +146,9 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/session-client.js') }}"></script>
     <script>
+        const client = new SessionClient('transcript');
         let currentTranscript = [];
         let videoPlayer = document.getElementById('mainVideo');
         let transcriptContainer = document.getElementById('transcriptContent');
@@ -150,10 +157,67 @@
         const undoStack = [];
         const redoStack = [];
 
+        // Initialize
+        client.onStateChange = (state) => {
+            if (state.edits) {
+                window.pendingEdits = state.edits;
+                if (currentTranscript.length > 0) {
+                    applyPendingEdits();
+                }
+            }
+        };
+
+        client.onAssetLoaded = (asset) => {
+            document.getElementById('currentFilename').textContent = asset.filename;
+            videoPlayer.src = `/api/video/${asset.filename}`;
+            loadTranscript();
+        };
+
+        client.init();
+
+        function loadVideo(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            // Local preview
+            const url = URL.createObjectURL(file);
+            videoPlayer.src = url;
+            document.getElementById('currentFilename').textContent = file.name;
+
+            // Upload via Client
+            const btn = document.querySelector('button[onclick*="videoInput"]');
+            const originalText = btn.textContent;
+            btn.textContent = 'Uploading...';
+            btn.disabled = true;
+
+            client.uploadAsset(file).then(() => {
+                loadTranscript();
+            }).finally(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        async function loadTranscript() {
+            transcriptContainer.innerHTML = '<div class="helper" style="text-align: center;">Transcribing audio... (this may take a moment)</div>';
+            
+            try {
+                const data = await client.analyze('transcription');
+                if (data.transcript) {
+                    renderTranscript(data.transcript);
+                } else {
+                    transcriptContainer.innerHTML = '<div class="helper" style="text-align: center;">Transcription started. Check back later.</div>';
+                }
+            } catch (e) {
+                transcriptContainer.innerHTML = `<div class="helper" style="text-align: center; color: red;">Error: ${e.message}</div>`;
+            }
+        }
+
         function pushUndo(action) {
             undoStack.push(action);
-            redoStack.length = 0; // Clear redo stack on new action
+            redoStack.length = 0; 
             updateUndoButtons();
+            saveState(); // Auto-save state
         }
 
         function updateUndoButtons() {
@@ -166,27 +230,23 @@
             const action = undoStack.pop();
             redoStack.push(action);
             
-            // Reverse action
             if (action.type === 'toggle') {
                 const span = transcriptContainer.children[action.index];
-                // If it was removed (true), we want to add it back (remove 'deleted')
-                // Wait, action.removed is the state AFTER the toggle.
-                // So to undo, we set it to !action.removed
                 if (action.removed) {
                     span.classList.remove('deleted');
                 } else {
                     span.classList.add('deleted');
                 }
             } else if (action.type === 'batch') {
-                // Batch undo (e.g. remove fillers)
                 action.indices.forEach(idx => {
                     const span = transcriptContainer.children[idx];
-                    span.classList.remove('deleted'); // Assuming batch is always delete
+                    span.classList.remove('deleted');
                 });
             }
             
             updateStats();
             updateUndoButtons();
+            saveState();
             debouncedPreview();
         }
 
@@ -195,7 +255,6 @@
             const action = redoStack.pop();
             undoStack.push(action);
             
-            // Re-apply action
             if (action.type === 'toggle') {
                 const span = transcriptContainer.children[action.index];
                 if (action.removed) {
@@ -212,13 +271,13 @@
             
             updateStats();
             updateUndoButtons();
+            saveState();
             debouncedPreview();
         }
 
         document.getElementById('undoBtn').addEventListener('click', performUndo);
         document.getElementById('redoBtn').addEventListener('click', performRedo);
 
-        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
                 e.preventDefault();
@@ -233,54 +292,13 @@
             }
         });
 
-        // Load file list on startup
-        fetch('/api/files')
-            .then(r => r.json())
-            .then(data => {
-                const select = document.getElementById('fileSelect');
-                data.videos.forEach(file => {
-                    const opt = document.createElement('option');
-                    opt.value = file;
-                    opt.textContent = file;
-                    select.appendChild(opt);
-                });
-            });
-
-        document.getElementById('fileSelect').addEventListener('change', (e) => {
-            const filename = e.target.value;
-            if (!filename) return;
-            
-            // Load Video
-            videoPlayer.src = `/api/video/${filename}`;
-            
-            // Load Transcript
-            fetch(`/api/transcript/${filename}`)
-                .then(r => {
-                    if (!r.ok) throw new Error('Transcript not found');
-                    return r.json();
-                })
-                .then(data => {
-                    renderTranscript(data);
-                })
-                .catch(err => {
-                    transcriptContainer.innerHTML = `
-                        <div class="helper" style="text-align: center; color: #ff4444;">
-                            Transcript not found. <br>
-                            <button class="voxel-btn" onclick="generateTranscript('${filename}')">Generate Transcript</button>
-                        </div>
-                    `;
-                });
-        });
-
         function renderTranscript(data) {
-            // Handle different Whisper JSON formats (verbose_json vs simple)
-            // Assuming verbose_json with segments -> words
             if (data.segments) {
                 currentTranscript = data.segments.flatMap(s => s.words || []);
             } else if (data.words) {
                 currentTranscript = data.words;
             } else {
-                currentTranscript = []; // Fallback
+                currentTranscript = []; 
             }
 
             transcriptContainer.innerHTML = '';
@@ -296,11 +314,23 @@
                 span.onclick = () => toggleWord(index);
                 transcriptContainer.appendChild(span);
             });
+            
+            applyPendingEdits();
             updateStats();
+        }
+        
+        function applyPendingEdits() {
+            if (window.pendingEdits) {
+                window.pendingEdits.forEach(edit => {
+                    if (edit.removed && transcriptContainer.children[edit.index]) {
+                        transcriptContainer.children[edit.index].classList.add('deleted');
+                    }
+                });
+                window.pendingEdits = null;
+            }
         }
 
         let previewDebounceTimer;
-
         function debounce(func, wait) {
             return function(...args) {
                 clearTimeout(previewDebounceTimer);
@@ -312,7 +342,7 @@
             if (document.getElementById('autoPreviewCheck').checked) {
                 requestPreview();
             }
-        }, 2000); // 2 second delay
+        }, 2000);
 
         function toggleWord(index) {
             const span = transcriptContainer.children[index];
@@ -322,14 +352,13 @@
             pushUndo({
                 type: 'toggle',
                 index: index,
-                removed: !wasDeleted // The new state
+                removed: !wasDeleted 
             });
             
             updateStats();
             debouncedPreview();
         }
 
-        // Sync video time with transcript highlighting
         videoPlayer.addEventListener('timeupdate', () => {
             const time = videoPlayer.currentTime;
             const words = transcriptContainer.children;
@@ -340,8 +369,7 @@
                 
                 if (time >= start && time <= end) {
                     words[i].classList.add('active');
-                    // Auto-scroll
-                    if (i % 10 === 0) { // Don't scroll on every word
+                    if (i % 10 === 0) { 
                         words[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 } else {
@@ -350,72 +378,24 @@
             }
         });
 
-        document.getElementById('removeFillersBtn').addEventListener('click', () => {
-            const filename = document.getElementById('fileSelect').value;
-            if (!filename) return alert('Please select a video first');
-            
-            const btn = document.getElementById('removeFillersBtn');
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = 'Detecting...';
-            
-            fetch('/api/transcript/detect-fillers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                
-                const words = transcriptContainer.children;
-                let count = 0;
-                
-                if (data.filler_indices && data.filler_indices.length > 0) {
-                    const indicesToRemove = [];
-                    data.filler_indices.forEach(index => {
-                        if (words[index] && !words[index].classList.contains('deleted')) {
-                            words[index].classList.add('deleted');
-                            indicesToRemove.push(index);
-                            count++;
-                        }
+        document.getElementById('removeFillersBtn').addEventListener('click', async () => {
+            try {
+                const data = await client.removeFillers();
+                if (data.indices && data.indices.length > 0) {
+                    // Push to undo stack as a batch so we can undo the backend operation locally
+                    // Note: This only undoes the visual state. To fully undo backend state, 
+                    // we'd need a backend undo or re-save state.
+                    // For now, we rely on "Save Edits" to sync back the visual state if user undoes.
+                    pushUndo({
+                        type: 'batch',
+                        indices: data.indices
                     });
-                    
-                    if (indicesToRemove.length > 0) {
-                        pushUndo({
-                            type: 'batch',
-                            indices: indicesToRemove
-                        });
-                    }
-                    
-                    alert(`Removed ${count} filler words.`);
-                } else {
-                    alert('No filler words found.');
+                    updateStats();
+                    debouncedPreview();
                 }
-                updateStats();
-                debouncedPreview();
-            })
-            .catch(err => {
-                console.error(err);
-                // Fallback to client-side if server fails or for immediate feedback
-                const fillers = ['um', 'uh', 'like', 'you know'];
-                const words = transcriptContainer.children;
-                let count = 0;
-                for (let i = 0; i < words.length; i++) {
-                    const text = words[i].textContent.trim().toLowerCase().replace(/[^a-z]/g, '');
-                    if (fillers.includes(text)) {
-                        words[i].classList.add('deleted');
-                        count++;
-                    }
-                }
-                alert(`Removed ${count} filler words (Client-side fallback).`);
-                updateStats();
-                debouncedPreview();
-            })
-            .finally(() => {
-                btn.disabled = false;
-                btn.textContent = originalText;
-            });
+            } catch (e) {
+                console.error(e);
+            }
         });
 
         function updateStats() {
@@ -437,7 +417,6 @@
                 }
             }
 
-            // Format helper
             const fmt = (s) => {
                 const m = Math.floor(s / 60);
                 const sec = Math.floor(s % 60);
@@ -447,62 +426,28 @@
             document.getElementById('origDuration').textContent = fmt(totalDuration);
             document.getElementById('editDuration').textContent = fmt(editedDuration);
         }
-        
-        function generateTranscript(filename) {
-            const btn = document.querySelector('button[onclick^="generateTranscript"]');
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = 'Transcribing... (this may take a moment)';
 
-            // Find the full path or use the filename relative to input dir
-            // We need to pass the full path if the backend expects it, or just the filename if the backend resolves it.
-            // app.py api_transcript_transcribe expects 'video_path'. 
-            // But since we are in the web UI context, we should probably let the backend resolve the path from the filename.
-            // However, the current API implementation expects 'video_path'. 
-            // Let's assume we need to construct the path or update the API to handle filenames.
-            // Looking at app.py, api_transcript_transcribe takes 'video_path'.
-            // But api_get_transcript takes 'filename'.
-            // Let's try sending the filename and letting the backend handle it, or we might need a small backend tweak.
-            // For now, let's assume the backend can handle a relative path or we send the absolute path if we know it.
-            // Actually, let's update the backend to be safer, but first let's try to call it.
-            
-            // We will send the filename and let the backend resolve it to INPUT_DIR / filename
-            // We need to update app.py to handle this if it doesn't already.
-            
-            fetch('/api/transcript/transcribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    video_path: filename, // The backend likely needs to resolve this
-                    model: 'base',
-                    language: 'en' // Default to English for now
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                if (data.success) {
-                    renderTranscript(data.transcript);
-                    // Also save it so next time it loads
-                    // The backend api_transcript_transcribe doesn't seem to save the JSON to disk automatically?
-                    // Wait, looking at app.py: "if result.success... return jsonify". 
-                    // It does NOT save to the expected JSON path for api_get_transcript to find later.
-                    // We should probably fix that in the backend too.
-                    alert('Transcription complete!');
+        async function saveState() {
+            const edits = [];
+            const words = transcriptContainer.children;
+            for (let i = 0; i < words.length; i++) {
+                if (words[i].classList.contains('deleted')) {
+                    edits.push({
+                        index: parseInt(words[i].dataset.index),
+                        removed: true
+                    });
                 }
-            })
-            .catch(err => {
-                alert('Transcription failed: ' + err.message);
-            })
-            .finally(() => {
-                btn.disabled = false;
-                btn.textContent = originalText;
-            });
+            }
+            
+            try {
+                await client.saveState({ edits: edits });
+            } catch (e) {
+                console.error('Failed to save state:', e);
+            }
         }
 
         document.getElementById('saveEditsBtn').addEventListener('click', () => {
-            // In a real app, this would save to a JSON file or DB
-            alert('Edits saved locally (in memory). Ready to preview.');
+            saveState().then(() => client.showToast('Session saved!', 'success'));
         });
 
         document.getElementById('exportBtn').addEventListener('click', (e) => {
@@ -511,125 +456,54 @@
             menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
         });
 
-        // Close dropdown when clicking outside
         window.addEventListener('click', () => {
             document.getElementById('exportMenu').style.display = 'none';
         });
 
         function exportProject(format) {
-            const filename = document.getElementById('fileSelect').value;
-            if (!filename) return alert('Please select a video first');
-
-            const edits = [];
-            const words = transcriptContainer.children;
-            for (let i = 0; i < words.length; i++) {
-                edits.push({
-                    index: parseInt(words[i].dataset.index),
-                    removed: words[i].classList.contains('deleted')
-                });
-            }
-
-            const btn = document.getElementById('exportBtn');
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = 'Exporting...';
-
-            fetch('/api/transcript/export', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    filename: filename, 
-                    edits: edits,
-                    format: format
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                
-                if (data.success) {
-                    // Trigger download
-                    const link = document.createElement('a');
-                    link.href = `/api/download/${data.filename}`; // Assuming api/download serves from OUTPUT_DIR
-                    link.download = data.filename;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    alert(`Export successful: ${data.filename}`);
-                }
-            })
-            .catch(err => {
-                alert('Export failed: ' + err.message);
-            })
-            .finally(() => {
-                btn.disabled = false;
-                btn.textContent = originalText;
-            });
+            client.export(format);
         }
 
-        function requestPreview() {
-            const filename = document.getElementById('fileSelect').value;
-            if (!filename) return; // Silent return for auto-preview
-
-            const edits = [];
-            const words = transcriptContainer.children;
-            for (let i = 0; i < words.length; i++) {
-                edits.push({
-                    index: parseInt(words[i].dataset.index),
-                    removed: words[i].classList.contains('deleted')
-                });
-            }
-
+        async function requestPreview() {
             const btn = document.getElementById('previewBtn');
-            const originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = 'Generating...';
 
-            fetch('/api/transcript/render', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename, edits })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                pollJob(data.job_id);
-            })
-            .catch(err => {
+            const edits = [];
+            const words = transcriptContainer.children;
+            for (let i = 0; i < words.length; i++) {
+                edits.push({
+                    index: parseInt(words[i].dataset.index),
+                    removed: words[i].classList.contains('deleted')
+                });
+            }
+            
+            try {
+                // 1. Save state first
+                await client.saveState({ edits });
+                
+                // 2. Request preview
+                const data = await client.renderPreview({ type: 'transcript' });
+                
+                if (data.url) {
+                    const video = document.getElementById('mainVideo');
+                    video.src = data.url;
+                    video.load();
+                    video.play();
+                    client.showToast('Preview ready', 'success');
+                }
+            } catch (err) {
                 console.error('Preview Error:', err);
+                client.showToast('Preview failed', 'error');
+            } finally {
                 btn.disabled = false;
                 btn.textContent = 'Generate Preview';
-            });
+            }
         }
 
         document.getElementById('previewBtn').addEventListener('click', () => {
-            const filename = document.getElementById('fileSelect').value;
-            if (!filename) return alert('Please select a video first');
             requestPreview();
         });
-
-        function pollJob(jobId) {
-            const interval = setInterval(() => {
-                fetch(`/api/jobs/${jobId}`)
-                    .then(r => r.json())
-                    .then(job => {
-                        if (job.status === 'completed') {
-                            clearInterval(interval);
-                            document.getElementById('previewBtn').disabled = false;
-                            document.getElementById('previewBtn').textContent = 'Generate Preview';
-                            
-                            // Play result
-                            videoPlayer.src = `/api/download/${job.output_file}`;
-                            videoPlayer.play();
-                        } else if (job.status === 'failed') {
-                            clearInterval(interval);
-                            alert('Render failed: ' + job.error);
-                            document.getElementById('previewBtn').disabled = false;
-                            document.getElementById('previewBtn').textContent = 'Generate Preview';
-                        }
-                    });
-            }, 1000);
-        }
     </script>
 </body>
 </html>

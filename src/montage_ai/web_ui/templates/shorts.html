@@ -478,9 +478,13 @@
                             <span class="icon">✋</span>
                             <span class="label">Manual</span>
                         </button>
-                        <button class="voxel-btn" onclick="visualizeReframing()" id="visualizeBtn" style="grid-column: span 2;">
+                        <button class="voxel-btn" onclick="visualizeReframing()" id="visualizeBtn">
                             <span class="icon">👁️</span>
-                            <span class="label">Preview AI Crop</span>
+                            <span class="label">Overlay</span>
+                        </button>
+                        <button class="voxel-btn" onclick="generatePreviewVideo()" id="renderPreviewBtn">
+                            <span class="icon">▶️</span>
+                            <span class="label">Render Preview</span>
                         </button>
                     </div>
                 </div>
@@ -646,8 +650,10 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/session-client.js') }}"></script>
     <script>
-        const API_BASE = '/api';
+        const client = new SessionClient('shorts');
+        
         let currentSettings = {
             reframeMode: 'auto',
             captionStyle: 'default',
@@ -659,9 +665,8 @@
             duration: 60
         };
 
-        let videoPath = null;
         let cropData = [];
-        let manualKeyframes = []; // Array of {time, x} (x is normalized 0-1)
+        let manualKeyframes = []; 
         let originalWidth = 1920;
         let originalHeight = 1080;
 
@@ -669,6 +674,24 @@
         const previewPlayer = document.getElementById('previewPlayer');
         const overlayCanvas = document.getElementById('overlayCanvas');
         const ctx = overlayCanvas.getContext('2d');
+
+        // Initialize
+        client.onStateChange = (state) => {
+            if (state.crops_auto) {
+                cropData = state.crops_auto;
+                resizeCanvas();
+            }
+        };
+
+        client.onAssetLoaded = (asset) => {
+            // Assuming /api/video/ serves from INPUT_DIR
+            const url = `/api/video/${asset.filename}`;
+            sourcePlayer.src = url;
+            previewPlayer.src = url;
+            console.log("Loaded video:", asset.filename);
+        };
+
+        client.init();
 
         // Sync players
         sourcePlayer.onplay = () => previewPlayer.play();
@@ -682,7 +705,6 @@
             updateCropOverlay();
         };
         
-        // Handle metadata loaded to set dimensions
         sourcePlayer.onloadedmetadata = () => {
             originalWidth = sourcePlayer.videoWidth;
             originalHeight = sourcePlayer.videoHeight;
@@ -698,15 +720,12 @@
             const normalizedX = x / rect.width;
             const time = sourcePlayer.currentTime;
             
-            // Add or update keyframe
-            // Remove existing keyframe near this time (within 0.5s)
             manualKeyframes = manualKeyframes.filter(k => Math.abs(k.time - time) > 0.5);
-            
             manualKeyframes.push({time, x: normalizedX});
             manualKeyframes.sort((a, b) => a.time - b.time);
             
-            showToast(`Keyframe set at ${formatTime(time)}`, 'success');
-            updateCropOverlay(); // Redraw to show marker
+            client.showToast(`Keyframe set at ${formatTime(time)}`, 'success');
+            updateCropOverlay();
         };
 
         function selectReframe(mode) {
@@ -715,12 +734,11 @@
                 btn.classList.toggle('selected', btn.dataset.mode === mode);
             });
             
-            // Enable pointer events for manual mode
             overlayCanvas.style.pointerEvents = mode === 'manual' ? 'auto' : 'none';
             overlayCanvas.style.cursor = mode === 'manual' ? 'crosshair' : 'default';
             
             if (mode === 'manual') {
-                showToast('Click on video to set crop center', 'info');
+                client.showToast('Click on video to set crop center', 'info');
             }
         }
 
@@ -757,12 +775,14 @@
         function toggleAudioPolish(el) {
             el.classList.toggle('active');
             currentSettings.audioPolish = el.classList.contains('active');
+            client.saveState({ audioPolish: currentSettings.audioPolish });
         }
 
         function loadVideo(input) {
             const file = input.files[0];
             if (!file) return;
 
+            // Local preview immediately
             const url = URL.createObjectURL(file);
             sourcePlayer.src = url;
             previewPlayer.src = url;
@@ -773,62 +793,19 @@
             cropData = [];
             ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-            // Upload for processing
-            uploadVideo(file);
-        }
-
-        async function uploadVideo(file) {
-            const formData = new FormData();
-            formData.append('video', file);
-            
-            showToast('Uploading...', 'info');
-
-            try {
-                // Note: In a real app, we'd use the existing upload endpoint.
-                // For now, we assume the file is saved to INPUT_DIR with its original name
-                // or we use a specific upload endpoint.
-                // Let's assume we just need to trigger analysis on the filename if it's already local,
-                // but here we are uploading.
-                
-                // We'll use a hypothetical upload endpoint or just assume local dev environment
-                // where we can access the file.
-                // Since I don't have the upload endpoint code handy, I'll assume the user
-                // puts the file in the input directory or I'll mock the upload success.
-                
-                // Wait, app.py has upload logic usually.
-                // I'll just call analyzeCrops with the filename directly for now, assuming local file.
-                // But for web UI, we need to upload.
-                
-                // Let's assume the file is uploaded to 'input/'
-                analyzeCrops(file.name);
-                
-            } catch (error) {
-                console.error('Upload failed:', error);
-            }
+            // Upload via Client
+            client.uploadAsset(file).then(() => {
+                analyzeCrops();
+            });
         }
         
-        async function analyzeCrops(filename) {
-            showToast('Analyzing subject tracking...', 'info');
+        async function analyzeCrops() {
             try {
-                const payload = {
-                    filename: filename,
-                    keyframes: manualKeyframes
-                };
-
-                const res = await fetch('/api/analyze-crops', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (data.error) throw new Error(data.error);
-                
-                cropData = data;
-                showToast('Tracking complete!', 'success');
-                
+                const data = await client.analyze('crops', { keyframes: manualKeyframes });
+                cropData = data.crops;
                 resizeCanvas();
             } catch (e) {
-                showToast('Analysis failed: ' + e.message, 'error');
+                // Error handled by client
             }
         }
 
@@ -844,37 +821,28 @@
             if (!cropData.length) return;
             const t = sourcePlayer.currentTime;
             
-            // Find closest frame
-            // Optimization: Binary search or just simple scan if short
-            // Simple scan is fine for < 1 hour
             let frame = null;
             let minDiff = Infinity;
             
-            // Assuming sorted by time
-            // We can optimize by remembering last index
             for (const c of cropData) {
                 const diff = Math.abs(c.time - t);
                 if (diff < minDiff) {
                     minDiff = diff;
                     frame = c;
                 } else {
-                    // If diff starts increasing, we passed the best frame
                     break;
                 }
             }
             
             if (frame) {
-                // Draw on Canvas (Source Monitor)
                 const scaleX = overlayCanvas.width / originalWidth;
                 const scaleY = overlayCanvas.height / originalHeight;
                 
                 ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                 
-                // Dim background
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                 ctx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                 
-                // Clear crop area
                 const x = frame.x * scaleX;
                 const y = frame.y * scaleY;
                 const w = frame.width * scaleX;
@@ -882,21 +850,17 @@
                 
                 ctx.clearRect(x, y, w, h);
                 
-                // Draw border
                 ctx.strokeStyle = '#F4D03F';
                 ctx.lineWidth = 3;
                 ctx.strokeRect(x, y, w, h);
                 
-                // Update Preview Player (Result)
                 const centerX = frame.x + frame.width / 2;
                 const percentX = (centerX / originalWidth) * 100;
                 previewPlayer.style.objectPosition = `${percentX}% 50%`;
             }
             
-            // Draw Manual Keyframes
             if (manualKeyframes.length > 0) {
                 for (const kf of manualKeyframes) {
-                    // Draw if within 2 seconds window
                     if (Math.abs(kf.time - t) < 2.0) {
                         const kx = kf.x * overlayCanvas.width;
                         
@@ -938,42 +902,53 @@
             sourcePlayer.currentTime = Math.min(sourcePlayer.duration, sourcePlayer.currentTime + 5);
         }
 
-        // ... Keep existing helper functions ...
         function formatTime(seconds) {
             const m = Math.floor(seconds / 60);
             const s = Math.floor(seconds % 60);
             return `${m}:${s.toString().padStart(2, '0')}`;
         }
-
-        function showToast(message, type = 'info') {
-            const toast = document.createElement('div');
-            toast.style.cssText = `
-                position: fixed;
-                bottom: 2rem;
-                left: 50%;
-                transform: translateX(-50%);
-                padding: 0.75rem 1.5rem;
-                border-radius: 8px;
-                color: white;
-                font-weight: 500;
-                z-index: 1000;
-                background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : type === 'warning' ? '#F59E0B' : '#7C3AED'};
-            `;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        }
         
-        // Placeholder for visualizeReframing if called from button
         function visualizeReframing() {
-             if (!videoPath) {
-                // If no video loaded, try to analyze whatever is in sourcePlayer if possible?
-                // No, need filename.
-                showToast('Load a video first', 'warning');
+             if (!client.sessionId) {
+                client.showToast('Load a video first', 'warning');
                 return;
             }
-            // Just re-trigger analysis
-            analyzeCrops(videoPath);
+            analyzeCrops();
+        }
+
+        async function generatePreviewVideo() {
+            if (!client.sessionId) {
+                client.showToast('Load a video first', 'warning');
+                return;
+            }
+            
+            const btn = document.getElementById('renderPreviewBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="icon">⏳</span><span class="label">Rendering...</span>';
+            
+            try {
+                // Save current crop state if manual
+                // await client.saveState({ ... });
+                
+                const data = await client.renderPreview({ 
+                    type: 'clip',
+                    timestamp: sourcePlayer.currentTime 
+                });
+                
+                if (data.url) {
+                    const previewPlayer = document.getElementById('previewPlayer');
+                    previewPlayer.src = data.url;
+                    previewPlayer.load();
+                    previewPlayer.play();
+                    client.showToast('Preview ready', 'success');
+                }
+            } catch (e) {
+                console.error(e);
+                client.showToast('Preview failed', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="icon">▶️</span><span class="label">Render Preview</span>';
+            }
         }
     </script>
 </body>

@@ -13,27 +13,27 @@
 
 ### Epic 1: Transcript Editor Productization
 *Goal: Turn the prototype into a reliable editing surface.*
-- [ ] **Story 1.1: Live Preview Flow**
+- [x] **Story 1.1: Live Preview Flow**
   - Implement 360p "ultrafast" preview generation triggered by transcript edits.
   - Ensure < 5s latency between "Apply Edits" and playback start.
-- [ ] **Story 1.2: Word-Level Cut List**
+- [x] **Story 1.2: Word-Level Cut List**
   - UI for selecting/striking words.
   - Backend logic to translate word indices to time ranges (EDL).
   - "Undo" stack for non-destructive editing.
-- [ ] **Story 1.3: Filler Removal & Speaker Tags**
+- [x] **Story 1.3: Filler Removal & Speaker Tags**
   - Detect filler words (um, uh) via Whisper.
   - UI toggle to "Strike all fillers".
   - Visual speaker change indicators in the text stream.
-- [ ] **Story 1.4: Text-Based Export**
+- [x] **Story 1.4: Text-Based Export**
   - Export button in Transcript view.
   - Generate OTIO/EDL directly from the text selection state.
 
 ### Epic 2: Preview-First Pipeline
 *Goal: Immediate feedback loop.*
-- [ ] **Story 2.1: Default Preview Generation**
+- [x] **Story 2.1: Default Preview Generation**
   - Automatically start 360p render immediately after upload/ingest.
   - Show clear ETA/Progress bar in the UI header.
-- [ ] **Story 2.2: "Final Render" Separation**
+- [x] **Story 2.2: "Final Render" Separation**
   - Distinct UI flow for "Export Master".
   - Only apply heavy effects (Upscale, Stabilization) in this step.
 - [ ] **Story 2.3: Telemetry**
@@ -51,13 +51,13 @@
 - [ ] **Story 3.1: Subject Tracking & Smoothing**
   - Upgrade `SmartReframer` to use continuous subject tracking (not just per-frame face detection).
   - Implement motion smoothing (Kalman filter or similar) to prevent jittery camera moves.
-- [ ] **Story 3.2: Crop Path Overlay**
+- [x] **Story 3.2: Crop Path Overlay**
   - "Phone Rig" UI: Show the 9:16 window moving over the 16:9 source in real-time.
   - Allow manual keyframe overrides for the crop center.
 
 ### Epic 4: Caption Styles & Highlights
 *Goal: Social-ready output without external tools.*
-- [ ] **Story 4.1: Live Caption Styles**
+- [x] **Story 4.1: Live Caption Styles**
   - Implement presets: "TikTok" (Classic), "Bold" (Impact), "Karaoke" (Active word highlight).
   - Render CSS-based preview in the web player.
 - [ ] **Story 4.2: Highlight Detection MVP**
@@ -73,19 +73,19 @@
 
 ### Epic 5: Pro Handoff Pack
 *Goal: Seamless integration with NLEs.*
-- [ ] **Story 5.1: Robust OTIO Export**
+- [x] **Story 5.1: Robust OTIO Export**
   - Ensure OTIO files open correctly in DaVinci Resolve and Premiere Pro.
   - Include relative paths to source media.
-- [ ] **Story 5.2: Proxy Generation**
+- [x] **Story 5.2: Proxy Generation**
   - Option to generate and link ProRes Proxy files.
-- [ ] **Story 5.3: Relink README**
+- [x] **Story 5.3: Relink README**
   - Auto-generate a `HOW_TO_RELINK.md` in the export folder with instructions.
 - [ ] **Story 5.4: Import Smoke Tests**
   - Automated tests to verify generated OTIO files against NLE import specs.
 
 ### Epic 6: Audio Polish
 *Goal: "Clean Audio" standard.*
-- [ ] **Story 6.1: "Clean Audio" Toggle**
+- [x] **Story 6.1: "Clean Audio" Toggle**
   - Single switch that activates Voice Isolation + Denoise.
   - Implement SNR (Signal-to-Noise Ratio) check before/after to verify improvement.
 - [ ] **Story 6.2: Fallback Strategy**

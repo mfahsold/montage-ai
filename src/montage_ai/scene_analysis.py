@@ -539,13 +539,15 @@ Return ONLY valid JSON, no markdown code blocks.'''
 
             if not CGPU_ENABLED:
                 return None
-            if not (
-                os.environ.get("GEMINI_API_KEY")
-                or os.environ.get("GOOGLE_API_KEY")
-                or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI")
-                or os.environ.get("GOOGLE_GENAI_USE_GCA")
-            ):
-                return None
+            
+            # Skip local API key check if using cgpu-server (it handles auth)
+            # if not (
+            #     os.environ.get("GEMINI_API_KEY")
+            #     or os.environ.get("GOOGLE_API_KEY")
+            #     or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI")
+            #     or os.environ.get("GOOGLE_GENAI_USE_GCA")
+            # ):
+            #     return None
 
             from openai import OpenAI
 

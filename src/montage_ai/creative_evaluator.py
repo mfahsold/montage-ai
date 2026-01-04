@@ -18,146 +18,21 @@ Based on research:
 
 import os
 import json
-from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 
-from .creative_director import (
-    CreativeDirector,
-    PROMPT_GUARDRAILS,
-)
+from .creative_director import CreativeDirector
 from .config import get_settings
+from .prompts import (
+    get_evaluator_prompt,
+    EvaluatorOutput,
+    EditingIssue,
+    EditingAdjustment,
+)
 
 VERSION = "0.1.0"
 
-
-# =============================================================================
-# Data Classes
-# =============================================================================
-
-@dataclass
-class EditingIssue:
-    """A detected issue in the montage."""
-    type: str  # pacing, variety, energy, transitions, duration, technical
-    severity: str  # minor, moderate, critical
-    description: str
-    timestamp: Optional[float] = None  # Where in timeline (if applicable)
-    affected_clips: List[int] = field(default_factory=list)
-
-
-@dataclass
-class EditingAdjustment:
-    """A suggested adjustment to editing instructions."""
-    target: str  # Parameter path like "pacing.speed" or "transitions.type"
-    current_value: Any
-    suggested_value: Any
-    rationale: str
-
-
-@dataclass
-class MontageEvaluation:
-    """Complete evaluation of a montage cut."""
-    satisfaction_score: float  # 0.0 to 1.0
-    issues: List[EditingIssue] = field(default_factory=list)
-    adjustments: List[EditingAdjustment] = field(default_factory=list)
-    summary: str = ""
-    approve_for_render: bool = False
-    iteration: int = 0
-
-    @property
-    def needs_refinement(self) -> bool:
-        """Check if refinement is recommended."""
-        return not self.approve_for_render and self.satisfaction_score < 0.8
-
-    @property
-    def critical_issues(self) -> List[EditingIssue]:
-        """Get critical issues that must be addressed."""
-        return [i for i in self.issues if i.severity == "critical"]
-
-
-# =============================================================================
-# System Prompt
-# =============================================================================
-
-EVALUATOR_SYSTEM_PROMPT = """You are the Creative Evaluator for the Montage AI video editing system.
-
-Your role: Analyze the first cut of a montage and provide structured feedback for refinement.
-
-You will receive:
-1. Original editing instructions (style, pacing, effects)
-2. Montage statistics (duration, cuts, tempo)
-3. Clip metadata (energy levels, shot types, selection scores)
-4. Audio energy profile
-
-Evaluate the montage against these criteria:
-- PACING: Does the cut rhythm match the intended style and music energy?
-- VARIETY: Is there enough shot variation? Are there jump cuts or repetition?
-- ENERGY: Do high-energy sections have fast cuts? Do calm sections breathe?
-- TRANSITIONS: Are transitions appropriate for the style?
-- DURATION: Is the overall length appropriate?
-- STORY ARC: Does the edit follow the requested narrative structure (e.g., Hero's Journey)?
-- TENSION: Does the visual tension match the intended emotional arc?
-
-You MUST respond with ONLY valid JSON matching this structure:
-{{
-  "satisfaction_score": 0.0-1.0,
-  "issues": [
-    {{
-      "type": "pacing" | "variety" | "energy" | "transitions" | "duration" | "story_arc" | "technical",
-      "severity": "minor" | "moderate" | "critical",
-      "description": "Human-readable description of the issue",
-      "timestamp": null | number,
-      "affected_clips": []
-    }}
-  ],
-  "adjustments": [
-    {{
-      "target": "pacing.speed" | "pacing.variation" | "transitions.type" | etc.,
-      "current_value": "current setting",
-      "suggested_value": "new setting",
-      "rationale": "Why this change helps"
-    }}
-  ],
-  "summary": "One paragraph summary of the evaluation",
-  "approve_for_render": true | false
-}}
-
-Examples:
-
-Input: Hitchcock style, 45s duration, 23 cuts, high energy throughout
-Response:
-{{
-  "satisfaction_score": 0.75,
-  "issues": [
-    {{"type": "pacing", "severity": "moderate", "description": "Intro section has too fast cuts for Hitchcock style", "timestamp": 0, "affected_clips": [0, 1, 2]}},
-    {{"type": "energy", "severity": "minor", "description": "Climax section could be more intense"}}
-  ],
-  "adjustments": [
-    {{"target": "pacing.intro_duration_beats", "current_value": 4, "suggested_value": 16, "rationale": "Hitchcock builds tension slowly"}},
-    {{"target": "pacing.climax_intensity", "current_value": 0.7, "suggested_value": 0.9, "rationale": "Increase climax impact"}}
-  ],
-  "summary": "Good overall structure but the intro cuts too quickly for Hitchcock's suspenseful pacing. Slow down the opening and intensify the climax for better dramatic effect.",
-  "approve_for_render": false
-}}
-
-Input: MTV style, 30s, 28 cuts, varied energy
-Response:
-{{
-  "satisfaction_score": 0.92,
-  "issues": [],
-  "adjustments": [],
-  "summary": "Excellent MTV-style edit with rapid cuts matching the energetic music. Shot variety is good and energy sync is on point.",
-  "approve_for_render": true
-}}
-
-CRITICAL RULES:
-1. Return ONLY valid JSON - no markdown, no explanations
-2. Be constructive - suggest specific, actionable adjustments
-3. Consider the original intent - don't suggest changes that contradict the style
-4. Approve if satisfaction >= 0.8 and no critical issues
-5. Maximum 3 iterations recommended (don't be too picky)
-"""
-
-EVALUATOR_SYSTEM_PROMPT = f"{EVALUATOR_SYSTEM_PROMPT}\n{PROMPT_GUARDRAILS}"
+# Alias for backward compatibility
+MontageEvaluation = EvaluatorOutput
 
 
 # =============================================================================
@@ -195,7 +70,7 @@ class CreativeEvaluator:
             timeout=self.timeout,
             persona="the Creative Evaluator for the Montage AI video editing system"
         )
-        self._director.system_prompt = EVALUATOR_SYSTEM_PROMPT
+        self._director.system_prompt = get_evaluator_prompt()
 
     def evaluate(
         self,
@@ -226,7 +101,7 @@ class CreativeEvaluator:
         )
 
         # Query LLM
-        response = self._director._query_llm(context)
+        response = self._director._query_llm(self._director.system_prompt, context)
 
         if not response:
             print("   ⚠️ LLM returned empty response, auto-approving")
@@ -341,39 +216,12 @@ Clips Summary (first 10):
             if text.endswith("```"):
                 text = text[:-3]
 
-            data = json.loads(text.strip())
+            # Validate with Pydantic
+            evaluation = EvaluatorOutput.model_validate_json(text)
+            evaluation.iteration = iteration
+            return evaluation
 
-            # Parse issues
-            issues = []
-            for issue_data in data.get("issues", []):
-                issues.append(EditingIssue(
-                    type=issue_data.get("type", "unknown"),
-                    severity=issue_data.get("severity", "minor"),
-                    description=issue_data.get("description", ""),
-                    timestamp=issue_data.get("timestamp"),
-                    affected_clips=issue_data.get("affected_clips", []),
-                ))
-
-            # Parse adjustments
-            adjustments = []
-            for adj_data in data.get("adjustments", []):
-                adjustments.append(EditingAdjustment(
-                    target=adj_data.get("target", ""),
-                    current_value=adj_data.get("current_value"),
-                    suggested_value=adj_data.get("suggested_value"),
-                    rationale=adj_data.get("rationale", ""),
-                ))
-
-            return MontageEvaluation(
-                satisfaction_score=float(data.get("satisfaction_score", 0.5)),
-                issues=issues,
-                adjustments=adjustments,
-                summary=data.get("summary", ""),
-                approve_for_render=data.get("approve_for_render", False),
-                iteration=iteration,
-            )
-
-        except json.JSONDecodeError as e:
+        except Exception as e:
             print(f"   ⚠️ Failed to parse evaluation response: {e}")
             return MontageEvaluation(
                 satisfaction_score=0.7,

@@ -248,12 +248,16 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
             f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2",
         ]
         if apply_colorlevels:
+            # Ensure RGB context for colorlevels if needed, but usually ffmpeg handles auto-conversion
+            # We'll stick to colorlevels as it's more robust than 'normalize'
             vf_filters.append(
                 "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:"
                 "rimax=0.922:gimax=0.922:bimax=0.922"
             )
-        if apply_normalize:
-            vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
+        # Removed 'normalize' filter as it forces RGB conversion and causes failures on some builds
+        # if apply_normalize:
+        #    vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
+        
         vf_filters.extend([
             f"fps={target_fps}",
             f"format={target_pix_fmt}",

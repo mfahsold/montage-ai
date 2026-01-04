@@ -98,6 +98,23 @@ Skip the presets and just describe what you want:
 
 ```bash
 CREATIVE_PROMPT="edit like a 90s skateboard video" ./montage-ai.sh run
+
+---
+
+## Production Deployment
+
+For production environments, we recommend using Redis for session persistence.
+
+### Redis Configuration
+
+Set the following environment variables:
+
+```bash
+REDIS_HOST=redis
+REDIS_PORT=6379
+```
+
+If running in Kubernetes, use the provided manifests in `deploy/k3s`.
 CREATIVE_PROMPT="moody and slow, lots of wide shots" ./montage-ai.sh run
 ```
 

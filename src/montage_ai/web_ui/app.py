@@ -13,15 +13,19 @@ import subprocess
 import threading
 import psutil
 import queue
+import time
 from datetime import datetime
 from pathlib import Path
 from collections import deque
-from flask import Flask, render_template, request, jsonify, send_file, Response
+from typing import Optional
+from flask import Flask, render_template, request, jsonify, send_file, Response, send_from_directory
 from werkzeug.utils import secure_filename
 
 from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
 from ..core.hardware import get_best_hwaccel
 from ..auto_reframe import AutoReframeEngine
+from ..audio_analysis import remove_filler_words
+from ..transcriber import Transcriber
 
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
@@ -29,6 +33,12 @@ from ..logger import logger
 
 # Job phase tracking models
 from .models import JobPhase, PIPELINE_PHASES
+
+# Session Management (Centralized State)
+from ..core.session import get_session_manager
+
+# Timeline Export
+from ..timeline_exporter import TimelineExporter, Timeline, Clip
 
 # SSE Helper (Refactored to separate module)
 from .sse import MessageAnnouncer, format_sse
@@ -1430,6 +1440,349 @@ def api_cgpu_jobs():
 
 
 # =============================================================================
+# SESSION API (Centralized State Management)
+# =============================================================================
+
+@app.route('/api/session/create', methods=['POST'])
+def api_session_create():
+    """Create a new editing session (Transcript or Shorts)."""
+    data = request.json or {}
+    session_type = data.get('type', 'generic')
+    
+    Session = get_session_manager()
+    session = Session.create(session_type=session_type)
+    
+    return jsonify(session.__dict__)
+
+@app.route('/api/session/<session_id>', methods=['GET'])
+def api_session_get(session_id):
+    """Get session state."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    return jsonify(session.__dict__)
+
+@app.route('/api/session/<session_id>/asset', methods=['POST'])
+def api_session_add_asset(session_id):
+    """Add an asset to a session (Unified Upload)."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    if 'file' not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+        
+    file = request.files['file']
+    asset_type = request.form.get('type', 'video')
+    
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+        
+    # Determine target directory based on asset type
+    if asset_type == 'audio':
+        target_dir = MUSIC_DIR
+    else:
+        target_dir = INPUT_DIR
+        
+    filename = secure_filename(file.filename)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_filename = f"{timestamp}_{filename}"
+    filepath = target_dir / unique_filename
+    
+    file.save(filepath)
+    
+    # Register asset in session
+    asset = session.add_asset(str(filepath), asset_type)
+    
+    return jsonify({
+        "success": True,
+        "asset": asset.__dict__,
+        "session": session.__dict__
+    })
+
+@app.route('/api/session/<session_id>/analyze', methods=['POST'])
+def api_session_analyze(session_id):
+    """Run analysis on session assets (Crops, Transcription, etc.)."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    data = request.json or {}
+    analysis_type = data.get('type', 'crops')
+    
+    try:
+        main_video = session.get_main_video()
+        if not main_video:
+            return jsonify({"error": "No video asset in session"}), 400
+            
+        if analysis_type == 'crops':
+            # Run AutoReframeEngine
+            from ..auto_reframe import AutoReframeEngine, Keyframe
+            
+            # Check if we have cached results (skip if keyframes provided, as that implies re-calc)
+            if 'crops_auto' in session.state and not data.get('force', False) and not data.get('keyframes'):
+                return jsonify({"success": True, "crops": session.state['crops_auto']})
+            
+            # Initialize engine
+            reframer = AutoReframeEngine(target_aspect=9/16)
+            
+            # Parse keyframes if present
+            keyframes = []
+            if 'keyframes' in data:
+                for kf in data['keyframes']:
+                    keyframes.append(Keyframe(time=float(kf['time']), center_x_norm=float(kf['x'])))
+            
+            # Run analysis (Note: This is blocking. For large files, use background job)
+            # For the prototype, we'll allow it to block for short clips or assume async client handling.
+            # Ideally, we should submit a job and return job_id.
+            # But to keep it simple as requested:
+            
+            # We need to pass the absolute path
+            crop_data = reframer.analyze(main_video.path, keyframes=keyframes)
+            
+            # Convert CropWindow objects to dicts for JSON serialization
+            crops_json = [
+                {
+                    "time": c.time,
+                    "x": c.x,
+                    "y": c.y,
+                    "width": c.width,
+                    "height": c.height,
+                    "score": c.score
+                }
+                for c in crop_data
+            ]
+            
+            # Update session state
+            session.update_state('crops_auto', crops_json)
+            
+            return jsonify({"success": True, "crops": crops_json})
+            
+        elif analysis_type == 'transcription':
+            # Check cache
+            if 'transcript' in session.state and not data.get('force', False):
+                 return jsonify({"success": True, "transcript": session.state['transcript']})
+
+            # Run transcription
+            transcriber = Transcriber()
+            if not transcriber.is_available():
+                 return jsonify({"error": "Transcription service unavailable"}), 503
+
+            # We want JSON output to parse it
+            output_path = transcriber.transcribe(main_video.path, output_format="json", word_timestamps=True)
+            
+            if not output_path or not os.path.exists(output_path):
+                return jsonify({"error": "Transcription failed"}), 500
+                
+            with open(output_path, 'r') as f:
+                transcript_data = json.load(f)
+                
+            session.update_state('transcript', transcript_data)
+            return jsonify({"success": True, "transcript": transcript_data})
+            
+        return jsonify({"error": "Unknown analysis type"}), 400
+        
+    except Exception as e:
+        logger.exception("Analysis failed")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/session/<session_id>/remove_fillers', methods=['POST'])
+def api_session_remove_fillers(session_id):
+    """Remove filler words from the transcript."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    if 'transcript' not in session.state:
+        return jsonify({"error": "No transcript found. Run analysis first."}), 400
+        
+    transcript = session.state['transcript']
+    
+    # Identify fillers
+    indices_to_remove = remove_filler_words(transcript)
+    
+    if not indices_to_remove:
+        return jsonify({"success": True, "count": 0, "message": "No filler words found"})
+        
+    # Update edits in session state
+    current_edits = session.state.get('edits', [])
+    
+    # Add new edits (avoid duplicates)
+    existing_indices = {e['index'] for e in current_edits if e.get('removed')}
+    new_edits = []
+    
+    for idx in indices_to_remove:
+        if idx not in existing_indices:
+            new_edits.append({"index": idx, "removed": True})
+            
+    updated_edits = current_edits + new_edits
+    session.update_state('edits', updated_edits)
+    
+    return jsonify({
+        "success": True, 
+        "count": len(new_edits), 
+        "indices": indices_to_remove,
+        "edits": updated_edits
+    })
+
+@app.route('/api/session/<session_id>/state', methods=['POST'])
+def api_session_update_state(session_id):
+    """Update session state (e.g. edits, cuts)."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    data = request.json or {}
+    for key, value in data.items():
+        session.update_state(key, value)
+        
+    return jsonify({"success": True, "session": session.__dict__})
+
+# Preview Generator
+from ..preview_generator import PreviewGenerator
+
+@app.route('/api/session/<session_id>/render_preview', methods=['POST'])
+def api_session_render_preview(session_id):
+    """
+    Generate a preview for the session (Phone Rig or Transcript Loop).
+    
+    Centralized preview logic that delegates to specific engines based on session type.
+    """
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    data = request.json or {}
+    preview_type = data.get('type', 'frame') # 'frame' or 'clip'
+    timestamp = data.get('timestamp', 0)
+    
+    try:
+        main_video = session.get_main_video()
+        if not main_video:
+            return jsonify({"error": "No video asset in session"}), 400
+            
+        generator = PreviewGenerator(output_dir=str(OUTPUT_DIR))
+        output_filename = f"preview_{session.id}_{int(time.time())}.mp4"
+        
+        if session.type == 'shorts':
+            # Shorts Preview (Phone Rig)
+            # Apply crop at timestamp
+            
+            # Get crop data for this time
+            crops = session.state.get('crops_auto', [])
+            # Find closest crop
+            crop = next((c for c in crops if c['time'] >= timestamp), crops[-1] if crops else None)
+            
+            if not crop:
+                # Default center crop
+                crop = {"x": 0.5, "y": 0.5, "width": 9/16, "height": 1.0} # Normalized
+            
+            if preview_type == 'clip':
+                # Check if we have dynamic crops (keyframes)
+                keyframes = session.state.get('crops_auto', [])
+                
+                # If no keyframes, try to generate them on the fly?
+                # This might be too slow for a "preview" button if it takes minutes.
+                # But if the user hasn't run analysis, we should probably warn them or run a fast version.
+                
+                if not keyframes:
+                    # Trigger fast analysis or just use center crop
+                    # For now, use center crop
+                    pass
+
+                output_path = generator.generate_shorts_preview(
+                    main_video.path, 
+                    crop, 
+                    output_filename,
+                    keyframes=keyframes if keyframes else None
+                )
+                return jsonify({
+                    "success": True,
+                    "url": f"/downloads/{output_filename}",
+                    "crop": crop
+                }) 
+                    output_filename
+                )
+                return jsonify({
+                    "success": True,
+                    "url": f"/downloads/{output_filename}",
+                    "crop": crop
+                })
+            else:
+                # Frame preview (just return crop data for frontend to render overlay)
+                return jsonify({
+                    "success": True,
+                    "url": f"/api/video/{main_video.filename}", 
+                    "crop": crop
+                })
+
+        elif session.type == 'transcript':
+            # Transcript Preview (Cut List)
+            timeline = _build_timeline_from_session(session, main_video)
+            if not timeline:
+                 return jsonify({"error": "Could not build timeline"}), 400
+            
+            # Convert timeline clips to segments (start, end)
+            segments = [(clip.start_time, clip.start_time + clip.duration) for clip in timeline.clips]
+            
+            output_path = generator.generate_transcript_preview(
+                main_video.path,
+                segments,
+                output_filename
+            )
+            
+            return jsonify({
+                "success": True,
+                "url": f"/downloads/{output_filename}"
+            })
+            
+        else:
+            return jsonify({"error": "Unknown session type"}), 400
+
+    except Exception as e:
+        logger.error(f"Preview generation failed: {e}")
+        return jsonify({"error": str(e)}), 500
+            
+        elif session.type == 'transcript':
+            # Transcript Preview (Edit Loop)
+            # Render the cut sequence defined by current edits
+            edits = data.get('edits', [])
+            
+            # Use TextEditor to render preview
+            from ..text_editor import TextEditor
+            editor = TextEditor(main_video.path)
+            
+            # Apply edits (in-memory)
+            removed_indices = [e['index'] for e in edits if e.get('removed')]
+            # ... apply logic ...
+            
+            # Render short preview (e.g. around cursor)
+            # Stub for now
+            return jsonify({
+                "success": True,
+                "message": "Preview render queued"
+            })
+            
+        return jsonify({"error": "Unknown session type"}), 400
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# =============================================================================
 # TRANSCRIPT API ENDPOINTS (Text-Based Editing)
 # =============================================================================
 
@@ -1485,7 +1838,24 @@ def api_transcript_transcribe():
     """Transcribe video using Whisper (local or CGPU)."""
     data = request.json or {}
     video_path_str = data.get('video_path')
+    session_id = data.get('session_id')
     
+    # Session-based workflow
+    session = None
+    if session_id:
+        Session = get_session_manager()
+        session = Session.load(session_id)
+        if session:
+            # Check if already transcribed
+            if 'transcript' in session.state:
+                return jsonify({"success": True, "transcript": session.state['transcript'], "cached": True})
+            
+            # If no video path provided, try to find main video in session
+            if not video_path_str:
+                main_video = session.get_main_video()
+                if main_video:
+                    video_path_str = main_video.path
+
     if not video_path_str:
         return jsonify({"error": "No video path provided"}), 400
 
@@ -1502,6 +1872,8 @@ def api_transcript_transcribe():
     json_output_path = video_path.with_suffix('.json')
     
     try:
+        transcript = None
+        
         # Try CGPU first, fall back to local
         cgpu_available = is_cgpu_available()
         
@@ -1520,12 +1892,6 @@ def api_transcript_transcribe():
             if result.success and result.output_path:
                 with open(result.output_path, 'r') as f:
                     transcript = json.load(f)
-                
-                # Save to local JSON path for persistence
-                with open(json_output_path, 'w') as f:
-                    json.dump(transcript, f, indent=2)
-                    
-                return jsonify({"success": True, "transcript": transcript})
             else:
                 raise Exception(result.error or "Transcription failed")
         else:
@@ -1546,13 +1912,16 @@ def api_transcript_transcribe():
             # Clean up temp audio
             audio_path.unlink(missing_ok=True)
             
-            # Save to local JSON path for persistence
+        # Save to local JSON path for persistence
+        if transcript:
             with open(json_output_path, 'w') as f:
                 json.dump(transcript, f, indent=2)
+                
+            # Update session state if active
+            if session:
+                session.update_state('transcript', transcript)
 
             return jsonify({"success": True, "transcript": transcript})
-            
-            return jsonify({"success": True, "transcript": result})
             
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1728,7 +2097,29 @@ def api_shorts_analyze():
     data = request.json or {}
     video_path = data.get('video_path')
     reframe_mode = data.get('reframe_mode', 'auto')  # auto, speaker, center, custom
+    session_id = data.get('session_id')
     
+    # Session-based workflow
+    session = None
+    if session_id:
+        Session = get_session_manager()
+        session = Session.load(session_id)
+        if session:
+            # Check cache
+            cache_key = f"crops_{reframe_mode}"
+            if cache_key in session.state:
+                return jsonify({
+                    "success": True,
+                    "mode": reframe_mode,
+                    "crop_data": session.state[cache_key],
+                    "cached": True
+                })
+            
+            if not video_path:
+                main_video = session.get_main_video()
+                if main_video:
+                    video_path = main_video.path
+
     if not video_path or not Path(video_path).exists():
         return jsonify({"error": "Video file not found"}), 404
     
@@ -1761,6 +2152,10 @@ def api_shorts_analyze():
             }
             for c in crop_data
         ]
+        
+        # Save to session
+        if session:
+            session.update_state(f"crops_{reframe_mode}", crops_json)
         
         return jsonify({
             "success": True,
@@ -2351,6 +2746,154 @@ def api_shorts_create():
     """Create a short video - convenience alias for render endpoint."""
     # This is the endpoint the frontend calls
     return api_shorts_render()
+
+
+def _build_timeline_from_session(session, main_video) -> Optional[Timeline]:
+    """Convert session state into a Timeline object."""
+    
+    # 1. Get duration of source
+    duration = main_video.metadata.get('duration')
+    if not duration:
+        # Fallback: try to get from transcript if available
+        if 'transcript' in session.state:
+             try:
+                 # Last segment end
+                 segs = session.state['transcript'].get('segments', [])
+                 if segs:
+                    duration = segs[-1]['end']
+                 else:
+                    words = session.state['transcript'].get('words', [])
+                    if words:
+                        duration = words[-1]['end']
+             except:
+                 pass
+    
+    # 2. Determine kept segments
+    kept_segments = [] # list of (start, end) tuples
+    
+    if 'edits' in session.state and 'transcript' in session.state:
+        # Reconstruct from transcript + edits
+        transcript = session.state['transcript']
+        edits = session.state['edits'] # list of {index: int, removed: bool}
+        removed_indices = {e['index'] for e in edits if e.get('removed')}
+        
+        words = []
+        if 'segments' in transcript:
+            for seg in transcript['segments']:
+                if 'words' in seg:
+                    words.extend(seg['words'])
+        elif 'words' in transcript:
+            words = transcript['words']
+            
+        if not words:
+            return None
+            
+        # Iterate words and build segments
+        current_start = None
+        current_end = None
+        
+        for i, word in enumerate(words):
+            is_kept = (i not in removed_indices)
+            
+            if is_kept:
+                if current_start is None:
+                    current_start = word['start']
+                current_end = word['end']
+            else:
+                if current_start is not None:
+                    # Close segment
+                    kept_segments.append((current_start, current_end))
+                    current_start = None
+                    current_end = None
+                    
+        # Close final segment
+        if current_start is not None:
+            kept_segments.append((current_start, current_end))
+            
+    else:
+        # Default: keep whole video if duration known
+        if duration:
+            kept_segments.append((0.0, duration))
+        else:
+            return None
+
+    # 3. Create Clips
+    clips = []
+    timeline_time = 0.0
+    for start, end in kept_segments:
+        dur = end - start
+        if dur <= 0: continue
+        
+        clip = Clip(
+            source_path=main_video.path,
+            start_time=start,
+            duration=dur,
+            timeline_start=timeline_time
+        )
+        clips.append(clip)
+        timeline_time += dur
+        
+    return Timeline(
+        clips=clips,
+        audio_path=main_video.path, # Assuming embedded audio
+        total_duration=timeline_time,
+        project_name=f"session_{session.id}"
+    )
+
+
+@app.route('/api/session/<session_id>/export', methods=['POST'])
+def api_session_export(session_id):
+    """Export the session to EDL/OTIO/Video."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    data = request.json or {}
+    export_format = data.get('format', 'edl') # edl, otio, video
+    
+    main_video = session.get_main_video()
+    if not main_video:
+        return jsonify({"error": "No video asset in session"}), 400
+        
+    # Build Timeline
+    timeline = _build_timeline_from_session(session, main_video)
+    if not timeline:
+         return jsonify({"error": "Could not build timeline from session state (missing duration or transcript)"}), 400
+
+    exporter = TimelineExporter(output_dir=str(OUTPUT_DIR))
+    
+    try:
+        output_path = None
+        if export_format == 'edl':
+            output_path = exporter._export_edl(timeline)
+        elif export_format == 'otio':
+            if not exporter.OTIO_AVAILABLE:
+                 return jsonify({"error": "OpenTimelineIO not installed"}), 501
+            output_path = exporter._export_otio(timeline)
+        elif export_format == 'video':
+             # TODO: Implement video render
+             return jsonify({"error": "Video export not yet implemented via this API"}), 501
+        else:
+            return jsonify({"error": f"Unknown format: {export_format}"}), 400
+            
+        # Return relative path or download URL
+        filename = os.path.basename(output_path)
+        return jsonify({
+            "success": True,
+            "path": output_path,
+            "url": f"/downloads/{filename}"
+        })
+    except Exception as e:
+        logger.error(f"Export failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/downloads/<path:filename>')
+def download_file(filename):
+    """Serve exported files."""
+    return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
 
 
 if __name__ == '__main__':

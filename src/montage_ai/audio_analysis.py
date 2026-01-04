@@ -965,6 +965,42 @@ def analyze_audio(audio_path: str, verbose: Optional[bool] = None) -> Tuple[Beat
     return beat_info, energy_profile
 
 
+def remove_filler_words(transcript: dict, fillers: Optional[List[str]] = None) -> List[int]:
+    """
+    Identify indices of filler words in a transcript.
+    
+    Args:
+        transcript: The transcript data structure (from Whisper JSON).
+        fillers: List of words to remove (defaults to common English fillers).
+        
+    Returns:
+        List of indices to mark as deleted.
+    """
+    if fillers is None:
+        fillers = ["um", "uh", "like", "you know", "sort of", "kind of", "hmm", "er"]
+    
+    indices_to_remove = []
+    
+    # Handle different transcript formats (segments vs words)
+    words = []
+    if 'segments' in transcript:
+        for segment in transcript['segments']:
+            if 'words' in segment:
+                words.extend(segment['words'])
+    elif 'words' in transcript:
+        words = transcript['words']
+        
+    for i, word_obj in enumerate(words):
+        # Clean word: remove punctuation, lowercase
+        raw_word = word_obj.get('word', '')
+        text = ''.join(c for c in raw_word if c.isalnum()).lower()
+        
+        if text in fillers:
+            indices_to_remove.append(i)
+            
+    return indices_to_remove
+
+
 # =============================================================================
 # Module Exports
 # =============================================================================
@@ -978,4 +1014,5 @@ __all__ = [
     "analyze_music_energy",
     "get_beat_times",
     "calculate_dynamic_cut_length",
+    "remove_filler_words",
 ]

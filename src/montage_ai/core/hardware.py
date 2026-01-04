@@ -54,7 +54,12 @@ def _has_nvidia() -> bool:
         "/dev/nvhost-nvenc",
         "/proc/driver/nvidia/version",
         "/etc/nv_tegra_release",
+        "/sys/bus/platform/drivers/tegra-fuse",  # Jetson specific
     )
+    # Also check for jtop/jetson_stats
+    if shutil.which("jtop") is not None:
+        return True
+        
     return any(os.path.exists(path) for path in nvidia_paths)
 
 def _has_vaapi() -> bool:

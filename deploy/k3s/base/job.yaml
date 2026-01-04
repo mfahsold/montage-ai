@@ -44,7 +44,7 @@ spec:
       containers:
         - name: montage-ai
           image: ghcr.io/mfahsold/montage-ai:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           args: ["run", "documentary"]
           env:
             - name: USE_GPU
@@ -62,6 +62,8 @@ spec:
             - name: STABILIZE
               value: "false"
             - name: CGPU_ENABLED
+              value: "true"
+            - name: CGPU_GPU_ENABLED
               value: "true"
             - name: CLEAN_AUDIO
               value: "true"
