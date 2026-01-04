@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cgpu-mock
+  namespace: montage-ai
+data:
+  cgpu: |
+    #!/bin/sh
+    if [ "$1" = "status" ]; then
+      echo "Mock cgpu status: OK"
+      exit 0
+    fi
+    echo "Mock cgpu command: $@"
+    exit 0

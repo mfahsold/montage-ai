@@ -24,6 +24,7 @@ from ..core.hardware import get_best_hwaccel
 
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
+from ..logger import logger
 
 # Job phase tracking models
 from .models import JobPhase, PIPELINE_PHASES
@@ -121,9 +122,16 @@ def process_job_from_queue(job_data: dict):
     global active_jobs
     active_jobs += 1
 
+    if job_data.get('type') == 'transcript_render':
+        target = run_transcript_render
+        args = (job_data,)
+    else:
+        target = run_montage
+        args = (job_data['job_id'], job_data['style'], job_data['options'])
+
     thread = threading.Thread(
-        target=run_montage,
-        args=(job_data['job_id'], job_data['style'], job_data['options']),
+        target=target,
+        args=args,
         daemon=False  # Non-daemon to ensure cleanup
     )
     thread.start()
@@ -237,8 +245,8 @@ def normalize_options(data: dict) -> dict:
 
 def run_montage(job_id: str, style: str, options: dict):
     """Run montage creation in background."""
-    global active_jobs
-
+    # active_jobs is incremented in process_job_from_queue, we just decrement in finally
+    
     # Ensure directories exist (lazy initialization)
     _settings.paths.ensure_directories()
 
@@ -391,32 +399,107 @@ def run_montage(job_id: str, style: str, options: dict):
                     }
             else:
                 jobs[job_id]["status"] = "failed"
-                # Read last lines from log file for error message
-                try:
-                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                        f.seek(0, 2)
-                        size = f.tell()
-                        f.seek(max(0, size - 1000))
-                        jobs[job_id]["error"] = f.read()
-                except Exception:
-                    jobs[job_id]["error"] = "Check log file for details"
+                jobs[job_id]["error"] = f"Process failed with code {result.returncode}"
+                announcer.announce(format_sse(json.dumps({
+                    "job_id": job_id,
+                    "status": "failed",
+                    "error": jobs[job_id]["error"]
+                }), event="job_failed"))
 
-    except subprocess.TimeoutExpired:
-        with job_lock:
-            jobs[job_id]["status"] = "timeout"
-            jobs[job_id]["error"] = "Job exceeded 1 hour timeout"
     except Exception as e:
         with job_lock:
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
+            announcer.announce(format_sse(json.dumps({
+                "job_id": job_id,
+                "status": "failed",
+                "error": str(e)
+            }), event="job_failed"))
     finally:
-        active_jobs -= 1
-        # Process next job in queue if available
-        if job_queue:
-            next_job = job_queue.popleft()
-            process_job_from_queue(next_job)
+        _cleanup_job()
 
 
+def _cleanup_job():
+    global active_jobs
+    active_jobs -= 1
+    if job_queue:
+        process_job_from_queue(job_queue.popleft())
+
+
+def run_transcript_render(job_data: dict):
+    """Run transcript-based render job."""
+    job_id = job_data['job_id']
+    
+    try:
+        from ..text_editor import TextEditor
+        
+        # Update status
+        with job_lock:
+            jobs[job_id]["status"] = "processing"
+            jobs[job_id]["phase"] = {"label": "Rendering Preview", "progress_percent": 10}
+            
+        # Initialize Editor
+        editor = TextEditor(job_data['video_path'])
+        editor.load_transcript(job_data['transcript_path'])
+        
+        # Apply Edits
+        removed_indices = [e['index'] for e in job_data['edits'] if e.get('removed')]
+        
+        # Map indices to words (TextEditor needs word objects or indices)
+        # TextEditor.remove_words takes strings, but we have indices.
+        # We need to manually mark words as removed in the editor instance.
+        count = 0
+        current_idx = 0
+        for seg in editor.segments:
+            for word in seg.words:
+                if current_idx in removed_indices:
+                    word.removed = True
+                    count += 1
+                current_idx += 1
+                
+        logger.info(f"Marked {count} words for removal")
+        
+        # Render
+        output_filename = f"preview_{job_id}.mp4"
+        output_path = OUTPUT_DIR / output_filename
+        
+        # Use fast preview settings
+        editor.export(
+            str(output_path),
+            preset="ultrafast",
+            crf=28,
+            audio_crossfade_ms=20
+        )
+        
+        # Success
+        with job_lock:
+            jobs[job_id]["status"] = "completed"
+            jobs[job_id]["output_file"] = output_filename
+            jobs[job_id]["phase"] = {"label": "Completed", "progress_percent": 100}
+            
+            announcer.announce(format_sse(json.dumps({
+                "job_id": job_id,
+                "status": "completed",
+                "output_file": output_filename
+            }), event="job_complete"))
+            
+    except Exception as e:
+        logger.error(f"Transcript render failed: {e}")
+        with job_lock:
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = str(e)
+            announcer.announce(format_sse(json.dumps({
+                "job_id": job_id,
+                "status": "failed",
+                "error": str(e)
+            }), event="job_failed"))
+            
+    finally:
+        _cleanup_job()
+
+
+# =============================================================================
+# ROUTES
 # =============================================================================
 # ROUTES
 # =============================================================================
@@ -568,6 +651,59 @@ def api_get_transcript(filename):
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/transcript/render', methods=['POST'])
+def api_render_transcript_edit():
+    """
+    Render a preview based on transcript edits.
+    
+    Expects JSON:
+    {
+        "filename": "video.mp4",
+        "edits": [
+            {"index": 0, "removed": false},
+            {"index": 1, "removed": true},
+            ...
+        ]
+    }
+    """
+    data = request.json
+    filename = secure_filename(data.get('filename'))
+    edits = data.get('edits', [])
+    
+    if not filename or not edits:
+        return jsonify({"error": "Missing filename or edits"}), 400
+        
+    video_path = INPUT_DIR / filename
+    transcript_path = INPUT_DIR / f"{os.path.splitext(filename)[0]}.json"
+    
+    if not video_path.exists() or not transcript_path.exists():
+        return jsonify({"error": "File not found"}), 404
+
+    # Create job ID
+    job_id = f"transcript_edit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # Queue the job
+    job_data = {
+        "job_id": job_id,
+        "type": "transcript_render",
+        "video_path": str(video_path),
+        "transcript_path": str(transcript_path),
+        "edits": edits,
+        "status": "queued",
+        "progress": 0
+    }
+    
+    with job_lock:
+        jobs[job_id] = job_data
+        job_queue.append(job_data)
+        
+    # Start processing if slot available
+    if active_jobs < MAX_CONCURRENT_JOBS:
+        process_job_from_queue(job_queue.popleft())
+        
+    return jsonify({"job_id": job_id, "status": "queued"})
 
 
 @app.route('/api/video/<filename>', methods=['GET'])
@@ -1132,10 +1268,7 @@ TRANSCRIPT_UPLOAD_DIR = Path(os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_tran
 TRANSCRIPT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-@app.route('/transcript')
-def transcript_editor():
-    """Render transcript-based text editor UI."""
-    return render_template('transcript.html')
+
 
 
 @app.route('/api/transcript/upload', methods=['POST'])
@@ -1163,6 +1296,9 @@ def api_transcript_upload():
         "path": str(filepath),
         "filename": unique_filename
     })
+
+
+
 
 
 @app.route('/api/transcript/video/<filename>')

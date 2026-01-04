@@ -249,6 +249,68 @@
             // Call API to start transcription job
             alert('Transcription job started (mock)');
         }
+
+        document.getElementById('saveEditsBtn').addEventListener('click', () => {
+            // In a real app, this would save to a JSON file or DB
+            alert('Edits saved locally (in memory). Ready to preview.');
+        });
+
+        document.getElementById('previewBtn').addEventListener('click', () => {
+            const filename = document.getElementById('fileSelect').value;
+            if (!filename) return alert('Please select a video first');
+
+            const edits = [];
+            const words = transcriptContainer.children;
+            for (let i = 0; i < words.length; i++) {
+                edits.push({
+                    index: parseInt(words[i].dataset.index),
+                    removed: words[i].classList.contains('deleted')
+                });
+            }
+
+            const btn = document.getElementById('previewBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+
+            fetch('/api/transcript/render', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, edits })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                pollJob(data.job_id);
+            })
+            .catch(err => {
+                alert('Error: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = 'Generate Preview';
+            });
+        });
+
+        function pollJob(jobId) {
+            const interval = setInterval(() => {
+                fetch(`/api/jobs/${jobId}`)
+                    .then(r => r.json())
+                    .then(job => {
+                        if (job.status === 'completed') {
+                            clearInterval(interval);
+                            document.getElementById('previewBtn').disabled = false;
+                            document.getElementById('previewBtn').textContent = 'Generate Preview';
+                            
+                            // Play result
+                            videoPlayer.src = `/api/download/${job.output_file}`;
+                            videoPlayer.play();
+                        } else if (job.status === 'failed') {
+                            clearInterval(interval);
+                            alert('Render failed: ' + job.error);
+                            document.getElementById('previewBtn').disabled = false;
+                            document.getElementById('previewBtn').textContent = 'Generate Preview';
+                        }
+                    });
+            }, 1000);
+        }
     </script>
 </body>
 </html>

@@ -24,73 +24,63 @@ def run_kubectl(args, check=True, capture_output=True):
     return result.stdout.strip()
 
 def find_helper_pod():
-    """Find a pod that mounts the output PVC."""
-    # First try data-helper
-    try:
-        pod = run_kubectl(["get", "pod", "data-helper", "-o", "jsonpath={.metadata.name}"], check=False)
-        if pod:
-            return pod
-    except:
-        pass
+    """Find a pod that mounts the output PVC, or create one."""
+    pod_name = "data-helper"
     
-    # Fallback to any pod with the mount
-    # This is a simplification; in a real scenario we'd query pods with the PVC mounted
-    return "data-helper"
+    # Check if exists
+    try:
+        run_kubectl(["get", "pod", pod_name], check=True, capture_output=True)
+        # Check if ready
+        run_kubectl(["wait", "--for=condition=Ready", "pod/" + pod_name, "--timeout=5s"], check=True)
+        return pod_name
+    except subprocess.CalledProcessError:
+        pass
+
+    print(f"🚀 Creating {pod_name} pod...")
+    # Create the pod
+    manifest = {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {"name": pod_name, "namespace": NAMESPACE},
+        "spec": {
+            "containers": [{
+                "name": "helper",
+                "image": "busybox",
+                "command": ["sleep", "infinity"],
+                "volumeMounts": [{"name": "out", "mountPath": REMOTE_OUTPUT_DIR}]
+            }],
+            "volumes": [{"name": "out", "persistentVolumeClaim": {"claimName": "montage-ai-output-nfs"}}],
+            "restartPolicy": "Never"
+        }
+    }
+    
+    # Apply manifest via stdin
+    subprocess.run(["kubectl", "apply", "-f", "-"], input=json.dumps(manifest), text=True, check=True, capture_output=True)
+    
+    print("⏳ Waiting for pod to be ready...")
+    run_kubectl(["wait", "--for=condition=Ready", "pod/" + pod_name, "--timeout=60s"])
+    return pod_name
 
 def list_remote_files(pod_name):
     """List files in the remote output directory."""
-    # Use ls -lt to sort by time (newest first)
-    # Alpine/Busybox supports --full-time but not --time-style
+    # Use ls -1tF to get filenames sorted by time, with type indicators
     try:
-        output = run_kubectl(["exec", pod_name, "--", "ls", "-lt", "--full-time", REMOTE_OUTPUT_DIR])
+        output = run_kubectl(["exec", pod_name, "--", "ls", "-1tF", REMOTE_OUTPUT_DIR])
     except subprocess.CalledProcessError:
-        # Fallback to simple ls -lt if --full-time fails
-        output = run_kubectl(["exec", pod_name, "--", "ls", "-lt", REMOTE_OUTPUT_DIR])
+        print("⚠️  Failed to list remote files.")
+        return []
 
     files = []
-    for line in output.splitlines()[1:]: # Skip total line
-        parts = line.split()
-        if len(parts) < 8:
+    for line in output.splitlines():
+        name = line.strip()
+        if not name:
             continue
-        
-        # Busybox ls -lt --full-time output:
-        # -rw-r--r--    1 root     root      31069405 2026-01-03 17:31:41.000000000 +0000 filename
-        # Standard ls -lt output:
-        # -rw-r--r--    1 root     root      31069405 Jan  3 17:31 filename
-        
-        is_dir = parts[0].startswith('d')
-        try:
-            size = int(parts[4])
-        except ValueError:
-            continue # Skip if size is not an int
             
-        # Name is usually the last part, but spaces in filenames make it tricky.
-        # We need to find where the date ends.
-        # Heuristic: find the first part after size that looks like a date/time or month
-        
-        # Simple approach: assume name starts after the time column
-        # In full-time: 5=date, 6=time, 7=timezone, 8+=name
-        # In standard: 5=Month, 6=Day, 7=Time/Year, 8+=name
-        
-        name_start_idx = 8
-        if "full-time" not in output and len(parts) >= 8:
-             # Standard ls output usually has 8 columns before name if we count month/day/time separately
-             # -rw-r--r-- 1 user group size Mon Day Time Name
-             pass
-             
-        name = " ".join(parts[name_start_idx:])
-        
-        # Fix for standard ls where it might be fewer columns if group is missing or whatever
-        # Let's just take the last part if it doesn't have spaces, or join from index 8
-        # Actually, let's just look for the known extensions or _PROJECT suffix
-        
-        # Better parsing:
-        # The filename is everything after the date/time.
-        # If we use --full-time, we have a strict format.
+        is_dir = name.endswith('/')
+        clean_name = name.rstrip('/')
         
         files.append({
-            "name": name,
-            "size": size,
+            "name": clean_name,
             "is_dir": is_dir
         })
     return files
@@ -202,31 +192,28 @@ def main():
         print(f"📦 Found project: {latest_project['name']}")
         local_proj = LOCAL_OUTPUT_DIR / latest_project['name']
         if not local_proj.exists():
-            copy_directory(pod_name, f"{REMOTE_OUTPUT_DIR}/{latest_project['name']}", local_proj)
+            if copy_directory(pod_name, f"{REMOTE_OUTPUT_DIR}/{latest_project['name']}", local_proj):
+                if local_proj.exists() and any(local_proj.iterdir()):
+                    print("✅ Project folder verification successful!")
+                else:
+                    print("❌ Project folder verification failed (empty or missing)!")
         else:
             print("   (Already exists locally)")
+    else:
+        print("⚠️  No project folder found for the latest run.")
             
     if latest_video:
-        print(f"🎬 Found video: {latest_video['name']} ({latest_video['size'] / 1024 / 1024:.2f} MB)")
+        print(f"🎬 Found video: {latest_video['name']}")
         local_vid = LOCAL_OUTPUT_DIR / latest_video['name']
         
-        should_copy = True
-        if local_vid.exists():
-            local_size = local_vid.stat().st_size
-            if local_size == latest_video['size']:
-                print("   (Already exists locally and size matches)")
-                should_copy = False
-            else:
-                print(f"   (Local size mismatch: {local_size} vs {latest_video['size']})")
-        
-        if should_copy:
+        if not local_vid.exists():
             copy_file(pod_name, f"{REMOTE_OUTPUT_DIR}/{latest_video['name']}", local_vid)
-            
-            # Verify
-            if local_vid.exists() and local_vid.stat().st_size == latest_video['size']:
+            if local_vid.exists():
                 print("✅ Verification successful!")
             else:
                 print("❌ Verification failed!")
+        else:
+            print("   (Already exists locally)")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,100 @@
+🎬 Montage AI
+   Style: documentary
+   Preset: slow
+   Stabilize: true
+   Shorts Mode: false
+   Export Timeline: false
+   cgpu LLM: false
+   cgpu GPU: false
+   Story Engine: true
+   Strict Cloud: false
+
+cgpu serve already running (PID: 116982)
+time="2026-01-04T12:07:39+01:00" level=warning msg="Found orphan containers ([montage-ai-web-ui-1]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up."
+💻 CPU Encoding: libx264
+/opt/conda/lib/python3.10/runpy.py:126: RuntimeWarning: 'montage_ai.editor' found in sys.modules after import of package 'montage_ai', but prior to execution of 'montage_ai.editor'; this may result in unpredictable behaviour
+  warn(RuntimeWarning(msg))
+💻 CPU Encoding: libx264
+[monitor] tee logging enabled → /data/output/render.log
+
+======================================================================
+🎬 FLUXIBRI VIDEO EDITOR - LIVE MONITOR
+======================================================================
+   Job ID:     20260104_110740
+   Started:    2026-01-04 11:07:53
+   PID:        1
+   Verbose:    True
+======================================================================
+
+[monitor] mem: rss=253.9Mi vms=1318.6Mi sys_used=10103.6Mi sys_free=5654.2Mi sys_pct=64.1%
+
+────────────────────────────────────────────────────────────
+📍 PHASE: INITIALIZATION
+────────────────────────────────────────────────────────────
+
+============================================================
+🎬 Montage AI v0.2.0
+============================================================
+
+📊 SYSTEM CONFIGURATION:
+   CPU Cores:        4
+   Parallel Jobs:    2
+   FFmpeg Preset:    slow
+   FFmpeg Threads:   0
+   Variants:         1
+   🎮 GPU Encoder:   None (using libx264)
+
+📊 ENHANCEMENT SETTINGS (from config):
+   STABILIZE:        True
+   UPSCALE:          True
+   ENHANCE:          True
+   PARALLEL_ENHANCE: True
+
+
+🎯 Creative Prompt: 'documentary'
+Creative Director using cgpu/Gemini at http://host.docker.internal:8090
+Creative Director analyzing: 'documentary'
+Detected style template: documentary
+   ✅ Style Applied: documentary
+
+📋 STYLE TEMPLATE DETAILS:
+   Style Name:       documentary
+   Description:      N/A...
+   Pacing Speed:     slow
+   Cut Duration:     N/A-N/As
+   Beat Sync:        N/A
+   Transition Style: ['N/A']
+   Template Effects:
+      - Stabilization: True
+      - Upscale:       N/A
+      - Sharpness:     False
+      - Contrast:      N/A
+      - Color Grade:   N/A
+============================================================
+
+
+   ✓ Phase 'initialization' completed in 1.9s
+      • style: documentary
+
+────────────────────────────────────────────────────────────
+📍 PHASE: VARIANT_1
+────────────────────────────────────────────────────────────
+
+🎬 Starting Montage Variant #1
+   📁 Setting up workspace...
+   🖥️ Resources: cpu:4
+Creative Director using cgpu/Gemini at http://host.docker.internal:8090
+Intelligent Clip Selector enabled (LLM-powered)
+   🧠 Intelligent Clip Selector initialized (style=dynamic)
+   🚀 Initialized parallel processor with 2 workers
+   🎨 Effects: STABILIZE=True, UPSCALE=True, ENHANCE=True
+
+   🎵 Analyzing assets...
+   📖 Story Engine: Checking for missing analysis...
+   ⚠️ Missing analysis for 11 clips.
+[monitor] mem: rss=256.4Mi vms=1320.6Mi sys_used=10007.8Mi sys_free=5749.9Mi sys_pct=63.5%
+11:07:59 [WARN]    ⚠️ Story Engine requires cgpu for tension analysis but cgpu is not available. Proceeding with dummy tension values.
+   🚀 Parallel scene detection (11 videos, 2 workers)
+Detecting scenes in FD 19 Earth~medium.mp4...
+Detecting scenes in FD_19_Earthmedium.mp4...
+

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: verify-output
+  namespace: montage-ai
+spec:
+  containers:
+  - name: verify
+    image: busybox
+    command: ["ls", "-lh", "/data/output/"]
+    volumeMounts:
+    - name: output
+      mountPath: /data/output
+  volumes:
+  - name: output
+    persistentVolumeClaim:
+      claimName: montage-ai-output-nfs
+  restartPolicy: Never
