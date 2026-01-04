@@ -1,0 +1,259 @@
+# Montage AI: Competitive Analysis & Market Positioning
+## Strategic Assessment Q1 2026
+
+**Last Updated:** January 4, 2026  
+**Audience:** Product teams, investors, technical partners  
+**Status:** Public Strategy Document
+
+---
+
+## Executive Summary
+
+Montage AI occupies a **unique niche** in the video editing landscape by being the only **open-source, local-first AI rough-cut tool** with professional handoff capabilities. While competitors like **Descript, Adobe Firefly, and Opus Clip** dominate their respective markets, Montage AI differentiates through:
+
+1. **Privacy-First Architecture** — No cloud upload of raw footage (optional)
+2. **Pro-Grade Export** — OTIO/EDL for NLE finishing (DaVinci, Premiere, FCP)
+3. **Text-Based Editing** — Descript-style workflows without the subscription lock
+4. **Open Source** — Full control, extensibility, no vendor lock-in
+5. **Shorts-Native** — Vertical video as first-class citizen, not afterthought
+
+**Market Gap:** A professional tool for creators and editorial teams who want *speed* (AI rough cut) + *control* (local processing) + *interop* (professional handoff).
+
+---
+
+## Competitive Landscape
+
+### 1. **Descript** (Direct Competitor)
+| Dimension | Descript | Montage AI | Winner |
+|-----------|----------|-----------|--------|
+| **Price** | $12-30/mo | Free (OSS) | 🟢 Montage |
+| **Text Editing** | ✅ Yes | ✅ Yes (prototype) | 🟡 Tie |
+| **Local Processing** | ❌ Cloud-only | ✅ Yes | 🟢 Montage |
+| **NLE Handoff** | ⚠️ Exports MP4 | ✅ OTIO/EDL | 🟢 Montage |
+| **Shorts/Vertical** | ❌ Not native | ✅ Dedicated UI | 🟢 Montage |
+| **UI Polish** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔴 Descript |
+| **Podcast Support** | ✅ Yes | ⚠️ Audio focus coming | 🟡 Descript |
+
+**Verdict:** Montage AI can capture *cost-conscious* and *privacy-first* users, plus professionals who need OTIO export. Descript dominates in UX maturity and podcaster workflows.
+
+---
+
+### 2. **Adobe Firefly / Premiere Assist** (Market Leader)
+| Dimension | Adobe | Montage AI | Winner |
+|-----------|-------|-----------|--------|
+| **Ecosystem** | ✅ Full Creative Cloud integration | ❌ Standalone | 🔴 Adobe |
+| **Quality** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 🔴 Adobe |
+| **Cost** | $54/mo+ | Free | 🟢 Montage |
+| **Learning Curve** | High (Premiere required) | Low (web UI) | 🟢 Montage |
+| **AI Training Data** | Proprietary models | Open (Llama, OSS) | 🟡 Adobe (better) |
+| **Generative Capability** | ✅ Yes | ❌ No | 🔴 Adobe |
+| **Privacy** | ❌ Cloud processing | ✅ Local-first | 🟢 Montage |
+
+**Verdict:** Adobe dominates enterprise and content studios. Montage AI wins with **indie creators** and **privacy-conscious** professionals. No overlap in "generative" use cases (intentional).
+
+---
+
+### 3. **Opus Clip** (Vertical/Social Specialist)
+| Dimension | Opus Clip | Montage AI | Winner |
+|-----------|-----------|-----------|--------|
+| **Shorts Specialization** | ✅ Excellent | ✅ Excellent | 🟡 Tie |
+| **Smart Reframe** | ✅ AI-driven | ✅ MediaPipe-based | 🟡 Tie |
+| **Pricing** | $30-100/mo | Free | 🟢 Montage |
+| **Local Processing** | ❌ Cloud-only | ✅ Yes | 🟢 Montage |
+| **Caption Styles** | Limited | Native support | 🟢 Montage |
+| **Standalone** | ⚠️ Requires Opus Clip Pro | ✅ Yes | 🟢 Montage |
+
+**Verdict:** Montage AI is **Opus Clip for budget-conscious creators** + professional editors. Opus retains advantage in AI sophistication and brand recognition.
+
+---
+
+### 4. **Auto-Editor / Frame.io / Runway** (Partial Competitors)
+| Tool | Niche | vs. Montage |
+|------|-------|-----------|
+| **auto-editor** | Silence removal only | Montage is broader |
+| **Frame.io** | Review/collab (post-production) | Different use case |
+| **Runway** | Generative video + removal | Montage is "polish only" |
+
+---
+
+## Market Positioning: "The Open-Source Alternative"
+
+### Montage AI's Unique Selling Propositions (USPs)
+
+1. **Privacy by Default**
+   - All processing happens locally
+   - Zero telemetry without explicit opt-in
+   - GDPR/HIPAA-friendly (no footage upload)
+
+2. **Pro-Grade Interoperability**
+   - OTIO export → DaVinci Resolve, Premiere Pro, Final Cut Pro
+   - EDL export for legacy NLEs
+   - Automatic proxy generation
+
+3. **Text-Based Editing Without Lock-In**
+   - Edit via transcript, not timeline
+   - No subscription required
+   - Export finished OTIO for Descript-style workflows
+
+4. **Vertical-Video Native**
+   - Shorts Studio 2.0 with safe zones + caption styles
+   - Not an afterthought, core workflow
+
+5. **Open Source = Trust + Extensibility**
+   - Audit-friendly for enterprises
+   - Community contributions (AI models, styles, codecs)
+   - No corporate pivot risk
+
+---
+
+## Implementation Maturity Assessment
+
+### Fully Production-Ready ✅
+
+| Component | Status | Evidence |
+|-----------|--------|----------|
+| **Beat Detection & Sync** | ✅ Prod | librosa/FFT + testing |
+| **Quality Profiles** | ✅ Prod | Preview, Standard, High, Master |
+| **GPU Auto-Detection** | ✅ Prod | hwaccel auto-selection |
+| **Shorts Reframing** | ✅ Prod | MediaPipe + smoothing |
+| **Style Templates** | ✅ Prod | 8 curated styles |
+| **Audio Analysis** | ✅ Prod | Energy + filler detection |
+| **SSE Streaming** | ✅ Prod | Real-time progress |
+| **Docker + K3s** | ✅ Prod | Verified deployment |
+
+### Beta / Near-Ready ⚠️
+
+| Component | Status | Target | Work Needed |
+|-----------|--------|--------|-------------|
+| **Transcript Editor** | ⚠️ Beta | Q1 2026 | Live preview, word-level cuts |
+| **OTIO Export** | ⚠️ MVP | Q1 2026 | Verify in DaVinci/Premiere |
+| **Caption Styles** | ⚠️ Partial | Q1 2026 | Karaoke, TikTok presets |
+| **Voice Isolation** | ⚠️ MVP | Q1 2026 | Real-time denoise + SNR check |
+
+### Research / Conceptual 🔴
+
+| Component | Status | Priority |
+|-----------|--------|----------|
+| **LLM Clip Selection** | 🔴 Prototype | Medium (post-Q1) |
+| **Story Engine** | 🔴 Prototype | Low (advanced feature) |
+| **Multi-Track Compositing** | 🔴 Out-of-scope | N/A (not an NLE) |
+| **Generative Backgrounds** | 🔴 Out-of-scope | N/A (by design) |
+
+---
+
+## Business Model & Sustainability
+
+### Current Model
+- **Open Source (PolyForm NC)** — Free for individuals, requires license for commercial use
+- **No SaaS** — Avoid vendor lock-in
+- **Community-Driven** — GitHub sponsorships, donations
+
+### Potential Revenue Streams (Post-Q1)
+1. **Enterprise License** (per-user/annual) — For studios, agencies
+2. **Cloud Acceleration Service** — Optional GPU upscaling (Replicate/CGPU)
+3. **Hosted SaaS** (Optional) — For teams that want managed infrastructure
+4. **Premium Styles Pack** — Community-curated style templates
+5. **Professional Support** — Training, custom workflows, integrations
+
+### Why This Works
+- **Low COGS** — Mostly open-source dependencies + community contributions
+- **Defensible Market** — Privacy + interop = hard to copy
+- **Sticky User Base** — OTIO export locks users into professional workflows
+- **Credibility** — Open source builds trust with enterprise buyers
+
+---
+
+## Risk Analysis & Mitigation
+
+### Risk: AI Model Commoditization
+**Threat:** Larger companies (Google, Adobe) release better free models  
+**Mitigation:** 
+- Focus on *integration* (beat sync, reframe, handoff) not models
+- Contribute to open-source models (Llama, Whisper)
+- Emphasize *control* + *privacy* as non-commoditizable
+
+### Risk: Feature Parity Trap
+**Threat:** Descript/Opus adds features faster  
+**Mitigation:**
+- Deep-dive 3 workflows (Transcript, Shorts, Handoff)
+- "Polish, not generate" prevents feature creep
+- Quality over breadth
+
+### Risk: Community Fatigue
+**Threat:** Open-source projects become unmaintained  
+**Mitigation:**
+- Clear roadmap (published quarterly)
+- Responsive issue triage
+- Regular blog updates + live demos
+- Early revenue to fund core maintainers
+
+### Risk: Licensing Confusion
+**Threat:** PolyForm NC is less recognized than MIT/Apache  
+**Mitigation:**
+- Clear FAQ on what "commercial" means
+- Tiered licensing (individual/team/enterprise)
+- Easy license purchase flow
+
+---
+
+## Strategic Recommendations (2026)
+
+### Q1 Priorities (MUST DO)
+1. ✅ **Transcript Editor Launch** — Descript parity (first feature users understand)
+2. ✅ **Shorts Studio 2.0** — Caption styles + highlight detection
+3. ✅ **Pro Handoff Beta** — OTIO verified in target NLEs
+4. ✅ **RQ Infrastructure** — Production-grade job queue (already done ✅)
+
+### Q2 Opportunties (SHOULD DO)
+5. Voice Isolation + denoise (audio polish)
+6. Enterprise licensing framework
+7. Hosted demo + case studies
+8. Community styles marketplace
+
+### Q3+ Vision (NICE TO HAVE)
+9. LLM Clip Selection (advanced AI)
+10. Story Engine (narrative arc optimization)
+11. Professional support packages
+12. Expand to podcast editing (Descript alternative)
+
+---
+
+## GitHub Pages & Marketing Update
+
+### Current State ⚠️
+- **index.html** has good design but lacks competitive context
+- **README.md** is feature-focused, not market-positioned
+- **STRATEGY.md** exists but not linked from main landing
+- No comparison table vs competitors
+- No clear "Why Montage AI?" narrative for different audiences
+
+### Recommended Changes 🎯
+1. Add "Why Montage AI?" section with 3 audience personas
+2. Create competitive comparison table (transparent, honest)
+3. Link to this strategic analysis on main site
+4. Add "For Professionals" landing page (OTIO handoff focus)
+5. Case studies section (before/after rough cuts)
+6. "Q1 2026 Roadmap" callout box
+7. Legal/licensing clarity (PolyForm NC explainer)
+
+---
+
+## Conclusion
+
+**Montage AI is not a Descript clone, Adobe competitor, or Opus replacement.** It's the open-source tool for creators and professionals who prioritize **privacy**, **control**, and **professional interoperability** over a polished SaaS interface.
+
+**Our competitive advantage:**
+- ✅ Free (OSS)
+- ✅ Local-first (privacy)
+- ✅ Pro handoff (OTIO)
+- ✅ Shorts-native
+- ⚠️ Immature UI (opportunity to grow)
+- ⚠️ Smaller team (agility advantage)
+
+**Next 12 months:** Establish Montage AI as the standard for **AI rough cuts with professional handoff**, trusted by editorial teams and privacy-conscious creators worldwide.
+
+---
+
+**Document Owner:** Product Team  
+**Review Cycle:** Quarterly  
+**Next Update:** April 2026

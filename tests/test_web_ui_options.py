@@ -5,7 +5,7 @@ Tests for Web UI Options Normalization and Queue Logic
 import pytest
 import json
 from unittest.mock import patch, MagicMock
-from src.montage_ai.web_ui.app import normalize_options, app, job_queue, jobs, active_jobs
+from src.montage_ai.web_ui.app import normalize_options, app
 
 # =============================================================================
 # normalize_options Tests
@@ -108,66 +108,43 @@ def client():
     with app.test_client() as client:
         yield client
 
-@patch('src.montage_ai.web_ui.app.MAX_CONCURRENT_JOBS', 1)
-@patch('src.montage_ai.web_ui.app.run_montage')
-def test_queue_overflow(mock_run_montage, client):
-    """Test that jobs are queued when MAX_CONCURRENT_JOBS is reached."""
-    # Reset global state
-    import src.montage_ai.web_ui.app as app_module
-    app_module.active_jobs = 0
-    app_module.job_queue.clear()
-    app_module.jobs.clear()
+@patch('src.montage_ai.web_ui.app.q')
+@patch('src.montage_ai.web_ui.app.job_store')
+def test_job_submission_queues_job(mock_job_store, mock_q, client):
+    """Test that submitting a job adds it to the store and the queue."""
+    # Setup
+    mock_job_store.create_job.return_value = None
+    mock_q.enqueue.return_value = None
     
-    # 1. Submit first job (should run)
-    res1 = client.post('/api/jobs', json={'style': 'test', 'options': {}})
-    assert res1.status_code == 200
-    assert app_module.active_jobs == 1
-    assert len(app_module.job_queue) == 0
-    assert mock_run_montage.call_count == 1
+    # Action
+    res = client.post('/api/jobs', json={'style': 'test', 'options': {}})
     
-    # 2. Submit second job (should queue because MAX=1)
-    res2 = client.post('/api/jobs', json={'style': 'test', 'options': {}})
-    assert res2.status_code == 200
-    assert app_module.active_jobs == 1  # Still 1 running
-    assert len(app_module.job_queue) == 1
-    assert mock_run_montage.call_count == 1  # Still only called once
+    # Assert
+    assert res.status_code == 200
+    assert mock_job_store.create_job.called
+    assert mock_q.enqueue.called
     
-    job2_id = res2.json['id']
-    assert app_module.jobs[job2_id]['status'] == 'queued'
+    # Verify arguments
+    args, _ = mock_job_store.create_job.call_args
+    job_id = args[0]
+    job_data = args[1]
+    assert job_data['status'] == 'queued'
+    assert job_data['style'] == 'test'
 
-@patch('src.montage_ai.web_ui.app.MAX_CONCURRENT_JOBS', 1)
-@patch('src.montage_ai.web_ui.app.run_montage')
-def test_queue_processing(mock_run_montage, client):
-    """Test that queued jobs are processed when active jobs finish."""
-    # Reset global state
-    import src.montage_ai.web_ui.app as app_module
-    app_module.active_jobs = 0
-    app_module.job_queue.clear()
-    app_module.jobs.clear()
+@patch('src.montage_ai.web_ui.app.q')
+@patch('src.montage_ai.web_ui.app.job_store')
+def test_multiple_job_submission(mock_job_store, mock_q, client):
+    """Test that multiple jobs can be submitted without blocking."""
+    # Setup
+    mock_job_store.create_job.return_value = None
+    mock_q.enqueue.return_value = None
     
-    # Fill the queue
-    client.post('/api/jobs', json={'style': 'job1'}) # Runs
-    client.post('/api/jobs', json={'style': 'job2'}) # Queues
+    # Action
+    res1 = client.post('/api/jobs', json={'style': 'job1'})
+    res2 = client.post('/api/jobs', json={'style': 'job2'})
     
-    assert app_module.active_jobs == 1
-    assert len(app_module.job_queue) == 1
-    
-    # Simulate job completion
-    # We need to manually trigger what happens in 'finally' block of run_montage
-    # Since we mocked run_montage, it didn't actually run or finish.
-    # We can simulate the cleanup logic:
-    
-    # Decrement active jobs
-    app_module.active_jobs -= 1
-    
-    # Process next job
-    if app_module.job_queue:
-        next_job = app_module.job_queue.popleft()
-        # In app.py, process_job_from_queue calls run_montage in a thread
-        # We'll just call the mock directly to verify logic
-        app_module.active_jobs += 1
-        mock_run_montage(next_job['job_id'], next_job['style'], next_job['options'])
-        
-    assert app_module.active_jobs == 1
-    assert len(app_module.job_queue) == 0
-    assert mock_run_montage.call_count == 2 # Called for job1 and job2
+    # Assert
+    assert res1.status_code == 200
+    assert res2.status_code == 200
+    assert mock_job_store.create_job.call_count == 2
+    assert mock_q.enqueue.call_count == 2

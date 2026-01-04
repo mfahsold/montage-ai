@@ -498,7 +498,128 @@ footer {
     color: var(--primary);
 }
 
+/* Feature Showcase */
+.feature-showcase {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+}
+
+.showcase-item {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+.showcase-item:nth-child(even) {
+    grid-template-columns: 1.5fr 1fr;
+}
+
+.showcase-item:nth-child(even) .showcase-visual {
+    order: 2;
+}
+
+.showcase-visual {
+    position: relative;
+}
+
+.ascii-demo {
+    background: var(--bg);
+    border: 2px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    overflow-x: auto;
+    color: var(--fg);
+}
+
+.showcase-content {
+    position: relative;
+}
+
+.feature-number {
+    position: absolute;
+    top: -0.5rem;
+    left: -0.5rem;
+    background: var(--primary);
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 900;
+    width: 3rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 3px solid var(--card-bg);
+    box-shadow: 0 4px 12px rgba(13,148,136,0.3);
+}
+
+.showcase-content h3 {
+    font-size: 1.1rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.feature-highlight {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--primary-strong);
+    margin-bottom: 0.75rem;
+    font-family: var(--font-display);
+}
+
+.feature-specs {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 1rem;
+}
+
+.feature-specs li {
+    font-size: 0.85rem;
+    padding: 0.4rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+.feature-specs li:before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+    font-weight: bold;
+}
+
+.feature-specs strong {
+    color: var(--primary-strong);
+}
+
 /* Responsive */
+@media (max-width: 768px) {
+    .showcase-item,
+    .showcase-item:nth-child(even) {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .showcase-item:nth-child(even) .showcase-visual {
+        order: 1;
+    }
+    
+    .feature-number {
+        font-size: 1.2rem;
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+    
+    .ascii-demo {
+        font-size: 0.6rem;
+    }
+}
+
 @media (max-width: 640px) {
     .header-actions { width: 100%; justify-content: space-between; }
     .hero-stats { justify-content: space-around; }

@@ -54,33 +54,221 @@
             </div>
         </section>
 
-        <!-- What's New -->
+        <!-- Top 5 Features -->
         <section class="voxel-card">
-            <h2>// FEATURES</h2>
+            <h2>// TOP 5 FEATURES</h2>
+            <p class="section-desc">The tools that make Montage AI different.</p>
+            
+            <div class="feature-showcase">
+                <!-- Feature 1: Beat Sync -->
+                <div class="showcase-item">
+                    <div class="showcase-visual">
+                        <pre class="ascii-demo">
+┌─────────────────────────────┐
+│ 🎵 BEAT DETECTION           │
+├─────────────────────────────┤
+│                             │
+│  Audio Waveform:            │
+│  ▂▃▅▇█▇▅▃▂  ▂▃▅▇█▇▅▃▂      │
+│    ↓  ↓  ↓    ↓  ↓  ↓       │
+│  [Cut][Cut][Cut] ...        │
+│                             │
+│  Tempo: 128 BPM             │
+│  Cuts aligned: 24/24 ✓      │
+└─────────────────────────────┘
+                        </pre>
+                    </div>
+                    <div class="showcase-content">
+                        <span class="feature-number">01</span>
+                        <h3>🎵 BEAT-SYNCED EDITING</h3>
+                        <p class="feature-highlight">Your cuts, perfectly on beat. Every time.</p>
+                        <p>Montage AI analyzes your music track and automatically places cuts at the perfect moments—no manual markers, no guesswork. Works with any genre: EDM, hip-hop, orchestral, or indie.</p>
+                        <ul class="feature-specs">
+                            <li><strong>3-stage detection</strong> — Global tempo → Local onsets → Adaptive thresholds</li>
+                            <li><strong>Genre-aware</strong> — Handles tempo changes and complex rhythms</li>
+                            <li><strong>30-second analysis</strong> — Fast enough for real-time iteration</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Feature 2: Professional Handoff -->
+                <div class="showcase-item">
+                    <div class="showcase-visual">
+                        <pre class="ascii-demo">
+┌─────────────────────────────┐
+│ 📁 EXPORT OPTIONS           │
+├─────────────────────────────┤
+│                             │
+│  ✓ montage.mp4 (1080p)      │
+│  ✓ montage.otio             │
+│  ✓ montage_edl.edl          │
+│                             │
+│  Compatible with:           │
+│  • DaVinci Resolve          │
+│  • Adobe Premiere Pro       │
+│  • Final Cut Pro            │
+│                             │
+└─────────────────────────────┘
+                        </pre>
+                    </div>
+                    <div class="showcase-content">
+                        <span class="feature-number">02</span>
+                        <h3>🎚️ PROFESSIONAL HANDOFF (OTIO)</h3>
+                        <p class="feature-highlight">Rough cut in Montage. Final polish in your NLE.</p>
+                        <p>Export your timeline as <strong>OpenTimelineIO (OTIO)</strong> or EDL format. Open it in DaVinci Resolve, Premiere Pro, or Final Cut Pro with all cuts, clips, and timing preserved. No re-editing from scratch.</p>
+                        <ul class="feature-specs">
+                            <li><strong>OTIO-native</strong> — Industry standard for timeline interchange</li>
+                            <li><strong>Frame-accurate</strong> — Preserves exact in/out points and transitions</li>
+                            <li><strong>No lock-in</strong> — Your timeline, your choice of NLE</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Feature 3: Quality Profiles -->
+                <div class="showcase-item">
+                    <div class="showcase-visual">
+                        <pre class="ascii-demo">
+┌─────────────────────────────┐
+│ 🎬 QUALITY SELECTOR         │
+├─────────────────────────────┤
+│                             │
+│  ○ Preview (360p, ~30s)     │
+│  ○ Standard (1080p, ~2m)    │
+│  ● High (1080p+, ~5m) ←     │
+│  ○ Master (4K, ~15m)        │
+│                             │
+│  Enhancements:              │
+│  ✓ Stabilization            │
+│  ✓ Color Grading            │
+│  ⧗ AI Upscaling             │
+│                             │
+└─────────────────────────────┘
+                        </pre>
+                    </div>
+                    <div class="showcase-content">
+                        <span class="feature-number">03</span>
+                        <h3>✨ QUALITY PROFILES</h3>
+                        <p class="feature-highlight">Pick your outcome, not technical settings.</p>
+                        <p>Forget CRF values, bitrates, and codec options. Choose <strong>Preview</strong> for fast drafts, <strong>Standard</strong> for social media, <strong>High</strong> for professional work, or <strong>Master</strong> for maximum quality. One selection automatically configures resolution, enhancements, and render time.</p>
+                        <ul class="feature-specs">
+                            <li><strong>Progressive enhancement</strong> — Higher profiles add stabilization, grading, upscaling</li>
+                            <li><strong>Hardware-aware</strong> — Auto-detects NVIDIA/Apple/Intel encoders</li>
+                            <li><strong>Transparent timing</strong> — Estimated render time before you start</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Feature 4: Shorts Studio -->
+                <div class="showcase-item">
+                    <div class="showcase-visual">
+                        <pre class="ascii-demo">
+┌─────────────────────────────┐
+│ 📱 SHORTS STUDIO            │
+├─────────────────────────────┤
+│                             │
+│  16:9 → 9:16 Reframe        │
+│  ┌─────────┐               │
+│  │    😊   │  Auto-crop    │
+│  │   👔    │  w/ tracking  │
+│  │         │               │
+│  └─────────┘               │
+│                             │
+│  + Captions (Karaoke)       │
+│  + Safe zones               │
+│  + Viral templates          │
+│                             │
+└─────────────────────────────┘
+                        </pre>
+                    </div>
+                    <div class="showcase-content">
+                        <span class="feature-number">04</span>
+                        <h3>📱 SHORTS STUDIO</h3>
+                        <p class="feature-highlight">Horizontal to vertical. Automatically.</p>
+                        <p>Convert 16:9 footage to 9:16 (TikTok, Reels, Shorts) with intelligent face detection and subject tracking. Add captions in viral styles (Karaoke, Bold, etc.), respect safe zones, and export ready-to-post clips in one pass.</p>
+                        <ul class="feature-specs">
+                            <li><strong>MediaPipe tracking</strong> — Real-time face detection with smoothing</li>
+                            <li><strong>Caption styles</strong> — Karaoke, TikTok Bold, Minimalist, custom burn-in</li>
+                            <li><strong>Safe zones</strong> — Automatically avoids UI overlays (like, share, profile)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Feature 5: Privacy First -->
+                <div class="showcase-item">
+                    <div class="showcase-visual">
+                        <pre class="ascii-demo">
+┌─────────────────────────────┐
+│ 🔒 LOCAL PROCESSING         │
+├─────────────────────────────┤
+│                             │
+│  Your Data:                 │
+│    /data/input/  ─→ 🏠     │
+│         ↓                   │
+│    [Process]                │
+│         ↓                   │
+│    /data/output/ ←─ 🏠     │
+│                             │
+│  ✗ No cloud uploads         │
+│  ✗ No analytics             │
+│  ✗ No tracking              │
+│                             │
+└─────────────────────────────┘
+                        </pre>
+                    </div>
+                    <div class="showcase-content">
+                        <span class="feature-number">05</span>
+                        <h3>🔒 PRIVACY-FIRST BY DESIGN</h3>
+                        <p class="feature-highlight">Your footage never leaves your machine.</p>
+                        <p>100% local processing. No telemetry, no analytics, no "phone home" features. Optional cloud GPU acceleration is <em>opt-in only</em> and uses your own API keys. GDPR-compliant by design.</p>
+                        <ul class="feature-specs">
+                            <li><strong>Zero tracking</strong> — No cookies, no logs, no user profiling</li>
+                            <li><strong>Air-gap compatible</strong> — Works fully offline if desired</li>
+                            <li><strong>Audit-friendly</strong> — Open source = you control the code</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- All Features Grid -->
+        <section class="voxel-card">
+            <h2>// ALL FEATURES</h2>
             <div class="feature-grid">
                 <div class="feature-card">
                     <span class="feature-icon">⌨️</span>
                     <h3>TRANSCRIPT EDITOR</h3>
-                    <p>Descript-style text editing. Delete words to cut video. Rearrange to reorder scenes. <strong>Now with Live Preview.</strong></p>
+                    <p>Descript-style text editing. Delete words to cut video. Rearrange to reorder scenes.</p>
+                    <span class="badge beta">BETA</span>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🎨</span>
+                    <h3>COLOR GRADING</h3>
+                    <p>LUT support + auto-grading. Cinematic looks in one click.</p>
                     <span class="badge live">LIVE</span>
                 </div>
                 <div class="feature-card">
-                    <span class="feature-icon">📱</span>
-                    <h3>SHORTS STUDIO</h3>
-                    <p>Vertical reframing, safe zones, caption styles. TikTok/Reels/Shorts in one click. <strong>Auto-Reframe v2.</strong></p>
-                    <span class="badge live">LIVE</span>
-                </div>
-                <div class="feature-card">
-                    <span class="feature-icon">🎚️</span>
-                    <h3>QUALITY PROFILES</h3>
-                    <p>Preview → Standard → High → Master. One selection replaces 5+ toggles.</p>
-                    <span class="badge live">LIVE</span>
+                    <span class="feature-icon">🎤</span>
+                    <h3>VOICE ISOLATION</h3>
+                    <p>Remove background noise, isolate dialogue. Silero VAD + optional cloud denoise.</p>
+                    <span class="badge beta">BETA</span>
                 </div>
                 <div class="feature-card">
                     <span class="feature-icon">☁️</span>
                     <h3>CLOUD ACCELERATION</h3>
-                    <p>Single toggle for GPU offloading. Graceful fallback to local processing.</p>
+                    <p>Optional GPU offloading for upscaling, stabilization. Your API keys, your control.</p>
                     <span class="badge live">LIVE</span>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🎞️</span>
+                    <h3>STYLE TEMPLATES</h3>
+                    <p>Dynamic, Hitchcock, MTV, Documentary, Wes Anderson, Minimalist, Action.</p>
+                    <span class="badge live">LIVE</span>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3>INTELLIGENT SELECTOR</h3>
+                    <p>Semantic matching of script to B-roll. No manual searching.</p>
+                    <span class="badge research">RESEARCH</span>
                 </div>
             </div>
         </section>
@@ -248,6 +436,47 @@
                 <a href="https://github.com/mfahsold/montage-ai" class="voxel-btn primary">VIEW ON GITHUB</a>
                 <a href="features.md" class="voxel-btn">FEATURES</a>
                 <a href="STRATEGY.md" class="voxel-btn">ROADMAP</a>
+                <a href="COMPETITIVE_ANALYSIS.md" class="voxel-btn">WHY MONTAGE AI?</a>
+            </div>
+        </section>
+
+        <!-- Why Montage AI -->
+        <section class="voxel-card">
+            <h2>// WHY MONTAGE AI?</h2>
+            <p class="section-desc">We're not another SaaS. We're the open-source alternative.</p>
+            <div class="comparison-grid">
+                <div class="comparison-box">
+                    <h4>vs. Descript</h4>
+                    <ul class="comparison-list">
+                        <li><strong>Cost:</strong> Free forever (vs. $12-30/mo)</li>
+                        <li><strong>Control:</strong> Your data, your machine</li>
+                        <li><strong>Interop:</strong> OTIO export for professionals</li>
+                        <li><em>Trade-off: Less UI polish</em></li>
+                    </ul>
+                </div>
+                <div class="comparison-box">
+                    <h4>vs. Adobe Firefly</h4>
+                    <ul class="comparison-list">
+                        <li><strong>Independence:</strong> No Creative Cloud lock-in</li>
+                        <li><strong>Privacy:</strong> 100% local processing</li>
+                        <li><strong>Simplicity:</strong> Pick quality, get result</li>
+                        <li><em>Trade-off: No generative features</em></li>
+                    </ul>
+                </div>
+                <div class="comparison-box">
+                    <h4>vs. Opus Clip</h4>
+                    <ul class="comparison-list">
+                        <li><strong>Cost:</strong> Free vs. $30-100/mo</li>
+                        <li><strong>Privacy:</strong> Local-first processing</li>
+                        <li><strong>Scope:</strong> Rough cuts + professional handoff</li>
+                        <li><em>Trade-off: Smaller feature set</em></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 2rem;">
+                <a href="COMPETITIVE_ANALYSIS.md" style="color: #0ff; text-decoration: underline;">
+                    Read full competitive analysis →
+                </a>
             </div>
         </section>
 
@@ -258,6 +487,8 @@
                 <a href="features.md">Features</a>
                 <a href="getting-started.md">Docs</a>
                 <a href="STRATEGY.md">Roadmap</a>
+                <a href="COMPETITIVE_ANALYSIS.md">Analysis</a>
+                <a href="BUSINESS_PLAN.md">For Investors</a>
             </div>
             <p class="copyright">© 2026 Montage AI · <a href="https://github.com/mfahsold/montage-ai/blob/main/LICENSE">PolyForm License</a></p>
             <p class="tagline">// WE POLISH PIXELS, WE DON'T GENERATE THEM</p>

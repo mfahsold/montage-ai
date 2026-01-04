@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from src.montage_ai.web_ui.app import app
@@ -7,6 +8,32 @@ from src.montage_ai.web_ui.app import app
 
 # Project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
+
+
+@pytest.fixture(autouse=True)
+def mock_redis_and_rq():
+    """Mock Redis and RQ for all tests."""
+    with patch('src.montage_ai.web_ui.app.redis_conn') as mock_redis, \
+         patch('src.montage_ai.web_ui.app.q') as mock_q, \
+         patch('src.montage_ai.web_ui.app.job_store') as mock_job_store:
+        
+        # Setup mock returns
+        mock_redis.ping.return_value = True
+        mock_q.enqueue = MagicMock(return_value=None)
+        mock_q.started_job_registry = []
+        mock_q.__len__ = MagicMock(return_value=0)
+        
+        # Mock job_store
+        mock_job_store.get_job = MagicMock(return_value=None)
+        mock_job_store.create_job = MagicMock(return_value=None)
+        mock_job_store.update_job = MagicMock(return_value=None)
+        mock_job_store.list_jobs = MagicMock(return_value={})
+        
+        yield {
+            'redis': mock_redis,
+            'q': mock_q,
+            'job_store': mock_job_store
+        }
 
 
 @pytest.fixture

@@ -210,6 +210,22 @@ More help → [docs/troubleshooting.md](docs/troubleshooting.md)
 
 ---
 
+## 🎯 Why Montage AI?
+
+| Dimension | Montage AI | Descript | Adobe Firefly | Opus Clip |
+|-----------|-----------|----------|---------------|-----------|
+| **Cost** | 🟢 Free | 🔴 $12-30/mo | 🔴 $54+/mo | 🔴 $30-100/mo |
+| **Local Processing** | 🟢 Yes | 🔴 Cloud-only | 🔴 Cloud-only | 🔴 Cloud-only |
+| **Privacy** | 🟢 100% | 🔴 Data collection | 🔴 Data collection | 🔴 Data collection |
+| **Pro Handoff (OTIO)** | 🟢 Yes | 🟡 Partial | 🟡 Premiere only | 🔴 No |
+| **Shorts-Native** | 🟢 Yes | 🔴 Afterthought | 🔴 No | 🟢 Yes |
+| **Open Source** | 🟢 Yes | 🔴 No | 🔴 No | 🔴 No |
+| **Text Editing** | 🟢 Yes | 🟢 Yes | 🔴 No | 🔴 No |
+
+**Read more:** [Competitive Analysis](docs/COMPETITIVE_ANALYSIS.md)
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -218,6 +234,8 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - [Report a bug](https://github.com/mfahsold/montage-ai/issues/new?template=bug_report.md)
 - [Request a feature](https://github.com/mfahsold/montage-ai/issues/new?template=feature_request.md)
 - [View the backlog](docs/BACKLOG.md)
+- [Strategic roadmap](docs/STRATEGY.md)
+- [Competitive positioning](docs/COMPETITIVE_ANALYSIS.md)
 
 ---
 
@@ -225,11 +243,13 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 [PolyForm Noncommercial 1.0.0](LICENSE) — free for personal use, commercial license available.
 
+**For businesses:** Contact us for enterprise licensing options.
+
 ---
 
 <p align="center">
   <strong>Montage AI</strong> — We polish pixels, we don't generate them.<br>
-  <a href="https://montage.ai">Website</a> · 
+  <a href="https://mfahsold.github.io/montage-ai">Website</a> · 
   <a href="https://github.com/mfahsold/montage-ai">GitHub</a> · 
-  <a href="mailto:hello@montage.ai">Contact</a>
+  <a href="https://github.com/mfahsold/montage-ai/blob/main/docs/COMPETITIVE_ANALYSIS.md">Why Choose Us?</a>
 </p>

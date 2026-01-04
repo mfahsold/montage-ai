@@ -113,10 +113,22 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static fi
 
 
 # Job queue and management
-jobs = {}
-job_lock = threading.Lock()
-job_queue = deque()
-active_jobs = 0
+from rq import Queue
+from redis import Redis
+from ..core.job_store import JobStore
+from ..tasks import run_montage, run_transcript_render
+
+# Redis connection
+redis_host = os.getenv('REDIS_HOST', 'localhost')
+redis_port = int(os.getenv('REDIS_PORT', 6379))
+redis_conn = Redis(host=redis_host, port=redis_port)
+q = Queue(connection=redis_conn)
+job_store = JobStore()
+
+# jobs = {} # Removed
+# job_lock = threading.Lock() # Removed
+# job_queue = deque() # Removed
+# active_jobs = 0 # Removed
 MAX_CONCURRENT_JOBS = _settings.processing.max_concurrent_jobs
 MIN_MEMORY_GB = 2  # Minimum memory required to start a job
 
@@ -131,24 +143,7 @@ def bool_to_env(value: bool) -> str:
     return "true" if value else "false"
 
 
-def process_job_from_queue(job_data: dict):
-    """Process a job from the queue in a background thread."""
-    global active_jobs
-    active_jobs += 1
 
-    if job_data.get('type') == 'transcript_render':
-        target = run_transcript_render
-        args = (job_data,)
-    else:
-        target = run_montage
-        args = (job_data['job_id'], job_data['style'], job_data['options'])
-
-    thread = threading.Thread(
-        target=target,
-        args=args,
-        daemon=False  # Non-daemon to ensure cleanup
-    )
-    thread.start()
 
 
 def check_memory_available(required_gb: float = MIN_MEMORY_GB) -> tuple[bool, float]:
@@ -168,8 +163,8 @@ def check_memory_available(required_gb: float = MIN_MEMORY_GB) -> tuple[bool, fl
 
 def get_job_status(job_id: str) -> dict:
     """Get status of a job."""
-    with job_lock:
-        return jobs.get(job_id, {"status": "not_found"})
+    job = job_store.get_job(job_id)
+    return job if job else {"status": "not_found"}
 
 
 def normalize_options(data: dict) -> dict:
@@ -257,258 +252,22 @@ def normalize_options(data: dict) -> dict:
     }
 
 
-def run_montage(job_id: str, style: str, options: dict):
-    """Run montage creation in background."""
-    # active_jobs is incremented in process_job_from_queue, we just decrement in finally
-    
-    # Ensure directories exist (lazy initialization)
-    _settings.paths.ensure_directories()
-
-    # Check memory before starting
-    memory_ok, available_gb = check_memory_available()
-    if not memory_ok:
-        error_msg = f"Insufficient memory (only {available_gb:.1f}GB available, need {MIN_MEMORY_GB}GB). Please try again later."
-        
-        # Write to log file so it's accessible
-        log_path = OUTPUT_DIR / f"render_{job_id}.log"
-        try:
-            with open(log_path, "w", encoding="utf-8") as f:
-                f.write(error_msg + "\n")
-        except Exception:
-            pass
-
-        with job_lock:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = error_msg
-            jobs[job_id]["completed_at"] = datetime.now().isoformat()
-        active_jobs -= 1
-        return
-
-    with job_lock:
-        jobs[job_id]["status"] = "running"
-        jobs[job_id]["started_at"] = datetime.now().isoformat()
-
-    try:
-        # Build command
-        import sys
-        from ..env_mapper import map_options_to_env
-        
-        cmd = [sys.executable, "-m", "montage_ai.editor"]
-
-        # Set environment variables using DRY mapper
-        # options dict is already normalized via normalize_options() with DEFAULT_OPTIONS
-        env = map_options_to_env(style, options, job_id)
-        
-        # Add Web-UI specific paths (if not already in env)
-        env["INPUT_DIR"] = str(INPUT_DIR)
-        env["MUSIC_DIR"] = str(MUSIC_DIR)
-        env["OUTPUT_DIR"] = str(OUTPUT_DIR)
-        env["ASSETS_DIR"] = str(ASSETS_DIR)
-
-        # Run montage
-        log_path = OUTPUT_DIR / f"render_{job_id}.log"
-        
-        def set_low_priority():
-            """Set process priority to low (nice +10) to keep UI responsive."""
-            try:
-                os.nice(10)
-            except Exception:
-                pass
-
-        with open(log_path, "w", encoding="utf-8") as log_file:
-            process = subprocess.Popen(
-                cmd,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-                preexec_fn=set_low_priority  # Hardware Nah: Lower priority for background task
-            )
-            
-            # Stream output and track phase
-            for line in process.stdout:
-                log_file.write(line)
-                log_file.flush()
-                
-                # Parse phase from logs (e.g., "Phase 1/5: Setup")
-                if "Phase" in line and "/" in line:
-                    try:
-                        # Extract "Phase X/Y: Name"
-                        # Format: "[INFO] Phase 1/5: Setup..." or "Phase 2/6: Analysis"
-                        match = re.search(r'Phase\s*(\d+)/(\d+):\s*(\w+)', line)
-                        if match:
-                            phase_num = int(match.group(1))
-                            phase_total = int(match.group(2))
-                            phase_name = match.group(3).lower()
-                            phase_data = {
-                                "name": phase_name,
-                                "label": f"Phase {phase_num}/{phase_total}: {match.group(3)}",
-                                "number": phase_num,
-                                "total": phase_total,
-                                "started_at": datetime.now().isoformat(),
-                                "progress_percent": int((phase_num / phase_total) * 100)
-                            }
-                            with job_lock:
-                                jobs[job_id]["phase"] = phase_data
-                            
-                            # Announce update via SSE
-                            announcer.announce(format_sse(json.dumps({
-                                "job_id": job_id,
-                                "status": "running",
-                                "phase": phase_data
-                            }), event="job_update"))
-                    except Exception:
-                        pass
-            
-            process.wait()
-            result = process
-
-        # Update job status
-        with job_lock:
-            # Find output files (check regardless of return code - video may succeed despite warnings)
-            output_pattern = f"*{job_id}*.mp4"
-            output_files = list(OUTPUT_DIR.glob(output_pattern))
-            
-            # Success if: return code 0 OR output file exists
-            # Python warnings (like RuntimeWarning) can cause non-zero exit even on success
-            if result.returncode == 0 or output_files:
-                jobs[job_id]["status"] = "completed"
-                jobs[job_id]["phase"] = {
-                    "name": "completed",
-                    "label": "Completed",
-                    "number": len(PIPELINE_PHASES),
-                    "total": len(PIPELINE_PHASES),
-                    "started_at": datetime.now().isoformat(),
-                    "progress_percent": 100
-                }
-                jobs[job_id]["completed_at"] = datetime.now().isoformat()
-
-                if output_files:
-                    jobs[job_id]["output_file"] = str(output_files[0].name)
-                
-                # Log warning if non-zero exit but file exists
-                if result.returncode != 0 and output_files:
-                    jobs[job_id]["warning"] = f"Process exited with code {result.returncode} but output was created successfully"
-
-                # Announce completion
-                announcer.announce(format_sse(json.dumps({
-                    "job_id": job_id,
-                    "status": "completed",
-                    "output_file": jobs[job_id].get("output_file")
-                }), event="job_complete"))
-
-                # Timeline files (if exported)
-
-                if options.get("export_timeline"):
-                    timeline_files = {
-                        "otio": list(OUTPUT_DIR.glob(f"*{job_id}*.otio")),
-                        "edl": list(OUTPUT_DIR.glob(f"*{job_id}*.edl")),
-                        "csv": list(OUTPUT_DIR.glob(f"*{job_id}*.csv"))
-                    }
-                    jobs[job_id]["timeline_files"] = {
-                        k: [str(f.name) for f in v]
-                        for k, v in timeline_files.items()
-                    }
-            else:
-                jobs[job_id]["status"] = "failed"
-                jobs[job_id]["error"] = f"Process failed with code {result.returncode}"
-                announcer.announce(format_sse(json.dumps({
-                    "job_id": job_id,
-                    "status": "failed",
-                    "error": jobs[job_id]["error"]
-                }), event="job_failed"))
-
-    except Exception as e:
-        with job_lock:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = str(e)
-            announcer.announce(format_sse(json.dumps({
-                "job_id": job_id,
-                "status": "failed",
-                "error": str(e)
-            }), event="job_failed"))
-    finally:
-        _cleanup_job()
 
 
-def _cleanup_job():
-    global active_jobs
-    active_jobs -= 1
-    if job_queue:
-        process_job_from_queue(job_queue.popleft())
 
 
-def run_transcript_render(job_data: dict):
-    """Run transcript-based render job."""
-    job_id = job_data['job_id']
-    
-    try:
-        from ..text_editor import TextEditor
-        
-        # Update status
-        with job_lock:
-            jobs[job_id]["status"] = "processing"
-            jobs[job_id]["phase"] = {"label": "Rendering Preview", "progress_percent": 10}
-            
-        # Initialize Editor
-        editor = TextEditor(job_data['video_path'])
-        editor.load_transcript(job_data['transcript_path'])
-        
-        # Apply Edits
-        # Optimize: Convert list of edits to a map for O(1) lookup
-        # edits format: [{"index": 0, "removed": true}, ...]
-        edits_map = {e['index']: e.get('removed', False) for e in job_data['edits']}
-        
-        count = 0
-        current_idx = 0
-        for seg in editor.segments:
-            for word in seg.words:
-                if current_idx in edits_map:
-                    word.removed = edits_map[current_idx]
-                    if word.removed:
-                        count += 1
-                current_idx += 1
-                
-        logger.info(f"Applied edits: {count} words removed")
-        
-        # Render
-        output_filename = f"preview_{job_id}.mp4"
-        output_path = OUTPUT_DIR / output_filename
-        
-        # Use fast preview settings via dedicated method
-        editor.render_preview(str(output_path))
-        
-        # Success
-        with job_lock:
-            jobs[job_id]["status"] = "completed"
-            jobs[job_id]["output_file"] = output_filename
-            jobs[job_id]["phase"] = {"label": "Completed", "progress_percent": 100}
-            
-            announcer.announce(format_sse(json.dumps({
-                "job_id": job_id,
-                "status": "completed",
-                "output_file": output_filename
-            }), event="job_complete"))
-            
-    except Exception as e:
-        logger.error(f"Transcript render failed: {e}")
-        with job_lock:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = str(e)
-            announcer.announce(format_sse(json.dumps({
-                "job_id": job_id,
-                "status": "failed",
-                "error": str(e)
-            }), event="job_failed"))
-            
-    finally:
-        _cleanup_job()
 
 
-# =============================================================================
-# ROUTES
+
+
+
+# Register Blueprints
+from .routes.session import session_bp
+from .routes.analysis import analysis_bp
+
+app.register_blueprint(session_bp)
+app.register_blueprint(analysis_bp)
+
 # =============================================================================
 # ROUTES
 # =============================================================================
@@ -559,6 +318,14 @@ def api_status():
         encoder_status = f"{hw_config.type} ({encoder_status})"
     cgpu_ok = is_cgpu_available()
 
+    # Get queue stats (RQ)
+    try:
+        active_jobs = len(q.started_job_registry)
+        queued_jobs = len(q)
+    except:
+        active_jobs = 0
+        queued_jobs = 0
+    
     return jsonify({
         "status": "ok",
         "version": VERSION,
@@ -569,7 +336,7 @@ def api_status():
             "memory_total_gb": round(mem.total / (1024**3), 2),
             "memory_percent": mem.percent,
             "active_jobs": active_jobs,
-            "queued_jobs": len(job_queue),
+            "queued_jobs": queued_jobs,
             "max_concurrent_jobs": MAX_CONCURRENT_JOBS,
             # New fields for UI
             "gpu_encoder": encoder_status,
@@ -744,22 +511,20 @@ def api_render_transcript_edit():
     
     # Queue the job
     job_data = {
-        "job_id": job_id,
+        "id": job_id,
         "type": "transcript_render",
         "video_path": str(video_path),
         "transcript_path": str(transcript_path),
         "edits": edits,
         "status": "queued",
-        "progress": 0
+        "created_at": datetime.now().isoformat()
     }
     
-    with job_lock:
-        jobs[job_id] = job_data
-        job_queue.append(job_data)
-        
-    # Trigger processing if worker is idle
-    if active_jobs < MAX_CONCURRENT_JOBS:
-        process_job_from_queue(job_queue.popleft())
+    # Store in Redis
+    job_store.create_job(job_id, job_data)
+    
+    # Enqueue with RQ
+    q.enqueue(run_transcript_render, job_id, str(video_path), str(transcript_path), edits)
         
     return jsonify({"job_id": job_id, "status": "queued"})
 
@@ -813,12 +578,6 @@ def api_detect_fillers():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-        
-    # Start processing if slot available
-    if active_jobs < MAX_CONCURRENT_JOBS:
-        process_job_from_queue(job_queue.popleft())
-        
-    return jsonify({"job_id": job_id, "status": "queued"})
 
 
 @app.route('/api/video/<filename>', methods=['GET'])
@@ -875,8 +634,6 @@ def api_upload():
 @app.route('/api/jobs', methods=['POST'])
 def api_create_job():
     """Create new montage job with queue management."""
-    global active_jobs
-
     data = request.json
 
     # Validate required fields
@@ -925,29 +682,11 @@ def api_create_job():
         "created_at": datetime.now().isoformat()
     }
 
-    with job_lock:
-        jobs[job_id] = job
+    # Store in Redis
+    job_store.create_job(job_id, job)
 
-    # Check if we can start immediately or need to queue
-    if active_jobs < MAX_CONCURRENT_JOBS:
-        # Start immediately
-        active_jobs += 1
-        thread = threading.Thread(
-            target=run_montage,
-            args=(job_id, data['style'], job['options']),
-            daemon=False  # Non-daemon for proper cleanup
-        )
-        thread.start()
-    else:
-        # Add to queue
-        job_queue.append({
-            'job_id': job_id,
-            'style': data['style'],
-            'options': job['options']
-        })
-        with job_lock:
-            jobs[job_id]["status"] = "queued"
-            jobs[job_id]["queue_position"] = len(job_queue)
+    # Enqueue
+    q.enqueue(run_montage, job_id, data['style'], job['options'])
 
     return jsonify(job)
 
@@ -975,8 +714,6 @@ def api_get_job(job_id):
 @app.route('/api/jobs/<job_id>/finalize', methods=['POST'])
 def api_finalize_job(job_id):
     """Create a high-quality render from a preview job."""
-    global active_jobs
-    
     # 1. Get original job
     original_job = get_job_status(job_id)
     if original_job.get("status") == "not_found":
@@ -1010,29 +747,11 @@ def api_finalize_job(job_id):
         "parent_job_id": job_id
     }
 
-    with job_lock:
-        jobs[new_job_id] = job
+    # Store in Redis
+    job_store.create_job(new_job_id, job)
 
-    # Check if we can start immediately or need to queue
-    if active_jobs < MAX_CONCURRENT_JOBS:
-        # Start immediately
-        active_jobs += 1
-        thread = threading.Thread(
-            target=run_montage,
-            args=(new_job_id, style, new_options),
-            daemon=False
-        )
-        thread.start()
-    else:
-        # Add to queue
-        job_queue.append({
-            'job_id': new_job_id,
-            'style': style,
-            'options': new_options
-        })
-        with job_lock:
-            jobs[new_job_id]["status"] = "queued"
-            jobs[new_job_id]["queue_position"] = len(job_queue)
+    # Enqueue
+    q.enqueue(run_montage, new_job_id, style, new_options)
 
     return jsonify(job)
 
@@ -1047,8 +766,8 @@ def api_finalize_job(job_id):
 @app.route('/api/jobs', methods=['GET'])
 def api_list_jobs():
     """List all jobs."""
-    with job_lock:
-        job_list = list(jobs.values())
+    jobs_dict = job_store.list_jobs()
+    job_list = list(jobs_dict.values())
     return jsonify({"jobs": sorted(job_list, key=lambda x: x['created_at'], reverse=True)})
 
 
@@ -1713,13 +1432,6 @@ def api_session_render_preview(session_id):
                     "success": True,
                     "url": f"/downloads/{output_filename}",
                     "crop": crop
-                }) 
-                    output_filename
-                )
-                return jsonify({
-                    "success": True,
-                    "url": f"/downloads/{output_filename}",
-                    "crop": crop
                 })
             else:
                 # Frame preview (just return crop data for frontend to render overlay)
@@ -1754,31 +1466,6 @@ def api_session_render_preview(session_id):
 
     except Exception as e:
         logger.error(f"Preview generation failed: {e}")
-        return jsonify({"error": str(e)}), 500
-            
-        elif session.type == 'transcript':
-            # Transcript Preview (Edit Loop)
-            # Render the cut sequence defined by current edits
-            edits = data.get('edits', [])
-            
-            # Use TextEditor to render preview
-            from ..text_editor import TextEditor
-            editor = TextEditor(main_video.path)
-            
-            # Apply edits (in-memory)
-            removed_indices = [e['index'] for e in edits if e.get('removed')]
-            # ... apply logic ...
-            
-            # Render short preview (e.g. around cursor)
-            # Stub for now
-            return jsonify({
-                "success": True,
-                "message": "Preview render queued"
-            })
-            
-        return jsonify({"error": "Unknown session type"}), 400
-        
-    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 

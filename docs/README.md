@@ -2,6 +2,22 @@
 
 Welcome to Montage AI documentation.
 
+> **Montage AI** is the free, open-source, privacy-first AI rough-cut tool for creators and professionals.
+> 
+> Drop your clips + music → Beat-synced edit → Professional NLE handoff (OTIO/EDL).
+> 
+> **Cost:** Free (OSS) | **Privacy:** 100% local | **Interop:** OTIO-native
+
+---
+
+## Quick Links (First Time Here?)
+
+- 🚀 **[Getting Started](getting-started.md)** — Install and create your first montage in 5 minutes
+- 🎯 **[Features Overview](features.md)** — Transcript Editor, Shorts Studio, Quality Profiles, Pro Handoff
+- 📖 **[Full Architecture](architecture.md)** — How the system works under the hood
+- 🤔 **[Why Montage AI?](../docs/COMPETITIVE_ANALYSIS.md)** — How we compare to Descript, Adobe, Opus Clip
+- 💼 **[Business Plan](../docs/BUSINESS_PLAN.md)** — For investors and enterprise partners
+
 ---
 
 ## For Users
@@ -16,6 +32,17 @@ Welcome to Montage AI documentation.
 
 ---
 
+## For Decision Makers
+
+| Doc | Description |
+|-----|-------------|
+| [Competitive Analysis](COMPETITIVE_ANALYSIS.md) | How we compare to Descript, Adobe, Opus Clip (with scoring) |
+| [Business Plan](BUSINESS_PLAN.md) | Market fit, revenue model, financials, investor thesis |
+| [Strategic Roadmap](STRATEGY.md) | Q1-Q4 2026 priorities, market positioning, consolidation plan |
+| [Marketing Playbook](MARKETING_PLAYBOOK.md) | LinkedIn, Twitter, Product Hunt, email templates |
+
+---
+
 ## For Developers
 
 | Doc | Description |
@@ -25,6 +52,7 @@ Welcome to Montage AI documentation.
 | [AI Director](AI_DIRECTOR.md) | LLM prompt interpretation and fallback chain |
 | [Models](models.md) | AI/ML libraries used and why |
 | [LLM Agent Guidelines](llm-agents.md) | Coding principles for AI assistants |
+| [RQ Migration](RQ_MIGRATION.md) | Redis Queue infrastructure (async jobs) |
 | [Contributing](../CONTRIBUTING.md) | How to contribute code |
 
 ---
@@ -37,17 +65,23 @@ Welcome to Montage AI documentation.
 | [cgpu Setup](cgpu-setup.md) | Google Cloud credentials for cgpu |
 | [Cloud Offloading](cloud_offloading_implementation.md) | cgpu job types and implementation |
 | [Stability Report](stability_report.md) | Memory protection and job admission |
+| [Deployment Scenarios](deployment_scenarios.md) | Docker, Kubernetes, cloud hosting options |
 
 ---
 
-## Roadmap
+## Roadmap & Strategy
 
-Active planning documents are currently internal. Please check [GitHub Issues](https://github.com/mfahsold/montage-ai/issues) for public roadmap items.
-| [Professional Export](roadmap/professional_export_design.md) | OTIO/EDL/Proxy workflow design |
+| Doc | Description |
+|-----|-------------|
+| [Q1 2026 Strategy](STRATEGY.md) | Current focus: Transcript Editor, Shorts Studio 2.0, Pro Handoff |
+| [Business Plan](BUSINESS_PLAN.md) | Market, financials, hiring, investor brief |
+| [Competitive Analysis](COMPETITIVE_ANALYSIS.md) | Deep comparison with Descript, Adobe, Opus, auto-editor |
+| [Strategic Backlog](STRATEGIC_BACKLOG.md) | Future features and research areas |
 
 ---
 
-## Archive
+## Archive & References
+
 
 Historical documents for reference:
 

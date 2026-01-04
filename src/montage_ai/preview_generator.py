@@ -97,65 +97,75 @@ class PreviewGenerator:
             Path to the generated preview file.
         """
         output_path = self.output_dir / output_filename
-        
-        # Calculate crop in pixels
-        # We need source dimensions first. 
-        # For now, assume we can get them or use relative crop filter if ffmpeg supports it (it does via iw/ih).
-        
-        if keyframes:
-            # Dynamic crop using sendcmd
-            # We need to generate a command file for sendcmd
-            # Format: [time] [command] [args]
-            # e.g. 0.0 crop x 100; 0.0 crop y 100; ...
-            
-            # However, ffmpeg's crop filter supports expressions with 't'.
-            # But for complex paths, sendcmd is better or generating a complex expression.
-            # For simplicity in this preview generator, let's stick to static crop if keyframes are complex,
-            # OR implement a basic interpolation expression if possible.
-            
-            # Actually, let's use the 'sendcmd' filter approach which is robust.
-            # But sendcmd requires a file.
-            
-            # Alternative: Use the 'crop' filter with expressions if we can construct a piecewise function.
-            # That's hard.
-            
-            # Let's fallback to static center crop for MVP of preview if keyframes are too complex,
-            # OR just use the first keyframe/crop_config.
-            
-            # TODO: Implement full dynamic crop preview.
-            # For now, we will use the static crop config (which might be the center or a specific frame).
-            pass
+        cmd_file_path = None
 
-        x = crop_config.get('x', 0.5)
-        y = crop_config.get('y', 0.5)
-        w = crop_config.get('width', 9/16)
-        h = crop_config.get('height', 1.0)
-        
-        # Convert center-based (x,y) to top-left (left, top)
-        # x, y are center coordinates (0-1)
-        # w, h are dimensions (0-1)
-        
-        # crop=w=iw*W:h=ih*H:x=(iw*X)-(ow/2):y=(ih*Y)-(oh/2)
-        
-        crop_filter = (
-            f"crop=w=iw*{w}:h=ih*{h}:"
-            f"x=(iw*{x})-(ow/2):y=(ih*{y})-(oh/2),"
-            f"scale={PREVIEW_HEIGHT*9//16}:{PREVIEW_HEIGHT}" # Scale to 360p vertical (approx 202x360)
-        )
-        
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", source_path,
-            "-vf", crop_filter,
-            "-c:v", "libx264", "-preset", PREVIEW_PRESET, "-crf", str(PREVIEW_CRF),
-            "-c:a", STANDARD_AUDIO_CODEC, "-b:a", STANDARD_AUDIO_BITRATE,
-            str(output_path)
-        ]
-        
-        logger.info(f"Generating shorts preview: {output_path}")
         try:
+            if keyframes:
+                # Dynamic crop using sendcmd
+                # Create a temporary file for sendcmd
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.cmd') as tmp:
+                    cmd_file_path = tmp.name
+                    for kf in keyframes:
+                        # kf is dict with time, x, y, width, height (in pixels)
+                        t = kf.get('time', 0.0)
+                        x = int(kf.get('x', 0))
+                        y = int(kf.get('y', 0))
+                        w = int(kf.get('width', 0))
+                        h = int(kf.get('height', 0))
+                        
+                        # Write commands: [time] [command] [arg]
+                        # crop filter supports x, y, w, h commands
+                        tmp.write(f"{t} x {x};\n")
+                        tmp.write(f"{t} y {y};\n")
+                        if w > 0: tmp.write(f"{t} w {w};\n")
+                        if h > 0: tmp.write(f"{t} h {h};\n")
+                
+                # Use the first keyframe for initial values
+                first = keyframes[0]
+                x_init = int(first.get('x', 0))
+                y_init = int(first.get('y', 0))
+                w_init = int(first.get('width', 0))
+                h_init = int(first.get('height', 0))
+                
+                # sendcmd must be before crop? Or we use sendcmd=f=...
+                # sendcmd sends commands to all filters.
+                # We initialize crop with first keyframe values.
+                crop_filter = (
+                    f"sendcmd=f='{cmd_file_path}',"
+                    f"crop=w={w_init}:h={h_init}:x={x_init}:y={y_init},"
+                    f"scale={PREVIEW_HEIGHT*9//16}:{PREVIEW_HEIGHT}"
+                )
+            else:
+                # Static crop
+                x = crop_config.get('x', 0.5)
+                y = crop_config.get('y', 0.5)
+                w = crop_config.get('width', 9/16)
+                h = crop_config.get('height', 1.0)
+                
+                # Convert center-based (x,y) to top-left (left, top)
+                # crop=w=iw*W:h=ih*H:x=(iw*X)-(ow/2):y=(ih*Y)-(oh/2)
+                crop_filter = (
+                    f"crop=w=iw*{w}:h=ih*{h}:"
+                    f"x=(iw*{x})-(ow/2):y=(ih*{y})-(oh/2),"
+                    f"scale={PREVIEW_HEIGHT*9//16}:{PREVIEW_HEIGHT}"
+                )
+            
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", source_path,
+                "-vf", crop_filter,
+                "-c:v", "libx264", "-preset", PREVIEW_PRESET, "-crf", str(PREVIEW_CRF),
+                "-c:a", STANDARD_AUDIO_CODEC, "-b:a", STANDARD_AUDIO_BITRATE,
+                str(output_path)
+            ]
+            
+            logger.info(f"Generating shorts preview: {output_path}")
             subprocess.run(cmd, check=True, capture_output=True)
             return str(output_path)
+
         except subprocess.CalledProcessError as e:
             logger.error(f"FFmpeg shorts preview failed: {e.stderr.decode()}")
             raise RuntimeError(f"Shorts preview failed: {e.stderr.decode()}")
+        finally:
+            if cmd_file_path and os.path.exists(cmd_file_path):
+                os.unlink(cmd_file_path)

@@ -65,3 +65,22 @@ verify_*.py
 
 # Test fixtures (generated via make test-fixtures)
 tests/fixtures/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.DS_Store
+*.swp
+*.swo
+*~
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.venv/
+venv/
+.env
+run_log.txt
+gallery_montage_*.mp4

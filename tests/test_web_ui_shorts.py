@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from src.montage_ai.web_ui.app import normalize_options, app, jobs
+from src.montage_ai.web_ui.app import normalize_options, app
 
 def test_normalize_options_shorts_mode():
     """Test that shorts_mode is correctly normalized."""
@@ -19,10 +19,13 @@ def test_normalize_options_export_resolution():
     assert opts['export_width'] == 640
     assert opts['export_height'] == 360
 
-@patch('src.montage_ai.web_ui.app.run_montage')
-def test_api_create_job_preview_resolution(mock_run_montage):
+@patch('src.montage_ai.web_ui.app.q')
+@patch('src.montage_ai.web_ui.app.job_store')
+def test_api_create_job_preview_resolution(mock_job_store, mock_q):
     """Test that preview preset sets 360p resolution."""
     client = app.test_client()
+    mock_job_store.create_job.return_value = None
+    mock_q.enqueue.return_value = None
     
     # Test 1: Normal Preview (Horizontal)
     data = {
@@ -32,19 +35,23 @@ def test_api_create_job_preview_resolution(mock_run_montage):
     }
     resp = client.post('/api/jobs', json=data)
     assert resp.status_code == 200
-    job_id = resp.json['id']
     
-    # Check options in the job store
-    options = jobs[job_id]['options']
+    # Verify options passed to job_store
+    args, _ = mock_job_store.create_job.call_args
+    job_data = args[1]
+    options = job_data['options']
     
     assert options['export_width'] == 640
     assert options['export_height'] == 360
     assert options['shorts_mode'] is False
 
-@patch('src.montage_ai.web_ui.app.run_montage')
-def test_api_create_job_preview_shorts_resolution(mock_run_montage):
+@patch('src.montage_ai.web_ui.app.q')
+@patch('src.montage_ai.web_ui.app.job_store')
+def test_api_create_job_preview_shorts_resolution(mock_job_store, mock_q):
     """Test that preview preset sets 360p vertical resolution for shorts."""
     client = app.test_client()
+    mock_job_store.create_job.return_value = None
+    mock_q.enqueue.return_value = None
     
     # Test 2: Shorts Preview (Vertical)
     data = {
@@ -54,18 +61,23 @@ def test_api_create_job_preview_shorts_resolution(mock_run_montage):
     }
     resp = client.post('/api/jobs', json=data)
     assert resp.status_code == 200
-    job_id = resp.json['id']
     
-    options = jobs[job_id]['options']
+    # Verify options passed to job_store
+    args, _ = mock_job_store.create_job.call_args
+    job_data = args[1]
+    options = job_data['options']
     
     assert options['export_width'] == 360
     assert options['export_height'] == 640
     assert options['shorts_mode'] is True
 
-@patch('src.montage_ai.web_ui.app.run_montage')
-def test_api_create_job_preview_shorts_nested(mock_run_montage):
+@patch('src.montage_ai.web_ui.app.q')
+@patch('src.montage_ai.web_ui.app.job_store')
+def test_api_create_job_preview_shorts_nested(mock_job_store, mock_q):
     """Test that preview preset sets 360p vertical resolution for shorts (nested options)."""
     client = app.test_client()
+    mock_job_store.create_job.return_value = None
+    mock_q.enqueue.return_value = None
     
     # Test 3: Shorts Preview with nested options
     data = {
@@ -77,9 +89,11 @@ def test_api_create_job_preview_shorts_nested(mock_run_montage):
     }
     resp = client.post('/api/jobs', json=data)
     assert resp.status_code == 200
-    job_id = resp.json['id']
     
-    options = jobs[job_id]['options']
+    # Verify options passed to job_store
+    args, _ = mock_job_store.create_job.call_args
+    job_data = args[1]
+    options = job_data['options']
     
     assert options['export_width'] == 360
     assert options['export_height'] == 640
