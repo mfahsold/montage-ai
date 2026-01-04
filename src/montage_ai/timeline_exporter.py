@@ -1,12 +1,13 @@
 """
 Timeline Exporter: Export Montage AI edits to professional NLE formats
 
-# STATUS: Work in Progress - Not yet fully tested
+# STATUS: Beta - Feature Complete (Relinking & Proxies supported)
 
 Supports:
 - OpenTimelineIO (.otio) - Industry standard for DaVinci, Premiere, FCP, Avid
 - CMX 3600 EDL (.edl) - Universal fallback for all NLEs
 - Proxy generation (H.264 low-res) for smooth editing workflow
+- Source Relinking (Switch between Proxy and Source)
 
 Based on 2024/2025 research:
 - OpenTimelineIO is Academy Software Foundation standard (Oscar-winning tech)
@@ -112,6 +113,8 @@ class TimelineExporter:
         self,
         timeline: Timeline,
         generate_proxies: bool = False,
+        proxy_format: str = "h264",
+        link_to_source: bool = False,
         export_otio: bool = True,
         export_edl: bool = True,
         export_xml: bool = True,
@@ -122,7 +125,9 @@ class TimelineExporter:
 
         Args:
             timeline: Timeline object with clips and metadata
-            generate_proxies: Create H.264 proxies for editing
+            generate_proxies: Create proxies for editing
+            proxy_format: Format for proxies ('h264', 'prores', 'dnxhr')
+            link_to_source: If True, links XML/OTIO to original source files instead of proxies
             export_otio: Export OpenTimelineIO file
             export_edl: Export CMX 3600 EDL file
             export_xml: Export FCP XML v7 file (Resolve/Premiere/Kdenlive)
@@ -135,21 +140,22 @@ class TimelineExporter:
         logger.info(f"   Project: {timeline.project_name}")
         logger.info(f"   Clips: {len(timeline.clips)}")
         logger.info(f"   Duration: {timeline.total_duration:.1f}s")
+        logger.info(f"   Link to Source: {link_to_source}")
 
         exported_files = {}
 
         # Generate proxies first (if requested)
         if generate_proxies:
-            logger.info("\n🎞️ Generating proxies...")
+            logger.info(f"\n🎞️ Generating proxies ({proxy_format})...")
             for clip in timeline.clips:
-                proxy_path = self._generate_proxy(clip.source_path)
+                proxy_path = self._generate_proxy(clip.source_path, format=proxy_format)
                 if proxy_path:
                     clip.proxy_path = proxy_path
                     logger.info(f"   ✅ {os.path.basename(clip.source_path)}")
 
         # Export OpenTimelineIO
         if export_otio and OTIO_AVAILABLE:
-            otio_path = self._export_otio(timeline)
+            otio_path = self._export_otio(timeline, link_to_source=link_to_source)
             if otio_path:
                 exported_files['otio'] = otio_path
                 logger.info(f"\n✅ OTIO exported: {otio_path}")
@@ -163,7 +169,7 @@ class TimelineExporter:
 
         # Export FCP XML
         if export_xml:
-            xml_path = self._export_xml(timeline)
+            xml_path = self._export_xml(timeline, link_to_source=link_to_source)
             if xml_path:
                 exported_files['xml'] = xml_path
                 logger.info(f"✅ XML exported: {xml_path}")
@@ -181,47 +187,75 @@ class TimelineExporter:
         logger.info(f"✅ Metadata exported: {metadata_path}")
 
         # Create project package
-        package_path = self._create_project_package(timeline, exported_files)
+        package_path = self._create_project_package(timeline, exported_files, link_to_source=link_to_source)
         exported_files['package'] = package_path
         logger.info(f"\n📦 Project package: {package_path}")
 
         return exported_files
 
-    def _generate_proxy(self, source_path: str) -> Optional[str]:
+    def _generate_proxy(self, source_path: str, format: str = "h264") -> Optional[str]:
         """
-        Generate H.264 proxy file for smooth editing.
+        Generate proxy file for smooth editing.
 
-        Proxy settings:
-        - Resolution: 960x540 (half-res for 9:16 1080x1920)
-        - Codec: H.264 (libx264)
-        - Bitrate: 5Mbps (balance of quality/size)
-        - Preset: fast (quick encoding)
+        Supported formats:
+        - h264: H.264 (libx264) - Good compatibility, small size
+        - prores: ProRes Proxy - Best for Mac/Resolve editing
+        - dnxhr: DNxHR LB - Best for Windows/Avid editing
 
         Args:
             source_path: Path to original video file
+            format: Proxy format ('h264', 'prores', 'dnxhr')
 
         Returns:
             Path to proxy file, or None if failed
         """
         source_name = os.path.basename(source_path)
-        proxy_name = f"proxy_{source_name}"
+        ext_map = {
+            "h264": ".mp4",
+            "prores": ".mov",
+            "dnxhr": ".mov"
+        }
+        ext = ext_map.get(format, ".mp4")
+        proxy_name = f"proxy_{os.path.splitext(source_name)[0]}{ext}"
         proxy_path = os.path.join(self.proxy_dir, proxy_name)
 
         # Skip if proxy already exists
         if os.path.exists(proxy_path):
             return proxy_path
 
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", source_path,
-            "-vf", "scale=960:540",  # Half-res
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-b:v", "5M",
-            "-c:a", "aac",
-            "-b:a", "128k",
-            proxy_path
-        ]
+        # Base command
+        cmd = ["ffmpeg", "-y", "-i", source_path]
+
+        # Format specific settings
+        if format == "prores":
+            # ProRes Proxy (profile 0)
+            # Scale to 960x540 (qscale -1 maintains aspect ratio)
+            cmd.extend([
+                "-c:v", "prores_ks",
+                "-profile:v", "0",
+                "-vf", "scale=-1:540",
+                "-c:a", "pcm_s16le"
+            ])
+        elif format == "dnxhr":
+            # DNxHR LB (Low Bandwidth)
+            cmd.extend([
+                "-c:v", "dnxhd",
+                "-profile:v", "dnxhr_lb",
+                "-vf", "scale=-1:540,format=yuv422p",
+                "-c:a", "pcm_s16le"
+            ])
+        else:
+            # Default H.264
+            cmd.extend([
+                "-vf", "scale=-1:540",
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-b:v", "5M",
+                "-c:a", "aac",
+                "-b:a", "128k"
+            ])
+
+        cmd.append(proxy_path)
 
         try:
             subprocess.run(
@@ -235,7 +269,7 @@ class TimelineExporter:
             logger.warning(f"   ⚠️ Proxy generation failed: {source_name}")
             return None
 
-    def _export_otio(self, timeline: Timeline) -> Optional[str]:
+    def _export_otio(self, timeline: Timeline, link_to_source: bool = False) -> Optional[str]:
         """
         Export OpenTimelineIO file.
 
@@ -244,6 +278,7 @@ class TimelineExporter:
 
         Args:
             timeline: Timeline object
+            link_to_source: If True, link to original source files
 
         Returns:
             Path to .otio file
@@ -259,7 +294,10 @@ class TimelineExporter:
         # Add video clips
         for clip_data in timeline.clips:
             # Use proxy if available, otherwise original
-            media_path = clip_data.proxy_path or clip_data.source_path
+            if link_to_source:
+                media_path = clip_data.source_path
+            else:
+                media_path = clip_data.proxy_path or clip_data.source_path
 
             # Create media reference (Robust URI handling)
             try:
@@ -391,7 +429,7 @@ class TimelineExporter:
 
         return edl_path
 
-    def _export_xml(self, timeline: Timeline) -> str:
+    def _export_xml(self, timeline: Timeline, link_to_source: bool = False) -> str:
         """
         Export FCP XML v7 file.
 
@@ -404,6 +442,7 @@ class TimelineExporter:
 
         Args:
             timeline: Timeline object
+            link_to_source: If True, link to original source files
 
         Returns:
             Path to .xml file
@@ -450,7 +489,12 @@ class TimelineExporter:
                 for i, clip in enumerate(timeline.clips, start=1):
                     clip_id = f"clipitem-{i}"
                     file_id = f"file-{i}"
-                    path = clip.proxy_path or clip.source_path
+                    
+                    if link_to_source:
+                        path = clip.source_path
+                    else:
+                        path = clip.proxy_path or clip.source_path
+                        
                     filename = os.path.basename(path)
                     
                     # Calculate frames
@@ -710,7 +754,8 @@ class TimelineExporter:
     def _create_project_package(
         self,
         timeline: Timeline,
-        exported_files: Dict[str, str]
+        exported_files: Dict[str, str],
+        link_to_source: bool = False
     ) -> str:
         """
         Create a complete project package for NLE import.
@@ -722,11 +767,12 @@ class TimelineExporter:
           ├── {project}.otio  # OTIO timeline
           ├── {project}.edl   # CMX EDL
           ├── metadata.json   # Full edit metadata
-          └── README.txt      # Instructions
+          └── HOW_TO_CONFORM.md # Instructions
 
         Args:
             timeline: Timeline object
             exported_files: Paths to exported timeline files
+            link_to_source: Whether XML/OTIO links to source or proxies
 
         Returns:
             Path to project package directory
@@ -734,24 +780,8 @@ class TimelineExporter:
         package_dir = os.path.join(self.output_dir, f"{timeline.project_name}_PROJECT")
         os.makedirs(package_dir, exist_ok=True)
 
-        # Create README
-        readme_path = os.path.join(package_dir, "README.txt")
-        with open(readme_path, 'w') as f:
-            f.write(f"Fluxibri Timeline Export - {timeline.project_name}\n")
-            f.write("=" * 60 + "\n\n")
-            f.write("This package contains everything needed to import this edit\n")
-            f.write("into professional NLE software (DaVinci, Premiere, FCP, etc.)\n\n")
-            f.write("Files:\n")
-            f.write(f"- {timeline.project_name}.otio: OpenTimelineIO (recommended)\n")
-            f.write(f"- {timeline.project_name}.xml: FCP XML v7 (Resolve/Premiere/Kdenlive)\n")
-            f.write(f"- {timeline.project_name}.edl: CMX EDL (universal fallback)\n")
-            f.write(f"- metadata.json: Full edit metadata from Fluxibri\n\n")
-            f.write("Import Instructions:\n")
-            f.write("1. DaVinci Resolve: File > Import > Timeline > .xml (or .otio)\n")
-            f.write("2. Adobe Premiere: File > Import > .xml\n")
-            f.write("3. Final Cut Pro: File > Import > XML\n")
-            f.write("4. Kdenlive/Shotcut: File > Open > .xml\n\n")
-            f.write(f"Generated by Montage AI v{VERSION}\n")
+        # Create Conform Guide
+        self._generate_conform_guide(package_dir, timeline, link_to_source)
 
         # Move exported files into package directory
         import shutil
@@ -790,6 +820,60 @@ class TimelineExporter:
 
         return package_dir
 
+    def _generate_conform_guide(self, package_dir: str, timeline: Timeline, link_to_source: bool) -> None:
+        """Create detailed README with relinking instructions."""
+        readme_path = os.path.join(package_dir, "HOW_TO_CONFORM.md")
+        with open(readme_path, 'w') as f:
+            f.write(f"# Fluxibri Timeline Export - {timeline.project_name}\n\n")
+            f.write("This package contains everything needed to import this edit into professional NLE software.\n\n")
+            
+            f.write("## 📁 Folder Structure\n")
+            f.write("- `/media`: Original high-res footage (Source)\n")
+            f.write("- `/proxies`: Low-res proxies (if generated)\n")
+            f.write(f"- `{timeline.project_name}.otio`: OpenTimelineIO (Best for Resolve/Premiere)\n")
+            f.write(f"- `{timeline.project_name}.xml`: FCP XML v7 (Universal)\n")
+            f.write(f"- `{timeline.project_name}.edl`: CMX EDL (Fallback)\n\n")
+
+            f.write("## 🔗 Link Status\n")
+            if link_to_source:
+                f.write("**Current Link Target: SOURCE FILES (High Res)**\n")
+                f.write("The XML/OTIO files are currently pointing to the original source files.\n")
+                f.write("Use this for Color Grading or Final Finishing.\n\n")
+            else:
+                f.write("**Current Link Target: PROXIES (Low Res)**\n")
+                f.write("The XML/OTIO files are currently pointing to the proxy files.\n")
+                f.write("Use this for offline editing speed.\n\n")
+
+            f.write("## 🎬 Import Instructions\n\n")
+            
+            f.write("### 1. DaVinci Resolve (Recommended)\n")
+            f.write("1. Create a new project.\n")
+            f.write("2. Go to **File > Import > Timeline...**\n")
+            f.write(f"3. Select `{timeline.project_name}.xml` (or .otio).\n")
+            f.write("4. In the dialog:\n")
+            f.write("   - Uncheck 'Automatically import source clips into media pool'.\n")
+            f.write("   - Check 'Use sizing information'.\n")
+            f.write("5. **If media is offline:**\n")
+            f.write("   - Select all clips in the Media Pool.\n")
+            f.write("   - Right Click > **Relink Selected Clips**.\n")
+            f.write("   - Point to the `media` folder (for Source) or `proxies` folder.\n\n")
+            
+            f.write("### 2. Adobe Premiere Pro\n")
+            f.write("1. Go to **File > Import...**\n")
+            f.write(f"2. Select `{timeline.project_name}.xml`.\n")
+            f.write("3. If prompted for media location, point to the `media` folder.\n\n")
+            
+            f.write("### 3. Final Cut Pro X\n")
+            f.write("1. Go to **File > Import > XML...**\n")
+            f.write(f"2. Select `{timeline.project_name}.xml`.\n\n")
+            
+            f.write("## 💡 Workflow: Proxy to Source Relinking\n")
+            f.write("If you started with proxies and want to switch to high-res source files:\n")
+            f.write("1. **Resolve:** Select clips > Right Click > **Unlink Selected Clips**. Then Right Click > **Relink Selected Clips** > Point to `/media`.\n")
+            f.write("2. **Premiere:** Select clips > Right Click > **Make Offline**. Then Right Click > **Link Media** > Point to `/media`.\n\n")
+            
+            f.write(f"Generated by Montage AI v{VERSION}\n")
+
     @staticmethod
     def _seconds_to_timecode(seconds: float, fps: float) -> str:
         """
@@ -820,6 +904,7 @@ def export_timeline_from_montage(
     output_dir: Optional[str] = None,
     project_name: str = "montage_ai",
     generate_proxies: bool = False,
+    link_to_source: bool = False,
     resolution: Optional[Tuple[int, int]] = None,
     fps: Optional[float] = None
 ) -> Dict[str, str]:
@@ -833,6 +918,7 @@ def export_timeline_from_montage(
         output_dir: Where to save exports
         project_name: Name of the project
         generate_proxies: Whether to generate proxy files
+        link_to_source: Whether to link to source files instead of proxies
         resolution: Optional (width, height) for the target project
         fps: Optional frame rate for the target project
 
@@ -875,6 +961,7 @@ def export_timeline_from_montage(
     return exporter.export_timeline(
         timeline,
         generate_proxies=generate_proxies,
+        link_to_source=link_to_source,
         export_otio=True,
         export_edl=True,
         export_xml=True
