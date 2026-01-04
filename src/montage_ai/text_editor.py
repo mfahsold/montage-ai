@@ -321,6 +321,26 @@ class TextEditor:
 
         return self.remove_words(list(fillers))
 
+    def toggle_word(self, global_index: int, removed: bool) -> bool:
+        """
+        Set the removed state of a word by its global index.
+
+        Args:
+            global_index: 0-based index of the word in the entire transcript
+            removed: True to remove (strike), False to keep
+
+        Returns:
+            True if word was found, False otherwise
+        """
+        current_idx = 0
+        for seg in self.segments:
+            for word in seg.words:
+                if current_idx == global_index:
+                    word.removed = removed
+                    return True
+                current_idx += 1
+        return False
+
     def remove_low_confidence(self, threshold: float = 0.5) -> int:
         """
         Remove words with low transcription confidence.
@@ -521,13 +541,43 @@ class TextEditor:
     # Export
     # =========================================================================
 
+    def render_preview(self, output_path: str) -> str:
+        """
+        Render a fast preview of the current edit.
+        
+        Optimized for speed:
+        - 360p resolution
+        - Ultrafast preset
+        - High CRF (lower quality)
+        - Short audio crossfades (20ms)
+        
+        Args:
+            output_path: Path to save preview video
+            
+        Returns:
+            Path to output video
+        """
+        # Import preview constants to avoid circular imports or duplication
+        from .ffmpeg_config import PREVIEW_PRESET, PREVIEW_CRF, PREVIEW_WIDTH, PREVIEW_HEIGHT
+        
+        return self.export(
+            output_path,
+            preset=PREVIEW_PRESET,
+            crf=PREVIEW_CRF,
+            audio_crossfade_ms=20,
+            width=PREVIEW_WIDTH,
+            height=PREVIEW_HEIGHT
+        )
+
     def export(
         self,
         output_path: str,
         codec: str = "libx264",
         crf: int = 23,
         preset: str = "medium",
-        audio_crossfade_ms: int = 50
+        audio_crossfade_ms: int = 50,
+        width: Optional[int] = None,
+        height: Optional[int] = None
     ) -> str:
         """
         Render edited video with smooth audio crossfades.
@@ -546,6 +596,8 @@ class TextEditor:
             crf: Quality (lower = better)
             preset: Encoding preset
             audio_crossfade_ms: Audio crossfade duration in milliseconds
+            width: Optional output width (for scaling)
+            height: Optional output height (for scaling)
 
         Returns:
             Path to output video
@@ -598,8 +650,20 @@ class TextEditor:
 
         # Concat filter
         n_segments = len(cut_list)
-        concat_filter = f"{''.join(concat_v)}{''.join(concat_a)}concat=n={n_segments}:v=1:a=1[outv][outa]"
+        concat_filter = f"{''.join(concat_v)}{''.join(concat_a)}concat=n={n_segments}:v=1:a=1[v_concat][outa]"
         filter_parts.append(concat_filter)
+        
+        # Scaling (if requested)
+        if width and height:
+            # Use scale filter with force_original_aspect_ratio to avoid distortion
+            # and pad to fill the box if needed (though usually we just scale)
+            # For preview, simple scaling is often enough, but let's be safe.
+            # scale=w:h:force_original_aspect_ratio=decrease,pad=w:h:(ow-iw)/2:(oh-ih)/2
+            scale_filter = f"[v_concat]scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2[outv]"
+            filter_parts.append(scale_filter)
+        else:
+            # Just rename the label
+            filter_parts.append(f"[v_concat]null[outv]")
         
         full_filter = ";".join(filter_parts)
         output_video_label = "[outv]"

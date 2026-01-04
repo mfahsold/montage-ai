@@ -1,5 +1,5 @@
 """
-Smart Reframing - AI-Powered Aspect Ratio Conversion
+Auto Reframe Engine - AI-Powered Aspect Ratio Conversion
 
 Converts landscape (16:9) video to vertical (9:16) or square (1:1)
 by tracking the main subject (face/object) and keeping it centered.
@@ -10,9 +10,9 @@ Uses:
 - Smooth camera motion simulation (damping) to avoid jitter
 
 Usage:
-    from montage_ai.smart_reframing import SmartReframer
+    from montage_ai.smart_reframing import AutoReframeEngine
 
-    reframer = SmartReframer(target_aspect=9/16)
+    reframer = AutoReframeEngine(target_aspect=9/16)
     crop_data = reframer.analyze("input.mp4")
     reframer.apply(crop_data, "input.mp4", "output_vertical.mp4")
 """
@@ -41,7 +41,13 @@ try:
     MP_AVAILABLE = True
 except ImportError:
     MP_AVAILABLE = False
-    logger.warning("MediaPipe not installed. Smart Reframing will fallback to center crop.")
+    logger.warning("MediaPipe not installed. Auto Reframe will fallback to center crop.")
+
+@dataclass
+class Keyframe:
+    """A manual override point for the camera path."""
+    time: float
+    center_x_norm: float # Normalized 0.0-1.0 relative to video width
 
 @dataclass
 class CropWindow:
@@ -53,7 +59,7 @@ class CropWindow:
     height: int
     score: float  # Confidence score of the subject
 
-class CinematicPathPlanner:
+class CameraMotionOptimizer:
     """
     Solves for an optimal camera path using convex optimization (L2 regularization).
     Minimizes: Distance to Subject + Velocity (Shake) + Acceleration (Jerk).
@@ -66,13 +72,18 @@ class CinematicPathPlanner:
         self.lambda_smooth = lambda_smooth # Penalizes velocity (keeps camera still)
         self.lambda_trend = lambda_trend   # Penalizes acceleration (smooths starts/stops)
 
-    def solve(self, raw_centers: List[int]) -> List[int]:
+    def solve(self, raw_centers: List[int], constraints: Dict[int, int] = None) -> List[int]:
         """
         Solve the linear system to find the optimal path.
+        
+        Args:
+            raw_centers: List of detected subject centers per frame.
+            constraints: Optional dict mapping frame_index -> target_center_x (pixels).
+                         Used for manual keyframes.
         """
         if not SCIPY_AVAILABLE:
             logger.warning("Scipy not available. Falling back to simple moving average.")
-            return self._fallback_smooth(raw_centers)
+            return self._fallback_smooth(raw_centers, constraints)
             
         n = len(raw_centers)
         if n < 3:
@@ -99,20 +110,69 @@ class CinematicPathPlanner:
         A = I + self.lambda_smooth * (D1.T @ D1) + self.lambda_trend * (D2.T @ D2)
         b = np.array(raw_centers)
         
+        # Apply constraints (Keyframes)
+        if constraints:
+            # Add penalty term: λ_constraint * Σ (x_i - target_i)^2
+            # This modifies the diagonal of A and the vector b.
+            lambda_constraint = 10000.0 # Strong pull towards keyframe
+            
+            constraint_weights = np.zeros(n)
+            constraint_targets = np.zeros(n)
+            
+            for idx, target in constraints.items():
+                if 0 <= idx < n:
+                    constraint_weights[idx] = lambda_constraint
+                    constraint_targets[idx] = target
+            
+            # Add diagonal matrix to A
+            C = sparse.diags(constraint_weights, 0, shape=(n, n))
+            A = A + C
+            
+            # Add to b
+            b = b + constraint_weights * constraint_targets
+
         # Solve
         try:
             smoothed_path = spsolve(A, b)
             return [int(x) for x in smoothed_path]
         except Exception as e:
             logger.error(f"Optimization failed: {e}. Using fallback.")
-            return self._fallback_smooth(raw_centers)
+            return self._fallback_smooth(raw_centers, constraints)
 
-    def _fallback_smooth(self, data: List[int], window: int = 15) -> List[int]:
-        """Simple moving average fallback."""
-        return [int(x) for x in np.convolve(data, np.ones(window)/window, mode='same')]
+    def _fallback_smooth(self, data: List[int], constraints: Dict[int, int] = None, window: int = 15) -> List[int]:
+        """Simple moving average fallback with edge padding."""
+        if not data:
+            return []
+        
+        # If constraints exist, overwrite data at those points (naive approach)
+        # A better approach would be linear interpolation between keyframes, blended with data.
+        # For now, just hard overwrite before smoothing.
+        working_data = np.array(data, dtype=float)
+        if constraints:
+            for idx, target in constraints.items():
+                if 0 <= idx < len(working_data):
+                    working_data[idx] = target
+        
+        # Adjust window for short clips
+        if len(working_data) < window:
+            window = max(1, len(working_data))
+            
+        # Pad edges to avoid zero-assumption dropoff
+        pad_width = window // 2
+        padded = np.pad(working_data, pad_width, mode='edge')
+        
+        smoothed = np.convolve(padded, np.ones(window)/window, mode='valid')
+        
+        # Ensure length matches input exactly (handle odd/even window mismatch)
+        if len(smoothed) < len(working_data):
+             smoothed = np.pad(smoothed, (0, len(working_data) - len(smoothed)), mode='edge')
+        elif len(smoothed) > len(working_data):
+             smoothed = smoothed[:len(working_data)]
+            
+        return [int(x) for x in smoothed]
 
 
-class SmartReframer:
+class AutoReframeEngine:
     """
     Intelligent video reframing engine.
     """
@@ -120,7 +180,7 @@ class SmartReframer:
     def __init__(self, target_aspect: float = 9/16, smoothing_window: int = 15):
         self.target_aspect = target_aspect
         self.smoothing_window = smoothing_window
-        self.path_planner = CinematicPathPlanner(lambda_smooth=100.0, lambda_trend=10.0)
+        self.path_planner = CameraMotionOptimizer(lambda_smooth=100.0, lambda_trend=10.0)
         
         if MP_AVAILABLE:
             self.mp_face_detection = mp.solutions.face_detection
@@ -129,7 +189,36 @@ class SmartReframer:
                 min_detection_confidence=0.6
             )
 
-    def analyze(self, video_path: str) -> List[CropWindow]:
+    # Backward compatibility alias
+    SmartReframer = None # Will be set after class definition if needed, but better to just rename usages.
+
+    def _calculate_iou(self, box1, box2) -> float:
+        """Calculate Intersection over Union (IoU) between two normalized bounding boxes."""
+        # box: [xmin, ymin, width, height]
+        x1_min, y1_min, w1, h1 = box1.xmin, box1.ymin, box1.width, box1.height
+        x1_max, y1_max = x1_min + w1, y1_min + h1
+        
+        x2_min, y2_min, w2, h2 = box2.xmin, box2.ymin, box2.width, box2.height
+        x2_max, y2_max = x2_min + w2, y2_min + h2
+        
+        # Intersection
+        xi_min = max(x1_min, x2_min)
+        yi_min = max(y1_min, y2_min)
+        xi_max = min(x1_max, x2_max)
+        yi_max = min(y1_max, y2_max)
+        
+        inter_w = max(0, xi_max - xi_min)
+        inter_h = max(0, yi_max - yi_min)
+        intersection = inter_w * inter_h
+        
+        # Union
+        area1 = w1 * h1
+        area2 = w2 * h2
+        union = area1 + area2 - intersection
+        
+        return intersection / union if union > 0 else 0.0
+
+    def analyze(self, video_path: str, keyframes: List[Keyframe] = None) -> List[CropWindow]:
         """
         Analyze video and calculate optimal crop windows per frame.
         Returns list of CropWindow objects.
@@ -155,8 +244,11 @@ class SmartReframer:
         raw_centers = []
         frame_idx = 0
         
-        # Track last known good position to handle dropouts
+        # Tracking state
         last_center_x = width // 2
+        active_subject_bbox = None
+        frames_since_detection = 0
+        MAX_LOST_FRAMES = int(fps * 1.0) # Reset tracking after 1 second of loss
         
         while True:
             ret, frame = cap.read()
@@ -170,17 +262,46 @@ class SmartReframer:
             
             center_x = last_center_x # Default to last known
             score = 0.0
+            current_best_face = None
             
             if results.detections:
-                # Find largest face
-                largest_face = max(results.detections, key=lambda d: d.location_data.relative_bounding_box.width * d.location_data.relative_bounding_box.height)
-                bbox = largest_face.location_data.relative_bounding_box
-                
-                # Calculate face center
-                face_center_x = int((bbox.xmin + bbox.width / 2) * width)
-                center_x = face_center_x
-                score = largest_face.score[0]
-                last_center_x = center_x # Update last known
+                if active_subject_bbox is None or frames_since_detection > MAX_LOST_FRAMES:
+                    # No active subject or lost track -> Find largest face
+                    current_best_face = max(results.detections, key=lambda d: d.location_data.relative_bounding_box.width * d.location_data.relative_bounding_box.height)
+                    frames_since_detection = 0 # Reset counter
+                else:
+                    # We have an active subject -> Find best match (IoU)
+                    best_iou = -1.0
+                    for detection in results.detections:
+                        iou = self._calculate_iou(active_subject_bbox, detection.location_data.relative_bounding_box)
+                        if iou > best_iou:
+                            best_iou = iou
+                            current_best_face = detection
+                    
+                    # If match is too poor, consider it lost (or scene cut)
+                    if best_iou < 0.1:
+                        # Fallback to largest if tracking fails completely? 
+                        # Or just hold position? Let's hold position for now, but check if there's a HUGE face we are ignoring.
+                        # For stability, let's just increment lost counter.
+                        current_best_face = None 
+                    else:
+                        frames_since_detection = 0
+
+                if current_best_face:
+                    bbox = current_best_face.location_data.relative_bounding_box
+                    
+                    # Update active subject
+                    active_subject_bbox = bbox
+                    
+                    # Calculate face center
+                    face_center_x = int((bbox.xmin + bbox.width / 2) * width)
+                    center_x = face_center_x
+                    score = current_best_face.score[0]
+                    last_center_x = center_x # Update last known
+                else:
+                    frames_since_detection += 1
+            else:
+                frames_since_detection += 1
             
             raw_centers.append(center_x)
             
@@ -200,9 +321,18 @@ class SmartReframer:
 
         cap.release()
         
+        # Convert keyframes to constraints
+        constraints = {}
+        if keyframes:
+            for kf in keyframes:
+                f_idx = int(kf.time * fps)
+                f_idx = max(0, min(f_idx, len(raw_centers) - 1))
+                pixel_x = int(kf.center_x_norm * width)
+                constraints[f_idx] = pixel_x
+
         # Apply Cinematic Path Planning (Global Optimization)
         logger.info("Optimizing camera path...")
-        smoothed_centers = self.path_planner.solve(raw_centers)
+        smoothed_centers = self.path_planner.solve(raw_centers, constraints)
         
         # Update crops with smoothed centers
         for i, crop in enumerate(crops):
@@ -310,11 +440,37 @@ class SmartReframer:
             
         return segments
 
-    def apply(self, crops: List[CropWindow], input_path: str, output_path: str) -> None:
+    def apply(self, crops: Optional[List[CropWindow]], input_path: str, output_path: str) -> None:
         """
         Apply the calculated crops using FFmpeg.
         Uses segmented cropping to simulate camera cuts/pans.
+        If crops is None, applies a static center crop.
         """
+        if crops is None:
+            # Fallback to center crop
+            logger.info("No crops provided. Applying center crop.")
+            cap = cv2.VideoCapture(input_path)
+            if not cap.isOpened():
+                logger.error(f"Could not open {input_path}")
+                return
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            cap.release()
+            
+            target_w, target_h = self._calculate_crop_dims(width, height)
+            x = (width - target_w) // 2
+            y = (height - target_h) // 2
+            
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", input_path,
+                "-vf", f"crop={target_w}:{target_h}:{x}:{y}",
+                "-c:a", "copy",
+                output_path
+            ]
+            run_command(cmd)
+            return
+
         segments = self._segment_crops(crops)
         
         if not segments:
@@ -364,3 +520,7 @@ class SmartReframer:
         
         run_command(cmd)
 
+
+# Backward compatibility aliases
+SmartReframer = AutoReframeEngine
+CinematicPathPlanner = CameraMotionOptimizer

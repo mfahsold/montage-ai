@@ -1,223 +1,152 @@
 # Montage AI – Strategic Product Document
 
-**Version:** 2.3 (PwC-Style Update)
-**Date:** January 2026
+**Version:** 2.4 (PwC-Style Strategy Update)
+**Date:** January 4, 2026
 **Classification:** Public
+**Status:** Active
 
 ---
 
 ## Executive Summary
 
-**Positionierung:** *"AI rough cut + social-ready output + pro handoff"*
+**Core Philosophy:** "Polish, don't generate."
+**Differentiation:** Local-first + Pro-handoff.
+**Current Focus:** Tangible speed and control ("Preview-First").
 
-Montage AI ist ein **local-first, privacy-first** Post-Production-Assistent, der konsequent dem Prinzip **"polish, don't generate"** folgt. Wir generieren keine Pixel – wir veredeln bestehendes Footage.
+Montage AI is not a generative video tool. It is a post-production assistant that refines existing footage. Our goal for Q1 2026 is to productize the **Transcript Editor**, deliver **Shorts Studio 2.0**, and stabilize **Pro-Handoff** and **Audio-Polish**.
 
-### Kernvorteil
-Der Kernvorteil bleibt **"polish, don't generate"**: local-first + pro-handoff ist klar differenziert; jetzt zählt erlebbare Geschwindigkeit und Kontrolle.
-
-### Priorität Q1
-- **Transcript Editor produktisieren**
-- **Shorts Studio 2.0 liefern**
-- **Pro-Handoff + Audio-Polish stabilisieren**
-- Alles auf **"Preview-first"** getrimmt.
+### Strategic Priorities (Q1)
+1.  **Transcript Editor Productization:** Move from prototype to a first-class editing surface.
+2.  **Shorts Studio 2.0:** Smart-Reframe v2 and native caption styles.
+3.  **Preview-First Pipeline:** Immediate feedback loops (360p) before final rendering.
+4.  **Pro-Handoff:** Reliable OTIO export to DaVinci Resolve/Premiere.
 
 ### Scope
-Strikt halten (Rough-Cut + Social-Ready + NLE-Export); generative Video-Erzeugung und Voll-NLE bewusst ausklammern.
+*   **In-Scope:** Rough-Cut, Transcript-Editing, Shorts/Vertical, Captions, Smart-Reframe, Audio-Polish, OTIO/EDL-Handoff.
+*   **Out-of-Scope:** Generative Video, Full NLE replacement (multitrack compositing, VFX), Social Hosting.
 
 ### UI Vision
-Vom "Toggle-Friedhof" zum **"Outcome-Studio"**: klare Workflows, sichtbare Story/Beat-Logik, stilprägende Motion.
+Transition from a "Toggle Graveyard" to an **"Outcome Studio"**.
+*   Clear workflows (Transcript, Shorts, Montage).
+*   Visible Story/Beat logic.
+*   Style-defining motion and "Cyber-NLE" aesthetics.
 
 ---
 
 ## Implementation Snapshot (Codebase Reality)
 
-| Feature | Status | Details |
-|---------|--------|---------|
-| **Preview Pipeline** | ✅ Ready | `ffmpeg_config.py` hat Preview-Preset (360p, ultrafast) + GPU-Auto-Encoding. Perfekte Basis für echte Preview-First-UX. |
-| **Text-based Editing** | ⚠️ Partial | `transcript.html` liefert Word-Level-Edits, Filler-Removal und Export-Buttons. Preview-Flow ist aktuell Stub. |
-| **Shorts/Reframing** | ⚠️ Partial | `shorts.html` liefert Safe-Zones, Caption-Style-Preview, Reframe-Modi, Highlight-UI. Highlights/Render sind teilweise Stub-Logik. |
-| **Pro-Export** | ✅ Core | `video_metadata.py` bestimmt Output-Profile via gewichtete Mediane; passt ideal zu Quality-Profile-Automatik. |
-| **Audio-Polish** | ⚠️ Stub | Toggle vorhanden, aber Implementierung (Voice Isolation) muss stabilisiert werden. |
-
-*Doku/Status wirkt inkonsistent (z.B. STRATEGY.md vs. vorhandene Transcript-UI); das erzeugt Erwartungslücken.*
+| Component | Status | Alignment |
+| :--- | :--- | :--- |
+| **ffmpeg_config.py** | ✅ Ready | Has Preview-Preset (360p, ultrafast) + GPU-Auto-Encoding. Perfect basis for Preview-First UX. |
+| **video_metadata.py** | ✅ Ready | Determines Output-Profiles via weighted medians; fits ideal Quality-Profile automation. |
+| **transcript.html** | ⚠️ Partial | Delivers Word-Level-Edits, Filler-Removal, Export-Buttons. Preview-Flow is currently a stub. |
+| **shorts.html** | ⚠️ Partial | Has Safe-Zones, Caption-Style-Preview, Reframe-Modes. Highlights/Render logic is partly stubbed. |
+| **Documentation** | ❌ Inconsistent | `STRATEGY.md` vs. actual UI state creates expectation gaps. |
 
 ---
 
 ## Market Signals & Benchmarks
 
-| Signal | Quelle | Implikation |
-|--------|--------|-------------|
-| **Video ist Mainstream** | [Wyzowl](https://www.wyzowl.com/video-marketing-statistics/) | Qualität beeinflusst Vertrauen → Quality-Profiles + Audio-Polish sind Pflicht. |
-| **Text-basiertes Editing** | [Descript](https://www.descript.com/), [Adobe](https://helpx.adobe.com/premiere/desktop/edit-projects/edit-video-using-text-based-editing/transcribe-video.html) | Standard bei Marktführern → Transcript-UI muss first-class sein. |
-| **Short-Form ist Kernformat** | [YouTube Shorts](https://support.google.com/youtube/answer/10059070?hl=en) | Vertical/Shorts-Workflow ist strategisch. |
-| **AI-Reframe** | [Opus Clip](https://www.opus.pro/ai-reframe) | Klarer Wettbewerbsvorteil bei Repurposing-Tools → Smart-Reframe-Qualität entscheidet. |
-| **Pro-NLEs & AI-Audio** | [DaVinci Resolve](https://www.blackmagicdesign.com/products/davinciresolve) | Erwartung für "Clean Audio" (Voice Isolation) ist gesetzt. |
-| **OTIO Standard** | [OpenTimelineIO](https://opentimelineio.readthedocs.io/en/stable/) | Pro-Export bleibt zentraler Differenziator. |
+1.  **Quality = Trust:** Video is mainstream; quality profiles and audio polish are mandatory [1].
+2.  **Text-Based Editing:** Standard feature for market leaders (Descript, Adobe) [2][3].
+3.  **Short-Form Strategy:** YouTube Shorts and TikTok require dedicated vertical workflows [5][6].
+4.  **AI-Reframe:** A key competitive advantage for repurposing tools (Opus Clip) [4].
+5.  **Clean Audio:** Pro NLEs set the expectation for Voice Isolation [7].
+6.  **OTIO Standard:** The industry standard for timeline handoff [8].
 
 ---
 
-## Fokus Features (Q1 Priorities)
+## Focus Features (Q1 Priorities)
 
-### 1. Transcript Editor Produktisierung
-- **Live-Preview (360p):** Sofortiges Feedback bei Text-Löschung.
-- **Word-Level-Cut-List:** Apply/Undo Stack.
-- **Filler-Removal:** Automatische Erkennung und Entfernung von "äh", "um".
-- **Pro-Export:** OTIO/EDL direkt aus dem Textschnitt; Transkription bleibt Whisper-kompatibel.
+### 1. Transcript Editor Productization
+*   **Live-Preview (360p):** Immediate playback of edits.
+*   **Word-Level-Cut-List:** Apply/Undo stack for precise editing.
+*   **Filler-Removal:** Auto-detect and remove "um", "uh" with Speaker Tags.
+*   **Pro-Export:** OTIO/EDL export directly from text edits.
 
 ### 2. Shorts Studio 2.0
-- **Smart-Reframe v2:** Subject Tracking + Motion Smoothing.
-- **Caption-Styles:** Echte Styles (TikTok/Bold/Karaoke) mit Live-Preview.
-- **Highlight-Detection:** MVP + Review-Cards.
+*   **Smart-Reframe v2:** Subject Tracking + Motion Smoothing.
+*   **Caption-Styles:** Real styles (TikTok/Bold/Karaoke) with Live-Preview.
+*   **Highlight-Detection:** MVP with Review-Cards.
 
 ### 3. Preview-First Pipeline
-- **Default-Preview:** Sofort nach Upload, klarer ETA/Progress.
-- **"Final Render":** Als separater Step.
-- **Upscale:** Nur in High/Master via Real-ESRGAN.
+*   **Default-Preview:** Starts immediately after upload. Clear ETA/Progress.
+*   **"Final Render":** A separate, deliberate step.
+*   **Upscale:** Only applied in High/Master profiles via Real-ESRGAN [9].
 
 ### 4. Pro Handoff Pack
-- **OTIO-Export:** Standard für DaVinci/Premiere.
-- **Proxies:** Automatische Generierung.
-- **Relink-README:** Anleitung für den Import.
-- **Import-Smoke-Tests:** Mit Resolve/Premiere.
+*   **OTIO-Export:** Compatible with DaVinci/Premiere.
+*   **Proxies:** Automatic generation.
+*   **Relink-README:** Auto-generated guide for importing.
+*   **Smoke Tests:** Verified imports in target NLEs.
 
 ### 5. Audio-Polish
-- **Clean Audio Toggle:** Voice Isolation + Denoise + Fallback bei Artefakten.
-- **SNR-Check:** Erwartung deckt Pro-NLE-Standard.
+*   **Clean Audio Toggle:** Voice Isolation + Denoise + Fallback.
+*   **SNR-Check:** Quality assurance metric.
 
 ---
 
-## Scope
+## Consolidation & Cleanup
 
-**In-Scope:**
-- Rough-Cut aus vorhandenen Clips
-- Transcript-Editing
-- Shorts-Outputs
-- Captions
-- Smart-Reframe
-- Audio-Polish
-- OTIO/EDL-Handoff
-- Local-first mit optionalem Cloud-Boost
-
-**Out-of-Scope:**
-- Generative Video
-- Vollständiger NLE-Ersatz (Multitrack-Compositing, VFX)
-- Social Hosting/Distribution
-- After-Effects-artige Motion-Graphics
+*   **AI Director:** Bundle LLM toggles under a single "AI Director" flag. Move "Creative Loop" to an Advanced drawer.
+*   **UI Reduction:** Deprecate Legacy/v2 variants. One "Outcome Hub" + three distinct workflows.
+*   **Style Presets:** Curate the catalog to core styles. Move the rest to a "Community Pack".
+*   **Silence Removal:** Treat as a utility baseline (like auto-editor), not a differentiator [10].
+*   **Cloud Options:** Single "Cloud Boost" toggle instead of granular flags.
 
 ---
 
-## Weglassen/Konsolidieren
+## UI/UX Vision: "Hip & Innovative"
 
-- **LLM-Toggles:** Unter ein "AI Director"-Flag bündeln.
-- **Creative Loop:** Als "Advanced-Drawer" verstecken.
-- **UI-Varianten:** Reduzieren auf einen Outcome-Hub + drei Workflows (Legacy/v2/Strategy deprecaten).
-- **Style-Preset-Katalog:** Straffen auf kuratierte Kern-Styles.
-- **Silence-Removal:** Als Basisfeature behandeln (Utility-Baseline).
-- **Cloud-Optionen:** Bündeln; Cloud-Toggle entscheidet, nicht einzelne Flags.
-
----
-
-## UI/UX Vision: "Outcome Studio"
-
-Damit es "hip & innovativ" wirkt:
-
-1.  **Transcript-First Tri-Pane:** Video + Text + Beat/Story-Timeline mit Live-Marker (zeigt, warum ein Cut passiert).
-2.  **Kinetische Beat-Timeline:** Energy-Curve, Beat-Ticks und Story-Arc-Phasen als Overlay (macht Differenzierung greifbar).
-3.  **Shorts-Studio als "Phone-Rig":** Crop-Path-Overlay mit Keyframe-Handles, Safe-Zone-Presets pro Plattform, Caption-Composer mit Live-Styles.
-4.  **"Preview vs Final":** Bewusstes Ritual, klarer Zustand, Vergleichssplit, schnelle A/B-Loops.
-5.  **Typo & Motion:** Starke, eigenständige Headlines, subtile Motion-Reveals, UI-Sounding (Click-to-Cut).
+*   **Transcript-First Tri-Pane:** Video + Text + Beat/Story-Timeline with Live-Markers.
+*   **Kinetic Beat Timeline:** Energy-Curve, Beat-Ticks, and Story-Arc phases as overlays.
+*   **Shorts-Studio "Phone-Rig":** Crop-Path-Overlay with Keyframe-Handles, Safe-Zone-Presets.
+*   **"Preview vs Final" Ritual:** Clear state distinction, comparison split, fast A/B loops.
+*   **Typo & Motion:** Strong headlines, subtle motion-reveals, UI-Sounding (Click-to-Cut).
 
 ---
 
-## 90-Tage-Plan (Komprimiert)
+## 90-Day Plan (Compressed)
 
-| Wochen | Fokus | Deliverable |
-|--------|-------|-------------|
-| **0-4** | **Foundation** | Transcript-Editor Preview-Flow + Export stabilisieren, Doku-Sync, Telemetrie für Time-to-Preview. |
-| **5-8** | **Growth** | Shorts Studio 2.0 (Reframe v2 + Caption-Styles + Highlight-MVP), UI-Polish. |
-| **9-12** | **Pro** | Pro-Handoff Pack + Audio-Polish + Performance-Targets. |
-
-## Kern-KPIs
-
-1.  **Time-to-First-Preview:** < 2-3 Min, Preview-Success-Rate > 95%.
-2.  **Transcript-Editing-Adoption:** > 40% der Sessions; Export-Success > 95%.
-3.  **Shorts-Creation-Cycle:** < 10 Min; Reframe-Accuracy > 90%.
-4.  **Audio-Improvement-Rate:** > 70% (SNR-Check).
+| Phase | Weeks | Focus | Key Deliverables |
+| :--- | :--- | :--- | :--- |
+| **1** | 0–4 | **Foundation** | Transcript-Editor Preview-Flow, Export stabilization, Telemetry. |
+| **2** | 5–8 | **Shorts 2.0** | Reframe v2, Caption-Styles, Highlight-MVP, UI Polish. |
+| **3** | 9–12 | **Pro Polish** | Pro-Handoff Pack, Audio-Polish, Performance Targets. |
 
 ---
 
-## Risiken & Mitigation
+## Core KPIs
 
-- **Performance/Hardware-Streuung:** Preview-First + Proxy-Pfad + GPU-Fallback.
-- **LLM-Unzuverlässigkeit:** Guardrails + deterministic defaults.
-- **UI-Komplexität:** Outcome-Flows + progressive disclosure.
-- **Cloud-Verfügbarkeit:** Harte Fallback-Strategie + klare UI-Kommunikation.
+*   **Time-to-First-Preview:** < 2–3 Minutes.
+*   **Preview-Success-Rate:** > 95%.
+*   **Transcript-Editing-Adoption:** > 40% of sessions.
+*   **Export-Success:** > 95%.
+*   **Shorts-Creation-Cycle:** < 10 Minutes.
+*   **Reframe-Accuracy:** > 90%.
+*   **Audio-Improvement-Rate:** > 70% (SNR Check).
 
 ---
 
-## Quellen
+## Risks & Mitigation
+
+*   **Performance/Hardware:** Mitigate via Preview-First + Proxy Path + GPU Fallback.
+*   **LLM Reliability:** Mitigate via Guardrails + Deterministic Defaults.
+*   **UI Complexity:** Mitigate via Outcome-Flows + Progressive Disclosure.
+*   **Cloud Availability:** Mitigate via Hard Fallback Strategy + Clear UI Communication.
+
+---
+
+## References
 
 [1] [Wyzowl Video Marketing Statistics](https://www.wyzowl.com/video-marketing-statistics/)
 [2] [Descript Video Editing](https://www.descript.com/video-editing)
 [3] [Adobe Text-Based Editing](https://helpx.adobe.com/premiere/desktop/edit-projects/edit-video-using-text-based-editing/transcribe-video.html)
 [4] [Opus Clip AI Reframe](https://www.opus.pro/ai-reframe)
-[5] [YouTube Shorts Guide](https://support.google.com/youtube/answer/10059070?hl=en)
-[6] [YouTube Captions](https://support.google.com/youtube/answer/2734796?hl=en)
+[5] [YouTube Shorts Getting Started](https://support.google.com/youtube/answer/10059070?hl=en)
+[6] [YouTube Creation Tools](https://support.google.com/youtube/answer/2734796?hl=en)
 [7] [DaVinci Resolve](https://www.blackmagicdesign.com/products/davinciresolve)
 [8] [OpenTimelineIO](https://opentimelineio.readthedocs.io/en/stable/)
 [9] [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
 [10] [Auto-Editor](https://github.com/WyattBlue/auto-editor)
 [11] [OpenAI Whisper](https://github.com/openai/whisper)
-
-
-Weg vom "Toggle-Friedhof" hin zu klaren Workflows:
-
-1.  **Transcript-First Tri-Pane:** Video + Text + Beat/Story-Timeline.
-2.  **Kinetische Beat-Timeline:** Energy-Curve und Story-Arc als Overlay.
-3.  **Shorts-Studio als "Phone-Rig":** Crop-Path-Overlay, Safe-Zones, Caption-Composer.
-4.  **Preview vs Final:** Bewusster Schritt, schneller A/B-Vergleich.
-5.  **Typo & Motion:** Cyber-NLE-Look, aber hochwertig (Click-to-Cut Sounding).
-
----
-
-## Roadmap 12 Monate
-
-### Phase 1: Foundation (0-4 Wochen)
-- Transcript-UI
-- Preview-first Pipeline
-- Toggle-Konsolidierung
-- Besseres Onboarding
-
-### Phase 2: Growth (5-12 Wochen)
-- Shorts Studio
-- Smart-Reframe-Upgrade
-- Captions-Styles
-- Highlight-Detection MVP
-
-### Phase 3: Pro (3-6 Monate)
-- Audio-Polish (Voice Isolation + Denoise)
-- Pro-Export-Pack (OTIO+Proxies+Relink)
-
-### Phase 4: Ecosystem (6-12 Monate)
-- Creative Loop v2
-- Style-Ecosystem/Marketplace
-- Performance-Optimierung und Reliability
-
----
-
-## UI/UX Vision
-
-- **Transcript-first Layout:** Split-View (Video + Text), Wort-Highlights, One-click Cuts.
-- **Energy/Beat Timeline:** Sichtbare Beat-Marker + Story-Arc-Kurve.
-- **Shorts Studio:** Phone-Frame, Safe-Area-Guides, Crop-Path-Overlay.
-- **Style-Moodboard:** Preset-Cards mit Farbfeld, Rhythmus-Label, Sample-Frames.
-- **Visual System:** Mutige Typo, kinetische Einstiegsmotion, subtile Texturen.
-
----
-
-## Risiken & Mitigation
-
-- **Reframe/Caption-Fehler:** Live-Preview, manuelle Override-Griffe.
-- **Performance:** Preview-first, Proxy-Generierung, GPU-Auto-Detect.
-- **UI-Komplexitaet:** Outcome-Flows, Progressive Disclosure.
-- **Wettbewerb:** Fokus auf zuverlaessigen Rough-cut + Pro-Handoff.

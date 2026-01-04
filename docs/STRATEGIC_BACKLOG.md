@@ -1,91 +1,100 @@
-# Montage AI – Strategic Backlog (2026)
+# Montage AI – Strategic Backlog (Q1 2026)
 
-Based on the "PwC-like" Strategy Update (Jan 2026).
+**Based on:** [STRATEGY.md](STRATEGY.md) (PwC-Style Update)
+**Timeline:** 90 Days (Weeks 0-12)
+**Focus:** Polish, Don't Generate.
 
-## Phase 1: Foundation (0-4 Weeks)
+---
 
-### Epic 1: Transcript-Based Editing UI (Priority: High)
-**Goal:** Bring the existing backend capability (`text_editor.py`) to the Web UI.
-- [ ] **Story 1.1: Transcript Panel Component**
-  - Create a split-view layout in `index.html` / `app.js`.
-  - Display transcription text with word-level timestamps.
-  - Highlight words as the video plays.
-- [ ] **Story 1.2: Click-to-Cut Interaction**
-  - Allow users to click words to "strike them out".
-  - Update the EDL/Cut-list in real-time.
-  - Send updated cut-list to backend for preview generation.
-- [ ] **Story 1.3: Filler Word Removal UI**
-  - Add a "Remove Fillers" button in the UI.
-  - Visualize removed filler words (e.g., red strikethrough).
-- [ ] **Story 1.4: Preview Generation**
-  - "Generate Preview" button that renders the text-based edits.
-  - Use the existing CLI logic via a new API endpoint.
+## Phase 1: Foundation & Preview-First (Weeks 0–4)
 
-### Epic 2: Preview-First Pipeline (Priority: High)
-**Goal:** Shift from "render everything" to "fast preview, then final render".
-- [x] **Story 2.1: Low-Res Preview Job**
-  - Create a fast render profile (360p, low bitrate).
-  - Update `montage-ai.sh` / `editor.py` to support `--preview` flag efficiently.
-- [ ] **Story 2.2: Web UI Preview Player**
-  - Default the main player to show the preview stream.
-  - Add a prominent "Final Render" button for high-quality export.
+**Theme:** "Make it usable and fast."
+**KPIs:** Time-to-First-Preview < 2-3 min, Preview-Success-Rate > 95%.
 
-### Epic 3: UI Consolidation (Priority: Medium)
-**Goal:** Clean up the "Toggle Graveyard".
-- [ ] **Story 3.1: Quality Profiles**
-  - Replace individual toggles (Upscale, Stabilize, Enhance) with a single "Quality Profile" dropdown (Draft, Social, Pro).
-  - Map profiles to backend flags.
-- [ ] **Story 3.2: Advanced Drawer**
-  - Move granular controls into a collapsible "Advanced" section.
+### Epic 1: Transcript Editor Productization
+*Goal: Turn the prototype into a reliable editing surface.*
+- [ ] **Story 1.1: Live Preview Flow**
+  - Implement 360p "ultrafast" preview generation triggered by transcript edits.
+  - Ensure < 5s latency between "Apply Edits" and playback start.
+- [ ] **Story 1.2: Word-Level Cut List**
+  - UI for selecting/striking words.
+  - Backend logic to translate word indices to time ranges (EDL).
+  - "Undo" stack for non-destructive editing.
+- [ ] **Story 1.3: Filler Removal & Speaker Tags**
+  - Detect filler words (um, uh) via Whisper.
+  - UI toggle to "Strike all fillers".
+  - Visual speaker change indicators in the text stream.
+- [ ] **Story 1.4: Text-Based Export**
+  - Export button in Transcript view.
+  - Generate OTIO/EDL directly from the text selection state.
 
-## Phase 2: Growth (5-12 Weeks)
+### Epic 2: Preview-First Pipeline
+*Goal: Immediate feedback loop.*
+- [ ] **Story 2.1: Default Preview Generation**
+  - Automatically start 360p render immediately after upload/ingest.
+  - Show clear ETA/Progress bar in the UI header.
+- [ ] **Story 2.2: "Final Render" Separation**
+  - Distinct UI flow for "Export Master".
+  - Only apply heavy effects (Upscale, Stabilization) in this step.
+- [ ] **Story 2.3: Telemetry**
+  - Instrument "Time to Preview" and "Edit Latency" metrics.
 
-### Epic 4: Shorts Studio (Priority: High)
-**Goal:** Dedicated workflow for vertical video.
-- [x] **Story 4.1: Vertical Player Layout**
-  - Add a "Shorts Mode" to the UI with 9:16 player container.
-  - Show safe-area overlays (TikTok/Reels UI zones).
-- [x] **Story 4.2: Smart Reframe Visualization**
-  - Visualize the crop path (where the camera is panning) over the original footage.
-  - Allow manual adjustment of the crop center.
-- [x] **Story 4.3: Caption Styles**
-  - Add style picker for captions (Karaoke, Minimal, Bold).
-  - Live preview of caption rendering (using CSS/Canvas overlay before burning).
+---
 
-### Epic 5: Highlight Detection MVP (Priority: Medium)
-**Goal:** Automated suggestion of "viral" clips.
-- [ ] **Story 5.1: Backend Analysis**
-  - Implement `highlight_detector.py` using audio energy and speech patterns.
-  - Return a list of candidate time-ranges.
-- [ ] **Story 5.2: Highlight Review UI**
-  - Display candidate clips as cards in the UI.
-  - Allow user to "Accept" or "Reject" highlights.
+## Phase 2: Shorts Studio 2.0 (Weeks 5–8)
 
-## Phase 3: Pro (3-6 Months)
+**Theme:** "Vertical Video that feels native."
+**KPIs:** Shorts-Creation-Cycle < 10 Min, Reframe-Accuracy > 90%.
 
-### Epic 6: Audio Polish (Priority: Medium)
-- [x] **Story 6.1: Voice Isolation Integration**
-  - Expose the cgpu `voice_isolation.py` job in the UI.
-  - Add "Clean Audio" toggle.
-- [ ] **Story 6.2: Noise Reduction**
-  - Implement basic noise gate/reduction in `editor.py` (ffmpeg filters).
+### Epic 3: Smart Reframe v2
+*Goal: Broadcast-quality vertical crops.*
+- [ ] **Story 3.1: Subject Tracking & Smoothing**
+  - Upgrade `SmartReframer` to use continuous subject tracking (not just per-frame face detection).
+  - Implement motion smoothing (Kalman filter or similar) to prevent jittery camera moves.
+- [ ] **Story 3.2: Crop Path Overlay**
+  - "Phone Rig" UI: Show the 9:16 window moving over the 16:9 source in real-time.
+  - Allow manual keyframe overrides for the crop center.
 
-### Epic 7: Pro Export Pack (Priority: Low)
-- [x] **Story 7.1: OTIO Export UI**
-  - Add "Export to Premiere/Resolve" button.
-  - Generate `.otio` file alongside `.mp4`.
+### Epic 4: Caption Styles & Highlights
+*Goal: Social-ready output without external tools.*
+- [ ] **Story 4.1: Live Caption Styles**
+  - Implement presets: "TikTok" (Classic), "Bold" (Impact), "Karaoke" (Active word highlight).
+  - Render CSS-based preview in the web player.
+- [ ] **Story 4.2: Highlight Detection MVP**
+  - "Magic Moments" sidebar suggesting 15-60s clips based on audio energy/laughter/keywords.
+  - Review Cards: "Keep", "Discard", "Edit" for each suggestion.
 
-## 90-Day Plan (Compressed)
+---
 
-| Week | Focus | Deliverable |
-|------|-------|-------------|
-| **0-4** | **Foundation** | Transcript Editor Preview-Flow, Doku-Sync, Telemetrie. |
-| **5-8** | **Growth** | Shorts Studio 2.0 (Reframe v2 + Caption Styles + Highlight MVP). |
-| **9-12** | **Pro** | Pro Handoff Pack + Audio Polish + Performance Targets. |
+## Phase 3: Pro Polish & Handoff (Weeks 9–12)
 
-## Kern-KPIs
+**Theme:** "Trust the output."
+**KPIs:** Audio-Improvement-Rate > 70%, Export-Success > 95%.
 
-1.  **Time-to-First-Preview:** < 2-3 Min (Success Rate > 95%)
-2.  **Transcript-Editing-Adoption:** > 40% der Sessions
-3.  **Shorts-Creation-Cycle:** < 10 Min
-4.  **Audio-Improvement-Rate:** > 70% (SNR-Check)
+### Epic 5: Pro Handoff Pack
+*Goal: Seamless integration with NLEs.*
+- [ ] **Story 5.1: Robust OTIO Export**
+  - Ensure OTIO files open correctly in DaVinci Resolve and Premiere Pro.
+  - Include relative paths to source media.
+- [ ] **Story 5.2: Proxy Generation**
+  - Option to generate and link ProRes Proxy files.
+- [ ] **Story 5.3: Relink README**
+  - Auto-generate a `HOW_TO_RELINK.md` in the export folder with instructions.
+- [ ] **Story 5.4: Import Smoke Tests**
+  - Automated tests to verify generated OTIO files against NLE import specs.
+
+### Epic 6: Audio Polish
+*Goal: "Clean Audio" standard.*
+- [ ] **Story 6.1: "Clean Audio" Toggle**
+  - Single switch that activates Voice Isolation + Denoise.
+  - Implement SNR (Signal-to-Noise Ratio) check before/after to verify improvement.
+- [ ] **Story 6.2: Fallback Strategy**
+  - If artifacts are detected (or confidence low), blend with original audio or reduce effect intensity.
+
+---
+
+## Out of Scope (Explicit)
+- Generative Video (Pixels from scratch).
+- Full NLE features (Multitrack compositing, complex VFX).
+- Social Hosting/Distribution APIs.
+- After-Effects-style Motion Graphics.

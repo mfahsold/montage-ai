@@ -45,21 +45,22 @@ spec:
         - name: montage-ai
           image: ghcr.io/mfahsold/montage-ai:latest
           imagePullPolicy: Always
+          args: ["run", "documentary"]
           env:
             - name: USE_GPU
               value: "prefer"
             - name: VK_ICD_FILENAMES
               value: "/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
             - name: QUALITY_PROFILE
-              value: "master"
+              value: "preview"
             - name: EXPORT_WIDTH
-              value: "3840"
+              value: "640"
             - name: EXPORT_HEIGHT
-              value: "2160"
+              value: "360"
             - name: UPSCALE
-              value: "true"
+              value: "false"
             - name: STABILIZE
-              value: "true"
+              value: "false"
             - name: CGPU_ENABLED
               value: "true"
             - name: CLEAN_AUDIO

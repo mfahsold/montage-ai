@@ -1,5 +1,7 @@
 # Features
 
+> **Strategic Context:** See [STRATEGY.md](STRATEGY.md) for our 2026 "Polish, Don't Generate" vision.
+
 Everything Montage AI can do for you.
 
 > **Philosophy:** We polish pixels, we don't generate them.
@@ -20,13 +22,31 @@ Edit video by editing text — inspired by Descript's revolutionary approach.
 5. Export final cut or OTIO timeline
 
 **Features:**
-- Word-level sync with click-to-seek
-- Speaker diarization (coming soon)
-- Filler word detection ("um", "uh", "like")
-- Silence removal with adjustable threshold
-- Export transcript as SRT/VTT
+- **Live Preview:** Auto-generates 360p preview 2 seconds after edits.
+- **Undo/Redo:** Full history stack for non-destructive editing.
+- **Word-level sync:** Click any word to seek video.
+- **Filler word detection:** Highlights "um", "uh", "like" for easy removal.
+- **Silence removal:** Adjustable threshold for automatic gap removal.
+- **Export formats:** Video (MP4), EDL (Premiere), OTIO (Resolve).
 
 **Access:** Web UI at `/transcript`
+
+---
+
+### Pro Handoff (Timeline Export)
+
+Seamlessly move from Montage AI to professional NLEs.
+
+**Features:**
+- **Source Relinking:** Option to link XML/OTIO to original high-res source files instead of proxies.
+- **Conform Guide:** Automatically generates `HOW_TO_CONFORM.md` with step-by-step instructions.
+- **Project Packaging:** Exports are bundled into a structured `{project}_PROJECT` folder.
+- **Proxy Generation:** Creates ProRes or DNxHR proxies for smooth editing.
+
+**Supported Formats:**
+- **OpenTimelineIO (.otio):** Modern standard for Resolve, Premiere, Nuke.
+- **FCP XML (.xml):** Universal exchange format.
+- **CMX 3600 EDL (.edl):** Legacy fallback.
 
 ---
 
@@ -47,7 +67,7 @@ Create vertical content optimized for TikTok, Instagram Reels, and YouTube Short
 | Center | Simple center crop |
 | Custom | Manual positioning with keyframes |
 
-**Smart Reframing Engine:**
+**Auto Reframe Engine:**
 - **Cinematic Path Planning:** Uses convex optimization (L2 regularization) to simulate professional camera operation.
 - **Physics-Based Smoothing:** Minimizes velocity and acceleration changes for fluid motion.
 - **Subject Awareness:** Keeps subjects in the "golden zone" while avoiding jerky movements.
@@ -96,6 +116,8 @@ Master:    enhance=true,  stabilize=true,  upscale=true,  resolution=4k
 **Usage:**
 ```bash
 # CLI
+./montage-ai.sh preview hitchcock   # Fast 360p render
+./montage-ai.sh finalize hitchcock  # Upgrade to High Quality
 ./montage-ai.sh run hitchcock --quality high
 
 # Environment variable
@@ -103,6 +125,14 @@ QUALITY_PROFILE=master ./montage-ai.sh run
 
 # Web UI: Select from Quality Profile cards
 ```
+
+### Preview-First Workflow
+
+Iterate faster by separating creative decisions from rendering time.
+
+1.  **Auto-Preview:** Upload clips and get a 360p rough cut in seconds.
+2.  **Review:** Check pacing, music sync, and story arc immediately.
+3.  **Finalize:** Click "Finalize (1080p)" to render the master copy with full stabilization and enhancement.
 
 ---
 

@@ -42,6 +42,7 @@ class Transcriber:
         audio_path: str,
         output_format: str = "srt",
         language: Optional[str] = None,
+        word_timestamps: bool = False,
     ) -> Optional[str]:
         """
         Transcribe an audio file using Whisper on cgpu.
@@ -50,6 +51,7 @@ class Transcriber:
             audio_path: Path to local audio file
             output_format: Output format (srt, vtt, txt, json)
             language: Optional language code (e.g., "en", "de")
+            word_timestamps: Enable word-level timestamps
 
         Returns:
             Path to the generated subtitle file, or None if failed.
@@ -59,6 +61,7 @@ class Transcriber:
             model=self.model,
             output_format=output_format,
             language=language,
+            word_timestamps=word_timestamps,
         )
         result = job.execute()
         
@@ -79,6 +82,7 @@ def transcribe_audio(
     model: Optional[str] = None,
     output_format: str = "srt",
     language: Optional[str] = None,
+    word_timestamps: bool = False,
 ) -> Optional[str]:
     """
     Quick transcription helper.
@@ -88,12 +92,13 @@ def transcribe_audio(
         model: Whisper model size (optional, uses config default if None)
         output_format: Output format (srt, vtt, txt, json)
         language: Optional language code
+        word_timestamps: Enable word-level timestamps
 
     Returns:
         Path to generated subtitle file, or None if failed
     """
     transcriber = Transcriber(model=model)
-    return transcriber.transcribe(audio_path, output_format, language)
+    return transcriber.transcribe(audio_path, output_format, language, word_timestamps)
 
 
 # =============================================================================

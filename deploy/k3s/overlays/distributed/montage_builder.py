@@ -328,7 +328,7 @@ def process_clip_task(
     # 1.5 Smart Reframing (Shorts Mode)
     if settings.features.shorts_mode:
         try:
-            from ..smart_reframing import SmartReframer
+            from ..auto_reframe import AutoReframeEngine as SmartReframer
             # Initialize reframer (target 9:16)
             reframer = SmartReframer(target_aspect=9/16)
             

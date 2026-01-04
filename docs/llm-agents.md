@@ -17,7 +17,7 @@ Montage AI is a post-production assistant, not a generative video AI. We take ex
 2.  **Analyze**:
     *   `AudioAnalyzer`: Beat detection (librosa/ffmpeg), energy levels.
     *   `SceneAnalyzer`: Scene detection (scenedetect), visual quality.
-    *   `SmartReframer`: Face detection (MediaPipe) for 9:16 crops.
+    *   `AutoReframeEngine`: Face detection (MediaPipe) for 9:16 crops.
 3.  **Plan**: `MontageBuilder` selects clips based on `StyleTemplate` (e.g., "Hitchcock" = slow build, "MTV" = fast cuts).
 4.  **Render**:
     *   **Preview Mode**: 360p, ultrafast preset, no effects.
@@ -30,7 +30,7 @@ Montage AI is a post-production assistant, not a generative video AI. We take ex
 | :--- | :--- | :--- |
 | `src/montage_ai/core/montage_builder.py` | **Orchestrator**. Manages the lifecycle of a montage job. | `MontageBuilder`, `process_clip_task` |
 | `src/montage_ai/ffmpeg_config.py` | **Configuration**. Single source of truth for FFmpeg args. | `FFmpegConfig`, `get_preview_video_params` |
-| `src/montage_ai/smart_reframing.py` | **AI Vision**. Handles 16:9 -> 9:16 conversion. | `SmartReframer`, `CinematicPathPlanner` |
+| `src/montage_ai/auto_reframe.py` | **AI Vision**. Handles 16:9 -> 9:16 conversion. | `AutoReframeEngine`, `CameraMotionOptimizer` |
 | `src/montage_ai/segment_writer.py` | **Rendering**. Handles disk-based segment writing. | `SegmentWriter` |
 | `src/montage_ai/web_ui/` | **Frontend**. Flask + Jinja2. | `app.py`, `templates/` |
 
@@ -62,7 +62,7 @@ You are a **Senior Creative Technologist**.
 make test
 
 # Run specific test
-pytest tests/test_smart_reframing.py
+pytest tests/test_auto_reframe.py
 ```
 
 ### Adding Dependencies

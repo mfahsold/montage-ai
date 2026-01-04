@@ -65,11 +65,12 @@ Open **http://localhost:8080** — upload videos + music → select Quality Prof
 cp your_videos/*.mp4 data/input/
 cp your_music.mp3 data/music/
 
-# Create a montage with a quality profile
-./montage-ai.sh run hitchcock --quality high
+# Preview-First Workflow
+./montage-ai.sh preview hitchcock   # Fast 360p draft
+./montage-ai.sh finalize hitchcock  # Upgrade to High Quality
 
-# Or use environment variables
-QUALITY_PROFILE=master ./montage-ai.sh run
+# Or run directly with a quality profile
+./montage-ai.sh run hitchcock --quality high
 ```
 
 The new CLI is powered by Python `click` and `rich` for a modern, interactive experience.

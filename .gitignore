@@ -56,6 +56,7 @@ secrets/
 # Temporary/Generated
 gallery_montage_*
 patch_files/
+tmp/
 tmp_test/
 downloads/
 local_downloads/

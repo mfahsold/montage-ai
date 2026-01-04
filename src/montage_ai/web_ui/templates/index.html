@@ -33,6 +33,17 @@
             <div class="version-badge">SYS.READY</div>
         </header>
 
+        <!-- Progress Bar (Hidden by default) -->
+        <div id="global-progress-bar" class="progress-container" style="display: none; margin-bottom: 1.5rem;">
+            <div class="progress-header" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.8rem;">
+                <span id="progress-label">PROCESSING...</span>
+                <span id="progress-eta">ETA: --:--</span>
+            </div>
+            <div class="progress-track" style="background: var(--border-color); height: 4px; border-radius: 2px; overflow: hidden;">
+                <div id="progress-fill" class="progress-fill" style="background: var(--primary); width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+            </div>
+        </div>
+
         <!-- Navigation Bar -->
         <nav class="nav-bar voxel-card" style="padding: 0.75rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
             <a href="/" class="btn btn-primary" style="text-decoration: none;">🏠 Montage Wizard</a>
@@ -92,8 +103,12 @@
                         <div id="musicList" class="file-list"></div>
                     </div>
                 </div>
-                <div class="text-center">
+                <div class="text-center" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
                     <button onclick="refreshFiles()" class="voxel-btn">⟳ Refresh Library</button>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; opacity: 0.9;">
+                        <input type="checkbox" id="autoPreview" checked>
+                        <span>Auto-generate 360p preview after upload</span>
+                    </label>
                 </div>
             </section>
 

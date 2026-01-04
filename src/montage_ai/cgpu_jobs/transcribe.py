@@ -45,6 +45,7 @@ class TranscribeJob(CGPUJob):
         model: str = "medium",
         output_format: str = "srt",
         language: Optional[str] = None,
+        word_timestamps: bool = False,
         output_dir: Optional[str] = None,
     ):
         """
@@ -55,6 +56,7 @@ class TranscribeJob(CGPUJob):
             model: Whisper model size (tiny, base, small, medium, large)
             output_format: Output format (srt, vtt, txt, json)
             language: Optional language code (e.g., "en", "de")
+            word_timestamps: Enable word-level timestamps (for json output)
             output_dir: Output directory (default: same as input)
         """
         super().__init__()
@@ -62,6 +64,7 @@ class TranscribeJob(CGPUJob):
         self.model = model if model in self.VALID_MODELS else "medium"
         self.output_format = output_format if output_format in self.VALID_FORMATS else "srt"
         self.language = language
+        self.word_timestamps = word_timestamps
         self.output_dir = Path(output_dir) if output_dir else self.audio_path.parent
 
         # Will be set after transcription
@@ -110,6 +113,9 @@ class TranscribeJob(CGPUJob):
 
         if self.language:
             cmd_parts.append(f"--language {self.language}")
+
+        if self.word_timestamps:
+            cmd_parts.append("--word_timestamps True")
 
         cmd = " && ".join([cmd_parts[0], " ".join(cmd_parts[1:])])
 

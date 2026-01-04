@@ -19,10 +19,9 @@ class TestRetrieval(unittest.TestCase):
         
     @patch('retrieve_results.run_kubectl')
     def test_list_remote_files(self, mock_run):
-        # Mock ls output (mimic ls --full-time)
-        mock_run.return_value = """total 100
-drwxr-xr-x 2 root root 4096 2026-01-03 12:00:00 +0000 20260103_120000_v1_PROJECT
--rw-r--r-- 1 root root 1048576 2026-01-03 12:01:00 +0000 video.mp4
+        # Mock ls -1tF output (names with type indicators)
+        mock_run.return_value = """20260103_120000_v1_PROJECT/
+video.mp4
 """
         files = retrieve_results.list_remote_files("pod")
         self.assertEqual(len(files), 2)
@@ -30,7 +29,8 @@ drwxr-xr-x 2 root root 4096 2026-01-03 12:00:00 +0000 20260103_120000_v1_PROJECT
         self.assertTrue(files[0]['is_dir'])
         self.assertEqual(files[1]['name'], "video.mp4")
         self.assertFalse(files[1]['is_dir'])
-        self.assertEqual(files[1]['size'], 1048576)
+        # The script doesn't parse size from ls -1tF, so we can't assert size
+        # self.assertEqual(files[1]['size'], 1048576)
 
     @patch('retrieve_results.run_kubectl')
     @patch('builtins.open', new_callable=MagicMock)

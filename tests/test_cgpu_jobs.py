@@ -147,11 +147,13 @@ class TestTranscribeJob:
                 audio_path=f.name,
                 model="large-v3",
                 output_format="vtt",
-                language="de"
+                language="de",
+                word_timestamps=True
             )
             assert job.model == "large-v3"
             assert job.output_format == "vtt"
             assert job.language == "de"
+            assert job.word_timestamps is True
 
     def test_invalid_model_fallback(self):
         """Invalid model falls back to medium."""

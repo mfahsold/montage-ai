@@ -427,7 +427,15 @@ document.getElementById('videoUpload')?.addEventListener('change', async (e) => 
         }
         await uploadFile(file, 'video');
     }
-    refreshFiles();
+    await refreshFiles();
+
+    // Auto-Preview Logic
+    const autoPreview = document.getElementById('autoPreview')?.checked;
+    const musicList = document.getElementById('musicList')?.textContent || '';
+    if (autoPreview && !musicList.includes('NO_AUDIO_TRACK')) {
+        showToast('Auto-starting preview render...', 'info');
+        createJob(true);
+    }
 });
 
 document.getElementById('musicUpload')?.addEventListener('change', async (e) => {
@@ -442,7 +450,15 @@ document.getElementById('musicUpload')?.addEventListener('change', async (e) => 
             showToast(validation.warning, 'warning');
         }
         await uploadFile(file, 'music');
-        refreshFiles();
+        await refreshFiles();
+
+        // Auto-Preview Logic
+        const autoPreview = document.getElementById('autoPreview')?.checked;
+        const videoList = document.getElementById('videoList')?.textContent || '';
+        if (autoPreview && !videoList.includes('NO_INPUT_STREAMS')) {
+            showToast('Auto-starting preview render...', 'info');
+            createJob(true);
+        }
     }
 });
 
@@ -738,12 +754,21 @@ function startPolling() {
             status: data.status,
             phase: data.phase
         });
+        updateGlobalProgress(data);
     });
 
     eventSource.addEventListener('job_complete', (e) => {
         const data = JSON.parse(e.data);
         showToast(`Job ${data.job_id.substring(0,8)} Completed!`, 'success');
         refreshJobs(); // Full refresh to update gallery
+        hideGlobalProgress();
+    });
+
+    eventSource.addEventListener('job_failed', (e) => {
+        const data = JSON.parse(e.data);
+        showToast(`Job Failed: ${data.error}`, 'error');
+        refreshJobs();
+        hideGlobalProgress();
     });
 
     eventSource.onerror = () => {
@@ -753,6 +778,33 @@ function startPolling() {
         if (pollInterval) clearInterval(pollInterval);
         pollInterval = setInterval(refreshJobs, 5000); // Slower polling as fallback
     };
+}
+
+function updateGlobalProgress(data) {
+    const bar = document.getElementById('global-progress-bar');
+    const fill = document.getElementById('progress-fill');
+    const label = document.getElementById('progress-label');
+    const eta = document.getElementById('progress-eta');
+    
+    if (!bar || !data.phase) return;
+    
+    bar.style.display = 'block';
+    fill.style.width = `${data.phase.progress_percent}%`;
+    label.textContent = `> JOB #${data.job_id.substring(0,6)}: ${data.phase.label.toUpperCase()}`;
+    
+    // Simple ETA calculation (mock for now, could be real later)
+    if (data.phase.progress_percent > 0) {
+        eta.textContent = `${data.phase.progress_percent}%`;
+    }
+}
+
+function hideGlobalProgress() {
+    const bar = document.getElementById('global-progress-bar');
+    if (bar) {
+        setTimeout(() => {
+            bar.style.display = 'none';
+        }, 2000);
+    }
 }
 
 async function refreshJobs() {
@@ -824,6 +876,24 @@ function formatLogLine(line) {
     return `<span class="log-dim">${line}</span>`;
 }
 
+async function finalizeJob(jobId) {
+    if (!confirm('Render this montage in High Quality (1080p)? This may take a few minutes.')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/jobs/${jobId}/finalize`, { method: 'POST' });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to start finalize job');
+        }
+        const result = await response.json();
+        showToast('Started High Quality Render', 'success');
+        // Refresh jobs list immediately
+        fetchJobs();
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
 function updateGalleryUI(jobs) {
     const gallery = document.getElementById('jobList'); // Reusing ID for gallery grid
     if (!gallery) return;
@@ -845,6 +915,9 @@ function updateGalleryUI(jobs) {
                     ${job.output_file ? 
                         `<a href="${API_BASE}/download/${job.output_file}" class="voxel-btn primary small">Download</a>` : 
                         `<span class="status-text">${job.status}</span>`
+                    }
+                    ${(job.status === 'completed' && job.options?.quality_profile === 'preview') ? 
+                        `<button onclick="finalizeJob('${job.id}')" class="voxel-btn small secondary" title="Render in High Quality">Finalize (1080p)</button>` : ''
                     }
                     ${job.status === 'completed' || job.status === 'failed' ? 
                         `<button onclick="showDecisions('${job.id}')" class="voxel-btn small secondary" title="View AI Decisions">Log</button>` : ''

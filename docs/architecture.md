@@ -85,7 +85,7 @@ The central orchestrator that executes the editing pipeline in phases:
 |--------|---------|
 | `audio_analysis.py` | Beat detection, tempo extraction, energy profiling (librosa + FFmpeg fallback) |
 | `scene_analysis.py` | Scene detection, content analysis, visual similarity with LRU cache |
-| `smart_reframing.py` | 9:16 conversion using Convex Optimization (L2) for cinematic camera paths |
+| `auto_reframe.py` | **Auto Reframe Engine**. 9:16 conversion using Convex Optimization (L2) for cinematic camera paths |
 | `video_metadata.py` | Technical metadata extraction (ffprobe wrapper) |
 | `clip_enhancement.py` | Stabilization, upscaling, color matching (Local/Cloud hybrid) |
 | `ffmpeg_config.py` | GPU encoder detection (NVENC/VAAPI/QSV), encoding parameters |

@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### 🆕 Transcript Editor (Descript-style) - FULLY WIRED
+- **Live Preview Flow**: Auto-generates 360p preview 2 seconds after edits (Story 1.1)
+- **Undo/Redo Stack**: Non-destructive editing with full history support (Story 1.2)
 - **Text-based editing**: Delete words to cut video, rearrange paragraphs to reorder scenes
 - **Word-level sync**: Click any word to seek video
 - **Filler word detection**: Highlights "um", "uh", "like" for easy removal
@@ -23,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Backend integration**: `TextEditor` class now properly wired to `/api/transcript/export`
 - **Stats tracking**: Real-time removed word count and time saved
 - **Web UI**: New `/transcript` route with dedicated editor interface
+
+#### 🎬 Pro Handoff (Timeline Export)
+- **Source Relinking**: XML/OTIO exports can now link to original high-res source files instead of proxies.
+- **Conform Guide**: Automatically generates `HOW_TO_CONFORM.md` with step-by-step instructions for Resolve/Premiere.
+- **Project Packaging**: Exports are bundled into a structured `{project}_PROJECT` folder with media, proxies, and metadata.
 
 #### 📱 Shorts Studio - CAPTION BURN-IN COMPLETE
 - **Phone-frame preview**: Live 9:16 aspect ratio preview with safe zones

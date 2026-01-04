@@ -169,7 +169,7 @@ test: validate test-local test-unit ## Run all tests
 
 test-unit: ## Run unit tests with pytest
 	@echo "$(CYAN)Running unit tests...$(RESET)"
-	pytest tests/ -v --ignore=tests/integration/
+	PYTHONPATH=src pytest tests/ -v --ignore=tests/integration/
 	@echo "$(GREEN)✓ Unit tests passed$(RESET)"
 
 test-assets: ## Download NASA test footage (public domain)

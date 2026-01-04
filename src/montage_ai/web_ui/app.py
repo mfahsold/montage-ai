@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 
 from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
 from ..core.hardware import get_best_hwaccel
+from ..auto_reframe import AutoReframeEngine
 
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
@@ -96,6 +97,9 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max upload
 app.config['UPLOAD_FOLDER'] = INPUT_DIR
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files (Hardware Nah: minimize I/O)
+
+
+
 
 
 # Job queue and management
@@ -443,33 +447,28 @@ def run_transcript_render(job_data: dict):
         editor.load_transcript(job_data['transcript_path'])
         
         # Apply Edits
-        removed_indices = [e['index'] for e in job_data['edits'] if e.get('removed')]
+        # Optimize: Convert list of edits to a map for O(1) lookup
+        # edits format: [{"index": 0, "removed": true}, ...]
+        edits_map = {e['index']: e.get('removed', False) for e in job_data['edits']}
         
-        # Map indices to words (TextEditor needs word objects or indices)
-        # TextEditor.remove_words takes strings, but we have indices.
-        # We need to manually mark words as removed in the editor instance.
         count = 0
         current_idx = 0
         for seg in editor.segments:
             for word in seg.words:
-                if current_idx in removed_indices:
-                    word.removed = True
-                    count += 1
+                if current_idx in edits_map:
+                    word.removed = edits_map[current_idx]
+                    if word.removed:
+                        count += 1
                 current_idx += 1
                 
-        logger.info(f"Marked {count} words for removal")
+        logger.info(f"Applied edits: {count} words removed")
         
         # Render
         output_filename = f"preview_{job_id}.mp4"
         output_path = OUTPUT_DIR / output_filename
         
-        # Use fast preview settings
-        editor.export(
-            str(output_path),
-            preset="ultrafast",
-            crf=28,
-            audio_crossfade_ms=20
-        )
+        # Use fast preview settings via dedicated method
+        editor.render_preview(str(output_path))
         
         # Success
         with job_lock:
@@ -575,6 +574,55 @@ def api_status():
     })
 
 
+@app.route('/api/analyze-crops', methods=['POST'])
+def analyze_crops():
+    """Analyze a video for smart reframing crops."""
+    data = request.json
+    filename = data.get('filename')
+    keyframes_data = data.get('keyframes', [])
+    
+    if not filename:
+        return jsonify({"error": "Filename required"}), 400
+        
+    filepath = os.path.join(INPUT_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({"error": "File not found"}), 404
+        
+    try:
+        # Use a smaller smoothing window for UI responsiveness if needed, 
+        # but default is fine.
+        reframer = AutoReframeEngine()
+        
+        # Convert keyframes dicts to Keyframe objects
+        from ..auto_reframe import Keyframe
+        keyframes = []
+        if keyframes_data:
+            for kf in keyframes_data:
+                keyframes.append(Keyframe(
+                    time=float(kf['time']),
+                    center_x_norm=float(kf['x'])
+                ))
+        
+        crops = reframer.analyze(filepath, keyframes=keyframes)
+        
+        # Convert dataclasses to dicts
+        result = [
+            {
+                "time": c.time,
+                "x": c.x,
+                "y": c.y,
+                "width": c.width,
+                "height": c.height,
+                "score": c.score
+            }
+            for c in crops
+        ]
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error analyzing crops: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/transparency')
 def api_transparency():
     """Return Responsible AI and transparency metadata for the UI."""
@@ -672,8 +720,8 @@ def api_render_transcript_edit():
     filename = secure_filename(data.get('filename'))
     edits = data.get('edits', [])
     
-    if not filename or not edits:
-        return jsonify({"error": "Missing filename or edits"}), 400
+    if not filename:
+        return jsonify({"error": "Missing filename"}), 400
         
     video_path = INPUT_DIR / filename
     transcript_path = INPUT_DIR / f"{os.path.splitext(filename)[0]}.json"
@@ -698,6 +746,63 @@ def api_render_transcript_edit():
     with job_lock:
         jobs[job_id] = job_data
         job_queue.append(job_data)
+        
+    # Trigger processing if worker is idle
+    if active_jobs < MAX_CONCURRENT_JOBS:
+        process_job_from_queue(job_queue.popleft())
+        
+    return jsonify({"job_id": job_id, "status": "queued"})
+
+
+@app.route('/api/transcript/detect-fillers', methods=['POST'])
+def api_detect_fillers():
+    """
+    Detect filler words in a transcript.
+    
+    Returns indices of filler words to be removed.
+    """
+    data = request.json
+    filename = secure_filename(data.get('filename'))
+    
+    if not filename:
+        return jsonify({"error": "Missing filename"}), 400
+        
+    transcript_path = INPUT_DIR / f"{os.path.splitext(filename)[0]}.json"
+    
+    if not transcript_path.exists():
+        return jsonify({"error": "Transcript not found"}), 404
+        
+    try:
+        # Load transcript
+        with open(transcript_path, 'r') as f:
+            transcript_data = json.load(f)
+            
+        # Flatten words
+        words = []
+        if 'segments' in transcript_data:
+            for seg in transcript_data['segments']:
+                words.extend(seg.get('words', []))
+        elif 'words' in transcript_data:
+            words = transcript_data['words']
+            
+        # Detect fillers
+        # Use the same list as TextEditor
+        from ..text_editor import FILLER_WORDS
+        
+        filler_indices = []
+        for i, word in enumerate(words):
+            text = word.get('word', '').lower().strip(".,!?;:")
+            if text in FILLER_WORDS:
+                filler_indices.append(i)
+                
+        return jsonify({
+            "success": True,
+            "filler_indices": filler_indices,
+            "count": len(filler_indices)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
         
     # Start processing if slot available
     if active_jobs < MAX_CONCURRENT_JOBS:
@@ -854,6 +959,71 @@ def api_get_job(job_id):
     job = get_job_status(job_id)
     if job.get("status") == "not_found":
         return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
+
+
+@app.route('/api/jobs/<job_id>/finalize', methods=['POST'])
+def api_finalize_job(job_id):
+    """Create a high-quality render from a preview job."""
+    global active_jobs
+    
+    # 1. Get original job
+    original_job = get_job_status(job_id)
+    if original_job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+        
+    # 2. Create new job options based on original
+    # Deep copy to avoid modifying original
+    import copy
+    new_options = copy.deepcopy(original_job['options'])
+    
+    # Upgrade settings for High Quality
+    new_options['quality_profile'] = 'high'
+    new_options['preview'] = False
+    new_options['export_width'] = 1920
+    new_options['export_height'] = 1080
+    new_options['upscale'] = True
+    new_options['stabilize'] = True
+    new_options['enhance'] = True
+    
+    # 3. Create new job
+    new_job_id = f"{job_id}_hq"
+    style = original_job['style']
+    
+    job = {
+        "id": new_job_id,
+        "style": style,
+        "options": new_options,
+        "status": "queued",
+        "phase": JobPhase.initial().to_dict(),
+        "created_at": datetime.now().isoformat(),
+        "parent_job_id": job_id
+    }
+
+    with job_lock:
+        jobs[new_job_id] = job
+
+    # Check if we can start immediately or need to queue
+    if active_jobs < MAX_CONCURRENT_JOBS:
+        # Start immediately
+        active_jobs += 1
+        thread = threading.Thread(
+            target=run_montage,
+            args=(new_job_id, style, new_options),
+            daemon=False
+        )
+        thread.start()
+    else:
+        # Add to queue
+        job_queue.append({
+            'job_id': new_job_id,
+            'style': style,
+            'options': new_options
+        })
+        with job_lock:
+            jobs[new_job_id]["status"] = "queued"
+            jobs[new_job_id]["queue_position"] = len(job_queue)
+
     return jsonify(job)
 
 
@@ -1314,10 +1484,22 @@ def api_transcript_video(filename):
 def api_transcript_transcribe():
     """Transcribe video using Whisper (local or CGPU)."""
     data = request.json or {}
-    video_path = data.get('video_path')
+    video_path_str = data.get('video_path')
     
-    if not video_path or not Path(video_path).exists():
-        return jsonify({"error": "Video file not found"}), 404
+    if not video_path_str:
+        return jsonify({"error": "No video path provided"}), 400
+
+    # Resolve path
+    video_path = Path(video_path_str)
+    if not video_path.exists():
+        # Try relative to INPUT_DIR
+        video_path = INPUT_DIR / video_path_str
+    
+    if not video_path.exists():
+        return jsonify({"error": f"Video file not found: {video_path_str}"}), 404
+    
+    # Define output JSON path (same name as video)
+    json_output_path = video_path.with_suffix('.json')
     
     try:
         # Try CGPU first, fall back to local
@@ -1327,16 +1509,22 @@ def api_transcript_transcribe():
             # Use CGPU transcription
             from ..cgpu_jobs import TranscribeJob
             job = TranscribeJob(
-                audio_path=video_path,
+                audio_path=str(video_path),
                 model=data.get('model', 'medium'),
                 output_format='json',  # Word-level timestamps
                 language=data.get('language'),
+                word_timestamps=True,
             )
             result = job.execute()
             
             if result.success and result.output_path:
                 with open(result.output_path, 'r') as f:
                     transcript = json.load(f)
+                
+                # Save to local JSON path for persistence
+                with open(json_output_path, 'w') as f:
+                    json.dump(transcript, f, indent=2)
+                    
                 return jsonify({"success": True, "transcript": transcript})
             else:
                 raise Exception(result.error or "Transcription failed")
@@ -1345,18 +1533,24 @@ def api_transcript_transcribe():
             from ..transcriber import transcribe_audio
             
             # Extract audio first
-            audio_path = Path(video_path).with_suffix('.wav')
+            audio_path = video_path.with_suffix('.wav')
             subprocess.run([
-                'ffmpeg', '-y', '-i', video_path,
+                'ffmpeg', '-y', '-i', str(video_path),
                 '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
                 str(audio_path)
             ], capture_output=True, check=True)
             
             # Transcribe
-            result = transcribe_audio(str(audio_path), model='base', word_timestamps=True)
+            transcript = transcribe_audio(str(audio_path), model='base', word_timestamps=True)
             
             # Clean up temp audio
             audio_path.unlink(missing_ok=True)
+            
+            # Save to local JSON path for persistence
+            with open(json_output_path, 'w') as f:
+                json.dump(transcript, f, indent=2)
+
+            return jsonify({"success": True, "transcript": transcript})
             
             return jsonify({"success": True, "transcript": result})
             
@@ -1368,49 +1562,84 @@ def api_transcript_transcribe():
 def api_transcript_export():
     """Export edited transcript as video, EDL, or OTIO."""
     data = request.json or {}
-    video_path = data.get('video_path')
-    transcript = data.get('transcript')
-    export_format = data.get('format', 'video')
     
-    if not video_path or not transcript:
-        return jsonify({"error": "Missing video_path or transcript"}), 400
+    # Support both workflows: 
+    # 1. filename + edits (preferred, loads from disk)
+    # 2. video_path + transcript (legacy/direct)
     
-    if not Path(video_path).exists():
-        return jsonify({"error": "Video file not found"}), 404
+    filename = data.get('filename')
+    edits = data.get('edits')
+    
+    video_path = None
+    editor = None
     
     try:
         from ..text_editor import TextEditor, Segment, Word
         
-        # Initialize TextEditor with video path
-        editor = TextEditor(video_path)
-        
-        # Convert frontend transcript format to TextEditor segments
-        # Frontend sends: { segments: [ { start, end, text, words: [{word, start, end, removed}] } ] }
-        segments = []
-        for idx, seg_data in enumerate(transcript.get('segments', [])):
-            words = []
-            for w in seg_data.get('words', []):
-                word = Word(
-                    text=w.get('word', w.get('text', '')).strip(),
-                    start=w.get('start', 0),
-                    end=w.get('end', 0),
-                    confidence=w.get('probability', w.get('confidence', 1.0)),
-                    removed=w.get('removed', False)  # Preserve removed state from UI
-                )
-                if word.text:
-                    words.append(word)
+        if filename and edits is not None:
+            # Workflow 1: Load from disk and apply edits
+            filename = secure_filename(filename)
+            video_path = INPUT_DIR / filename
+            transcript_path = INPUT_DIR / f"{os.path.splitext(filename)[0]}.json"
             
-            segment = Segment(
-                id=seg_data.get('id', idx),
-                start=seg_data.get('start', 0),
-                end=seg_data.get('end', 0),
-                text=seg_data.get('text', ''),
-                words=words
-            )
-            segments.append(segment)
+            if not video_path.exists() or not transcript_path.exists():
+                return jsonify({"error": "File not found"}), 404
+                
+            editor = TextEditor(str(video_path))
+            editor.load_transcript(str(transcript_path))
+            
+            # Apply edits (indices)
+            removed_indices = [e['index'] for e in edits if e.get('removed')]
+            
+            current_idx = 0
+            for seg in editor.segments:
+                for word in seg.words:
+                    if current_idx in removed_indices:
+                        word.removed = True
+                    current_idx += 1
+                    
+        else:
+            # Workflow 2: Full transcript payload
+            video_path_str = data.get('video_path')
+            transcript = data.get('transcript')
+            
+            if not video_path_str or not transcript:
+                return jsonify({"error": "Missing filename+edits OR video_path+transcript"}), 400
+            
+            video_path = Path(video_path_str)
+            if not video_path.exists():
+                return jsonify({"error": "Video file not found"}), 404
+                
+            editor = TextEditor(str(video_path))
+            
+            # Convert frontend transcript format to TextEditor segments
+            segments = []
+            for idx, seg_data in enumerate(transcript.get('segments', [])):
+                words = []
+                for w in seg_data.get('words', []):
+                    word = Word(
+                        text=w.get('word', w.get('text', '')).strip(),
+                        start=w.get('start', 0),
+                        end=w.get('end', 0),
+                        confidence=w.get('probability', w.get('confidence', 1.0)),
+                        removed=w.get('removed', False)
+                    )
+                    if word.text:
+                        words.append(word)
+                
+                segment = Segment(
+                    id=seg_data.get('id', idx),
+                    start=seg_data.get('start', 0),
+                    end=seg_data.get('end', 0),
+                    text=seg_data.get('text', ''),
+                    words=words
+                )
+                segments.append(segment)
+            
+            editor.segments = segments
         
-        editor.segments = segments
-        
+        # Perform Export
+        export_format = data.get('format', 'video')
         output_dir = OUTPUT_DIR
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
@@ -1427,42 +1656,33 @@ def api_transcript_export():
             })
             
         elif export_format == 'edl':
-            # Export EDL using TextEditor method
-            edl_path = output_dir / f"transcript_edit_{timestamp}.edl"
-            editor.export_edl(str(edl_path))
-            
-            with open(edl_path, 'r') as f:
-                edl_content = f.read()
-            
+            output_path = output_dir / f"transcript_edit_{timestamp}.edl"
+            editor.export_edl(str(output_path))
             return jsonify({
                 "success": True,
-                "filename": edl_path.name,
-                "path": str(edl_path)
+                "filename": output_path.name,
+                "path": str(output_path)
             })
             
         elif export_format == 'otio':
-            # Export OTIO using TextEditor method (which uses TimelineExporter)
-            otio_path = output_dir / f"transcript_edit_{timestamp}.otio"
-            
+            output_path = output_dir / f"transcript_edit_{timestamp}.otio"
             try:
-                editor.export_otio(str(otio_path))
-                
+                editor.export_otio(str(output_path))
                 return jsonify({
                     "success": True,
-                    "filename": otio_path.name,
-                    "path": str(otio_path)
+                    "filename": output_path.name,
+                    "path": str(output_path)
                 })
             except RuntimeError as e:
                 return jsonify({"success": False, "error": f"OTIO export failed: {str(e)}"}), 500
             except Exception as e:
                 return jsonify({"success": False, "error": str(e)}), 500
-        
+            
         else:
             return jsonify({"error": f"Unknown format: {export_format}"}), 400
-            
+
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Export failed: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1513,7 +1733,7 @@ def api_shorts_analyze():
         return jsonify({"error": "Video file not found"}), 404
     
     try:
-        from ..smart_reframing import SmartReframer
+        from ..auto_reframe import AutoReframeEngine as SmartReframer
         
         reframer = SmartReframer(target_aspect=9/16)
         
@@ -1565,7 +1785,7 @@ def shorts_visualize():
         if not video_path or not os.path.exists(video_path):
             return jsonify({'error': 'Video not found'}), 404
             
-        from ..smart_reframing import SmartReframer
+        from ..auto_reframe import AutoReframeEngine as SmartReframer
         from dataclasses import asdict
         import cv2
         
@@ -1658,7 +1878,7 @@ def api_shorts_render():
                 print(f"Audio polish failed: {e}")
                 # Continue with original audio
 
-        from ..smart_reframing import SmartReframer
+        from ..auto_reframe import AutoReframeEngine as SmartReframer
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         reframed_path = OUTPUT_DIR / f"shorts_reframed_{timestamp}.mp4"

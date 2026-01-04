@@ -94,7 +94,20 @@
                 <option value="">Select a video...</option>
             </select>
             <button id="removeFillersBtn" class="voxel-btn">Remove Fillers</button>
+            <button id="undoBtn" class="voxel-btn" disabled>Undo</button>
+            <button id="redoBtn" class="voxel-btn" disabled>Redo</button>
             <button id="saveEditsBtn" class="voxel-btn">Save Edits</button>
+            <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.9rem; margin-left: 1rem;">
+                <input type="checkbox" id="autoPreviewCheck" checked> Auto-Preview
+            </label>
+            <div class="dropdown" style="position: relative; display: inline-block;">
+                <button id="exportBtn" class="voxel-btn">Export ▾</button>
+                <div id="exportMenu" class="dropdown-content" style="display: none; position: absolute; background: var(--surface-color); border: 1px solid var(--border-color); min-width: 160px; z-index: 1; border-radius: 4px; box-shadow: 0 8px 16px rgba(0,0,0,0.5);">
+                    <a href="#" onclick="exportProject('video')" style="color: var(--text-primary); padding: 12px 16px; text-decoration: none; display: block;">Video (MP4)</a>
+                    <a href="#" onclick="exportProject('edl')" style="color: var(--text-primary); padding: 12px 16px; text-decoration: none; display: block;">EDL (Premiere)</a>
+                    <a href="#" onclick="exportProject('otio')" style="color: var(--text-primary); padding: 12px 16px; text-decoration: none; display: block;">OTIO (Resolve)</a>
+                </div>
+            </div>
             <button id="previewBtn" class="voxel-btn btn-primary">Generate Preview</button>
         </div>
 
@@ -133,6 +146,93 @@
         let videoPlayer = document.getElementById('mainVideo');
         let transcriptContainer = document.getElementById('transcriptContent');
         
+        // Undo/Redo Stacks
+        const undoStack = [];
+        const redoStack = [];
+
+        function pushUndo(action) {
+            undoStack.push(action);
+            redoStack.length = 0; // Clear redo stack on new action
+            updateUndoButtons();
+        }
+
+        function updateUndoButtons() {
+            document.getElementById('undoBtn').disabled = undoStack.length === 0;
+            document.getElementById('redoBtn').disabled = redoStack.length === 0;
+        }
+
+        function performUndo() {
+            if (undoStack.length === 0) return;
+            const action = undoStack.pop();
+            redoStack.push(action);
+            
+            // Reverse action
+            if (action.type === 'toggle') {
+                const span = transcriptContainer.children[action.index];
+                // If it was removed (true), we want to add it back (remove 'deleted')
+                // Wait, action.removed is the state AFTER the toggle.
+                // So to undo, we set it to !action.removed
+                if (action.removed) {
+                    span.classList.remove('deleted');
+                } else {
+                    span.classList.add('deleted');
+                }
+            } else if (action.type === 'batch') {
+                // Batch undo (e.g. remove fillers)
+                action.indices.forEach(idx => {
+                    const span = transcriptContainer.children[idx];
+                    span.classList.remove('deleted'); // Assuming batch is always delete
+                });
+            }
+            
+            updateStats();
+            updateUndoButtons();
+            debouncedPreview();
+        }
+
+        function performRedo() {
+            if (redoStack.length === 0) return;
+            const action = redoStack.pop();
+            undoStack.push(action);
+            
+            // Re-apply action
+            if (action.type === 'toggle') {
+                const span = transcriptContainer.children[action.index];
+                if (action.removed) {
+                    span.classList.add('deleted');
+                } else {
+                    span.classList.remove('deleted');
+                }
+            } else if (action.type === 'batch') {
+                action.indices.forEach(idx => {
+                    const span = transcriptContainer.children[idx];
+                    span.classList.add('deleted');
+                });
+            }
+            
+            updateStats();
+            updateUndoButtons();
+            debouncedPreview();
+        }
+
+        document.getElementById('undoBtn').addEventListener('click', performUndo);
+        document.getElementById('redoBtn').addEventListener('click', performRedo);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    performRedo();
+                } else {
+                    performUndo();
+                }
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+                e.preventDefault();
+                performRedo();
+            }
+        });
+
         // Load file list on startup
         fetch('/api/files')
             .then(r => r.json())
@@ -196,12 +296,37 @@
                 span.onclick = () => toggleWord(index);
                 transcriptContainer.appendChild(span);
             });
+            updateStats();
         }
+
+        let previewDebounceTimer;
+
+        function debounce(func, wait) {
+            return function(...args) {
+                clearTimeout(previewDebounceTimer);
+                previewDebounceTimer = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        const debouncedPreview = debounce(() => {
+            if (document.getElementById('autoPreviewCheck').checked) {
+                requestPreview();
+            }
+        }, 2000); // 2 second delay
 
         function toggleWord(index) {
             const span = transcriptContainer.children[index];
+            const wasDeleted = span.classList.contains('deleted');
             span.classList.toggle('deleted');
+            
+            pushUndo({
+                type: 'toggle',
+                index: index,
+                removed: !wasDeleted // The new state
+            });
+            
             updateStats();
+            debouncedPreview();
         }
 
         // Sync video time with transcript highlighting
@@ -223,31 +348,156 @@
                     words[i].classList.remove('active');
                 }
             }
-            
-            // Skip deleted segments
-            // This is a simple implementation; a robust one would seek past deleted ranges
         });
 
         document.getElementById('removeFillersBtn').addEventListener('click', () => {
-            const fillers = ['um', 'uh', 'like', 'you know'];
-            const words = transcriptContainer.children;
-            for (let i = 0; i < words.length; i++) {
-                const text = words[i].textContent.trim().toLowerCase().replace(/[^a-z]/g, '');
-                if (fillers.includes(text)) {
-                    words[i].classList.add('deleted');
+            const filename = document.getElementById('fileSelect').value;
+            if (!filename) return alert('Please select a video first');
+            
+            const btn = document.getElementById('removeFillersBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Detecting...';
+            
+            fetch('/api/transcript/detect-fillers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                
+                const words = transcriptContainer.children;
+                let count = 0;
+                
+                if (data.filler_indices && data.filler_indices.length > 0) {
+                    const indicesToRemove = [];
+                    data.filler_indices.forEach(index => {
+                        if (words[index] && !words[index].classList.contains('deleted')) {
+                            words[index].classList.add('deleted');
+                            indicesToRemove.push(index);
+                            count++;
+                        }
+                    });
+                    
+                    if (indicesToRemove.length > 0) {
+                        pushUndo({
+                            type: 'batch',
+                            indices: indicesToRemove
+                        });
+                    }
+                    
+                    alert(`Removed ${count} filler words.`);
+                } else {
+                    alert('No filler words found.');
                 }
-            }
-            updateStats();
+                updateStats();
+                debouncedPreview();
+            })
+            .catch(err => {
+                console.error(err);
+                // Fallback to client-side if server fails or for immediate feedback
+                const fillers = ['um', 'uh', 'like', 'you know'];
+                const words = transcriptContainer.children;
+                let count = 0;
+                for (let i = 0; i < words.length; i++) {
+                    const text = words[i].textContent.trim().toLowerCase().replace(/[^a-z]/g, '');
+                    if (fillers.includes(text)) {
+                        words[i].classList.add('deleted');
+                        count++;
+                    }
+                }
+                alert(`Removed ${count} filler words (Client-side fallback).`);
+                updateStats();
+                debouncedPreview();
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            });
         });
 
         function updateStats() {
-            // Calculate duration based on non-deleted words
-            // This is an approximation
+            const words = transcriptContainer.children;
+            let totalDuration = 0;
+            let editedDuration = 0;
+
+            if (words.length > 0) {
+                const firstStart = parseFloat(words[0].dataset.start);
+                const lastEnd = parseFloat(words[words.length - 1].dataset.end);
+                totalDuration = lastEnd - firstStart;
+            }
+
+            for (let i = 0; i < words.length; i++) {
+                if (!words[i].classList.contains('deleted')) {
+                    const start = parseFloat(words[i].dataset.start);
+                    const end = parseFloat(words[i].dataset.end);
+                    editedDuration += (end - start);
+                }
+            }
+
+            // Format helper
+            const fmt = (s) => {
+                const m = Math.floor(s / 60);
+                const sec = Math.floor(s % 60);
+                return `${m}:${sec.toString().padStart(2, '0')}`;
+            };
+
+            document.getElementById('origDuration').textContent = fmt(totalDuration);
+            document.getElementById('editDuration').textContent = fmt(editedDuration);
         }
         
         function generateTranscript(filename) {
-            // Call API to start transcription job
-            alert('Transcription job started (mock)');
+            const btn = document.querySelector('button[onclick^="generateTranscript"]');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Transcribing... (this may take a moment)';
+
+            // Find the full path or use the filename relative to input dir
+            // We need to pass the full path if the backend expects it, or just the filename if the backend resolves it.
+            // app.py api_transcript_transcribe expects 'video_path'. 
+            // But since we are in the web UI context, we should probably let the backend resolve the path from the filename.
+            // However, the current API implementation expects 'video_path'. 
+            // Let's assume we need to construct the path or update the API to handle filenames.
+            // Looking at app.py, api_transcript_transcribe takes 'video_path'.
+            // But api_get_transcript takes 'filename'.
+            // Let's try sending the filename and letting the backend handle it, or we might need a small backend tweak.
+            // For now, let's assume the backend can handle a relative path or we send the absolute path if we know it.
+            // Actually, let's update the backend to be safer, but first let's try to call it.
+            
+            // We will send the filename and let the backend resolve it to INPUT_DIR / filename
+            // We need to update app.py to handle this if it doesn't already.
+            
+            fetch('/api/transcript/transcribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    video_path: filename, // The backend likely needs to resolve this
+                    model: 'base',
+                    language: 'en' // Default to English for now
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                if (data.success) {
+                    renderTranscript(data.transcript);
+                    // Also save it so next time it loads
+                    // The backend api_transcript_transcribe doesn't seem to save the JSON to disk automatically?
+                    // Wait, looking at app.py: "if result.success... return jsonify". 
+                    // It does NOT save to the expected JSON path for api_get_transcript to find later.
+                    // We should probably fix that in the backend too.
+                    alert('Transcription complete!');
+                }
+            })
+            .catch(err => {
+                alert('Transcription failed: ' + err.message);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            });
         }
 
         document.getElementById('saveEditsBtn').addEventListener('click', () => {
@@ -255,7 +505,18 @@
             alert('Edits saved locally (in memory). Ready to preview.');
         });
 
-        document.getElementById('previewBtn').addEventListener('click', () => {
+        document.getElementById('exportBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const menu = document.getElementById('exportMenu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', () => {
+            document.getElementById('exportMenu').style.display = 'none';
+        });
+
+        function exportProject(format) {
             const filename = document.getElementById('fileSelect').value;
             if (!filename) return alert('Please select a video first');
 
@@ -268,7 +529,59 @@
                 });
             }
 
+            const btn = document.getElementById('exportBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Exporting...';
+
+            fetch('/api/transcript/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    filename: filename, 
+                    edits: edits,
+                    format: format
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                
+                if (data.success) {
+                    // Trigger download
+                    const link = document.createElement('a');
+                    link.href = `/api/download/${data.filename}`; // Assuming api/download serves from OUTPUT_DIR
+                    link.download = data.filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    alert(`Export successful: ${data.filename}`);
+                }
+            })
+            .catch(err => {
+                alert('Export failed: ' + err.message);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            });
+        }
+
+        function requestPreview() {
+            const filename = document.getElementById('fileSelect').value;
+            if (!filename) return; // Silent return for auto-preview
+
+            const edits = [];
+            const words = transcriptContainer.children;
+            for (let i = 0; i < words.length; i++) {
+                edits.push({
+                    index: parseInt(words[i].dataset.index),
+                    removed: words[i].classList.contains('deleted')
+                });
+            }
+
             const btn = document.getElementById('previewBtn');
+            const originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = 'Generating...';
 
@@ -283,10 +596,16 @@
                 pollJob(data.job_id);
             })
             .catch(err => {
-                alert('Error: ' + err.message);
+                console.error('Preview Error:', err);
                 btn.disabled = false;
                 btn.textContent = 'Generate Preview';
             });
+        }
+
+        document.getElementById('previewBtn').addEventListener('click', () => {
+            const filename = document.getElementById('fileSelect').value;
+            if (!filename) return alert('Please select a video first');
+            requestPreview();
         });
 
         function pollJob(jobId) {

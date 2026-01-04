@@ -57,6 +57,7 @@ class TestTranscriber(unittest.TestCase):
             model="medium",
             output_format="srt",
             language=None,
+            word_timestamps=False,
         )
 
     @patch('src.montage_ai.transcriber.TranscribeJob')
@@ -93,6 +94,7 @@ class TestTranscriber(unittest.TestCase):
             model="large",
             output_format="vtt",
             language="de",
+            word_timestamps=False,
         )
 
 
@@ -134,6 +136,7 @@ class TestConvenienceFunction(unittest.TestCase):
             model="large-v3",
             output_format="json",
             language="en",
+            word_timestamps=False,
         )
 
 

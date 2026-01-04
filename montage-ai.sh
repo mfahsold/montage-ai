@@ -33,6 +33,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}text-edit${NC}       Text-based editing (remove fillers, edit by transcript)
   ${GREEN}web${NC}             Start Web UI
   ${GREEN}preview${NC}         Quick preview (fast preset, 360p)
+  ${GREEN}finalize${NC}        Finalize render (high quality, 1080p, stabilized)
   ${GREEN}hq${NC}              High quality render (1080p/4K)
   ${GREEN}retrieve${NC}        Retrieve results from cluster
   ${GREEN}list${NC}            List available styles
@@ -294,6 +295,16 @@ case "${1:-run}" in
     preview)
         PRESET="fast"
         QUALITY_PROFILE="preview"
+        STABILIZE="false"
+        ENHANCE="false"
+        shift
+        [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
+        ;;
+    finalize)
+        PRESET="slow"
+        QUALITY_PROFILE="high"
+        STABILIZE="true"
+        ENHANCE="true"
         shift
         [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
         ;;

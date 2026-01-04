@@ -1,29 +1,30 @@
-/* Montage AI - Poly-Chrome Archive / Cyber-NLE Design System */
+/* Montage AI - Cyber-NLE Design System */
 
 :root {
-    /* Palette (warm light with teal/amber accents) */
-    --bg: #f5f4f1;
-    --fg: #1c1c1c;
-    --primary: #0d9488;       /* teal */
-    --primary-strong: #0f766e;
-    --accent: #f59e0b;        /* amber */
-    --muted: #c7cbd1;
-    --card-bg: #ffffff;
-    --border: #1c1c1c;
-    --border-soft: #e4e6eb;
-    --success: #16a34a;
-    --warning: #f97316;
-    --danger: #ef4444;
+    /* Palette (Dark Mode / Cyber-NLE) */
+    --bg: #0a0a0a;            /* Void Black */
+    --surface-color: #161616; /* Panel Gray */
+    --border-color: #2a2a2a;  /* Border Gray */
+    --input-bg: #1f1f1f;      /* Input Gray */
+    
+    --fg: #ffffff;            /* Primary Text */
+    --text-secondary: #888888;
+    
+    --primary: #F4D03F;       /* Cyber Yellow (Action) */
+    --primary-text-on-color: #000000;
+    
+    --accent: #3498DB;        /* Signal Blue (Info) */
+    --danger: #E74C3C;        /* Record Red */
+    --success: #2ECC71;       /* Success Green */
 
     /* Typography */
     --font-display: 'Inter', sans-serif;
     --font-body: 'Space Mono', 'Courier New', monospace;
 
     /* Dimensions */
-    --radius: 12px;
-    --shadow: 0 18px 40px rgba(0,0,0,0.08);
-    --border-width: 2px;
-    --card-border-width: 2px;
+    --radius: 4px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.5);
+    --border-width: 1px;
     --gap: 1.25rem;
 }
 
@@ -36,38 +37,23 @@
 body {
     background-color: var(--bg);
     color: var(--fg);
-    font-family: var(--font-body);
-    background-image:
-        linear-gradient(to right, rgba(28, 28, 28, 0.02) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(28, 28, 28, 0.02) 1px, transparent 1px);
-    background-size: 32px 32px;
+    font-family: var(--font-display); /* UI is Sans, Data is Mono */
     min-height: 100vh;
     line-height: 1.5;
     padding-bottom: 4rem;
 }
 
-/* Scanline Overlay - DISABLED for better readability */
-/* body::after {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: linear-gradient(
-        to bottom,
-        rgba(255,255,255,0),
-        rgba(255,255,255,0) 50%,
-        rgba(0,0,0,0.02) 50%,
-        rgba(0,0,0,0.02)
-    );
-    background-size: 100% 4px;
-    pointer-events: none;
-    z-index: 9999;
-} */
+/* Voxel Card Pattern */
+.voxel-card {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+}
 
 .container {
-    max-width: 1120px;
+    max-width: 1400px; /* Wider for NLE view */
     margin: 0 auto;
     padding: 2rem 1.25rem 3rem;
     display: flex;
@@ -82,22 +68,23 @@ h1, h2, h3, h4 {
     text-transform: uppercase;
     letter-spacing: -0.02em;
     margin-bottom: 1rem;
+    color: var(--fg);
 }
 
-h1 { font-size: 2.5rem; line-height: 1; }
-h2 { font-size: 1.5rem; border-bottom: 2px solid var(--fg); padding-bottom: 0.5rem; margin-bottom: 1.5rem; }
-h3 { font-size: 1rem; color: var(--primary); margin-bottom: 0.5rem; }
+h1 { font-size: 2rem; line-height: 1; }
+h2 { font-size: 1rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; letter-spacing: 0.1em; }
+h3 { font-size: 0.875rem; color: var(--primary); margin-bottom: 0.5rem; }
 
 /* Header / Console Top */
 header {
-    border: var(--card-border-width) solid var(--border);
-    background: var(--card-bg);
-    padding: 1.5rem 1.75rem;
-    box-shadow: var(--shadow);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--surface-color);
+    padding: 1rem 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: relative;
+    margin-bottom: 2rem;
+}
     border-radius: var(--radius);
 }
 
@@ -110,90 +97,84 @@ header {
 .logo-svg {
     width: 48px;
     height: 48px;
-    filter: grayscale(100%) contrast(120%);
+    filter: none;
 }
 
 .logo-text h1 {
     margin: 0;
     font-size: 1.8rem;
+    color: var(--fg);
 }
 
 .logo-ai {
-    color: var(--primary-strong);
+    color: var(--primary);
 }
 
 .subtitle {
     font-size: 0.8rem;
-    color: var(--fg);
-    opacity: 0.7;
-    font-family: 'Space Mono', monospace;
+    color: var(--text-secondary);
+    opacity: 1;
+    font-family: var(--font-body);
 }
 
 .version-badge {
-    background: var(--fg);
-    color: var(--bg);
+    background: var(--primary);
+    color: var(--primary-text-on-color);
     padding: 0.25rem 0.5rem;
     font-weight: bold;
     font-size: 0.8rem;
-    border-radius: 999px;
+    border-radius: 2px;
+    text-transform: uppercase;
 }
 
-/* Voxel Components */
-.voxel-card {
-    background: var(--card-bg);
-    border: var(--card-border-width) solid var(--border);
-    box-shadow: var(--shadow);
-    padding: 1.5rem;
-    border-radius: var(--radius);
-    position: relative;
-}
-
+/* Voxel Components (Updated for Cyber-NLE) */
 .voxel-btn {
-    background: var(--card-bg);
-    border: var(--border-width) solid var(--fg);
-    box-shadow: 6px 6px 0 0 var(--fg);
+    background: transparent;
+    border: 1px solid var(--fg);
+    box-shadow: none;
     color: var(--fg);
     padding: 0.75rem 1.5rem;
-    font-family: var(--font-body);
-    font-weight: bold;
+    font-family: var(--font-display);
+    font-weight: 700;
     text-transform: uppercase;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition: all 0.1s ease;
     display: inline-block;
-    border-radius: 10px;
+    border-radius: 2px;
 }
 
 .voxel-btn:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 0 var(--primary);
+    transform: none;
+    background: rgba(255,255,255,0.1);
     border-color: var(--primary);
     color: var(--primary);
+    box-shadow: 0 0 10px rgba(244, 208, 63, 0.2);
 }
 
 .voxel-btn:active {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0 0 var(--primary);
+    transform: translateY(1px);
+    box-shadow: none;
 }
 
-.voxel-btn.primary {
+.voxel-btn.btn-primary {
     background: var(--primary);
-    color: white;
-    border-color: var(--fg);
+    color: var(--primary-text-on-color);
+    border-color: var(--primary);
 }
 
-.voxel-btn.primary:hover {
-    background: white;
-    color: var(--primary);
+.voxel-btn.btn-primary:hover {
+    background: #F7DC6F; /* Lighter yellow */
+    color: black;
+    box-shadow: 0 0 15px rgba(244, 208, 63, 0.4);
 }
 
 .voxel-btn.small {
     padding: 0.4rem 0.8rem;
     font-size: 0.75rem;
-    box-shadow: 3px 3px 0 0 var(--fg);
 }
 
 .btn-busy {
-    background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent);
+    background-image: linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1) 75%, transparent 75%, transparent);
     background-size: 1rem 1rem;
     animation: progress-stripes 1s linear infinite;
     cursor: not-allowed;
@@ -208,8 +189,9 @@ header {
 .voxel-input, .voxel-select {
     width: 100%;
     padding: 0.75rem;
-    background: #f7f7f7;
-    border: var(--border-width) solid var(--fg);
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--fg);
     font-family: var(--font-body);
     font-size: 1rem;
     color: var(--fg);

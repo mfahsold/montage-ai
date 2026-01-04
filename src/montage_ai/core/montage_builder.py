@@ -163,6 +163,9 @@ class MontageContext:
     # Semantic query for clip selection (Phase 2: Semantic Storytelling)
     semantic_query: Optional[str] = None
 
+    # B-Roll Plan (Epic 2: AI B-Roll)
+    broll_plan: Optional[List[Dict[str, Any]]] = None
+
     # Audio analysis results
     audio_result: Optional[AudioAnalysisResult] = None
 
@@ -325,12 +328,12 @@ def process_clip_task(
         err = err_lines[-1] if err_lines else "unknown error"
         raise RuntimeError(f"ffmpeg extract failed: {err}")
     
-    # 1.5 Smart Reframing (Shorts Mode)
+    # 1.5 Auto Reframe (Shorts Mode)
     if settings.features.shorts_mode:
         try:
-            from ..smart_reframing import SmartReframer
+            from ..auto_reframe import AutoReframeEngine
             # Initialize reframer (target 9:16)
-            reframer = SmartReframer(target_aspect=9/16)
+            reframer = AutoReframeEngine(target_aspect=9/16)
             
             # Analyze the extracted subclip
             crops = reframer.analyze(temp_clip_path)
@@ -769,6 +772,10 @@ class MontageBuilder:
         # Initialize audio clip and calculate duration
         self._init_audio_duration()
 
+        # AI B-Roll Planning (Epic 2)
+        if self.ctx.editing_instructions and "script" in self.ctx.editing_instructions:
+            self._plan_broll_sequence()
+
         # Initialize crossfade settings
         self._init_crossfade_settings()
 
@@ -970,6 +977,56 @@ class MontageBuilder:
                 self.ctx.semantic_query = ' '.join(semantic_parts)
         if env_semantic and not self.ctx.semantic_query:
             self.ctx.semantic_query = env_semantic
+
+    def _plan_broll_sequence(self):
+        """
+        Generate B-Roll plan from script.
+        
+        Uses BrollPlanner to find relevant clips for script segments.
+        Estimates timing based on word count if no timestamps provided.
+        """
+        try:
+            from ..broll_planner import plan_broll
+            
+            script = self.ctx.editing_instructions["script"]
+            logger.info(f"   📜 Planning B-Roll for script: {script[:50]}...")
+            
+            # Plan B-Roll (find suggestions)
+            # We use input_dir from context
+            plan = plan_broll(
+                script, 
+                input_dir=str(self.ctx.input_dir),
+                top_k=3,
+                analyze_first=True
+            )
+            
+            # Estimate timing
+            # Simple heuristic: Distribute segments evenly or by word count
+            total_words = len(script.split())
+            duration_per_word = self.ctx.target_duration / max(1, total_words)
+            
+            current_time = 0.0
+            for segment in plan:
+                seg_text = segment["segment"]
+                seg_words = len(seg_text.split())
+                
+                # If we have a voiceover file, we could use forced alignment here
+                # For now, we estimate
+                seg_duration = seg_words * duration_per_word
+                
+                # Ensure minimum duration
+                seg_duration = max(seg_duration, 2.0)
+                
+                segment["start_time"] = current_time
+                segment["end_time"] = current_time + seg_duration
+                current_time += seg_duration
+                
+            self.ctx.broll_plan = plan
+            logger.info(f"   ✅ B-Roll Plan created with {len(plan)} segments")
+            
+        except Exception as e:
+            logger.warning(f"   ⚠️ B-Roll planning failed: {e}")
+            self.ctx.broll_plan = None
 
     def _init_monitor(self):
         """Initialize monitoring system."""
@@ -1902,6 +1959,36 @@ class MontageBuilder:
                         score += int(sem_result.overall_score * 40)
                 except Exception:
                     pass
+
+            # Rule 7: B-Roll Plan Matching (Epic 2)
+            if self.ctx.broll_plan:
+                # Find active segment
+                active_segment = None
+                for seg in self.ctx.broll_plan:
+                    if seg.get("start_time", 0) <= self.ctx.current_time < seg.get("end_time", 99999):
+                        active_segment = seg
+                        break
+                
+                if active_segment:
+                    # Check if this scene is one of the suggestions
+                    is_suggested = False
+                    for sug in active_segment.get("suggestions", []):
+                        if sug.get("clip") == scene["path"]:
+                            is_suggested = True
+                            # Boost score significantly if it's a direct suggestion
+                            score += 100
+                            break
+                    
+                    # If not a direct suggestion, check semantic match with segment text
+                    if not is_suggested and (meta.get('tags') or meta.get('caption')):
+                        try:
+                            from ..semantic_matcher import get_semantic_matcher
+                            matcher = get_semantic_matcher()
+                            if matcher.is_available:
+                                sem_result = matcher.match_query_to_clip(active_segment["segment"], meta)
+                                score += int(sem_result.overall_score * 50)
+                        except Exception:
+                            pass
 
             # Randomness factor
             score += random.randint(-15, 15)
