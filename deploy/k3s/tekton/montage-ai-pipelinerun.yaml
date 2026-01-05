@@ -18,7 +18,7 @@ spec:
     - name: revision
       value: main
     - name: image
-      value: 192.168.1.16:30500/montage-ai:latest
+      value: 192.168.1.12:5000/montage-ai:latest
     - name: dockerfile
       value: ./Dockerfile
     - name: context

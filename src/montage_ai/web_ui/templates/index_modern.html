@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montage AI - AI Post-Production Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ==================== CSS VARIABLES (DARK MODE) ==================== */
+        :root {
+            /* Color Palette - Professional Cinematic */
+            --primary: #8B5CF6;          /* Violet */
+            --primary-light: #A78BFA;    /* Light Violet */
+            --primary-dark: #6D28D9;     /* Dark Violet */
+            
+            --accent: #EC4899;           /* Rose */
+            --accent-light: #F472B6;     /* Light Rose */
+            
+            --success: #10B981;          /* Emerald */
+            --warning: #F59E0B;          /* Amber */
+            --error: #EF4444;            /* Red */
+            
+            /* Backgrounds */
+            --bg: #0F0F13;               /* Near-black */
+            --bg-secondary: #1A1A1F;     /* Slightly lighter */
+            --card-bg: #1F1F27;          /* Card background */
+            --overlay-bg: rgba(15, 15, 19, 0.8);
+            
+            /* Text & Borders */
+            --fg: #E5E5EB;               /* Main text */
+            --fg-muted: #A1A1AB;         /* Muted text */
+            --border: #2D2D35;           /* Border color */
+            --border-light: #3D3D45;     /* Light border */
+            
+            /* Shadows (Voxel-inspired) */
+            --shadow-sm: 2px 2px 0px 0px rgba(139, 92, 246, 0.2);
+            --shadow-md: 4px 4px 0px 0px rgba(139, 92, 246, 0.3);
+            --shadow-lg: 8px 8px 0px 0px rgba(139, 92, 246, 0.25);
+            --shadow-xl: 12px 12px 0px 0px rgba(139, 92, 246, 0.2);
+            
+            /* Spacing */
+            --spacing-xs: 0.5rem;
+            --spacing-sm: 1rem;
+            --spacing-md: 1.5rem;
+            --spacing-lg: 2rem;
+            --spacing-xl: 3rem;
+            
+            /* Border Radius */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+        }
+
+        /* ==================== GLOBAL STYLES ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        a:hover {
+            color: var(--primary-light);
+        }
+
+        /* ==================== LAYOUT ==================== */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: var(--spacing-md);
+            }
+        }
+
+        /* ==================== HEADER ==================== */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            background-color: rgba(15, 15, 19, 0.9);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--spacing-md) var(--spacing-lg);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-icon {
+            font-size: 2rem;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: var(--spacing-lg);
+            align-items: center;
+        }
+
+        .nav-link {
+            font-size: 0.9rem;
+            color: var(--fg-muted);
+            transition: all 0.2s ease;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-md);
+        }
+
+        .nav-link:hover {
+            background: var(--card-bg);
+            color: var(--fg);
+        }
+
+        /* ==================== HERO SECTION ==================== */
+        .hero {
+            text-align: center;
+            padding: var(--spacing-xl) 0;
+            margin-bottom: var(--spacing-xl);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+            opacity: 0.1;
+            filter: blur(40px);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2rem, 5vw, 4rem);
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: var(--spacing-md);
+            background: linear-gradient(135deg, var(--primary), var(--primary-light), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            color: var(--fg-muted);
+            font-weight: 500;
+            margin-bottom: var(--spacing-md);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .version {
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            background: var(--card-bg);
+            color: var(--fg-muted);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            margin-top: var(--spacing-md);
+        }
+
+        /* ==================== WORKFLOW CARDS ==================== */
+        .workflows {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .workflow-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .workflow-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--primary), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .workflow-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-4px);
+            background: rgba(139, 92, 246, 0.05);
+        }
+
+        .workflow-card:hover::before {
+            opacity: 1;
+        }
+
+        .workflow-icon {
+            font-size: 2.5rem;
+            margin-bottom: var(--spacing-md);
+            display: inline-block;
+        }
+
+        .workflow-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm);
+            color: var(--fg);
+        }
+
+        .workflow-subtitle {
+            font-size: 0.9rem;
+            color: var(--fg-muted);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .workflow-features {
+            list-style: none;
+            flex-grow: 1;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .workflow-features li {
+            font-size: 0.85rem;
+            color: var(--fg-muted);
+            padding: var(--spacing-xs) 0;
+            padding-left: var(--spacing-md);
+            position: relative;
+        }
+
+        .workflow-features li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .workflow-btn {
+            align-self: flex-start;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: var(--spacing-sm) var(--spacing-lg);
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-block;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .workflow-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+        }
+
+        .workflow-btn:active {
+            transform: translateY(0);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ==================== FEATURES SECTION ==================== */
+        .features-section {
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-lg);
+            color: var(--fg);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-lg);
+        }
+
+        .feature-card {
+            background: rgba(139, 92, 246, 0.05);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .feature-title {
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm);
+            color: var(--fg);
+        }
+
+        .feature-description {
+            font-size: 0.9rem;
+            color: var(--fg-muted);
+        }
+
+        /* ==================== CTA SECTION ==================== */
+        .cta-section {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1));
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: var(--spacing-xl);
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+            opacity: 0.08;
+            filter: blur(40px);
+            pointer-events: none;
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .cta-description {
+            font-size: 1.1rem;
+            color: var(--fg-muted);
+            margin-bottom: var(--spacing-lg);
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ==================== FOOTER ==================== */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: var(--spacing-lg) 0;
+            text-align: center;
+            color: var(--fg-muted);
+            font-size: 0.9rem;
+        }
+
+        /* ==================== RESPONSIVE ==================== */
+        @media (max-width: 768px) {
+            .workflows {
+                grid-template-columns: 1fr;
+            }
+
+            .header-nav {
+                gap: var(--spacing-md);
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .section-title {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* ==================== ANIMATIONS ==================== */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .workflow-card {
+            animation: fadeIn 0.6s ease-out;
+            animation-fill-mode: both;
+        }
+
+        .workflow-card:nth-child(1) { animation-delay: 0.1s; }
+        .workflow-card:nth-child(2) { animation-delay: 0.2s; }
+        .workflow-card:nth-child(3) { animation-delay: 0.3s; }
+
+        /* ==================== DARK MODE (DEFAULT) ==================== */
+        /* Already implemented above */
+
+        /* ==================== UTILITY CLASSES ==================== */
+        .text-gradient {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glow {
+            position: relative;
+        }
+
+        .glow::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: var(--radius-lg);
+            padding: 1px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .glow:hover::after {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">🎬</span>
+                <span>Montage AI</span>
+            </div>
+            <nav class="header-nav">
+                <a href="#workflows" class="nav-link">Workflows</a>
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#" class="nav-link">Docs</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Post-Production Assistant for Modern Creators</h1>
+                <p class="tagline">AI-powered beat detection, scene detection, and social-ready output. Polish your footage faster than ever.</p>
+                <span class="version">v{{ version }}</span>
+            </div>
+        </section>
+
+        <!-- Workflows Section -->
+        <section id="workflows" class="workflows">
+            <!-- Montage Creator -->
+            <div class="workflow-card glow" onclick="window.location.href='/montage'">
+                <span class="workflow-icon">🎬</span>
+                <h2 class="workflow-title">Montage Creator</h2>
+                <p class="workflow-subtitle">Beat-sync + Story Arc + Style Presets</p>
+                <ul class="workflow-features">
+                    <li>AI rough cut automation</li>
+                    <li>Beat-synced to music</li>
+                    <li>Story arc shaping</li>
+                    <li>Hitchcock / MTV / Documentary presets</li>
+                    <li>Quality profiles</li>
+                </ul>
+                <a href="/montage" class="workflow-btn">Start Creating →</a>
+            </div>
+
+            <!-- Shorts Studio -->
+            <div class="workflow-card glow" onclick="window.location.href='/shorts'">
+                <span class="workflow-icon">📱</span>
+                <h2 class="workflow-title">Shorts Studio</h2>
+                <p class="workflow-subtitle">Vertical video in seconds</p>
+                <ul class="workflow-features">
+                    <li>Auto 16:9 → 9:16 reframing</li>
+                    <li>Face-detection crops</li>
+                    <li>Auto-caption generation</li>
+                    <li>Smart clip selection</li>
+                    <li>Batch processing</li>
+                </ul>
+                <a href="/shorts" class="workflow-btn">Create Shorts →</a>
+            </div>
+
+            <!-- Transcript Editor -->
+            <div class="workflow-card glow" onclick="window.location.href='/transcript'">
+                <span class="workflow-icon">📝</span>
+                <h2 class="workflow-title">Transcript Editor</h2>
+                <p class="workflow-subtitle">Sync speech to visual beats</p>
+                <ul class="workflow-features">
+                    <li>Whisper transcription</li>
+                    <li>Word-level sync to video</li>
+                    <li>Auto caption styling</li>
+                    <li>Story arc analysis</li>
+                    <li>Export for all platforms</li>
+                </ul>
+                <a href="/transcript" class="workflow-btn">Edit Transcripts →</a>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features-section">
+            <h2 class="section-title">Why Choose Montage AI?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3 class="feature-title">AI-Powered</h3>
+                    <p class="feature-description">Beat detection, scene analysis, and automatic pacing.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3 class="feature-title">Style Presets</h3>
+                    <p class="feature-description">Hitchcock, MTV, Documentary, and custom styles.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📺</div>
+                    <h3 class="feature-title">Multi-Format</h3>
+                    <p class="feature-description">Horizontal, vertical, square, and custom aspect ratios.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3 class="feature-title">Cloud-Ready</h3>
+                    <p class="feature-description">Kubernetes-native, GPU-accelerated, distributed rendering.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔧</div>
+                    <h3 class="feature-title">Extensible</h3>
+                    <p class="feature-description">Custom LLM prompts, filters, and integrations.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⏱️</div>
+                    <h3 class="feature-title">Fast</h3>
+                    <p class="feature-description">Preview mode in seconds, master in minutes.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <div class="cta-content">
+                <h2 class="cta-title">Ready to Polish Your Content?</h2>
+                <p class="cta-description">Upload your raw footage and let AI handle the heavy lifting.</p>
+                <a href="/montage" class="workflow-btn">Get Started Now →</a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Montage AI. We do not generate pixels; we polish them. <a href="#">GitHub</a> | <a href="#">Docs</a></p>
+    </footer>
+</body>
+</html>

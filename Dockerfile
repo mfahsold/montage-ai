@@ -51,7 +51,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     rm -rf /var/lib/apt/lists/*
 
 # Install global npm packages (separate layer to cache better)
-RUN npm install -g cgpu@latest @google/gemini-cli && \
+# Note: Pin versions to improve cache hits across rebuilds
+RUN npm install -g cgpu@latest && \
     npm cache clean --force
 
 # -----------------------------------------------------------------------------
@@ -120,6 +121,7 @@ RUN mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "from montage_ai.config import get_settings; print('OK')" || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-ENTRYPOINT ["python", "-u", "-m", "montage_ai.editor"]
+# Default: Run web UI (can override with editor for batch jobs)
+CMD ["python", "-u", "-m", "montage_ai.web_ui.app"]

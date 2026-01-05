@@ -92,6 +92,30 @@ docker save montage-ai:latest | \
 
 ## Deploy to Cluster
 
+### Quick Start (Fluxibri Clusters)
+
+For clusters with Fluxibri infrastructure (Traefik, Prometheus, Grafana):
+
+```bash
+# Deploy with Kustomize (recommended)
+kubectl apply -k deploy/k3s/app/
+
+# Access web UI
+open http://montage-ai.fluxibri.lan
+
+# Monitor in Grafana
+open http://grafana.fluxibri.lan
+```
+
+**Includes:**
+- Web UI with ingress at `montage-ai.fluxibri.lan`
+- Prometheus metrics collection
+- Grafana dashboard integration
+- Auto-scaling and health checks
+- Persistent storage for input/output/music
+
+### Manual Deployment
+
 ### Step 1: Create Namespace and Resources
 
 ```bash

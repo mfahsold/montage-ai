@@ -191,14 +191,14 @@ app.register_blueprint(analysis_bp)
 
 @app.route('/')
 def index():
-    """Main landing page with workflow selection (strategy-aligned UI)."""
-    return render_template('index_strategy.html', version=VERSION)
+    """Main landing page with workflow selection (modern voxel design)."""
+    return render_template('index.html', version=VERSION)
 
 
 @app.route('/montage')
 def montage_creator():
-    """Montage Creator - redirects to main landing."""
-    return redirect(url_for('index'))
+    """Montage Creator - advanced editing interface."""
+    return render_template('montage.html', version=VERSION)
 
 
 @app.route('/shorts')
@@ -2636,6 +2636,17 @@ def download_file(filename):
     return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
 
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Kubernetes probes."""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "montage-ai-web"
+    }), 200
+
+
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
+    logger.info(f"🚀 Starting Montage AI Web UI on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
