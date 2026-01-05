@@ -24,7 +24,7 @@ COPY requirements.txt .
 # Install python dependencies
 # Use --no-cache-dir to keep image small
 # Use --prefer-binary to avoid compiling from source when possible
-RUN pip install --no-cache-dir --prefer-binary -r requirements.txt
+RUN pip install --default-timeout=100 --no-cache-dir --prefer-binary -r requirements.txt
 
 # Conditional download of Real-ESRGAN based on architecture
 ARG TARGETARCH

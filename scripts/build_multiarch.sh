@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-REGISTRY="${REGISTRY:-10.43.17.166:5000}"
+REGISTRY="${REGISTRY:-192.168.1.12:5000}"
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
 TAG="${TAG:-latest}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
