@@ -69,8 +69,6 @@ spec:
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 5
-      nodeSelector:
-        kubernetes.io/arch: amd64
       volumes:
       - name: data-input
         persistentVolumeClaim:
