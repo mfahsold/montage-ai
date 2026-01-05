@@ -1,0 +1,84 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-web
+  namespace: montage-ai
+  labels:
+    app: montage-ai
+    component: web
+    app.kubernetes.io/part-of: fluxibri-v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: montage-ai
+      component: web
+  template:
+    metadata:
+      labels:
+        app: montage-ai
+        component: web
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: montage-ai
+        image: 192.168.1.16:30500/montage-ai:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: QUALITY_PROFILE
+          value: "standard"
+        - name: CGPU_ENABLED
+          value: "false"
+        volumeMounts:
+        - name: data-input
+          mountPath: /data/input
+        - name: data-output
+          mountPath: /data/output
+        - name: data-music
+          mountPath: /data/music
+        - name: cache
+          mountPath: /tmp
+        resources:
+          requests:
+            memory: 2Gi
+            cpu: 1000m
+          limits:
+            memory: 8Gi
+            cpu: 4000m
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: data-input
+        persistentVolumeClaim:
+          claimName: montage-ai-input
+      - name: data-output
+        persistentVolumeClaim:
+          claimName: montage-ai-output
+      - name: data-music
+        persistentVolumeClaim:
+          claimName: montage-ai-music
+      - name: cache
+        emptyDir:
+          sizeLimit: 10Gi

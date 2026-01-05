@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: montage-ai
+
+resources:
+  - namespace.yaml
+  - pvcs.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - servicemonitor.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: fluxibri-v2
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/name: montage-ai

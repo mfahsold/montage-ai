@@ -1,0 +1,21 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: montage-ai-metrics
+  namespace: monitoring
+  labels:
+    app: montage-ai
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: montage-ai
+      component: web
+  namespaceSelector:
+    matchNames:
+      - montage-ai
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics

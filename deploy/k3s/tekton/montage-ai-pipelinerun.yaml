@@ -1,0 +1,42 @@
+---
+# Multi-Architecture Build Pipeline for Montage AI
+# Uses Tekton to build and push to cluster registry
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: montage-ai-build-
+  namespace: tekton-pipelines
+  labels:
+    app: montage-ai
+    build-type: multi-arch
+spec:
+  pipelineRef:
+    name: build-and-push
+  params:
+    - name: repo-url
+      value: https://github.com/mfahsold/montage-ai.git
+    - name: revision
+      value: main
+    - name: image
+      value: 192.168.1.16:30500/montage-ai:latest
+    - name: dockerfile
+      value: ./Dockerfile
+    - name: context
+      value: ./
+  workspaces:
+    - name: source
+      emptyDir: {}
+  taskRunSpecs:
+    # Run kaniko build with elevated permissions
+    - pipelineTaskName: build-image
+      podTemplate:
+        securityContext:
+          runAsUser: 0
+          runAsNonRoot: false
+      computeResources:
+        requests:
+          memory: 4Gi
+          cpu: 2000m
+        limits:
+          memory: 8Gi
+          cpu: 4000m

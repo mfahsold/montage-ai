@@ -43,7 +43,26 @@ deploy/k3s/
 
 ## Build the Image
 
-Build and push the container image before deploying:
+### Recommended: Tekton Pipeline (Multi-Arch)
+
+For Fluxibri clusters with Tekton CI/CD infrastructure:
+
+```bash
+# Trigger multi-architecture build in cluster
+kubectl create -f deploy/k3s/tekton/montage-ai-pipelinerun.yaml
+
+# Watch build progress
+kubectl get pipelineruns -n tekton-pipelines -w
+
+# View logs
+tkn pipelinerun logs -f -n tekton-pipelines
+```
+
+**Advantages:**
+- Multi-architecture support (AMD64 + ARM64)
+- Distributed build across cluster nodes
+- Integrated with cluster registry
+- No local Docker daemon required
 
 ### Option A: Local Build + Push to Registry
 
@@ -55,29 +74,19 @@ docker buildx build --platform linux/amd64 \
 # Push to GitHub Container Registry
 docker push ghcr.io/mfahsold/montage-ai:latest
 
-# Or push to local/private registry
-docker tag ghcr.io/mfahsold/montage-ai:latest your-registry/montage-ai:latest
-docker push your-registry/montage-ai:latest
+# Or push to cluster registry
+docker tag ghcr.io/mfahsold/montage-ai:latest 192.168.1.16:30500/montage-ai:latest
+docker push 192.168.1.16:30500/montage-ai:latest
 ```
 
-### Option B: In-Cluster Build (Kaniko)
-
-For clusters with Kaniko or similar build systems, create a build job that:
-
-1. Clones this repository
-2. Builds the image using `Dockerfile`
-3. Pushes to your registry
-
-See your cluster's build documentation (e.g., fluxibri_core for Fluxibri clusters).
-
-### Option C: Manual Import
+### Option B: Manual Import
 
 ```bash
 # Build locally
-docker build -t ghcr.io/mfahsold/montage-ai:latest .
+docker build -t montage-ai:latest .
 
 # Export and import to cluster node
-docker save ghcr.io/mfahsold/montage-ai:latest | \
+docker save montage-ai:latest | \
   ssh user@cluster-node "sudo ctr -n k8s.io images import -"
 ```
 
