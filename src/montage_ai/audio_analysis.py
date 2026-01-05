@@ -310,6 +310,11 @@ class AudioQuality:
     quality_tier: str  # "excellent", "good", "acceptable", "poor", "unusable"
 
     @property
+    def quality_level(self) -> str:
+        """Alias for quality_tier (backward compatibility)."""
+        return self.quality_tier
+
+    @property
     def warning(self) -> Optional[str]:
         if self.quality_tier == "unusable":
             return f"Audio quality too low (SNR: {self.snr_db:.1f}dB). Consider re-recording."

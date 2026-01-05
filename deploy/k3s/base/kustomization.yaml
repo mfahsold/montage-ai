@@ -22,7 +22,8 @@ labels:
       app.kubernetes.io/version: "1.0.0"
       app.kubernetes.io/managed-by: kustomize
 
-# Image configuration - override in overlays
+# Image configuration - use local cluster registry
 images:
   - name: ghcr.io/mfahsold/montage-ai
+    newName: 192.168.1.12:5000/montage-ai
     newTag: latest

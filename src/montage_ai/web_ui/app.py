@@ -1800,7 +1800,7 @@ def _apply_clean_audio(video_path: str) -> str:
         try:
             quality = estimate_audio_snr(video_path)
             snr_db = quality.snr_db
-            logger.info(f"Clean audio: SNR = {snr_db:.1f}dB ({quality.quality_level})")
+            logger.info(f"Clean audio: SNR = {snr_db:.1f}dB ({quality.quality_tier})")
 
             # Excellent audio - skip processing
             if snr_db >= 40:
