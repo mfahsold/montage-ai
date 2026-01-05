@@ -153,6 +153,44 @@
             appearance: none;
             cursor: pointer;
         }
+        
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: var(--muted);
+            border: 2px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            transition: width 0.3s ease;
+            position: relative;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.2) 50%,
+                transparent 100%
+            );
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
@@ -396,13 +434,217 @@
             <div class="voxel-card">
                 <h3 class="mb-2 text-primary">STEP 4: Generate Short</h3>
                 <p class="text-xs text-muted mb-4">Render your 9:16 vertical short with AI-optimized reframing.</p>
-                <button class="voxel-btn voxel-btn-primary w-full">Generate Short</button>
+                
+                <!-- Progress Display (hidden initially) -->
+                <div id="progressSection" style="display: none;" class="mb-4">
+                    <div class="tech-label mb-2">STATUS</div>
+                    <div id="progressPhase" class="text-sm text-primary mb-2">Queued...</div>
+                    <div class="progress-bar mb-2">
+                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="progressPercent" class="text-xs text-muted">0%</div>
+                    <button id="cancelBtn" class="voxel-btn text-xs mt-2" onclick="cancelJob()" style="display: none;">Cancel Job</button>
+                </div>
+                
+                <button id="generateBtn" class="voxel-btn voxel-btn-primary w-full" onclick="generateShort()">Generate Short</button>
+                
+                <!-- Success Message (hidden initially) -->
+                <div id="successMessage" style="display: none;" class="mt-4 p-3 bg-success text-bg border-l-4 border-primary">
+                    <div class="text-sm font-bold mb-1">✓ Short Created!</div>
+                    <a id="downloadLink" href="#" class="voxel-btn text-xs mt-2" download>Download Video</a>
+                </div>
+                
+                <!-- Error Message (hidden initially) -->
+                <div id="errorMessage" style="display: none;" class="mt-4 p-3 bg-error text-bg border-l-4 border-secondary">
+                    <div class="text-sm font-bold mb-1">✗ Generation Failed</div>
+                    <div id="errorText" class="text-xs text-muted"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // =====================================================================
+        // Job Management (Async Processing with Progress Tracking)
+        // =====================================================================
+        
+        let currentJobId = null;
+        let pollInterval = null;
+        
+        async function generateShort() {
+            const btn = document.getElementById('generateBtn');
+            const progressSection = document.getElementById('progressSection');
+            const successMessage = document.getElementById('successMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // Hide previous messages
+            successMessage.style.display = 'none';
+            errorMessage.style.display = 'none';
+            
+            // Get options
+            const videoPath = '/data/input/test.mp4'; // TODO: Get from file upload
+            const reframeMode = document.getElementById('reframeMode').value;
+            const captionStyle = document.getElementById('captionStyle')?.value || 'tiktok';
+            const autoCaptions = document.getElementById('autoCaptions')?.checked !== false;
+            const cleanAudio = document.getElementById('cleanAudio')?.checked === true;
+            const platform = document.getElementById('platformPreset').value || 'tiktok';
+            
+            // Build payload
+            const payload = {
+                video_path: videoPath,
+                reframeMode: reframeMode,
+                captionStyle: captionStyle,
+                autoCaptions: autoCaptions,
+                cleanAudio: cleanAudio,
+                platform: platform
+            };
+            
+            // Disable button
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+            
+            try {
+                // Submit job
+                const response = await fetch('/api/shorts/render', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to submit job');
+                }
+                
+                const result = await response.json();
+                currentJobId = result.job_id;
+                
+                // Show progress section
+                progressSection.style.display = 'block';
+                btn.textContent = 'Processing...';
+                
+                // Start polling
+                startJobPolling();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                errorMessage.style.display = 'block';
+                document.getElementById('errorText').textContent = error.message;
+                btn.disabled = false;
+                btn.textContent = 'Generate Short';
+            }
+        }
+        
+        function startJobPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            
+            // Poll every 2 seconds
+            pollInterval = setInterval(async () => {
+                if (!currentJobId) return;
+                
+                try {
+                    const response = await fetch(`/api/jobs/${currentJobId}`);
+                    if (!response.ok) throw new Error('Failed to fetch job status');
+                    
+                    const job = await response.json();
+                    updateJobProgress(job);
+                    
+                    // Stop polling if job is complete/failed
+                    if (['completed', 'failed', 'cancelled'].includes(job.status)) {
+                        clearInterval(pollInterval);
+                        handleJobComplete(job);
+                    }
+                    
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000);
+        }
+        
+        function updateJobProgress(job) {
+            const phase = job.phase || {};
+            const progress = job.progress_percent || 0;
+            
+            // Update phase label
+            const phaseLabel = phase.label || phase.name || 'Processing';
+            document.getElementById('progressPhase').textContent = phaseLabel;
+            
+            // Update progress bar
+            document.getElementById('progressFill').style.width = `${progress}%`;
+            document.getElementById('progressPercent').textContent = `${progress}%`;
+            
+            // Show cancel button if running
+            const cancelBtn = document.getElementById('cancelBtn');
+            if (job.status === 'running' || job.status === 'queued') {
+                cancelBtn.style.display = 'inline-block';
+            } else {
+                cancelBtn.style.display = 'none';
+            }
+        }
+        
+        function handleJobComplete(job) {
+            const btn = document.getElementById('generateBtn');
+            const progressSection = document.getElementById('progressSection');
+            const successMessage = document.getElementById('successMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            if (job.status === 'completed') {
+                // Success
+                progressSection.style.display = 'none';
+                successMessage.style.display = 'block';
+                
+                const downloadLink = document.getElementById('downloadLink');
+                downloadLink.href = `/api/download/${job.output_file || job.path}`;
+                downloadLink.download = job.output_file || 'short.mp4';
+                
+                btn.disabled = false;
+                btn.textContent = 'Generate Another';
+                
+            } else if (job.status === 'failed') {
+                // Failed
+                progressSection.style.display = 'none';
+                errorMessage.style.display = 'block';
+                document.getElementById('errorText').textContent = job.error || 'Unknown error';
+                
+                btn.disabled = false;
+                btn.textContent = 'Try Again';
+                
+            } else if (job.status === 'cancelled') {
+                // Cancelled
+                progressSection.style.display = 'none';
+                btn.disabled = false;
+                btn.textContent = 'Generate Short';
+            }
+            
+            currentJobId = null;
+        }
+        
+        async function cancelJob() {
+            if (!currentJobId) return;
+            
+            if (!confirm('Cancel this job?')) return;
+            
+            try {
+                const response = await fetch(`/api/jobs/${currentJobId}/cancel`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    clearInterval(pollInterval);
+                    document.getElementById('progressPhase').textContent = 'Cancelled';
+                    document.getElementById('generateBtn').disabled = false;
+                    document.getElementById('generateBtn').textContent = 'Generate Short';
+                    document.getElementById('progressSection').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Cancel error:', error);
+            }
+        }
+        
+        // =====================================================================
         // Safe Zone Management System
+        // =====================================================================
+        
         let safeZones = [];
         let isDrawingMode = false;
         let isDrawing = false;

@@ -642,6 +642,40 @@ def api_finalize_job(job_id):
     return jsonify(job)
 
 
+@app.route('/api/jobs/<job_id>/cancel', methods=['POST'])
+def api_cancel_job(job_id):
+    """
+    Cancel a running job.
+    
+    NOTE: This marks the job as cancelled in JobStore, but RQ workers
+    don't support graceful cancellation. The subprocess may continue
+    until it completes or fails naturally.
+    
+    For true cancellation, we'd need to:
+    1. Track subprocess PIDs in JobStore
+    2. Send SIGTERM to the subprocess
+    3. Handle cleanup in tasks.py
+    
+    For now, this just updates the UI state.
+    """
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+    
+    # Update status to cancelled
+    job_store.update_job(job_id, {
+        "status": "cancelled",
+        "cancelled_at": datetime.now().isoformat()
+    })
+    
+    logger.info(f"Job {job_id} marked as cancelled")
+    
+    return jsonify({
+        "success": True,
+        "message": "Job cancelled (note: subprocess may continue until natural completion)"
+    })
+
+
 
 
 
@@ -1950,112 +1984,55 @@ def _apply_ffmpeg_noise_reduction(video_path: str) -> str:
 
 @app.route('/api/shorts/render', methods=['POST'])
 def api_shorts_render():
-    """Render vertical video with smart reframing and captions."""
+    """
+    Render vertical video with smart reframing and captions.
+    
+    NOW ASYNC: Uses job queue for consistent progress tracking and cancellation.
+    Returns job_id immediately, client polls /api/jobs/<id> for progress.
+    """
     data = request.json or {}
     video_path = data.get('video_path')
     reframe_mode = data.get('reframeMode', data.get('reframe_mode', 'auto'))
     caption_style = data.get('captionStyle', data.get('caption_style', 'tiktok'))
     add_captions = data.get('autoCaptions', data.get('add_captions', True))
     platform = data.get('platform', 'tiktok')
-    duration = int(data.get('duration', 60))
-    # Support both old (audioPolish) and new (cleanAudio) parameter names
     clean_audio = data.get('cleanAudio', data.get('audioPolish', False))
 
     if not video_path or not Path(video_path).exists():
         return jsonify({"error": "Video file not found"}), 404
 
-    try:
-        # Apply Clean Audio if requested (voice isolation + noise reduction)
-        if clean_audio:
-            video_path = _apply_clean_audio(video_path)
-
-        from ..auto_reframe import AutoReframeEngine as SmartReframer
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        reframed_path = OUTPUT_DIR / f"shorts_reframed_{timestamp}.mp4"
-        output_path = OUTPUT_DIR / f"shorts_{timestamp}.mp4"
-        
-        reframer = SmartReframer(target_aspect=9/16)
-        
-        # Analyze if needed
-        if reframe_mode != 'center':
-            crop_data = reframer.analyze(video_path)
-        else:
-            crop_data = None
-        
-        # Apply reframing
-        reframer.apply(crop_data, video_path, str(reframed_path))
-        
-        # Add captions if requested
-        if add_captions:
-            from ..transcriber import transcribe_audio
-            from ..caption_burner import CaptionBurner, CaptionStyle
-            
-            # Map frontend caption style to CaptionStyle enum
-            style_map = {
-                'default': CaptionStyle.TIKTOK,
-                'tiktok': CaptionStyle.TIKTOK,
-                'bold': CaptionStyle.BOLD,
-                'minimal': CaptionStyle.MINIMAL,
-                'gradient': CaptionStyle.KARAOKE,  # Gradient uses karaoke highlighting
-                'karaoke': CaptionStyle.KARAOKE,
-            }
-            burner_style = style_map.get(caption_style, CaptionStyle.TIKTOK)
-            
-            # Transcribe video
-            transcript = transcribe_audio(str(reframed_path), model='base', word_timestamps=True)
-            
-            # Generate SRT file
-            srt_path = reframed_path.with_suffix('.srt')
-            _generate_srt_from_transcript(transcript, str(srt_path))
-            
-            # Burn captions into video
-            burner = CaptionBurner(style=burner_style)
-            burner.burn(str(reframed_path), str(srt_path), str(output_path))
-            
-            # Clean up intermediate file
-            reframed_path.unlink(missing_ok=True)
-            srt_path.unlink(missing_ok=True)
-        else:
-            # No captions - just rename
-            reframed_path.rename(output_path)
-        
-        return jsonify({
-            "success": True,
-            "filename": output_path.name,
-            "path": str(output_path),
-            "mode": reframe_mode,
-            "platform": platform,
-            "caption_style": caption_style if add_captions else None
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-def _generate_srt_from_transcript(transcript: dict, srt_path: str):
-    """Generate SRT file from Whisper transcript."""
-    segments = transcript.get('segments', [])
+    # Generate job ID
+    job_id = f"shorts_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
-    with open(srt_path, 'w', encoding='utf-8') as f:
-        for i, seg in enumerate(segments, 1):
-            start = seg.get('start', 0)
-            end = seg.get('end', 0)
-            text = seg.get('text', '').strip()
-            
-            # Format timecodes: HH:MM:SS,mmm
-            def tc(seconds):
-                h = int(seconds // 3600)
-                m = int((seconds % 3600) // 60)
-                s = int(seconds % 60)
-                ms = int((seconds - int(seconds)) * 1000)
-                return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
-            
-            f.write(f"{i}\n")
-            f.write(f"{tc(start)} --> {tc(end)}\n")
-            f.write(f"{text}\n\n")
+    # Create job record
+    job = {
+        "id": job_id,
+        "type": "shorts_reframe",
+        "status": "queued",
+        "options": {
+            "video_path": video_path,
+            "reframe_mode": reframe_mode,
+            "caption_style": caption_style,
+            "add_captions": add_captions,
+            "platform": platform,
+            "clean_audio": clean_audio
+        },
+        "phase": JobPhase.initial().to_dict(),
+        "created_at": datetime.now().isoformat()
+    }
+    
+    # Store in Redis
+    job_store.create_job(job_id, job)
+    
+    # Enqueue for async processing
+    from ..tasks import run_shorts_reframe
+    q.enqueue(run_shorts_reframe, job_id, job['options'])
+    
+    return jsonify({
+        "success": True,
+        "job_id": job_id,
+        "message": "Shorts job queued. Poll /api/jobs/{job_id} for progress."
+    })
 
 
 @app.route('/api/shorts/highlights', methods=['POST'])
