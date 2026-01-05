@@ -2,6 +2,14 @@
 
 Deploy montage-ai as a Kubernetes Job for batch video processing.
 
+## 🚀 Current Status: LIVE
+
+**Web UI:** http://montage-ai.fluxibri.lan ✅ (Running)
+**Architecture:** AMD64 + ARM64 (Multi-arch build in progress)
+**Quality:** Preview (360p) / Standard (1080p) / High (4K)
+
+See [DEPLOYMENT_STATUS.md](./DEPLOYMENT_STATUS.md) for full deployment details, performance metrics, and 8-week implementation roadmap.
+
 ## Directory Structure
 
 ```text
