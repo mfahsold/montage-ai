@@ -19,7 +19,7 @@
         </div>
     </nav>
 
-    <div class="container voxel-container">
+    <div class="container">
         <div class="mb-8">
             <h1 class="voxel-title">SETTINGS</h1>
             <p class="text-xs text-muted">SYSTEM CONFIGURATION AND AI PARAMETERS.</p>
@@ -27,9 +27,9 @@
 
         <div class="grid grid-cols-1 gap-4">
             <div class="voxel-card">
-                <h3 class="mb-2">HARDWARE ACCELERATION</h3>
+                <h4 class="mb-2 text-primary">HARDWARE ACCELERATION</h4>
                 <p class="text-xs text-muted mb-4">Configure how the system utilizes your GPU for rendering and AI inference.</p>
-                <div class="flex justify-between items-center p-4 border border-muted mb-4">
+                <div class="flex justify-between items-center p-4" style="border: 2px solid var(--border); box-shadow: var(--shd-sm); margin-bottom: 1rem;">
                     <div>
                         <div class="text-sm font-bold">GPU ENCODING</div>
                         <div class="text-xs text-muted">Intel QSV / NVIDIA NVENC / Apple Silicon</div>
@@ -39,9 +39,9 @@
             </div>
 
             <div class="voxel-card">
-                <h3 class="mb-2">AI MODELS</h3>
+                <h4 class="mb-2 text-primary">AI MODELS</h4>
                 <p class="text-xs text-muted mb-4">Active LLM and Vision models used for scene analysis and creative direction.</p>
-                <div class="flex justify-between items-center p-4 border border-muted mb-4">
+                <div class="flex justify-between items-center p-4" style="border: 2px solid var(--border); box-shadow: var(--shd-sm); margin-bottom: 1rem;">
                     <div>
                         <div class="text-sm font-bold">CREATIVE DIRECTOR</div>
                         <div class="text-xs text-muted">Gemini 1.5 Flash (Cloud)</div>

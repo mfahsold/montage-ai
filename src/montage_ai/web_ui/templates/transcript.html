@@ -6,121 +6,45 @@
     <title>Montage AI - Transcript Editor</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
     <style>
-        .editor-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            height: calc(100vh - 200px);
-        }
-        .video-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
         .transcript-panel {
-            background: var(--surface-color);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            background: var(--input-bg);
+            border: 2px solid var(--border);
             padding: 1.5rem;
             overflow-y: auto;
-            font-family: 'Space Mono', monospace;
-            line-height: 1.6;
+            max-height: 60vh;
+            line-height: 1.8;
+            box-shadow: var(--shd-sm);
         }
         .word {
             cursor: pointer;
             padding: 2px 4px;
-            border-radius: 4px;
-            transition: all 0.2s;
+            transition: all 0.1s steps(2);
             display: inline-block;
+            border: 1px solid transparent;
         }
         .word:hover {
-            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary);
+            background: var(--muted);
         }
         .word.active {
-            background: var(--primary-color);
-            color: #000;
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
         }
         .word.deleted {
             text-decoration: line-through;
-            color: #666;
-            background: rgba(255, 0, 0, 0.1);
-        }
-        .toolbar {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            padding: 1rem;
-            background: var(--surface-color);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            color: var(--muted-fg);
+            opacity: 0.5;
         }
         .filler-word {
-            border-bottom: 2px solid #ff4444;
-        }
-        /* Beat Timeline Strip */
-        .beat-timeline {
-            margin-top: 1.5rem;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--surface-color);
-            overflow: hidden;
-        }
-        .beat-timeline-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.75rem 1rem;
-            background: rgba(255,255,255,0.02);
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-        }
-        .beat-timeline-header:hover {
-            background: rgba(255,255,255,0.05);
-        }
-        .beat-timeline-title {
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .beat-timeline-toggle {
-            font-size: 0.9rem;
-            opacity: 0.6;
-        }
-        .beat-timeline-body {
-            display: none;
-            padding: 1rem;
-        }
-        .beat-timeline-body.visible {
-            display: block;
+            border-bottom: 2px solid var(--error);
         }
         .energy-canvas {
             width: 100%;
             height: 80px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 4px;
-            cursor: crosshair;
+            background: var(--input-bg);
+            border: 2px solid var(--border);
         }
-        .beat-legend {
-            display: flex;
-            gap: 1.5rem;
-            margin-top: 0.75rem;
-            font-size: 0.8rem;
-            opacity: 0.7;
-        }
-        .beat-legend span {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-        .beat-legend .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-        }
-        .beat-legend .dot.energy { background: #7C3AED; }
-        .beat-legend .dot.beat { background: #F4D03F; }
-        .beat-legend .dot.removed { background: #EF4444; }
     </style>
 </head>
 <body>
@@ -136,622 +60,63 @@
         </div>
     </nav>
 
-    <div class="container voxel-container">
-        <div class="mb-8 flex justify-between items-center">
-            <div>
-                <h1 class="voxel-title">TRANSCRIPT EDITOR</h1>
-                <p class="text-xs text-muted">TEXT-BASED VIDEO EDITING // AI TRANSCRIPTION.</p>
-            </div>
-            <div class="flex gap-4">
-                <div class="voxel-badge voxel-badge-primary">SYSTEM ONLINE</div>
-                <div class="voxel-badge voxel-badge-secondary">GPU READY</div>
-            </div>
+    <div class="container">
+        <div class="mb-8">
+            <h1 class="voxel-title">TRANSCRIPT EDITOR</h1>
+            <p class="text-muted">Edit video by deleting text. AI handles the cuts.</p>
         </div>
 
-        <div class="voxel-card mb-8 flex items-center gap-4">
-            <div class="flex-1">
-                <h3 class="mb-1">TEXT-BASED EDITING</h3>
-                <p class="text-xs text-muted">Edit your video by editing the text. Delete words to cut the video, or use the "Remove Fillers" button to automatically clean up "umms" and "ahhs".</p>
-            </div>
-            <div class="flex gap-2">
-                <input type="file" id="videoInput" accept="video/*" style="display:none" onchange="loadVideo(this)">
-                <button class="voxel-btn voxel-btn-secondary" onclick="document.getElementById('videoInput').click()">
-                    📹 SELECT VIDEO
-                </button>
-                <button id="removeFillersBtn" class="voxel-btn voxel-btn-primary">
-                    ✨ REMOVE FILLERS
-                </button>
-            </div>
-        </div>
-
-        <div class="toolbar mb-4 flex gap-2 items-center">
-            <span id="currentFilename" class="text-xs text-muted"></span>
-            <div class="flex-1"></div>
-            <button id="undoBtn" class="voxel-btn text-xs" disabled>UNDO</button>
-            <button id="redoBtn" class="voxel-btn text-xs" disabled>REDO</button>
-            <button id="saveEditsBtn" class="voxel-btn text-xs">SAVE</button>
-            <label class="flex items-center gap-2 cursor-pointer text-xs">
-                <input type="checkbox" id="autoPreviewCheck" class="voxel-checkbox" checked> AUTO-PREVIEW
-            </label>
-            <button id="previewBtn" class="voxel-btn voxel-btn-primary text-xs">GENERATE PREVIEW</button>
-        </div>
-
-        <div class="editor-container">
-            <div class="video-panel">
-                <div class="voxel-card video-frame">
-                    <video id="mainVideo" controls class="video-contained">
-                        Your browser does not support the video tag.
-                    </video>
-                </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Left: Video & Analysis -->
+            <div class="flex flex-col gap-4">
                 <div class="voxel-card">
-                    <h3>Stats</h3>
-                    <div class="grid-2-lg">
-                        <div>
-                            <div class="label">Original Duration</div>
-                            <div class="value" id="origDuration">00:00</div>
-                        </div>
-                        <div>
-                            <div class="label">Edited Duration</div>
-                            <div class="value" id="editDuration">00:00</div>
-                        </div>
+                    <h3 class="mb-4">PREVIEW</h3>
+                    <div style="aspect-ratio: 16/9; background: #000; border: 2px solid var(--border); position: relative;">
+                        <video id="mainVideo" style="width: 100%; height: 100%; object-fit: contain;"></video>
+                    </div>
+                    <div class="mt-4 flex gap-2">
+                        <button class="voxel-btn voxel-btn-primary">PLAY</button>
+                        <button class="voxel-btn">PAUSE</button>
+                        <div class="flex-grow"></div>
+                        <span class="text-sm text-muted">00:12 / 01:45</span>
+                    </div>
+                </div>
+
+                <div class="voxel-card">
+                    <h3 class="mb-2">AUDIO ENERGY</h3>
+                    <canvas class="energy-canvas" id="energyCanvas"></canvas>
+                    <div class="flex justify-between mt-2">
+                        <span class="text-xs text-muted">BEAT DETECTION: ACTIVE</span>
+                        <span class="text-xs text-muted">BPM: 124</span>
                     </div>
                 </div>
             </div>
-            
-            <div class="transcript-panel" id="transcriptContent">
-                <div class="helper helper-centered">
-                    Select a video to load transcript...
-                </div>
-            </div>
-        </div>
 
-        <!-- Beat Timeline Strip -->
-        <div class="beat-timeline" id="beatTimeline">
-            <div class="beat-timeline-header" onclick="toggleBeatTimeline()">
-                <div class="beat-timeline-title">
-                    🎵 <span>Audio Energy & Beats</span>
-                </div>
-                <span class="beat-timeline-toggle" id="beatToggleIcon">▼ Show</span>
-            </div>
-            <div class="beat-timeline-body" id="beatTimelineBody">
-                <canvas class="energy-canvas" id="energyCanvas"></canvas>
-                <div class="beat-legend">
-                    <span><span class="dot energy"></span> Energy</span>
-                    <span><span class="dot beat"></span> Beats</span>
-                    <span><span class="dot removed"></span> Removed Regions</span>
+            <!-- Right: Transcript -->
+            <div class="flex flex-col gap-4">
+                <div class="voxel-card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3>TRANSCRIPT</h3>
+                        <div class="flex gap-2">
+                            <button class="voxel-btn text-xs">REMOVE FILLERS</button>
+                            <button class="voxel-btn text-xs">EXPORT OTIO</button>
+                        </div>
+                    </div>
+                    
+                    <div class="transcript-panel" id="transcriptArea">
+                        <!-- Placeholder Words -->
+                        <span class="word">So</span> <span class="word">basically</span> <span class="word filler-word">uh</span> 
+                        <span class="word">we</span> <span class="word">are</span> <span class="word">looking</span> <span class="word">at</span> 
+                        <span class="word">the</span> <span class="word">new</span> <span class="word">pipeline</span> <span class="word">and</span> 
+                        <span class="word">it</span> <span class="word">looks</span> <span class="word">really</span> <span class="word">good.</span>
+                    </div>
+
+                    <div class="mt-6">
+                        <button class="voxel-btn voxel-btn-primary w-full">APPLY EDITS & RENDER</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <script src="{{ url_for('static', filename='js/session-client.js') }}"></script>
-    <script>
-        const client = new SessionClient('transcript');
-        let currentTranscript = [];
-        let videoPlayer = document.getElementById('mainVideo');
-        let transcriptContainer = document.getElementById('transcriptContent');
-        
-        // Undo/Redo Stacks
-        const undoStack = [];
-        const redoStack = [];
-
-        // Initialize
-        client.onStateChange = (state) => {
-            if (state.edits) {
-                window.pendingEdits = state.edits;
-                if (currentTranscript.length > 0) {
-                    applyPendingEdits();
-                }
-            }
-        };
-
-        client.onAssetLoaded = (asset) => {
-            document.getElementById('currentFilename').textContent = asset.filename;
-            videoPlayer.src = `/api/video/${asset.filename}`;
-            loadTranscript();
-        };
-
-        client.init();
-
-        function loadVideo(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            // Local preview
-            const url = URL.createObjectURL(file);
-            videoPlayer.src = url;
-            document.getElementById('currentFilename').textContent = file.name;
-
-            // Upload via Client
-            const btn = document.querySelector('button[onclick*="videoInput"]');
-            const originalText = btn.textContent;
-            btn.textContent = 'Uploading...';
-            btn.disabled = true;
-
-            client.uploadAsset(file).then(() => {
-                loadTranscript();
-            }).finally(() => {
-                btn.textContent = originalText;
-                btn.disabled = false;
-            });
-        }
-
-        async function loadTranscript() {
-            transcriptContainer.innerHTML = '<div class="helper helper-centered">Transcribing audio... (this may take a moment)</div>';
-            
-            try {
-                const data = await client.analyze('transcription');
-                if (data.transcript) {
-                    renderTranscript(data.transcript);
-                } else {
-                    transcriptContainer.innerHTML = '<div class="helper helper-centered">Transcription started. Check back later.</div>';
-                }
-            } catch (e) {
-                transcriptContainer.innerHTML = `<div class="helper helper-centered helper-error">Error: ${e.message}</div>`;
-            }
-        }
-
-        function pushUndo(action) {
-            undoStack.push(action);
-            redoStack.length = 0; 
-            updateUndoButtons();
-            saveState(); // Auto-save state
-        }
-
-        function updateUndoButtons() {
-            document.getElementById('undoBtn').disabled = undoStack.length === 0;
-            document.getElementById('redoBtn').disabled = redoStack.length === 0;
-        }
-
-        function performUndo() {
-            if (undoStack.length === 0) return;
-            const action = undoStack.pop();
-            redoStack.push(action);
-            
-            if (action.type === 'toggle') {
-                const span = transcriptContainer.children[action.index];
-                if (action.removed) {
-                    span.classList.remove('deleted');
-                } else {
-                    span.classList.add('deleted');
-                }
-            } else if (action.type === 'batch') {
-                action.indices.forEach(idx => {
-                    const span = transcriptContainer.children[idx];
-                    span.classList.remove('deleted');
-                });
-            }
-            
-            updateStats();
-            updateUndoButtons();
-            saveState();
-            debouncedPreview();
-        }
-
-        function performRedo() {
-            if (redoStack.length === 0) return;
-            const action = redoStack.pop();
-            undoStack.push(action);
-            
-            if (action.type === 'toggle') {
-                const span = transcriptContainer.children[action.index];
-                if (action.removed) {
-                    span.classList.add('deleted');
-                } else {
-                    span.classList.remove('deleted');
-                }
-            } else if (action.type === 'batch') {
-                action.indices.forEach(idx => {
-                    const span = transcriptContainer.children[idx];
-                    span.classList.add('deleted');
-                });
-            }
-            
-            updateStats();
-            updateUndoButtons();
-            saveState();
-            debouncedPreview();
-        }
-
-        document.getElementById('undoBtn').addEventListener('click', performUndo);
-        document.getElementById('redoBtn').addEventListener('click', performRedo);
-
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    performRedo();
-                } else {
-                    performUndo();
-                }
-            } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
-                e.preventDefault();
-                performRedo();
-            }
-        });
-
-        function renderTranscript(data) {
-            if (data.segments) {
-                currentTranscript = data.segments.flatMap(s => s.words || []);
-            } else if (data.words) {
-                currentTranscript = data.words;
-            } else {
-                currentTranscript = []; 
-            }
-
-            transcriptContainer.innerHTML = '';
-            
-            currentTranscript.forEach((word, index) => {
-                const span = document.createElement('span');
-                span.className = 'word';
-                span.textContent = word.word + ' ';
-                span.dataset.start = word.start;
-                span.dataset.end = word.end;
-                span.dataset.index = index;
-                
-                span.onclick = () => toggleWord(index);
-                transcriptContainer.appendChild(span);
-            });
-            
-            applyPendingEdits();
-            updateStats();
-        }
-        
-        function applyPendingEdits() {
-            if (window.pendingEdits) {
-                window.pendingEdits.forEach(edit => {
-                    if (edit.removed && transcriptContainer.children[edit.index]) {
-                        transcriptContainer.children[edit.index].classList.add('deleted');
-                    }
-                });
-                window.pendingEdits = null;
-            }
-        }
-
-        let previewDebounceTimer;
-        function debounce(func, wait) {
-            return function(...args) {
-                clearTimeout(previewDebounceTimer);
-                previewDebounceTimer = setTimeout(() => func.apply(this, args), wait);
-            };
-        }
-
-        const debouncedPreview = debounce(() => {
-            if (document.getElementById('autoPreviewCheck').checked) {
-                requestPreview();
-            }
-        }, 2000);
-
-        function toggleWord(index) {
-            const span = transcriptContainer.children[index];
-            const wasDeleted = span.classList.contains('deleted');
-            span.classList.toggle('deleted');
-            
-            pushUndo({
-                type: 'toggle',
-                index: index,
-                removed: !wasDeleted 
-            });
-            
-            updateStats();
-            debouncedPreview();
-        }
-
-        videoPlayer.addEventListener('timeupdate', () => {
-            const time = videoPlayer.currentTime;
-            const words = transcriptContainer.children;
-            
-            for (let i = 0; i < words.length; i++) {
-                const start = parseFloat(words[i].dataset.start);
-                const end = parseFloat(words[i].dataset.end);
-                
-                if (time >= start && time <= end) {
-                    words[i].classList.add('active');
-                    if (i % 10 === 0) { 
-                        words[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                } else {
-                    words[i].classList.remove('active');
-                }
-            }
-        });
-
-        document.getElementById('removeFillersBtn').addEventListener('click', async () => {
-            try {
-                const data = await client.removeFillers();
-                if (data.indices && data.indices.length > 0) {
-                    // Push to undo stack as a batch so we can undo the backend operation locally
-                    // Note: This only undoes the visual state. To fully undo backend state, 
-                    // we'd need a backend undo or re-save state.
-                    // For now, we rely on "Save Edits" to sync back the visual state if user undoes.
-                    pushUndo({
-                        type: 'batch',
-                        indices: data.indices
-                    });
-                    updateStats();
-                    debouncedPreview();
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        });
-
-        function updateStats() {
-            const words = transcriptContainer.children;
-            let totalDuration = 0;
-            let editedDuration = 0;
-
-            if (words.length > 0) {
-                const firstStart = parseFloat(words[0].dataset.start);
-                const lastEnd = parseFloat(words[words.length - 1].dataset.end);
-                totalDuration = lastEnd - firstStart;
-            }
-
-            for (let i = 0; i < words.length; i++) {
-                if (!words[i].classList.contains('deleted')) {
-                    const start = parseFloat(words[i].dataset.start);
-                    const end = parseFloat(words[i].dataset.end);
-                    editedDuration += (end - start);
-                }
-            }
-
-            const fmt = (s) => {
-                const m = Math.floor(s / 60);
-                const sec = Math.floor(s % 60);
-                return `${m}:${sec.toString().padStart(2, '0')}`;
-            };
-
-            document.getElementById('origDuration').textContent = fmt(totalDuration);
-            document.getElementById('editDuration').textContent = fmt(editedDuration);
-        }
-
-        async function saveState() {
-            const edits = [];
-            const words = transcriptContainer.children;
-            for (let i = 0; i < words.length; i++) {
-                if (words[i].classList.contains('deleted')) {
-                    edits.push({
-                        index: parseInt(words[i].dataset.index),
-                        removed: true
-                    });
-                }
-            }
-            
-            try {
-                await client.saveState({ edits: edits });
-            } catch (e) {
-                console.error('Failed to save state:', e);
-            }
-        }
-
-        document.getElementById('saveEditsBtn').addEventListener('click', () => {
-            saveState().then(() => client.showToast('Session saved!', 'success'));
-        });
-
-        document.getElementById('exportBtn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            const menu = document.getElementById('exportMenu');
-            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-        });
-
-        window.addEventListener('click', () => {
-            document.getElementById('exportMenu').style.display = 'none';
-        });
-
-        function exportProject(format) {
-            client.export(format);
-        }
-
-        async function requestPreview() {
-            const btn = document.getElementById('previewBtn');
-            btn.disabled = true;
-            btn.textContent = 'Generating...';
-
-            const edits = [];
-            const words = transcriptContainer.children;
-            for (let i = 0; i < words.length; i++) {
-                edits.push({
-                    index: parseInt(words[i].dataset.index),
-                    removed: words[i].classList.contains('deleted')
-                });
-            }
-            
-            try {
-                // 1. Save state first
-                await client.saveState({ edits });
-                
-                // 2. Request preview
-                const data = await client.renderPreview({ type: 'transcript' });
-                
-                if (data.url) {
-                    const video = document.getElementById('mainVideo');
-                    video.src = data.url;
-                    video.load();
-                    video.play();
-                    client.showToast('Preview ready', 'success');
-                }
-            } catch (err) {
-                console.error('Preview Error:', err);
-                client.showToast('Preview failed', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Generate Preview';
-            }
-        }
-
-        document.getElementById('previewBtn').addEventListener('click', () => {
-            requestPreview();
-        });
-
-        // ============================================================
-        // BEAT TIMELINE (Energy Curve + Beats Visualization)
-        // ============================================================
-        let energyData = [];
-        let beatTimes = [];
-        let videoDuration = 0;
-        let beatTimelineVisible = false;
-
-        function toggleBeatTimeline() {
-            beatTimelineVisible = !beatTimelineVisible;
-            const body = document.getElementById('beatTimelineBody');
-            const icon = document.getElementById('beatToggleIcon');
-            
-            if (beatTimelineVisible) {
-                body.classList.add('visible');
-                icon.textContent = '▲ Hide';
-                // Load energy data if not loaded
-                if (energyData.length === 0 && client.sessionId) {
-                    loadAudioAnalysis();
-                }
-            } else {
-                body.classList.remove('visible');
-                icon.textContent = '▼ Show';
-            }
-        }
-
-        async function loadAudioAnalysis() {
-            try {
-                const mainAsset = client.state?.assets?.find(a => a.type === 'video');
-                if (!mainAsset) return;
-
-                const response = await fetch('/api/audio/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_path: mainAsset.path })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    energyData = data.energy || [];
-                    beatTimes = data.beats || [];
-                    videoDuration = data.duration || 60;
-                    renderEnergyCanvas();
-                }
-            } catch (e) {
-                console.error('Audio analysis failed:', e);
-            }
-        }
-
-        function renderEnergyCanvas() {
-            const canvas = document.getElementById('energyCanvas');
-            const ctx = canvas.getContext('2d');
-            
-            // High DPI scaling
-            const dpr = window.devicePixelRatio || 1;
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-
-            const width = rect.width;
-            const height = rect.height;
-
-            // Clear
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.fillRect(0, 0, width, height);
-
-            if (energyData.length === 0) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.font = '12px Space Mono';
-                ctx.textAlign = 'center';
-                ctx.fillText('Loading audio analysis...', width / 2, height / 2);
-                return;
-            }
-
-            // Draw energy curve
-            const maxEnergy = Math.max(...energyData, 0.001);
-            ctx.beginPath();
-            ctx.moveTo(0, height);
-            
-            for (let i = 0; i < energyData.length; i++) {
-                const x = (i / energyData.length) * width;
-                const y = height - (energyData[i] / maxEnergy) * height * 0.9;
-                ctx.lineTo(x, y);
-            }
-            
-            ctx.lineTo(width, height);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(124, 58, 237, 0.5)';
-            ctx.fill();
-
-            // Draw energy line
-            ctx.beginPath();
-            for (let i = 0; i < energyData.length; i++) {
-                const x = (i / energyData.length) * width;
-                const y = height - (energyData[i] / maxEnergy) * height * 0.9;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.strokeStyle = '#7C3AED';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            // Draw beat markers
-            ctx.fillStyle = '#F4D03F';
-            for (const beat of beatTimes) {
-                const x = (beat / videoDuration) * width;
-                ctx.fillRect(x - 1, 0, 2, height);
-            }
-
-            // Draw removed regions (based on transcript edits)
-            const words = transcriptContainer.children;
-            ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
-            for (const word of words) {
-                if (word.classList.contains('deleted')) {
-                    const start = parseFloat(word.dataset.start);
-                    const end = parseFloat(word.dataset.end);
-                    const x1 = (start / videoDuration) * width;
-                    const x2 = (end / videoDuration) * width;
-                    ctx.fillRect(x1, 0, x2 - x1, height);
-                }
-            }
-
-            // Draw playhead
-            if (videoPlayer.duration) {
-                const x = (videoPlayer.currentTime / videoPlayer.duration) * width;
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, height);
-                ctx.stroke();
-            }
-        }
-
-        // Click on canvas to seek
-        document.getElementById('energyCanvas').addEventListener('click', (e) => {
-            const canvas = e.target;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const ratio = x / rect.width;
-            
-            if (videoPlayer.duration) {
-                videoPlayer.currentTime = ratio * videoPlayer.duration;
-            }
-        });
-
-        // Update playhead on video timeupdate
-        videoPlayer.addEventListener('timeupdate', () => {
-            if (beatTimelineVisible && energyData.length > 0) {
-                renderEnergyCanvas();
-            }
-        });
-
-        // Re-render on window resize
-        window.addEventListener('resize', () => {
-            if (beatTimelineVisible && energyData.length > 0) {
-                renderEnergyCanvas();
-            }
-        });
-
-        // Update canvas when edits change
-        const originalPushUndo = pushUndo;
-        pushUndo = function(action) {
-            originalPushUndo(action);
-            if (beatTimelineVisible) {
-                renderEnergyCanvas();
-            }
-        };
-    </script>
 </body>
 </html>

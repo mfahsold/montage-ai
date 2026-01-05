@@ -19,8 +19,8 @@
         </div>
     </nav>
 
-    <div class="container voxel-container">
-        <div class="mb-8 flex justify-between items-center">
+    <div class="container">
+        <div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 class="voxel-title">DASHBOARD</h1>
                 <p class="text-xs text-muted">AI POST-PRODUCTION ASSISTANT // POLISH, DON'T GENERATE.</p>
@@ -31,9 +31,9 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-3 mb-8">
+        <div class="grid grid-cols-auto mb-8">
             <!-- Quick Action: New Montage -->
-            <a href="/montage" class="voxel-card flex flex-col justify-between" style="text-decoration: none; height: 220px;">
+            <a href="/montage" class="voxel-card flex flex-col justify-between" style="text-decoration: none;">
                 <div>
                     <h3 class="text-primary mb-2">NEW PROJECT</h3>
                     <p class="text-xs text-muted mb-4">The core engine. Upload footage and let the AI Director assemble a cinematic montage based on your style and prompt.</p>
@@ -44,7 +44,7 @@
             </a>
 
             <!-- Quick Action: Shorts -->
-            <a href="/shorts" class="voxel-card flex flex-col justify-between" style="text-decoration: none; height: 220px;">
+            <a href="/shorts" class="voxel-card flex flex-col justify-between" style="text-decoration: none;">
                 <div>
                     <h3 class="text-secondary mb-2">SHORTS GENERATOR</h3>
                     <p class="text-xs text-muted mb-4">Optimized for social media. Automatically detects faces and points of interest to crop 16:9 footage into 9:16 vertical clips.</p>
@@ -55,7 +55,7 @@
             </a>
 
             <!-- Stats -->
-            <div class="voxel-card flex flex-col justify-between" style="height: 220px;">
+            <div class="voxel-card flex flex-col justify-between">
                 <div>
                     <h3 class="mb-2">SYSTEM STATUS</h3>
                     <p class="text-xs text-muted mb-4">Real-time monitoring of local storage and AI processing queue.</p>
@@ -74,7 +74,7 @@
             </div>
         </div>
 
-        <h2 class="mb-4">RECENT JOBS</h2>
+        <h2 class="mb-4 text-primary">RECENT JOBS</h2>
         <div class="grid grid-cols-1">
             <!-- Job List (Placeholder) -->
             <div class="voxel-card flex justify-between items-center">

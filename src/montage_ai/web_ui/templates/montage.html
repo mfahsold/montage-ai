@@ -5,6 +5,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Montage Creator - Voxel Studio</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+    <style>
+        .style-card {
+            border: 2px solid var(--border);
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+
+        .style-card:hover {
+            border-color: var(--primary);
+            background: var(--muted);
+        }
+
+        .style-card.active {
+            border-color: var(--secondary);
+            background: rgba(255, 85, 0, 0.1);
+            box-shadow: var(--shd-secondary);
+        }
+
+        .style-card h5 {
+            font-size: 0.9rem;
+            font-weight: 900;
+            margin-bottom: 0.5rem;
+        }
+
+        .style-card p {
+            font-size: 0.7rem;
+            color: var(--muted-foreground);
+        }
+
+        .option-group {
+            background: var(--muted);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .option-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .option-item:last-child {
+            border-bottom: none;
+        }
+
+        .option-item input[type="checkbox"] {
+            margin-top: 0.25rem;
+            width: 18px;
+            height: 18px;
+        }
+
+        .option-label {
+            flex: 1;
+        }
+
+        .option-label-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--foreground);
+        }
+
+        .option-label-desc {
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+            margin-top: 0.25rem;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -19,118 +90,162 @@
         </div>
     </nav>
 
-    <div class="container voxel-container">
+    <div class="container">
         <div class="mb-8">
-            <h1 class="voxel-title">NEW PROJECT</h1>
-            <p class="text-muted">Configure your AI director parameters.</p>
+            <h1 class="voxel-title">PROJECT CREATOR</h1>
+            <p class="text-muted">Configure your montage with AI-powered editing. Source footage from /data/input.</p>
         </div>
 
-        <div class="grid grid-cols-3 gap-4">
-            <!-- Left Panel: Controls -->
-            <div class="voxel-card">
-                <form action="/api/jobs" method="POST" id="montageForm">
-                    <div class="mb-8">
-                        <h3 class="mb-1">1. STYLE</h3>
-                        <p class="text-xs text-muted mb-4">Select the editing rhythm and visual language.</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            <label class="voxel-btn text-sm" style="text-align: center;">
-                                <input type="radio" name="style" value="dynamic" checked style="display:none" onchange="selectStyle(this)">
-                                DYNAMIC
-                            </label>
-                            <label class="voxel-btn text-sm" style="text-align: center;">
-                                <input type="radio" name="style" value="hitchcock" style="display:none" onchange="selectStyle(this)">
-                                HITCHCOCK
-                            </label>
-                            <label class="voxel-btn text-sm" style="text-align: center;">
-                                <input type="radio" name="style" value="mtv" style="display:none" onchange="selectStyle(this)">
-                                MTV
-                            </label>
-                            <label class="voxel-btn text-sm" style="text-align: center;">
-                                <input type="radio" name="style" value="minimalist" style="display:none" onchange="selectStyle(this)">
-                                MINIMAL
-                            </label>
+        <form action="/api/jobs" method="POST" id="montageForm">
+            <!-- STEP 1: Select Style -->
+            <div class="mb-8">
+                <div class="voxel-card">
+                    <h3 class="mb-3 text-primary">STEP 1: SELECT STYLE</h3>
+                    <p class="text-xs text-muted mb-4">Choose the editing rhythm and visual language. Each style dictates pacing, transitions, and cut timing.</p>
+                    
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <!-- DYNAMIC -->
+                        <label class="style-card active" onclick="selectStyle('dynamic')">
+                            <input type="radio" name="style" value="dynamic" checked style="display:none">
+                            <h5>DYNAMIC</h5>
+                            <p>Fast cuts on the beat. High energy. Perfect for action & sports.</p>
+                        </label>
+
+                        <!-- HITCHCOCK -->
+                        <label class="style-card" onclick="selectStyle('hitchcock')">
+                            <input type="radio" name="style" value="hitchcock" style="display:none">
+                            <h5>HITCHCOCK</h5>
+                            <p>Slow build + tension. Suspenseful. Cinematic reveals.</p>
+                        </label>
+
+                        <!-- MTV -->
+                        <label class="style-card" onclick="selectStyle('mtv')">
+                            <input type="radio" name="style" value="mtv" style="display:none">
+                            <h5>MTV</h5>
+                            <p>Quick MTV-style cuts. Energetic transitions. Music-driven.</p>
+                        </label>
+
+                        <!-- MINIMALIST -->
+                        <label class="style-card" onclick="selectStyle('minimalist')">
+                            <input type="radio" name="style" value="minimalist" style="display:none">
+                            <h5>MINIMAL</h5>
+                            <p>Subtle, intentional. Long takes. Let footage breathe.</p>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2: Director's Prompt -->
+            <div class="mb-8">
+                <div class="voxel-card">
+                    <h3 class="mb-3 text-primary">STEP 2: CREATIVE DIRECTION</h3>
+                    <p class="text-xs text-muted mb-4">Guide the AI with natural language. Describe mood, pacing, and artistic intent. The AI director will interpret these instructions.</p>
+                    
+                    <label class="tech-label">CREATIVE PROMPT</label>
+                    <textarea 
+                        class="voxel-input mb-3" 
+                        name="prompt" 
+                        rows="5" 
+                        placeholder="Examples:&#10;• High-energy skate montage with fast cuts on kick tricks&#10;• Cinematic interview piece with slow zooms and depth&#10;• Music video style with synchronized beat-cuts&#10;• Documentary feel with natural transitions">
+                    </textarea>
+                    
+                    <p class="text-xs text-muted">💡 <strong>Tip:</strong> Be specific about mood, pace, and subject matter. The AI learns from your descriptions.</p>
+                </div>
+            </div>
+
+            <!-- STEP 3: Processing Options -->
+            <div class="mb-8">
+                <div class="voxel-card">
+                    <h3 class="mb-3 text-primary">STEP 3: PROCESSING OPTIONS</h3>
+                    <p class="text-xs text-muted mb-4">Choose additional AI enhancements to apply during rendering.</p>
+                    
+                    <!-- Video Enhancement -->
+                    <div class="option-group">
+                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--primary); margin-bottom: 0.75rem;">VIDEO ENHANCEMENT</div>
+                        <div class="option-item">
+                            <input type="checkbox" name="upscale" id="upscale">
+                            <div class="option-label">
+                                <div class="option-label-title">AI UPSCALE (4K)</div>
+                                <div class="option-label-desc">Enhance resolution using Real-ESRGAN. Increases file size and render time.</div>
+                            </div>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" name="stabilize" id="stabilize" checked>
+                            <div class="option-label">
+                                <div class="option-label-title">STABILIZE FOOTAGE</div>
+                                <div class="option-label-desc">Remove camera shake using vid.stab. Recommended for handheld footage.</div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="mb-8">
-                        <h3 class="mb-1">2. DIRECTOR'S PROMPT</h3>
-                        <p class="text-xs text-muted mb-4">Guide the AI with natural language instructions.</p>
-                        <textarea class="voxel-input" name="prompt" rows="4" placeholder="Describe the vibe (e.g., 'High energy skate video with fast cuts on the beat')..."></textarea>
-                    </div>
-
-                    <div class="mb-8">
-                        <h3 class="mb-1">3. OPTIONS</h3>
-                        <p class="text-xs text-muted mb-4">Additional AI processing steps.</p>
-                        <div class="flex flex-col gap-2">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" name="upscale" class="voxel-checkbox">
-                                <div class="flex flex-col">
-                                    <span class="text-sm">AI UPSCALE (4K)</span>
-                                    <span class="text-xs text-muted">Enhance resolution using Real-ESRGAN.</span>
-                                </div>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" name="stabilize" class="voxel-checkbox" checked>
-                                <div class="flex flex-col">
-                                    <span class="text-sm">STABILIZE FOOTAGE</span>
-                                    <span class="text-xs text-muted">Remove camera shake via vid.stab.</span>
-                                </div>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" name="auto_reframe" class="voxel-checkbox">
-                                <div class="flex flex-col">
-                                    <span class="text-sm">AUTO-REFRAME (9:16)</span>
-                                    <span class="text-xs text-muted">Smart crop for vertical social media.</span>
-                                </div>
-                            </label>
+                    <!-- Output Format -->
+                    <div class="option-group">
+                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--primary); margin-bottom: 0.75rem;\">OUTPUT FORMAT</div>
+                        <div class="option-item">
+                            <input type="checkbox" name="auto_reframe" id="auto_reframe">
+                            <div class="option-label">
+                                <div class="option-label-title">AUTO-REFRAME (9:16)</div>
+                                <div class="option-label-desc">Generate vertical version for TikTok/Reels. Creates additional output file.</div>
+                            </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
+            <!-- STEP 4: Quality Profile -->
+            <div class="mb-8">
+                <div class="voxel-card">
+                    <h3 class="mb-3 text-primary">STEP 4: QUALITY PROFILE</h3>
+                    <p class="text-xs text-muted mb-4">Balance between render speed and output quality.</p>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                        <label class="flex items-center gap-3 cursor-pointer p-3 border border-border rounded">
+                            <input type="radio" name="quality" value="preview" style="width: 18px; height: 18px;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">PREVIEW</div>
+                                <div style="font-size: 0.75rem; color: var(--muted-foreground);">360p • Ultrafast • Tests setup</div>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer p-3 border border-border rounded" style="border-color: var(--secondary);">
+                            <input type="radio" name="quality" value="standard" checked style="width: 18px; height: 18px;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">STANDARD</div>
+                                <div style="font-size: 0.75rem; color: var(--muted-foreground);">1080p • Balanced • Recommended</div>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer p-3 border border-border rounded">
+                            <input type="radio" name="quality" value="high" style="width: 18px; height: 18px;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">HIGH</div>
+                                <div style="font-size: 0.75rem; color: var(--muted-foreground);">4K • Slow • Cinema-quality</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 5: Submit -->
+            <div class="mb-8">
+                <div class="voxel-card">
+                    <h3 class="mb-3 text-primary">STEP 5: START RENDER</h3>
+                    <p class="text-xs text-muted mb-4">Review your settings and submit. Montage AI will process your footage and create a finished video.</p>
                     <button type="submit" class="voxel-btn voxel-btn-primary w-full">START RENDER</button>
-                </form>
-            </div>
-
-            <!-- Right Panel: Preview / Status -->
-            <div class="voxel-card" style="grid-column: span 2;">
-                <div class="flex justify-between items-center mb-4">
-                    <h3>PREVIEW</h3>
-                    <span class="badge">WAITING FOR INPUT</span>
-                </div>
-                
-                <!-- Placeholder for Video Player -->
-                <div style="background: #000; width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; border: 2px solid var(--border);">
-                    <div class="text-center">
-                        <p class="text-muted mb-2">NO PREVIEW AVAILABLE</p>
-                        <p class="text-xs text-muted">Upload footage to /data/input to begin</p>
-                    </div>
-                </div>
-
-                <div class="mt-8">
-                    <h4 class="mb-2">LOGS</h4>
-                    <div class="voxel-input" style="height: 150px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; color: var(--muted-foreground);">
-                        [SYSTEM] Ready to process.
-                        [SYSTEM] GPU: NVIDIA A100 (Simulated)
-                        [SYSTEM] Storage: 100GB Free
-                    </div>
                 </div>
             </div>
-        </div>
+        </form>
     </div>
 
     <script>
-        function selectStyle(radio) {
-            // Reset all buttons
-            document.querySelectorAll('input[name="style"]').forEach(el => {
-                el.parentElement.classList.remove('voxel-btn-primary');
+        function selectStyle(styleName) {
+            // Update radio button
+            document.querySelector(`input[name="style"][value="${styleName}"]`).checked = true;
+            
+            // Update visual state
+            document.querySelectorAll('.style-card').forEach(card => {
+                card.classList.remove('active');
             });
-            // Highlight selected
-            if(radio.checked) {
-                radio.parentElement.classList.add('voxel-btn-primary');
-            }
+            event.currentTarget.classList.add('active');
         }
-        
-        // Initialize first selection
-        document.querySelector('input[name="style"]:checked').parentElement.classList.add('voxel-btn-primary');
     </script>
 </body>
 </html>

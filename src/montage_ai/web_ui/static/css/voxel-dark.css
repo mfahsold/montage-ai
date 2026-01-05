@@ -1,64 +1,83 @@
-/* Montage AI - Voxel Dark Mode Theme */
-/* Inspired by Pxltshirt / Nightfly Studio */
+/* 
+ * Montage AI - Voxel Dark Mode Theme (SOTA Refactor)
+ * Focus: Technical Readability, Fluid Typography, Mobile-First Responsiveness
+ */
 
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
 :root {
-  /* --- COLOR SYSTEM --- */
-  --background: #050505;
-  --foreground: #e0e0e0;
+  /* --- COLOR SYSTEM (Neon Voxel) --- */
+  --bg: #050505;
+  --fg: #e0e0e0;
+  --card-bg: #0d0d0d;
   
-  --card: #0d0d0d;
-  --card-foreground: #e0e0e0;
-  
-  --primary: #0055ff; /* Electric Blue */
-  --primary-muted: #002266;
-  --primary-foreground: #ffffff;
-  
-  --secondary: #ff5500; /* Neon Orange */
-  --secondary-muted: #662200;
-  --secondary-foreground: #ffffff;
+  --primary: #0055ff;      /* Electric Blue */
+  --primary-glow: rgba(0, 85, 255, 0.3);
+  --secondary: #ff5500;    /* Neon Orange */
+  --secondary-glow: rgba(255, 85, 0, 0.3);
   
   --muted: #1a1a1a;
-  --muted-foreground: #888888;
-  
-  --accent: #222222;
-  --accent-foreground: #ffffff;
-  
+  --muted-fg: #888888;
   --border: #222222;
   --border-bright: #444444;
-  --input: #0a0a0a;
+  --input-bg: #0a0a0a;
   
   --success: #00ff88;
   --warning: #ffcc00;
-  --destructive: #ff3333;
-  
-  --radius: 0px; /* Hard edges for Voxel look */
-  
-  /* --- TYPOGRAPHY SYSTEM --- */
+  --error: #ff3333;
+
+  /* --- TYPOGRAPHY (Fluid & Technical) --- */
   --font-main: 'Share Tech Mono', monospace;
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.25rem;
-  --font-size-xl: 1.5rem;
-  --font-size-2xl: 2rem;
   
-  /* --- SHADOWS & EFFECTS --- */
-  --shadow-voxel-sm: 2px 2px 0px 0px var(--border);
-  --shadow-voxel: 4px 4px 0px 0px var(--border);
-  --shadow-voxel-hover: 4px 4px 0px 0px var(--primary);
-  --shadow-voxel-active: 1px 1px 0px 0px var(--primary);
+  /* SOTA: Fluid typography using clamp() */
+  --fs-xs: clamp(0.7rem, 0.6rem + 0.5vw, 0.8rem);
+  --fs-sm: clamp(0.8rem, 0.7rem + 0.5vw, 0.9rem);
+  --fs-base: clamp(0.9rem, 0.8rem + 0.5vw, 1rem);
+  --fs-lg: clamp(1.1rem, 1rem + 1vw, 1.3rem);
+  --fs-xl: clamp(1.4rem, 1.2rem + 2vw, 1.8rem);
+  --fs-2xl: clamp(1.8rem, 1.5rem + 3vw, 2.5rem);
+
+  /* Technical details for mono fonts */
+  --lh-tight: 1.1;
+  --lh-base: 1.5;
+  --ls-wide: 0.05em;
+  --ls-tight: -0.02em;
+
+  /* Technical Labels */
+  --tech-label: {
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted-fg);
+    font-weight: 700;
+  };
+
+  /* --- SHADOWS (Voxel Style) --- */
+  --shd-sm: 2px 2px 0px 0px var(--border);
+  --shd-md: 4px 4px 0px 0px var(--border);
+  --shd-primary: 4px 4px 0px 0px var(--primary);
+  --shd-secondary: 4px 4px 0px 0px var(--secondary);
+}
+
+/* --- RESET & BASE --- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--bg);
+  color: var(--fg);
   font-family: var(--font-main);
-  margin: 0;
-  padding: 0;
+  line-height: var(--lh-base);
   overflow-x: hidden;
-  line-height: 1.6;
+  min-height: 100vh;
   
   /* Dark Grid Pattern */
   background-image: 
@@ -67,104 +86,152 @@ body {
   background-size: 40px 40px;
 }
 
-/* Layout Utilities */
+/* --- LAYOUT --- */
 .container {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .container { padding: 2rem; }
 }
 
 .grid {
   display: grid;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
-.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Responsive Grid System */
+.grid-cols-auto { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.grid-cols-1 { grid-template-columns: 1fr; }
+
+@media (min-width: 768px) {
+  .grid { gap: 1.5rem; }
+  .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+}
 
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
 .justify-center { justify-content: center; }
 .gap-2 { gap: 0.5rem; }
 .gap-4 { gap: 1rem; }
-.p-4 { padding: 1rem; }
-.p-6 { padding: 1.5rem; }
-.mt-4 { margin-top: 1rem; }
-.mb-4 { margin-bottom: 1rem; }
-.mb-8 { margin-bottom: 2rem; }
-.w-full { width: 100%; }
-.h-full { height: 100%; }
 
-/* Typography */
-.voxel-title {
-  font-size: var(--font-size-2xl);
-  font-weight: 900;
-  letter-spacing: -1px;
-  text-transform: uppercase;
-  margin: 0;
-  color: var(--primary);
-  text-shadow: 2px 2px 0px var(--secondary);
-  line-height: 1;
-}
-
+/* --- TYPOGRAPHY --- */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-main);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 0;
+  letter-spacing: var(--ls-wide);
+  line-height: var(--lh-tight);
+  margin-bottom: 0.5rem;
 }
 
-h1 { font-size: var(--font-size-xl); line-height: 1.2; }
-h2 { font-size: var(--font-size-lg); line-height: 1.2; }
-h3 { font-size: var(--font-size-base); line-height: 1.2; }
+h1 { font-size: var(--fs-xl); }
+h2 { font-size: var(--fs-lg); }
+h3 { font-size: var(--fs-base); }
+
+.voxel-title {
+  font-size: var(--fs-2xl);
+  color: var(--primary);
+  text-shadow: 3px 3px 0px var(--secondary);
+  letter-spacing: var(--ls-tight);
+  margin-bottom: 1rem;
+}
 
 .text-primary { color: var(--primary); }
 .text-secondary { color: var(--secondary); }
-.text-muted { color: var(--muted-foreground); }
-.text-sm { font-size: var(--font-size-sm); }
-.text-xs { font-size: var(--font-size-xs); }
-.uppercase { text-transform: uppercase; }
-.tracking-wider { letter-spacing: 0.1em; }
-.font-bold { font-weight: 700; }
+.text-muted { color: var(--muted-fg); }
+.text-xs { font-size: var(--fs-xs); }
+.text-sm { font-size: var(--fs-sm); }
+.text-center { text-align: center; }
 
-/* Components */
+/* --- COMPONENTS --- */
 
-.voxel-badge {
-  padding: 4px 12px;
-  font-size: 0.75rem;
-  font-weight: 800;
+/* Navbar */
+.navbar {
+  background-color: var(--card-bg);
+  border-bottom: 2px solid var(--border);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+@media (min-width: 768px) {
+  .navbar {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+  }
+}
+
+.nav-brand {
+  font-weight: 900;
+  font-size: var(--fs-lg);
+  color: var(--fg);
+  text-decoration: none;
   text-transform: uppercase;
-  border: 2px solid currentColor;
-  box-shadow: 3px 3px 0px 0px currentColor;
-  background: var(--background);
 }
 
-.voxel-badge-primary {
+.nav-brand span { color: var(--primary); }
+
+.nav-links {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 768px) {
+  .nav-links {
+    gap: 2rem;
+    padding-bottom: 0;
+    overflow-x: visible;
+  }
+}
+
+.nav-link {
+  color: var(--muted-fg);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color 0.1s steps(2);
+}
+
+.nav-link:hover, .nav-link.active {
   color: var(--primary);
-}
-
-.voxel-badge-secondary {
-  color: var(--secondary);
 }
 
 /* Voxel Card */
 .voxel-card {
-  background-color: var(--card);
-  color: var(--card-foreground);
+  background-color: var(--card-bg);
   border: 2px solid var(--border);
-  box-shadow: var(--shadow-voxel);
-  padding: 1.5rem;
+  box-shadow: var(--shd-md);
+  padding: 1.25rem;
   transition: transform 0.1s steps(2), box-shadow 0.1s steps(2);
+  height: 100%; /* Ensure cards in grid fill height */
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .voxel-card { padding: 1.5rem; }
 }
 
 .voxel-card:hover {
   transform: translate(-2px, -2px);
-  box-shadow: var(--shadow-voxel-hover);
+  box-shadow: var(--shd-primary);
   border-color: var(--primary);
 }
 
@@ -173,25 +240,26 @@ h3 { font-size: var(--font-size-base); line-height: 1.2; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 1.5rem;
-  font-family: var(--font-mono);
+  padding: 0.6rem 1.2rem;
+  font-family: var(--font-main);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background-color: var(--secondary);
-  color: var(--secondary-foreground);
+  letter-spacing: var(--ls-wide);
+  background-color: var(--muted);
+  color: var(--fg);
   border: 2px solid var(--border);
-  box-shadow: var(--shadow-voxel-sm);
+  box-shadow: var(--shd-sm);
   cursor: pointer;
-  transition: all 0.1s steps(2);
   text-decoration: none;
+  transition: all 0.1s steps(2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
 }
 
 .voxel-btn:hover {
   transform: translate(-2px, -2px);
-  box-shadow: var(--shadow-voxel);
-  background-color: var(--secondary);
-  filter: brightness(1.1);
+  box-shadow: var(--shd-md);
+  background-color: var(--border-bright);
 }
 
 .voxel-btn:active {
@@ -201,390 +269,60 @@ h3 { font-size: var(--font-size-base); line-height: 1.2; }
 
 .voxel-btn-primary {
   background-color: var(--primary);
-  color: var(--primary-foreground);
-}
-  transform: translate(-2px, -2px);
-  box-shadow: var(--shadow-voxel-hover);
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.voxel-btn:active {
-  transform: translate(1px, 1px);
-  box-shadow: var(--shadow-voxel-active);
-}
-
-.voxel-btn-primary {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
+  color: white;
   border-color: var(--primary);
 }
 
 .voxel-btn-primary:hover {
-  background-color: #003399;
+  box-shadow: var(--shd-primary);
+  filter: brightness(1.1);
+}
+
+.voxel-btn-secondary {
+  background-color: var(--secondary);
   color: white;
-  border-color: #003399;
-}
-
-.voxel-btn-secondary {
-  background-color: var(--secondary);
-  color: var(--secondary-foreground);
   border-color: var(--secondary);
 }
 
-/* Voxel Input */
+.voxel-btn-secondary:hover {
+  box-shadow: var(--shd-secondary);
+  filter: brightness(1.1);
+}
+
+/* Voxel Input & Textarea */
 .voxel-input {
   width: 100%;
-  background-color: var(--input);
-  color: var(--foreground);
+  background-color: var(--input-bg);
+  color: var(--fg);
   border: 2px solid var(--border);
-  padding: 0.75rem;
-  font-family: var(--font-mono);
-  outline: none;
-  transition: all 0.2s;
-  box-sizing: border-box; /* Fix width issues */
-}
-
-.voxel-input:focus {
-  border-color: var(--primary);
-  box-shadow: 4px 4px 0px 0px rgba(0, 68, 204, 0.2);
-}
-
-/* Badge */
-.badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  background-color: var(--muted);
-  color: var(--foreground);
-  border: 2px solid var(--border);
-  box-shadow: 2px 2px 0px 0px var(--border);
-  letter-spacing: 0.05em;
-}
-
-.badge-primary {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  border-color: var(--primary);
-  box-shadow: 2px 2px 0px 0px #003399;
-}
-
-.badge-secondary {
-  background-color: var(--secondary);
-  color: var(--secondary-foreground);
-  border-color: var(--secondary);
-  box-shadow: 2px 2px 0px 0px #cc3d00;
-}
-
-/* Navbar */
-.navbar {
-  background-color: var(--background);
-  border-bottom: 2px solid var(--border);
-  padding: 1rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.nav-brand {
-  font-family: var(--font-sans);
-  font-weight: 900;
-  font-size: 1.5rem;
-  color: var(--foreground);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.nav-brand span { color: var(--primary); }
-
-.nav-links {
-  display: flex;
-  gap: 2rem;
-}
-
-.nav-link {
-  color: var(--muted-foreground);
-  text-decoration: none;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 0.875rem;
-  text-transform: uppercase;
-  transition: color 0.1s steps(2);
-}
-
-.nav-link:hover, .nav-link.active {
-  color: var(--primary);
-}
-
-/* Forms */
-.voxel-input {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background-color: var(--input);
-  color: var(--foreground);
-  border: 2px solid var(--border);
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  transition: border-color 0.1s steps(2);
-  outline: none;
-}
-
-.voxel-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(0, 68, 204, 0.2);
-}
-
-/* Progress Bar */
-.progress-container {
-  width: 100%;
-  height: 16px;
-  background-color: var(--input);
-  border: 2px solid var(--border);
-  margin-top: 0.5rem;
-  position: relative;
-  box-shadow: 2px 2px 0px 0px var(--border);
-}
-
-.progress-bar {
-  height: 100%;
-  background-color: var(--primary);
-  width: 0%;
-  transition: width 0.3s steps(10); /* Stepped transition for voxel feel */
-  border-right: 2px solid var(--border);
-  background-image: linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.1) 25%,
-    transparent 25%,
-    transparent 50%,
-    rgba(255, 255, 255, 0.1) 50%,
-    rgba(255, 255, 255, 0.1) 75%,
-    transparent 75%,
-    transparent
-  );
-  background-size: 16px 16px;
-}
-
-hr {
-  border: 0;
-  border-top: 2px solid var(--border);
-  margin: 2rem 0;
-}
-
-.voxel-hr {
-  border-top: 4px solid var(--primary);
-  box-shadow: 0 4px 0 0 var(--secondary);
-}
-
-.voxel-shadow {
-  box-shadow: var(--shadow-voxel);
-}
-
-.voxel-shadow-sm {
-  box-shadow: var(--shadow-voxel-sm);
-}
-
-.voxel-text {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.voxel-code {
-  background-color: var(--input);
-  padding: 0.2rem 0.4rem;
-  border: 1px solid var(--border);
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-}
-
-/* Animations */
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .grid-cols-2, .grid-cols-3, .grid-cols-4 {
-    grid-template-columns: 1fr;
-  }
-  
-  .container {
-    padding: 1rem;
-  }
-}
-
-/* Additional Voxel Styles */
-.voxel-btn-primary {
-  background-color: var(--primary) !important;
-  color: var(--primary-foreground) !important;
-}
-
-.voxel-btn-secondary {
-  background-color: var(--secondary) !important;
-  color: var(--secondary-foreground) !important;
-}
-
-.voxel-btn-primary:hover, .voxel-btn-secondary:hover {
-  filter: brightness(1.2);
-  transform: translate(-2px, -2px);
-  box-shadow: var(--shadow-voxel);
-}
-
-.voxel-container {
-  background-image: 
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 40px 40px;
-  border: 4px solid var(--border);
-  padding: 2rem;
-  position: relative;
-}
-
-.voxel-container::before {
-  content: "";
-  position: absolute;
-  top: -10px;
-  left: -10px;
-  right: -10px;
-  bottom: -10px;
-  border: 2px solid var(--primary);
-  pointer-events: none;
-  opacity: 0.3;
-}
-
-.voxel-card {
-  background: var(--background);
-  border: 4px solid var(--primary);
-  box-shadow: 8px 8px 0px 0px var(--secondary);
-  padding: 1.5rem;
-  transition: transform 0.1s steps(2), box-shadow 0.1s steps(2);
-}
-
-.voxel-card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 10px 10px 0px 0px var(--secondary);
-}
-
-.voxel-text {
-  font-family: var(--font-mono);
-  line-height: 1.6;
-  color: var(--foreground);
-  background: rgba(0, 68, 204, 0.1);
-  padding: 0.5rem;
-  border-left: 4px solid var(--primary);
-}
-
-.voxel-code {
-  font-family: var(--font-mono);
-  background: #000;
-  color: #0f0;
-  padding: 1rem;
-  border: 2px solid #333;
-  box-shadow: 4px 4px 0px 0px #111;
-  overflow-x: auto;
-}
-
-.voxel-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 16px;
-  font-size: 0.875rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  border: 2px solid currentColor;
-  background: transparent;
-  cursor: pointer;
-  transition: transform 0.1s steps(2), box-shadow 0.1s steps(2);
-  position: relative;
-  box-shadow: 4px 4px 0px 0px currentColor;
-  text-decoration: none;
-}
-
-.voxel-btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0px 0px currentColor;
-}
-
-.voxel-btn-primary {
-  color: var(--primary);
-}
-
-.voxel-btn-secondary {
-  color: var(--secondary);
-}
-
-.voxel-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* Blocky Scrollbar */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--background);
-  border-left: 2px solid var(--border);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border: 2px solid var(--background);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--secondary);
-}
-
-/* Selection */
-::selection {
-  background: var(--secondary);
-  color: var(--secondary-foreground);
-}
-
-/* Voxel Inputs */
-.voxel-input {
-  width: 100%;
-  background-color: var(--input);
-  border: 2px solid var(--border);
-  color: var(--foreground);
   padding: 0.75rem;
   font-family: var(--font-main);
-  font-size: var(--font-size-sm);
-  box-shadow: var(--shadow-voxel-sm);
+  font-size: var(--fs-sm);
   outline: none;
+  box-shadow: var(--shd-sm);
   transition: border-color 0.1s steps(2);
 }
 
 .voxel-input:focus {
   border-color: var(--primary);
+}
+
+textarea.voxel-input {
+  resize: vertical;
+  min-height: 120px;
 }
 
 /* Voxel Checkbox */
 .voxel-checkbox {
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   border: 2px solid var(--border);
-  background-color: var(--input);
+  background-color: var(--input-bg);
   cursor: pointer;
   position: relative;
   box-shadow: 2px 2px 0px 0px var(--border);
+  flex-shrink: 0;
 }
 
 .voxel-checkbox:checked {
@@ -599,9 +337,25 @@ hr {
   left: 50%;
   transform: translate(-50%, -50%);
   color: white;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 900;
 }
+
+/* Badge */
+.voxel-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  border: 2px solid currentColor;
+  box-shadow: 2px 2px 0px 0px currentColor;
+  background: var(--bg);
+  letter-spacing: var(--ls-wide);
+}
+
+.voxel-badge-primary { color: var(--primary); }
+.voxel-badge-secondary { color: var(--secondary); }
 
 /* Progress Bar */
 .progress-container {
@@ -616,59 +370,91 @@ hr {
 .progress-bar {
   height: 100%;
   background-color: var(--primary);
-  transition: width 0.3s ease;
+  width: 0%;
+  transition: width 0.3s steps(10);
 }
 
-/* Navbar */
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background-color: var(--card);
-  border-bottom: 2px solid var(--border);
-  margin-bottom: 2rem;
-}
-
-.nav-brand {
-  font-size: var(--font-size-lg);
-  font-weight: 900;
-  text-decoration: none;
-  color: var(--foreground);
-}
-
-.nav-brand span {
-  color: var(--primary);
-}
-
-.nav-links {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.nav-link {
-  text-decoration: none;
-  color: var(--muted-foreground);
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-  transition: color 0.1s steps(2);
-}
-
-.nav-link:hover, .nav-link.active {
-  color: var(--primary);
-}
-
-/* Utilities */
-.text-muted { color: var(--muted-foreground); }
-.text-xs { font-size: var(--font-size-xs); }
-.text-sm { font-size: var(--font-size-sm); }
+/* --- UTILITIES --- */
+.w-full { width: 100%; }
 .mb-1 { margin-bottom: 0.25rem; }
 .mb-2 { margin-bottom: 0.5rem; }
 .mb-4 { margin-bottom: 1rem; }
 .mb-8 { margin-bottom: 2rem; }
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.gap-2 { gap: 0.5rem; }
-.gap-4 { gap: 1rem; }
-.items-center { align-items: center; }
-.justify-between { justify-content: space-between; }
+.mt-4 { margin-top: 1rem; }
+.py-12 { padding-top: 3rem; padding-bottom: 3rem; }
+
+/* Blocky Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border: 2px solid var(--bg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Selection */
+::selection {
+  background: var(--primary);
+  color: white;
+}
+
+/* --- RESPONSIVE FIXES --- */
+img, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Fix for overflowing text in cards */
+.voxel-card p {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Technical Typography Details */
+.tech-label {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-fg);
+  font-weight: 700;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.tech-value {
+  font-family: var(--font-main);
+  font-weight: 900;
+  color: var(--primary);
+}
+
+/* Scanline Effect (Subtle) */
+body::after {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+  z-index: 9999;
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
+  opacity: 0.3;
+}

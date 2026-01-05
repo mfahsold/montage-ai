@@ -7,45 +7,25 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
     <style>
         :root {
-            /* Inherit from style.css, but define local overrides if needed */
-            --accent-soft: rgba(244, 208, 63, 0.15); /* Yellow soft */
-            --safe-zone: rgba(52, 152, 219, 0.2); /* Blue safe zone */
+            --accent-soft: rgba(244, 208, 63, 0.15);
+            --safe-zone: rgba(52, 152, 219, 0.2);
         }
 
-        body {
-            font-family: var(--font-display);
-        }
-
-        .shorts-layout {
-            display: grid;
-            grid-template-columns: 250px 1fr 300px;
-            gap: 1.5rem;
-            min-height: calc(100vh - 200px);
-        }
-
-        @media (max-width: 1200px) {
-            .shorts-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Phone Preview Frame */
+        /* Phone Preview Frame - Voxel Style */
         .phone-frame {
-            background: #000;
-            border: 4px solid #333;
-            border-radius: 40px;
+            background: var(--bg);
+            border: 4px solid var(--border);
             padding: 8px;
             position: relative;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: var(--shd-md);
             max-width: 280px;
             margin: 0 auto;
         }
 
         .phone-notch {
-            width: 100px;
-            height: 25px;
-            background: #000;
-            border-radius: 0 0 15px 15px;
+            width: 80px;
+            height: 20px;
+            background: var(--border);
             position: absolute;
             top: 0;
             left: 50%;
@@ -55,10 +35,10 @@
 
         .phone-screen {
             background: #000;
-            border-radius: 30px;
             overflow: hidden;
             aspect-ratio: 9/16;
             position: relative;
+            border: 2px solid var(--muted);
         }
 
         .phone-screen video {
@@ -75,11 +55,12 @@
             right: 0;
             bottom: 0;
             pointer-events: none;
-            display: none;
+            opacity: 0;
+            transition: opacity 0.2s steps(4);
         }
 
         .safe-zone-overlay.visible {
-            display: block;
+            opacity: 1;
         }
 
         .safe-zone-top {
@@ -87,9 +68,21 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 15%;
+            height: var(--top-zone, 15%);
             background: var(--safe-zone);
-            border-bottom: 1px dashed var(--accent);
+            border-bottom: 2px dashed var(--primary);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 0.25rem;
+        }
+
+        .safe-zone-top::after {
+            content: 'UNSAFE ZONE (TOP)';
+            font-size: 0.6rem;
+            font-weight: 900;
+            color: var(--primary);
+            text-shadow: 0 0 4px rgba(0, 85, 255, 0.8);
         }
 
         .safe-zone-bottom {
@@ -97,332 +90,174 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 20%;
+            height: var(--bottom-zone, 20%);
             background: var(--safe-zone);
-            border-top: 2px dashed #FFC107;
-        }
-
-        .safe-zone-label {
-            position: absolute;
-            font-size: 10px;
-            color: #FFC107;
-            padding: 2px 6px;
-            background: rgba(0,0,0,0.5);
-            border-radius: 4px;
-        }
-
-        .safe-zone-top .safe-zone-label {
-            bottom: 4px;
-            left: 4px;
-        }
-
-        .safe-zone-bottom .safe-zone-label {
-            top: 4px;
-            left: 4px;
-        }
-
-        /* Crop Path Overlay */
-        .crop-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            border: 3px solid var(--accent);
-            pointer-events: none;
-            display: none;
-        }
-
-        .crop-overlay.visible {
-            display: block;
-        }
-
-        .crop-handle {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: var(--accent);
-            border-radius: 50%;
-        }
-
-        .crop-handle.tl { top: -6px; left: -6px; }
-        .crop-handle.tr { top: -6px; right: -6px; }
-        .crop-handle.bl { bottom: -6px; left: -6px; }
-        .crop-handle.br { bottom: -6px; right: -6px; }
-
-        /* Caption Preview */
-        .caption-preview {
-            position: absolute;
-            bottom: 25%;
-            left: 10%;
-            right: 10%;
-            text-align: center;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 14px;
-            display: none;
-        }
-
-        .caption-preview.visible {
-            display: block;
-        }
-
-        .caption-preview.style-default {
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-        }
-
-        .caption-preview.style-bold {
-            background: #FFEB3B;
-            color: black;
-        }
-
-        .caption-preview.style-minimal {
-            background: transparent;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-        }
-
-        .caption-preview.style-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        /* Settings Panel */
-        .settings-panel {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 1.5rem;
-        }
-
-        .settings-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .settings-group h3 {
-            font-family: 'Space Mono', monospace;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--primary);
-            margin-bottom: 1rem;
+            border-top: 2px dashed var(--primary);
             display: flex;
-            align-items: center;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 0.25rem;
+        }
+
+        .safe-zone-bottom::after {
+            content: 'UNSAFE ZONE (UI)';
+            font-size: 0.6rem;
+            font-weight: 900;
+            color: var(--primary);
+            text-shadow: 0 0 4px rgba(0, 85, 255, 0.8);
+        }
+
+        .clip-item {
+            cursor: pointer;
+            transition: all 0.1s steps(2);
+        }
+
+        .clip-item:hover {
+            border-color: var(--primary);
+            background: var(--muted);
+        }
+
+        .clip-item.active {
+            border-color: var(--secondary);
+            box-shadow: var(--shd-secondary);
+        }
+
+        /* Range Slider Styling */
+        .slider-container {
+            display: flex;
+            flex-direction: column;
             gap: 0.5rem;
         }
 
-        .settings-group h3::before {
-            content: '';
-            display: block;
-            width: 4px;
-            height: 4px;
-            background: var(--primary);
-            box-shadow: 0 0 8px var(--primary);
-        }
-
-        /* Reframe Mode Buttons */
-        .reframe-modes {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
-        }
-
-        .voxel-btn .icon {
-            font-size: 1.5rem;
-            display: block;
-            margin-bottom: 0.25rem;
-        }
-
-        .voxel-btn .label {
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .voxel-btn.selected {
-            background: var(--primary);
-            color: var(--bg);
-            border-color: var(--primary);
-            box-shadow: 0 0 10px rgba(244, 208, 63, 0.3);
-        }
-
-        /* Caption Styles */
-        .caption-styles {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
-        }
-
-        /* Highlight Detection */
-        .highlights-list {
-            max-height: 200px;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-
-        .highlights-list::-webkit-scrollbar {
-            width: 4px;
-        }
-        
-        .highlights-list::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 2px;
-        }
-
-        .highlight-item {
+        .slider-labels {
             display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid transparent;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .highlight-item:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: var(--primary);
-            transform: translateX(2px);
-        }
-
-        .highlight-time {
-            font-family: 'Space Mono', monospace;
-            font-size: 0.75rem;
-            color: var(--primary);
-            min-width: 45px;
-        }
-
-        .highlight-type {
-            font-size: 0.7rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            background: rgba(244, 208, 63, 0.1);
-            color: var(--primary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-weight: 600;
-        }
-
-        .highlight-score {
-            margin-left: auto;
-            font-size: 0.75rem;
-            opacity: 0.5;
-            font-family: 'Space Mono', monospace;
-        }
-
-        .highlight-placeholder {
-            text-align: center;
-            padding: 1rem;
-            font-size: 0.85rem;
-        }
-
-        /* Timeline Strip */
-        .timeline-strip {
-            /* Inherits voxel-card styles */
-            margin-top: 1rem;
-        }
-
-        .timeline-bar {
-            height: 40px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 4px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .timeline-segment {
-            position: absolute;
-            height: 100%;
-            background: var(--primary);
-            opacity: 0.6;
-        }
-
-        .timeline-highlight {
-            position: absolute;
-            height: 100%;
-            width: 4px;
-            background: var(--primary);
-            box-shadow: 0 0 8px var(--primary);
-        }
-
-        /* Toggle Switch */
-        .toggle-row {
-            display: flex;
-            align-items: center;
             justify-content: space-between;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        .toggle-row:last-child {
-            border-bottom: none;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 0.5rem;
         }
 
-        .toggle-label {
-            font-size: 0.875rem;
-            font-weight: 500;
+        .slider-labels .text-xs {
+            flex: 0 0 auto;
+            white-space: nowrap;
         }
 
-        .toggle-switch {
-            width: 44px;
-            height: 24px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            position: relative;
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 0;
+            background: var(--muted);
+            border: 1px solid var(--border);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
             cursor: pointer;
-            transition: background 0.3s;
         }
 
-        .toggle-switch.active {
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 0;
             background: var(--primary);
+            cursor: pointer;
+            border: 2px solid var(--bg);
+            box-shadow: 0 0 8px rgba(0, 85, 255, 0.6);
+            transition: all 0.1s;
         }
 
-        .toggle-switch::after {
-            content: '';
+        input[type="range"]::-webkit-slider-thumb:hover {
+            box-shadow: 0 0 12px rgba(0, 85, 255, 1);
+            transform: scale(1.1);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 0;
+            background: var(--primary);
+            cursor: pointer;
+            border: 2px solid var(--bg);
+            box-shadow: 0 0 8px rgba(0, 85, 255, 0.6);
+            transition: all 0.1s;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            box-shadow: 0 0 12px rgba(0, 85, 255, 1);
+            transform: scale(1.1);
+        }
+
+        /* Safe Zone Drag Affordance */
+        .safe-zone-top, .safe-zone-bottom {
+            cursor: grab;
+            transition: background 0.15s;
+        }
+
+        .safe-zone-top:hover, .safe-zone-bottom:hover {
+            background: rgba(0, 85, 255, 0.2);
+        }
+
+        .safe-zone-top.dragging, .safe-zone-bottom.dragging {
+            background: rgba(0, 85, 255, 0.35);
+            cursor: grabbing;
+        }
+
+        /* Custom Safe Zone Rectangles */
+        #safeZone {
+            pointer-events: none;
+        }
+
+        .safe-zone-rect {
             position: absolute;
-            width: 18px;
-            height: 18px;
-            background: #0a0a0a;
-            border-radius: 50%;
-            top: 3px;
-            left: 3px;
-            transition: transform 0.3s;
+            background: rgba(0, 85, 255, 0.15);
+            border: 2px dashed var(--secondary);
+            box-shadow: 0 0 8px rgba(255, 85, 0, 0.6);
         }
 
-        .toggle-switch.active::after {
-            transform: translateX(20px);
+        #safeZone.drawing {
+            pointer-events: auto;
         }
 
-        /* Nav Links */
-        .nav-links {
+        .safe-zone-rect.active {
+            background: rgba(0, 85, 255, 0.25);
+            border-color: var(--primary);
+        }
+
+        .safe-zone-rect-list {
+            max-height: 120px;
+            overflow-y: auto;
+            background: var(--muted);
+            border: 1px solid var(--border);
+            padding: 0.5rem;
+        }
+
+        .safe-zone-item {
             display: flex;
-            gap: 1rem;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            margin-bottom: 0.25rem;
+            font-size: 0.7rem;
         }
 
-        .nav-link {
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            text-decoration: none;
-            color: var(--fg);
-            opacity: 0.8;
-            transition: all 0.2s;
+        .safe-zone-item button {
+            background: var(--secondary);
+            color: var(--bg);
+            border: none;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            font-size: 0.6rem;
         }
 
-        .nav-link:hover {
-            background: var(--accent-soft);
-            opacity: 1;
-        }
-
-        .nav-link.active {
-            background: var(--accent);
-            color: white;
-            opacity: 1;
+        .safe-zone-item button:hover {
+            background: #ff6600;
         }
     </style>
 </head>
+<body>
     <nav class="navbar">
         <a href="/" class="nav-brand">
             <span>MONTAGE</span> AI
@@ -435,781 +270,330 @@
         </div>
     </nav>
 
-    <div class="container voxel-container">
-        <div class="mb-8 flex justify-between items-center">
-            <div>
-                <h1 class="voxel-title">SHORTS STUDIO</h1>
-                <p class="text-xs text-muted">AI-POWERED VERTICAL VIDEO CREATOR // 9:16 OPTIMIZATION.</p>
-            </div>
-            <div class="flex gap-4">
-                <div class="voxel-badge voxel-badge-primary">SYSTEM ONLINE</div>
-                <div class="voxel-badge voxel-badge-secondary">GPU READY</div>
-            </div>
+    <div class="container">
+        <div class="mb-8">
+            <h1 class="voxel-title">SHORTS STUDIO</h1>
+            <p class="text-muted">AI-Powered 9:16 Vertical Reframe Engine for Social Platforms.</p>
         </div>
 
-        <section class="voxel-card mb-8">
-            <div class="flex items-center gap-4">
-                <span class="icon-xl">📱</span>
+        <!-- STEP 1: Select Clip (Top) -->
+        <div class="mb-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left: Clip Library -->
                 <div>
-                    <h2 class="text-primary">VERTICAL OPTIMIZATION</h2>
-                    <p class="text-xs text-muted">Transform horizontal footage into high-impact vertical content. Our AI automatically tracks subjects and detects highlights to ensure your message fits the frame.</p>
-                </div>
-            </div>
-        </section>
-
-        <div class="shorts-layout">
-            <!-- Left Panel: Settings -->
-            <div class="voxel-card settings-panel">
-                <div class="settings-group">
-                    <h3 class="mb-1">🎯 REFRAME MODE</h3>
-                    <p class="text-xs text-muted mb-4">Choose how the AI crops your video.</p>
-                    <div class="reframe-modes">
-                        <button class="voxel-btn selected" onclick="selectReframe('auto')" data-mode="auto">
-                            <span class="icon">🤖</span>
-                            <span class="label">AUTO (AI)</span>
-                        </button>
-                        <button class="voxel-btn" onclick="selectReframe('face')" data-mode="face">
-                            <span class="icon">👤</span>
-                            <span class="label">FACE TRACK</span>
-                        </button>
-                        <button class="voxel-btn" onclick="selectReframe('center')" data-mode="center">
-                            <span class="icon">⬛</span>
-                            <span class="label">CENTER</span>
-                        </button>
-                        <button class="voxel-btn" onclick="selectReframe('manual')" data-mode="manual">
-                            <span class="icon">✋</span>
-                            <span class="label">MANUAL</span>
-                        </button>
-                        <button class="voxel-btn" onclick="visualizeReframing()" id="visualizeBtn">
-                            <span class="icon">👁️</span>
-                            <span class="label">OVERLAY</span>
-                        </button>
-                        <button class="voxel-btn" onclick="generatePreviewVideo()" id="renderPreviewBtn">
-                            <span class="icon">▶️</span>
-                            <span class="label">RENDER</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="settings-group">
-                    <h3 class="mb-1">💬 CAPTION STYLE</h3>
-                    <p class="text-xs text-muted mb-4">Visual style for burned-in subtitles.</p>
-                    <div class="caption-styles">
-                        <button class="voxel-btn style-default selected" onclick="selectCaptionStyle('default')">
-                            DEFAULT
-                        </button>
-                        <button class="voxel-btn style-bold" onclick="selectCaptionStyle('bold')">
-                            BOLD
-                        </button>
-                        <button class="voxel-btn style-minimal" onclick="selectCaptionStyle('minimal')">
-                            MINIMAL
-                        </button>
-                        <button class="voxel-btn style-gradient" onclick="selectCaptionStyle('gradient')">
-                            GRADIENT
-                        </button>
-                    </div>
-                </div>
-
-                <div class="settings-group">
-                    <h3 class="mb-1">⚙️ OPTIONS</h3>
-                    <p class="text-xs text-muted mb-4">Additional processing steps.</p>
-                    <div class="toggle-row">
-                        <div class="flex flex-col">
-                            <span class="toggle-label">SAFE ZONES</span>
-                            <span class="text-xs text-muted">Show UI overlays.</span>
+                    <div class="voxel-card">
+                        <h3 class="mb-3 text-primary">STEP 1: SELECT CLIP</h3>
+                        <div class="flex flex-col gap-2" id="clipList">
+                            <div class="voxel-card clip-item active p-2">
+                                <div class="text-xs font-bold">SKATE_PARK_01.MP4</div>
+                                <div class="text-xs text-muted">00:15 • 4K</div>
+                            </div>
+                            <div class="voxel-card clip-item p-2">
+                                <div class="text-xs font-bold">INTERVIEW_04.MP4</div>
+                                <div class="text-xs text-muted">01:20 • 1080p</div>
+                            </div>
                         </div>
-                        <div class="toggle-switch active" onclick="toggleSafeZones(this)" id="safeZonesToggle"></div>
-                    </div>
-                    <div class="toggle-row">
-                        <div class="flex flex-col">
-                            <span class="toggle-label">AUTO CAPTIONS</span>
-                            <span class="text-xs text-muted">AI transcription.</span>
-                        </div>
-                        <div class="toggle-switch active" onclick="toggleCaptions(this)" id="captionsToggle"></div>
-                    </div>
-                    <div class="toggle-row">
-                        <div class="flex flex-col">
-                            <span class="toggle-label">HIGHLIGHTS</span>
-                            <span class="text-xs text-muted">Find viral moments.</span>
-                        </div>
-                        <div class="toggle-switch" onclick="toggleHighlights(this)" id="highlightsToggle"></div>
-                    </div>
-                    <div class="toggle-row">
-                        <div class="flex flex-col">
-                            <span class="toggle-label">CLEAN AUDIO</span>
-                            <span class="text-xs text-muted">Remove background noise.</span>
-                        </div>
-                        <div class="toggle-switch" onclick="toggleCleanAudio(this)" id="cleanAudioToggle"></div>
+                        <button class="voxel-btn w-full mt-4 text-xs">UPLOAD MORE</button>
                     </div>
                 </div>
 
-                <div class="settings-group">
-                    <h3>📁 Source</h3>
-                    <input type="file" id="videoInput" accept="video/*" class="hidden-input" aria-label="Select source video" onchange="loadVideo(this)">
-                    <button class="voxel-btn voxel-btn-secondary btn-dashed-full" onclick="document.getElementById('videoInput').click()">
-                        📹 Select Video
-                    </button>
-                </div>
-            </div>
-
-            <!-- Center: Source Monitor -->
-            <div class="voxel-card panel-stack">
-                <div class="panel-header">
-                    <h3 class="info-card-heading">Source Monitor</h3>
-                    <span id="timeDisplay" class="text-mono-faint">00:00 / 00:00</span>
-                </div>
-                
-                <div class="video-shell">
-                    <video id="sourcePlayer" class="video-contained">
-                        <source src="" type="video/mp4">
-                    </video>
-                    <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
-                </div>
-
-                <div class="control-row">
-                    <button onclick="seekBackward()" class="voxel-btn btn-compact">⏪ -5s</button>
-                    <button onclick="playPause()" class="voxel-btn btn-wide" id="playBtn">▶️ Play</button>
-                    <button onclick="seekForward()" class="voxel-btn btn-compact">⏩ +5s</button>
-                </div>
-                
-                <!-- Timeline Strip moved here -->
-                <div class="voxel-card timeline-strip timeline-wrapper">
-                    <div class="timeline-bar" id="timelineBar"></div>
-                </div>
-            </div>
-
-            <!-- Right Panel: Phone Preview -->
-            <div class="preview-col">
-                <h3 class="preview-heading">Result Preview</h3>
-                <div class="phone-frame">
-                    <div class="phone-notch"></div>
-                    <div class="phone-screen">
-                        <!-- We simulate the crop by using object-fit and object-position on the source video, 
-                             or by using a canvas. For preview, let's use a second video element synced. -->
-                        <video id="previewPlayer" loop muted class="video-cover">
-                            <source src="" type="video/mp4">
-                        </video>
-                        <div class="safe-zone-overlay visible" id="safeZoneOverlay">
-                            <div class="safe-zone-top"><span class="safe-zone-label">Platform UI</span></div>
-                            <div class="safe-zone-bottom"><span class="safe-zone-label">Description</span></div>
+                <!-- Center: Preview -->
+                <div>
+                    <div class="voxel-card">
+                        <h4 class="mb-4 text-primary">PREVIEW (9:16)</h4>
+                        <p class="text-xs text-muted mb-3" id="previewHint">Select a clip to start.</p>
+                        
+                        <div class="phone-frame">
+                            <div class="phone-notch"></div>
+                            <div class="phone-screen" id="phoneScreen">
+                                <video id="previewVideo" src="" muted loop></video>
+                                <div class="safe-zone-overlay" id="safeZone">
+                                    <!-- Custom rectangles drawn here -->
+                                </div>
+                            </div>
                         </div>
-                        <div class="caption-preview style-default visible" id="captionPreview">
-                            Sample caption text here
+
+                        <div class="mt-4 flex justify-center gap-2">
+                            <button class="voxel-btn text-xs">PREV</button>
+                            <button class="voxel-btn voxel-btn-primary text-xs">PLAY</button>
+                            <button class="voxel-btn text-xs">NEXT</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: AI Settings -->
+                <div>
+                    <div class="voxel-card">
+                        <h3 class="mb-3 text-primary">STEP 2: AI SETTINGS</h3>
+                        
+                        <label class="tech-label">TRACKING MODE</label>
+                        <select class="voxel-input mb-4">
+                            <option>FACE DETECTION (SOTA)</option>
+                            <option>ACTION TRACKING</option>
+                            <option>CENTER CROP</option>
+                            <option>MANUAL</option>
+                        </select>
+
+                        <label class="tech-label">SMOOTHING</label>
+                        <div class="slider-container mb-4">
+                            <div class="slider-labels">
+                                <span class="text-xs">STIFF</span>
+                                <span class="text-xs">FLUID</span>
+                            </div>
+                            <input type="range" id="smoothingSlider" class="voxel-input" min="0" max="100" value="70" onchange="updateSmoothing()">
+                        </div>
+
+                        <label class="tech-label">CAPTION STYLE</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="voxel-btn text-xs">MINIMAL</button>
+                            <button class="voxel-btn text-xs voxel-btn-secondary">BOLD NEON</button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Highlights Panel -->
-        <div class="hidden-block" id="highlightsPanel">
-                <div class="settings-group">
-                    <h3>⚡ Detected Highlights</h3>
-                    <div class="highlights-list" id="highlightsList">
-                        <div class="highlight-placeholder" id="highlightsPlaceholder">
-                            <span style="opacity: 0.6;">Load a video and click "Detect" to find highlights</span>
-                        </div>
+        <!-- STEP 3: Safe Zone Configuration (Optional, Advanced) -->
+        <div class="mb-6">
+            <div class="voxel-card">
+                <h3 class="mb-3 text-primary">STEP 3: SAFE ZONES (OPTIONAL)</h3>
+                <p class="text-xs text-muted mb-4">Protect content from platform UI overlays. Draw custom zones or apply platform presets for TikTok, Instagram, YouTube, etc.</p>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label class="tech-label">PLATFORM PRESETS</label>
+                        <select id="platformPreset" class="voxel-input" onchange="applyPlatformPreset()">
+                            <option value="">-- CUSTOM --</option>
+                            <option value="tiktok">TikTok (Bottom + Right)</option>
+                            <option value="instagram">Instagram Reels (Bottom)</option>
+                            <option value="youtube">YouTube Shorts (Bottom)</option>
+                            <option value="twitch">Twitch (Top + Bottom + Right)</option>
+                            <option value="snapchat">Snapchat (Edges)</option>
+                        </select>
                     </div>
-                    <button onclick="detectHighlights()" class="voxel-btn w-100 mt-05" id="detectHighlightsBtn">
-                        🔍 Detect Highlights
-                    </button>
-                </div>
-
-                <div class="settings-group">
-                    <h3>📐 Output</h3>
-                    <div class="grid-2">
-                        <div>
-                            <label class="label-small" for="platformSelect">Platform</label>
-                            <select class="voxel-select w-100" id="platformSelect">
-                                <option value="tiktok">TikTok</option>
-                                <option value="reels">Instagram Reels</option>
-                                <option value="shorts">YouTube Shorts</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="label-small" for="durationSelect">Duration</label>
-                            <select class="voxel-select w-100" id="durationSelect">
-                                <option value="15">15 sec</option>
-                                <option value="30">30 sec</option>
-                                <option value="60" selected>60 sec</option>
-                                <option value="90">90 sec</option>
-                            </select>
+                    <div>
+                        <label class="tech-label">ACTIONS</label>
+                        <div class="flex gap-2">
+                            <button class="voxel-btn text-xs" id="drawModeBtn" onclick="toggleDrawMode()">DRAW MODE: OFF</button>
+                            <button class="voxel-btn text-xs" onclick="clearAllZones()">CLEAR ALL</button>
                         </div>
                     </div>
                 </div>
+                
+                <label class="tech-label">DEFINED ZONES</label>
+                <div class="safe-zone-rect-list" id="zoneList">
+                    <p class="text-xs text-muted">No zones yet. Click "DRAW MODE: ON" and drag on preview to create.</p>
+                </div>
+                
+                <p class="text-xs text-muted mt-3"><strong>💡 How to:</strong> Enable DRAW MODE, then click & drag on the preview above to draw rectangles. Click to deselect.</p>
+                
+                <button class="voxel-btn text-xs mt-3" id="safeZoneBtn" onclick="toggleSafeZone()">SAFE ZONE OVERLAY: OFF</button>
+            </div>
+        </div>
 
-                <button onclick="createShort()" class="voxel-btn voxel-btn-primary w-100 mt-1">
-                    🎬 Create Short
-                </button>
-
-                <button onclick="exportSettings()" class="voxel-btn voxel-btn-secondary w-100 mt-05">
-                    💾 Export Settings
-                </button>
+        <!-- STEP 4: Generate -->
+        <div>
+            <div class="voxel-card">
+                <h3 class="mb-2 text-primary">STEP 4: GENERATE SHORT</h3>
+                <p class="text-xs text-muted mb-4">All settings configured. Click below to render your 9:16 vertical short with AI-optimized reframing.</p>
+                <button class="voxel-btn voxel-btn-primary w-full">GENERATE SHORT</button>
             </div>
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/session-client.js') }}"></script>
     <script>
-        const client = new SessionClient('shorts');
-        
-        let currentSettings = {
-            reframeMode: 'auto',
-            captionStyle: 'default',
-            showSafeZones: true,
-            autoCaptions: true,
-            detectHighlights: false,
-            cleanAudio: false,  // Combines voice_isolation + noise_reduction
-            platform: 'tiktok',
-            duration: 60
-        };
+        // Safe Zone Management System
+        let safeZones = [];
+        let isDrawingMode = false;
+        let isDrawing = false;
+        let drawStart = { x: 0, y: 0 };
 
-        let cropData = [];
-        let manualKeyframes = []; 
-        let originalWidth = 1920;
-        let originalHeight = 1080;
-
-        const sourcePlayer = document.getElementById('sourcePlayer');
-        const previewPlayer = document.getElementById('previewPlayer');
-        const overlayCanvas = document.getElementById('overlayCanvas');
-        const ctx = overlayCanvas.getContext('2d');
-
-        // Initialize
-        client.onStateChange = (state) => {
-            if (state.crops_auto) {
-                cropData = state.crops_auto;
-                resizeCanvas();
-            }
-        };
-
-        client.onAssetLoaded = (asset) => {
-            // Assuming /api/video/ serves from INPUT_DIR
-            const url = `/api/video/${asset.filename}`;
-            sourcePlayer.src = url;
-            previewPlayer.src = url;
-            console.log("Loaded video:", asset.filename);
-        };
-
-        client.init();
-
-        // Sync players
-        sourcePlayer.onplay = () => previewPlayer.play();
-        sourcePlayer.onpause = () => previewPlayer.pause();
-        sourcePlayer.onseeking = () => previewPlayer.currentTime = sourcePlayer.currentTime;
-        sourcePlayer.onseeked = () => previewPlayer.currentTime = sourcePlayer.currentTime;
-        sourcePlayer.ontimeupdate = () => {
-            const t = sourcePlayer.currentTime;
-            const d = sourcePlayer.duration || 0;
-            document.getElementById('timeDisplay').textContent = `${formatTime(t)} / ${formatTime(d)}`;
-            updateCropOverlay();
-        };
-        
-        sourcePlayer.onloadedmetadata = () => {
-            originalWidth = sourcePlayer.videoWidth;
-            originalHeight = sourcePlayer.videoHeight;
-            resizeCanvas();
-        };
-        
-        // Canvas Click Handler for Manual Keyframes
-        overlayCanvas.onclick = (e) => {
-            if (currentSettings.reframeMode !== 'manual') return;
+        function toggleSafeZone() {
+            const overlay = document.getElementById('safeZone');
+            const btn = document.getElementById('safeZoneBtn');
+            const isVisible = overlay.classList.toggle('visible');
             
-            const rect = overlayCanvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const normalizedX = x / rect.width;
-            const time = sourcePlayer.currentTime;
-            
-            manualKeyframes = manualKeyframes.filter(k => Math.abs(k.time - time) > 0.5);
-            manualKeyframes.push({time, x: normalizedX});
-            manualKeyframes.sort((a, b) => a.time - b.time);
-            
-            client.showToast(`Keyframe set at ${formatTime(time)}`, 'success');
-            updateCropOverlay();
-        };
-
-        function selectReframe(mode) {
-            currentSettings.reframeMode = mode;
-            document.querySelectorAll('.reframe-modes .voxel-btn').forEach(btn => {
-                btn.classList.toggle('selected', btn.dataset.mode === mode);
-            });
-            
-            overlayCanvas.style.pointerEvents = mode === 'manual' ? 'auto' : 'none';
-            overlayCanvas.style.cursor = mode === 'manual' ? 'crosshair' : 'default';
-            
-            if (mode === 'manual') {
-                client.showToast('Click on video to set crop center', 'info');
-            }
-        }
-
-        function selectCaptionStyle(style) {
-            currentSettings.captionStyle = style;
-            document.querySelectorAll('.caption-styles .voxel-btn').forEach(btn => {
-                btn.classList.remove('selected');
-            });
-            
-            const btn = event.target.closest('button');
-            if (btn) btn.classList.add('selected');
-
-            const preview = document.getElementById('captionPreview');
-            preview.className = `caption-preview style-${style} visible`;
-        }
-
-        function toggleSafeZones(el) {
-            el.classList.toggle('active');
-            currentSettings.showSafeZones = el.classList.contains('active');
-            document.getElementById('safeZoneOverlay').classList.toggle('visible', currentSettings.showSafeZones);
-        }
-
-        function toggleCaptions(el) {
-            el.classList.toggle('active');
-            currentSettings.autoCaptions = el.classList.contains('active');
-            document.getElementById('captionPreview').classList.toggle('visible', currentSettings.autoCaptions);
-        }
-
-        function toggleHighlights(el) {
-            el.classList.toggle('active');
-            currentSettings.detectHighlights = el.classList.contains('active');
-            setHighlightsPanelVisible(currentSettings.detectHighlights || highlightsData.length > 0);
-            client.saveState({ detectHighlights: currentSettings.detectHighlights });
-        }
-
-        function toggleCleanAudio(el) {
-            el.classList.toggle('active');
-            currentSettings.cleanAudio = el.classList.contains('active');
-            client.saveState({ cleanAudio: currentSettings.cleanAudio });
-        }
-
-        function loadVideo(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            // Local preview immediately
-            const url = URL.createObjectURL(file);
-            sourcePlayer.src = url;
-            previewPlayer.src = url;
-            sourcePlayer.load();
-            previewPlayer.load();
-
-            // Reset
-            cropData = [];
-            ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-            // Upload via Client
-            client.uploadAsset(file).then(() => {
-                analyzeCrops();
-            });
-        }
-        
-        async function analyzeCrops() {
-            try {
-                const data = await client.analyze('crops', { keyframes: manualKeyframes });
-                cropData = data.crops;
-                resizeCanvas();
-            } catch (e) {
-                // Error handled by client
-            }
-        }
-
-        function resizeCanvas() {
-            if (sourcePlayer.clientWidth) {
-                overlayCanvas.width = sourcePlayer.clientWidth;
-                overlayCanvas.height = sourcePlayer.clientHeight;
-            }
-        }
-        window.onresize = resizeCanvas;
-
-        function updateCropOverlay() {
-            if (!cropData.length) return;
-            const t = sourcePlayer.currentTime;
-            
-            let frame = null;
-            let minDiff = Infinity;
-            
-            for (const c of cropData) {
-                const diff = Math.abs(c.time - t);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    frame = c;
-                } else {
-                    break;
-                }
-            }
-            
-            if (frame) {
-                const scaleX = overlayCanvas.width / originalWidth;
-                const scaleY = overlayCanvas.height / originalHeight;
-                
-                ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                
-                const x = frame.x * scaleX;
-                const y = frame.y * scaleY;
-                const w = frame.width * scaleX;
-                const h = frame.height * scaleY;
-                
-                ctx.clearRect(x, y, w, h);
-                
-                ctx.strokeStyle = '#F4D03F';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(x, y, w, h);
-                
-                const centerX = frame.x + frame.width / 2;
-                const percentX = (centerX / originalWidth) * 100;
-                previewPlayer.style.objectPosition = `${percentX}% 50%`;
-            }
-            
-            if (manualKeyframes.length > 0) {
-                for (const kf of manualKeyframes) {
-                    if (Math.abs(kf.time - t) < 2.0) {
-                        const kx = kf.x * overlayCanvas.width;
-                        
-                        ctx.fillStyle = '#00FF00';
-                        ctx.beginPath();
-                        ctx.arc(kx, overlayCanvas.height / 2, 6, 0, Math.PI * 2);
-                        ctx.fill();
-                        
-                        ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.moveTo(kx, 0);
-                        ctx.lineTo(kx, overlayCanvas.height);
-                        ctx.stroke();
-                    }
-                }
-            }
-        }
-
-        function playPause() {
-            if (sourcePlayer.paused) {
-                sourcePlayer.play();
-                document.getElementById('playBtn').textContent = '⏸️ Pause';
+            if (isVisible) {
+                btn.textContent = 'SAFE ZONE OVERLAY: ON';
+                btn.classList.add('voxel-btn-primary');
             } else {
-                sourcePlayer.pause();
-                document.getElementById('playBtn').textContent = '▶️ Play';
+                btn.textContent = 'SAFE ZONE OVERLAY: OFF';
+                btn.classList.remove('voxel-btn-primary');
             }
         }
 
-        function seekTo(seconds) {
-            sourcePlayer.currentTime = seconds;
+        function toggleDrawMode() {
+            isDrawingMode = !isDrawingMode;
+            const btn = document.getElementById('drawModeBtn');
+            const overlay = document.getElementById('safeZone');
+            
+            if (isDrawingMode) {
+                btn.textContent = 'DRAW MODE: ON';
+                btn.classList.add('voxel-btn-primary');
+                overlay.classList.add('drawing');
+                document.getElementById('previewHint').textContent = 'Click & drag on preview to draw safe zones.';
+            } else {
+                btn.textContent = 'DRAW MODE: OFF';
+                btn.classList.remove('voxel-btn-primary');
+                overlay.classList.remove('drawing');
+                document.getElementById('previewHint').textContent = 'Preview';
+            }
         }
 
-        function seekBackward() {
-            sourcePlayer.currentTime = Math.max(0, sourcePlayer.currentTime - 5);
+        function applyPlatformPreset() {
+            const preset = document.getElementById('platformPreset').value;
+            clearAllZones();
+            
+            const presets = {
+                tiktok: [
+                    { x: 85, y: 80, w: 15, h: 20 }, // Right buttons
+                    { x: 0, y: 90, w: 100, h: 10 }  // Bottom bar
+                ],
+                instagram: [
+                    { x: 0, y: 88, w: 100, h: 12 }  // Bottom UI
+                ],
+                youtube: [
+                    { x: 0, y: 92, w: 100, h: 8 }   // Bottom player
+                ],
+                twitch: [
+                    { x: 0, y: 0, w: 100, h: 5 },   // Top bar
+                    { x: 90, y: 15, w: 10, h: 60 }, // Right panel
+                    { x: 0, y: 95, w: 100, h: 5 }   // Bottom chat
+                ],
+                snapchat: [
+                    { x: 0, y: 0, w: 100, h: 10 },   // Top
+                    { x: 0, y: 90, w: 100, h: 10 },  // Bottom
+                    { x: 0, y: 10, w: 15, h: 80 },   // Left
+                    { x: 85, y: 10, w: 15, h: 80 }   // Right
+                ]
+            };
+            
+            if (preset && presets[preset]) {
+                presets[preset].forEach(z => addSafeZone(z.x, z.y, z.w, z.h));
+                document.getElementById('platformPreset').value = '';
+            }
         }
 
-        function seekForward() {
-            sourcePlayer.currentTime = Math.min(sourcePlayer.duration, sourcePlayer.currentTime + 5);
+        function addSafeZone(x, y, w, h) {
+            const zone = { x, y, w, h, id: Date.now() };
+            safeZones.push(zone);
+            renderSafeZones();
+            renderZoneList();
         }
 
-        function formatTime(seconds) {
-            const m = Math.floor(seconds / 60);
-            const s = Math.floor(seconds % 60);
-            return `${m}:${s.toString().padStart(2, '0')}`;
+        function removeSafeZone(id) {
+            safeZones = safeZones.filter(z => z.id !== id);
+            renderSafeZones();
+            renderZoneList();
         }
-        
-        function visualizeReframing() {
-             if (!client.sessionId) {
-                client.showToast('Load a video first', 'warning');
+
+        function clearAllZones() {
+            safeZones = [];
+            renderSafeZones();
+            renderZoneList();
+        }
+
+        function renderSafeZones() {
+            const overlay = document.getElementById('safeZone');
+            overlay.innerHTML = '';
+            
+            safeZones.forEach(zone => {
+                const rect = document.createElement('div');
+                rect.className = 'safe-zone-rect';
+                rect.style.left = zone.x + '%';
+                rect.style.top = zone.y + '%';
+                rect.style.width = zone.w + '%';
+                rect.style.height = zone.h + '%';
+                overlay.appendChild(rect);
+            });
+        }
+
+        function renderZoneList() {
+            const list = document.getElementById('zoneList');
+            
+            if (safeZones.length === 0) {
+                list.innerHTML = '<p class="text-xs text-muted">No zones defined. Draw or select a preset.</p>';
                 return;
             }
-            analyzeCrops();
-        }
-
-        function setHighlightsPanelVisible(show) {
-            const panel = document.getElementById('highlightsPanel');
-            if (!panel) return;
-            panel.classList.toggle('hidden-block', !show);
-        }
-
-        // ============================================================
-        // HIGHLIGHTS DETECTION (Wired to /api/shorts/highlights)
-        // ============================================================
-        let highlightsData = [];
-
-        async function detectHighlights() {
-            if (!client.sessionId) {
-                client.showToast('Load a video first', 'warning');
-                return;
-            }
-
-            const btn = document.getElementById('detectHighlightsBtn');
-            const list = document.getElementById('highlightsList');
             
-            btn.disabled = true;
-            btn.innerHTML = '⏳ Detecting...';
-            list.innerHTML = '<div class="highlight-placeholder"><span style="opacity: 0.6;">Analyzing audio and video...</span></div>';
-
-            try {
-                // Get video path from session
-                const mainAsset = client.state?.assets?.find(a => a.type === 'video');
-                if (!mainAsset) {
-                    throw new Error('No video loaded');
-                }
-
-                const response = await fetch('/api/shorts/highlights', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        video_path: mainAsset.path,
-                        max_clips: 5,
-                        min_duration: 5.0,
-                        max_duration: 60.0,
-                        include_speech: true
-                    })
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Detection failed');
-                }
-
-                highlightsData = data.highlights || [];
-                renderHighlights(highlightsData);
-                
-                // Save to session state
-                const toggle = document.getElementById('highlightsToggle');
-                if (toggle && !toggle.classList.contains('active')) {
-                    toggle.classList.add('active');
-                    currentSettings.detectHighlights = true;
-                }
-                setHighlightsPanelVisible(true);
-                client.saveState({
-                    highlights: highlightsData,
-                    detectHighlights: currentSettings.detectHighlights
-                });
-                
-                client.showToast(`Found ${highlightsData.length} highlights`, 'success');
-
-            } catch (e) {
-                console.error('Highlight detection error:', e);
-                list.innerHTML = '<div class="highlight-placeholder"><span style="color: #EF4444;">Detection failed. Try again.</span></div>';
-                client.showToast('Highlight detection failed: ' + e.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '🔍 Detect Highlights';
-            }
-        }
-
-        function renderHighlights(highlights) {
-            const list = document.getElementById('highlightsList');
-            
-            if (!highlights || highlights.length === 0) {
-                list.innerHTML = '<div class="highlight-placeholder"><span style="opacity: 0.6;">No highlights detected</span></div>';
-                return;
-            }
-
-            // Sort by score descending
-            const sorted = [...highlights].sort((a, b) => b.score - a.score);
-            
-            list.innerHTML = sorted.map(h => `
-                <div class="highlight-item" onclick="seekTo(${h.time})" title="${h.label || ''}">
-                    <span class="highlight-time">${formatTime(h.time)}</span>
-                    <span class="highlight-type">${h.type || 'Moment'}</span>
-                    <span class="highlight-score">${(h.score || 0).toFixed(2)}</span>
+            list.innerHTML = safeZones.map(z => `
+                <div class="safe-zone-item">
+                    <span>${z.x.toFixed(0)}%, ${z.y.toFixed(0)}% [${z.w.toFixed(0)}% × ${z.h.toFixed(0)}%]</span>
+                    <button onclick="removeSafeZone(${z.id})">DELETE</button>
                 </div>
             `).join('');
         }
 
-        // Load highlights from session state if available
-        function loadCachedHighlights() {
-            if (client.state?.highlights) {
-                highlightsData = client.state.highlights;
-                renderHighlights(highlightsData);
+        // Drawing functionality
+        const phoneScreen = document.getElementById('phoneScreen');
+        
+        phoneScreen.addEventListener('mousedown', (e) => {
+            if (!isDrawingMode) return;
+            isDrawing = true;
+            const rect = phoneScreen.getBoundingClientRect();
+            drawStart.x = ((e.clientX - rect.left) / rect.width) * 100;
+            drawStart.y = ((e.clientY - rect.top) / rect.height) * 100;
+        });
+
+        phoneScreen.addEventListener('mousemove', (e) => {
+            if (!isDrawing || !isDrawingMode) return;
+            
+            const rect = phoneScreen.getBoundingClientRect();
+            const currentX = ((e.clientX - rect.left) / rect.width) * 100;
+            const currentY = ((e.clientY - rect.top) / rect.height) * 100;
+            
+            const overlay = document.getElementById('safeZone');
+            let preview = overlay.querySelector('.preview-rect');
+            
+            if (!preview) {
+                preview = document.createElement('div');
+                preview.className = 'safe-zone-rect preview-rect';
+                overlay.appendChild(preview);
             }
+            
+            const x = Math.min(drawStart.x, currentX);
+            const y = Math.min(drawStart.y, currentY);
+            const w = Math.abs(currentX - drawStart.x);
+            const h = Math.abs(currentY - drawStart.y);
+            
+            preview.style.left = x + '%';
+            preview.style.top = y + '%';
+            preview.style.width = w + '%';
+            preview.style.height = h + '%';
+        });
+
+        phoneScreen.addEventListener('mouseup', (e) => {
+            if (!isDrawing || !isDrawingMode) return;
+            isDrawing = false;
+            
+            const rect = phoneScreen.getBoundingClientRect();
+            const currentX = ((e.clientX - rect.left) / rect.width) * 100;
+            const currentY = ((e.clientY - rect.top) / rect.height) * 100;
+            
+            const x = Math.min(drawStart.x, currentX);
+            const y = Math.min(drawStart.y, currentY);
+            const w = Math.abs(currentX - drawStart.x);
+            const h = Math.abs(currentY - drawStart.y);
+            
+            // Only add if reasonable size
+            if (w > 2 && h > 2) {
+                addSafeZone(x, y, w, h);
+            }
+            
+            // Remove preview
+            const preview = document.getElementById('safeZone').querySelector('.preview-rect');
+            if (preview) preview.remove();
+        });
+
+        function updateSmoothing() {
+            const value = document.getElementById('smoothingSlider').value;
+            console.log('Smoothing value:', value);
         }
 
-        // Hook into state changes
-        const originalOnStateChange = client.onStateChange;
-        client.onStateChange = (state) => {
-            if (originalOnStateChange) originalOnStateChange(state);
-            if (typeof state.detectHighlights === 'boolean') {
-                const toggle = document.getElementById('highlightsToggle');
-                if (toggle) {
-                    toggle.classList.toggle('active', state.detectHighlights);
-                    currentSettings.detectHighlights = state.detectHighlights;
-                }
-                setHighlightsPanelVisible(state.detectHighlights || highlightsData.length > 0);
-            }
-            if (state.highlights) {
-                highlightsData = state.highlights;
-                renderHighlights(highlightsData);
-                const toggle = document.getElementById('highlightsToggle');
-                if (toggle && !toggle.classList.contains('active')) {
-                    toggle.classList.add('active');
-                    currentSettings.detectHighlights = true;
-                }
-                setHighlightsPanelVisible(true);
-            }
-        };
-
-        async function generatePreviewVideo() {
-            if (!client.sessionId) {
-                client.showToast('Load a video first', 'warning');
-                return;
-            }
-
-            const btn = document.getElementById('renderPreviewBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="icon">⏳</span><span class="label">Rendering...</span>';
-
-            try {
-                // Save current crop state if manual
-                // await client.saveState({ ... });
-
-                const data = await client.renderPreview({
-                    type: 'clip',
-                    timestamp: sourcePlayer.currentTime
-                });
-
-                if (data.url) {
-                    const previewPlayer = document.getElementById('previewPlayer');
-                    previewPlayer.src = data.url;
-                    previewPlayer.load();
-                    previewPlayer.play();
-                    client.showToast('Preview ready', 'success');
-                }
-            } catch (e) {
-                console.error(e);
-                client.showToast('Preview failed', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<span class="icon">▶️</span><span class="label">Render Preview</span>';
-            }
-        }
-
-        // ============================================================
-        // CREATE SHORT (Renders full vertical video with all settings)
-        // ============================================================
-        async function createShort() {
-            if (!client.sessionId) {
-                client.showToast('Load a video first', 'warning');
-                return;
-            }
-
-            // Get video path from session state
-            const mainAsset = client.state?.assets?.find(a => a.type === 'video');
-            if (!mainAsset || !mainAsset.path) {
-                client.showToast('No video loaded in session', 'error');
-                return;
-            }
-
-            // Gather current settings from UI
-            const platform = document.getElementById('platformSelect')?.value || currentSettings.platform;
-            const duration = parseInt(document.getElementById('durationSelect')?.value || currentSettings.duration);
-
-            const payload = {
-                video_path: mainAsset.path,
-                reframeMode: currentSettings.reframeMode,
-                captionStyle: currentSettings.captionStyle,
-                autoCaptions: currentSettings.autoCaptions,
-                platform: platform,
-                duration: duration,
-                cleanAudio: currentSettings.cleanAudio  // Voice isolation + noise reduction
-            };
-
-            // Add manual keyframes if in manual mode
-            if (currentSettings.reframeMode === 'manual' && manualKeyframes.length > 0) {
-                payload.keyframes = manualKeyframes;
-            }
-
-            // Add selected highlights if any
-            if (highlightsData.length > 0) {
-                payload.highlights = highlightsData;
-            }
-
-            const btn = document.querySelector('button[onclick="createShort()"]');
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '⏳ Rendering...';
-
-            try {
-                const response = await fetch('/api/shorts/create', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Render failed');
-                }
-
-                // Success - show result
-                if (data.output_path) {
-                    client.showToast(`Short created: ${data.output_path.split('/').pop()}`, 'success');
-
-                    // Update preview player with result if URL available
-                    if (data.url) {
-                        previewPlayer.src = data.url;
-                        previewPlayer.load();
-                    }
-
-                    // Save to session state
-                    client.saveState({
-                        lastRender: {
-                            path: data.output_path,
-                            timestamp: new Date().toISOString(),
-                            settings: payload
-                        }
-                    });
-                } else {
-                    client.showToast('Short created successfully', 'success');
-                }
-
-            } catch (e) {
-                console.error('Create short error:', e);
-                client.showToast('Failed to create short: ' + e.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }
-
-        // ============================================================
-        // EXPORT SETTINGS (Download current settings as JSON)
-        // ============================================================
-        function exportSettings() {
-            // Gather all current settings
-            const platform = document.getElementById('platformSelect')?.value || currentSettings.platform;
-            const duration = parseInt(document.getElementById('durationSelect')?.value || currentSettings.duration);
-
-            const exportData = {
-                version: '1.0',
-                exportedAt: new Date().toISOString(),
-                settings: {
-                    reframeMode: currentSettings.reframeMode,
-                    captionStyle: currentSettings.captionStyle,
-                    showSafeZones: currentSettings.showSafeZones,
-                    autoCaptions: currentSettings.autoCaptions,
-                    detectHighlights: currentSettings.detectHighlights,
-                    cleanAudio: currentSettings.cleanAudio,
-                    platform: platform,
-                    duration: duration
-                },
-                keyframes: manualKeyframes.length > 0 ? manualKeyframes : undefined,
-                highlights: highlightsData.length > 0 ? highlightsData : undefined,
-                videoInfo: client.state?.assets?.find(a => a.type === 'video') || null
-            };
-
-            // Create downloadable JSON file
-            const json = JSON.stringify(exportData, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `shorts-settings-${Date.now()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            client.showToast('Settings exported', 'success');
-        }
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            renderZoneList();
+        });
     </script>
 </body>
 </html>
