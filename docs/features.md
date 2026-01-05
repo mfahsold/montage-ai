@@ -41,8 +41,9 @@ Move from Montage AI to professional NLEs (DaVinci, Premiere, Resolve).
 
 **Features:**
 - Source relinking to original high-res files
-- Proxy generation (ProRes, DNxHR)
+- **Smart Proxies:** H.264 (SOTA optimized for scrubbing), ProRes, DNxHR
 - Conform guide with step-by-step instructions
+- Seamless roundtrip via OTIO
 
 ---
 

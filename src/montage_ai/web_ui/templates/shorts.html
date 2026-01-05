@@ -293,6 +293,30 @@
         .safe-zone-item button:hover {
             background: #ff6600;
         }
+
+        .progress-terminal-msg {
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--primary);
+            background: rgba(0, 85, 255, 0.05); /* Very subtle bg */
+            padding: 0.4rem 0.6rem;
+            border-left: 3px solid var(--primary);
+            margin-bottom: 0.75rem;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .progress-terminal-msg::before {
+            content: '>';
+            margin-right: 0.5rem;
+            font-weight: bold;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
     </style>
 </head>
 <body>
@@ -364,8 +388,25 @@
                     <div class="voxel-card">
                         <h3 class="mb-3 text-primary">STEP 2: AI Settings</h3>
                         
+                        <label class="tech-label">WORKFLOW TYPE</label>
+                        <select id="workflowType" class="voxel-input mb-4" onchange="toggleWorkflowOptions()">
+                            <option value="reframe">SMART REFRAME (Single Clip)</option>
+                            <option value="montage">BEAT-SYNCED MONTAGE</option>
+                        </select>
+
+                        <div id="styleSection" style="display: none;">
+                            <label class="tech-label">EDITING STYLE</label>
+                            <select id="montageStyle" class="voxel-input mb-4">
+                                <option value="dynamic">DYNAMIC (Fast Paced)</option>
+                                <option value="hitchcock">HITCHCOCK (Suspense)</option>
+                                <option value="mtv">MTV (Music Video)</option>
+                                <option value="action">ACTION (High Energy)</option>
+                                <option value="minimalist">MINIMALIST (Clean)</option>
+                            </select>
+                        </div>
+
                         <label class="tech-label">TRACKING MODE</label>
-                        <select class="voxel-input mb-4">
+                        <select id="reframeMode" class="voxel-input mb-4">
                             <option>FACE DETECTION (SOTA)</option>
                             <option>ACTION TRACKING</option>
                             <option>CENTER CROP</option>
@@ -438,7 +479,8 @@
                 <!-- Progress Display (hidden initially) -->
                 <div id="progressSection" style="display: none;" class="mb-4">
                     <div class="tech-label mb-2">STATUS</div>
-                    <div id="progressPhase" class="text-sm text-primary mb-2">Queued...</div>
+                    <div id="progressPhase" class="text-sm text-primary mb-1">Queued...</div>
+                    <div id="progressMessage" class="progress-terminal-msg">Waiting for job...</div>
                     <div class="progress-bar mb-2">
                         <div id="progressFill" class="progress-fill" style="width: 0%"></div>
                     </div>
@@ -471,6 +513,14 @@
         let currentJobId = null;
         let pollInterval = null;
         
+        function toggleWorkflowOptions() {
+            const type = document.getElementById('workflowType').value;
+            const styleSec = document.getElementById('styleSection');
+            if (styleSec) {
+                styleSec.style.display = (type === 'montage') ? 'block' : 'none';
+            }
+        }
+        
         async function generateShort() {
             const btn = document.getElementById('generateBtn');
             const progressSection = document.getElementById('progressSection');
@@ -483,6 +533,8 @@
             
             // Get options
             const videoPath = '/data/input/test.mp4'; // TODO: Get from file upload
+            const workflowType = document.getElementById('workflowType').value;
+            const montageStyle = document.getElementById('montageStyle').value;
             const reframeMode = document.getElementById('reframeMode').value;
             const captionStyle = document.getElementById('captionStyle')?.value || 'tiktok';
             const autoCaptions = document.getElementById('autoCaptions')?.checked !== false;
@@ -492,6 +544,8 @@
             // Build payload
             const payload = {
                 video_path: videoPath,
+                workflow_type: workflowType,
+                style: montageStyle,
                 reframeMode: reframeMode,
                 captionStyle: captionStyle,
                 autoCaptions: autoCaptions,
@@ -523,8 +577,8 @@
                 progressSection.style.display = 'block';
                 btn.textContent = 'Processing...';
                 
-                // Start polling
-                startJobPolling();
+                // Start monitoring (SSE)
+                startJobMonitoring();
                 
             } catch (error) {
                 console.error('Error:', error);
@@ -535,30 +589,36 @@
             }
         }
         
-        function startJobPolling() {
-            if (pollInterval) clearInterval(pollInterval);
+        function startJobMonitoring() {
+            // Using SSE for real-time updates
+            if (window.evtSource) window.evtSource.close();
             
-            // Poll every 2 seconds
-            pollInterval = setInterval(async () => {
-                if (!currentJobId) return;
-                
+            console.log(`Starting SSE for job ${currentJobId}`);
+            window.evtSource = new EventSource(`/api/progress/${currentJobId}`);
+            
+            window.evtSource.onmessage = function(event) {
                 try {
-                    const response = await fetch(`/api/jobs/${currentJobId}`);
-                    if (!response.ok) throw new Error('Failed to fetch job status');
+                    const msg = JSON.parse(event.data);
+                    // msg contains {job_id, updates, full_data} or might be just updates depending on structure
+                    // JobStore sends {job_id, updates, full_data}
                     
-                    const job = await response.json();
+                    const job = msg.full_data || msg; // Fallback if msg is the job itself
                     updateJobProgress(job);
                     
-                    // Stop polling if job is complete/failed
                     if (['completed', 'failed', 'cancelled'].includes(job.status)) {
-                        clearInterval(pollInterval);
+                        window.evtSource.close();
                         handleJobComplete(job);
                     }
-                    
-                } catch (error) {
-                    console.error('Polling error:', error);
+                } catch (e) {
+                    console.error("SSE Parse Error", e);
                 }
-            }, 2000);
+            };
+            
+            window.evtSource.onerror = function(err) {
+                console.error("SSE Error", err);
+                // Optional: Fallback to polling or just close
+                // window.evtSource.close();
+            };
         }
         
         function updateJobProgress(job) {
@@ -568,6 +628,12 @@
             // Update phase label
             const phaseLabel = phase.label || phase.name || 'Processing';
             document.getElementById('progressPhase').textContent = phaseLabel;
+            
+            // Update granular message
+            if (job.message) {
+                const msgEl = document.getElementById('progressMessage');
+                if (msgEl) msgEl.textContent = job.message;
+            }
             
             // Update progress bar
             document.getElementById('progressFill').style.width = `${progress}%`;

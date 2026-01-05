@@ -102,6 +102,33 @@ def file_exists_and_valid(path: Union[str, Path]) -> bool:
     return path_obj.exists() and path_obj.stat().st_size > 0
 
 
+def get_video_duration(video_path: Union[str, Path]) -> float:
+    """
+    Get video duration using ffprobe.
+    
+    Refactored from SegmentWriter to be a shared utility.
+    """
+    from .ffmpeg_utils import build_ffprobe_cmd, run_cmd
+    
+    try:
+        cmd = build_ffprobe_cmd([
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(video_path)
+        ])
+        result = run_cmd(
+            cmd,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return float(result.stdout.strip())
+        return 0.0
+    except Exception:
+        return 0.0
+
+
 def normalize_path(path: Union[str, Path]) -> Path:
     """
     Normalize a path to absolute, resolved Path object.
@@ -144,6 +171,7 @@ __all__ = [
     "coerce_float",
     "file_size_mb",
     "file_exists_and_valid",
+    "get_video_duration",
     "normalize_path",
     "ensure_parent_dir",
 ]

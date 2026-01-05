@@ -32,7 +32,8 @@ services:
       # LUT files for professional color grading (optional)
       - ./data/luts:/data/luts:ro
       # cgpu Cloud GPU credentials (cgpu binary is installed in Docker image)
-      - ${HOME}/.config/cgpu:/root/.config/cgpu:ro
+      # Must be writable to allow token refresh/updates
+      - ${HOME}/.config/cgpu:/root/.config/cgpu
     environment:
       # Creative Direction
       - CREATIVE_PROMPT=${CREATIVE_PROMPT:-}

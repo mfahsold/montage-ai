@@ -207,6 +207,64 @@ Shorts Flow:
 
 ---
 
+### 4. **Workflow Architecture Refactoring** (`src/montage_ai/core/montage_workflow.py`)
+
+**Problem:** Creator logic was monolithic in `MontageBuilder`  
+- Hard to maintain or extend  
+- Mixed orchestration with implementation details  
+
+**Solution:** Implemented Template Method Pattern via `MontageWorkflow`
+
+```python
+class VideoWorkflow(ABC):
+    """Template for all video workflows"""
+    def run(self):
+        self.validate()
+        self.analyze()
+        self.process()
+        self.render()
+
+class MontageWorkflow(VideoWorkflow):
+    """Creator workflow implementation"""
+    # ... delegates to MontageBuilder for specific steps
+```
+
+**Benefits:**
+- ✅ Separation of Concerns: Workflow orchestration vs. Video processing logic
+- ✅ Consistency: All workflows follow the same lifecycle
+- ✅ Testability: Easier to mock workflow steps
+
+**Files Created/Refactored:**
+- `src/montage_ai/core/workflow.py` (Base classes)
+- `src/montage_ai/core/montage_workflow.py` (Concrete implementation)
+- `src/montage_ai/core/montage_builder.py` (Refactored to be callable step-by-step)
+
+---
+
+### 5. **Professional Proxy Workflow** (`src/montage_ai/proxy_generator.py`)
+
+**Problem:** Proxy generation was ad-hoc and blocking export  
+- Slow exports due to sequential transcoding  
+- No SOTA optimization (scrubbing performance)  
+
+**Solution:** Dedicated `ProxyGenerator` with "Ingest First" strategy
+
+- **SOTA Format:** H.264 High Profile, GOP=30 (optimized for scrubbing)
+- **Ingest Integration:** Proxies generate async during analysis phase
+- **Hardware Accel:** Auto-detects NVENC/VAAPI/VideoToolbox
+- **NLE Handover:** Timecode passthrough + Standard folder structure (`./Proxies`)
+
+**Benefits:**
+- ✅ Performance: Non-blocking export
+- ✅ UX: Faster previews
+- ✅ Pro Feature: Ready for valid NLE relinking (Premiere/Resolve)
+
+**Files Created:**
+- `src/montage_ai/proxy_generator.py`
+- `src/montage_ai/timeline_exporter.py` (Refactored to use ProxyGenerator)
+
+---
+
 ## 🔧 Remaining Work (Complex Themes)
 
 ### Template Updates (Task 6)
@@ -222,7 +280,7 @@ Shorts Flow:
 - [ ] Test error handling
 
 ### Future Refactoring (Phase 2)
-- [ ] Refactor Creator to use `MontageWorkflow` class
+- [x] Refactor Creator to use `MontageWorkflow` class
 - [ ] Add priority queues (high-priority: Shorts/Preview, low-priority: Final renders)
 - [ ] Multi-pass optimization (share analysis cache between workflows)
 

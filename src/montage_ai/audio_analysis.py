@@ -97,6 +97,7 @@ class MusicSection:
     end_time: float
     energy_level: str  # "low", "medium", "high"
     avg_energy: float
+    label: str = "undefined"  # "intro", "build", "drop", "outro", "verse", "chorus"
 
     @property
     def duration(self) -> float:
@@ -138,6 +139,71 @@ class EnergyProfile:
         idx = np.searchsorted(self.times, time_sec)
         idx = min(idx, len(self.rms) - 1)
         return float(self.rms[idx])
+
+
+def fit_story_arc_to_sections(sections: List[MusicSection], total_duration: float) -> List[MusicSection]:
+    """
+    Label music sections with story arc phases (Intro, Build, Drop, Outro).
+    
+    Logic:
+    - First low energy section -> "intro"
+    - Section leading to high energy -> "build"
+    - High energy section -> "drop"
+    - Last low energy section -> "outro"
+    """
+    if not sections:
+        return []
+
+    # Copy list to avoid mutating original
+    labeled_sections = []
+    
+    for i, section in enumerate(sections):
+        # Default label based on energy
+        label = "verse" if section.energy_level in ["low", "medium"] else "chorus"
+        
+        # Position-based overrides
+        relative_start = section.start_time / total_duration
+        relative_end = section.end_time / total_duration
+        
+        # Intro: First section(s), usually low energy, first 15%
+        if i == 0 or (relative_end < 0.15 and section.energy_level == "low"):
+            label = "intro"
+            
+        # Outro: Last section, usually low energy, last 10%
+        elif i == len(sections) - 1 or (relative_start > 0.9 and section.energy_level == "low"):
+            label = "outro"
+            
+        # Drop: High energy section
+        elif section.energy_level == "high":
+            # If preceded by a build-up, it fits the "Drop" definition perfectly
+            label = "drop"
+            
+        # Build: Medium/High energy section BEFORE a Drop
+        elif section.energy_level in ["medium", "high"]:
+            # Look ahead for a drop
+            is_build = False
+            for forward_section in sections[i+1:]:
+                if forward_section.energy_level == "high":
+                    # Found a drop ahead, acts as build
+                    is_build = True
+                    break
+                if forward_section.energy_level == "low":
+                    # Energy drops back down, so not a build to a drop
+                    break
+            
+            if is_build:
+                label = "build"
+        
+        # Create new section with label
+        labeled_sections.append(MusicSection(
+            start_time=section.start_time,
+            end_time=section.end_time,
+            energy_level=section.energy_level,
+            avg_energy=section.avg_energy,
+            label=label
+        ))
+        
+    return labeled_sections
 
 
 def detect_music_sections(profile: EnergyProfile, min_section_duration: float = 5.0) -> List[MusicSection]:
@@ -250,7 +316,10 @@ def detect_music_sections(profile: EnergyProfile, min_section_duration: float = 
             i += 1
         sections = new_sections
 
-    return sections
+    # 6. Apply Story Arc Labels
+    duration = sections[-1].end_time if sections else 0.0
+    labeled_sections = fit_story_arc_to_sections(sections, duration)
+    return labeled_sections
 
 
 # =============================================================================

@@ -31,6 +31,7 @@ from ..ffmpeg_utils import build_ffmpeg_cmd
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 from ..timeline_exporter import export_timeline_from_montage
 from ..storytelling import StoryArc, TensionProvider, StorySolver
+from ..proxy_generator import ProxyGenerator
 
 
 # =============================================================================
@@ -589,6 +590,8 @@ class MontageBuilder:
         variant_id: int = 1,
         settings: Optional[Settings] = None,
         editing_instructions: Optional[Dict[str, Any]] = None,
+        job_id: Optional[str] = None,
+        progress_callback: Optional[Any] = None
     ):
         """
         Initialize the MontageBuilder.
@@ -597,14 +600,19 @@ class MontageBuilder:
             variant_id: Variant number for this montage (1-based)
             settings: Optional Settings instance (uses global if None)
             editing_instructions: Optional Creative Director instructions
+            job_id: Unique job identifier
+            progress_callback: Callable[[int, str], None] for status updates
         """
         self.settings = settings or get_settings()
         self.variant_id = variant_id
         self.rng = random.Random(42 + variant_id)  # Seeded RNG for determinism
         self.editing_instructions = editing_instructions
+        self.progress_callback = progress_callback
 
         # Initialize context
         self.ctx = self._create_context()
+        if job_id:
+            self.ctx.job_id = job_id
 
         # Component references (lazy initialized)
         self._monitor = None
@@ -657,29 +665,29 @@ class MontageBuilder:
             logger.info(f"\n🎬 Starting Montage Variant #{self.variant_id}")
 
             # Phase 1: Setup
-            self._setup_workspace()
+            self.setup_workspace()
 
             # Phase 2: Analyze
-            self._analyze_assets()
+            self.analyze_assets()
 
             # Phase 3: Plan
-            self._plan_montage()
+            self.plan_montage()
 
             # Phase 4: Enhance (if enabled)
             if self.ctx.stabilize or self.ctx.upscale or self.ctx.enhance:
-                self._enhance_assets()
+                self.enhance_assets()
 
             # Phase 5: Render
-            self._render_output()
+            self.render_output()
 
             # Phase 6: Export Timeline
-            self._export_timeline()
+            self.export_timeline()
 
             # Phase 7: Save episodic memory (if enabled)
             self._save_episodic_memory()
 
             # Phase 8: Cleanup
-            self._cleanup()
+            self.cleanup()
 
             # Build result
             return MontageResult(
@@ -695,7 +703,7 @@ class MontageBuilder:
 
         except Exception as e:
             logger.error(f"❌ Montage build failed: {e}")
-            self._cleanup()
+            self.cleanup()
             return MontageResult(
                 success=False,
                 output_path=None,
@@ -709,7 +717,7 @@ class MontageBuilder:
     # Pipeline Phases
     # =========================================================================
 
-    def _setup_workspace(self):
+    def setup_workspace(self):
         """
         Phase 1: Initialize workspace.
 
@@ -747,7 +755,7 @@ class MontageBuilder:
 
         logger.info(f"   🎨 Effects: STABILIZE={self.ctx.stabilize}, UPSCALE={self.ctx.upscale}, ENHANCE={self.ctx.enhance}")
 
-    def _analyze_assets(self):
+    def analyze_assets(self):
         """
         Phase 2: Analyze audio and video assets.
 
@@ -765,6 +773,24 @@ class MontageBuilder:
         # Story Engine Analysis Trigger (Phase 1)
         if self.settings.features.story_engine:
             self._trigger_story_analysis()
+
+        # OPTIMIZATION: Start proxy generation in background
+        # This ensures proxies are ready for NLE export later
+        proxy_futures = []
+        if self.ctx.video_files:
+            logger.info("   🎞️ Checking proxies...")
+            # Try to store proxies next to input for NLE linking standard
+            proxy_dir = self.ctx.input_dir / "Proxies"
+            try:
+                proxy_dir.mkdir(parents=True, exist_ok=True)
+            except (PermissionError, OSError):
+                proxy_dir = self.ctx.temp_dir / "proxies"
+            
+            generator = ProxyGenerator(proxy_dir)
+            for video_path in self.ctx.video_files:
+                proxy_futures.append(
+                    self._executor.submit(generator.ensure_proxy, video_path)
+                )
 
         # OPTIMIZATION: Start voice isolation in background while doing scene detection
         voice_isolation_future = None
@@ -808,6 +834,19 @@ class MontageBuilder:
         # Initialize footage pool
         self._init_footage_pool()
 
+        # Wait for proxies
+        if proxy_futures:
+            logger.info("   ⏳ Waiting for proxy generation to complete...")
+            completed = 0
+            for f in proxy_futures:
+                try:
+                    f.result()
+                    completed += 1
+                except Exception as e:
+                    logger.warning(f"   ⚠️ Proxy generation warning: {e}")
+            if completed > 0:
+                logger.info(f"   ✅ {completed} Proxies ready")
+
     def _setup_output_paths(self, style_name: str):
         """Determine output filename and logo path."""
         # Sanitize style name
@@ -824,7 +863,7 @@ class MontageBuilder:
         logo_files = self._get_files(self.ctx.assets_dir, ('.png', '.jpg'))
         self.ctx.logo_path = logo_files[0] if logo_files else None
 
-    def _plan_montage(self):
+    def plan_montage(self):
         """
         Phase 3: Plan the montage timeline.
 
@@ -879,7 +918,7 @@ class MontageBuilder:
         logger.info("   ✂️ Assembling cuts...")
         self._run_assembly_loop()
 
-    def _enhance_assets(self):
+    def enhance_assets(self):
         """
         Phase 4: Apply clip enhancements.
 
@@ -898,7 +937,7 @@ class MontageBuilder:
         # This phase is for pre-enhancement if doing batch processing
         pass
 
-    def _render_output(self):
+    def render_output(self):
         """
         Phase 5: Render final output.
 
@@ -939,7 +978,7 @@ class MontageBuilder:
             # Legacy path would go here
             raise NotImplementedError("Legacy MoviePy rendering not implemented in MontageBuilder")
 
-    def _cleanup(self):
+    def cleanup(self):
         """
         Phase 6: Cleanup resources.
 
@@ -1263,6 +1302,10 @@ class MontageBuilder:
             adaptive_workers = self.settings.processing.get_adaptive_parallel_jobs(self.settings.features.low_memory_mode)
             max_workers = min(optimal_workers, adaptive_workers, len(uncached_videos))
             logger.info(f"   🚀 Parallel scene detection ({len(uncached_videos)} videos, {max_workers} workers)")
+            
+            # Progress tracking setup
+            total_tasks = len(uncached_videos)
+            completed_tasks = 0
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {executor.submit(detect_video_scenes, v): v for v in uncached_videos}
@@ -1272,6 +1315,16 @@ class MontageBuilder:
                     detected_scenes[v_path] = scenes
                     # Save to cache
                     cache.save_scenes(v_path, threshold, scenes)
+                    
+                    # Update progress
+                    completed_tasks += 1
+                    if self.progress_callback:
+                        # Map 0-100% of this phase to 10-40% of overall job
+                        local_pct = int((completed_tasks / total_tasks) * 100)
+                        # We arbitrarily map "Scene Detection" to the 20-50% range of the whole job
+                        # But simpler is just to report "Analyzing X/Y"
+                        msg = f"Detecting scenes in {os.path.basename(v_path)} ({completed_tasks}/{total_tasks})"
+                        self.progress_callback(local_pct, msg)
 
         # Combine cached and detected scenes
         all_video_scenes = {**cached_scenes, **detected_scenes}
@@ -2315,7 +2368,7 @@ class MontageBuilder:
 
 
 
-    def _export_timeline(self):
+    def export_timeline(self):
         """
         Phase 6: Export timeline to NLE formats (EDL, XML, OTIO).
         """

@@ -28,6 +28,7 @@ from pathlib import Path
 
 from .logger import logger
 from .ffmpeg_utils import build_ffmpeg_cmd
+from .proxy_generator import ProxyGenerator
 
 VERSION = "0.1.0"
 
@@ -196,79 +197,12 @@ class TimelineExporter:
 
     def _generate_proxy(self, source_path: str, format: str = "h264") -> Optional[str]:
         """
-        Generate proxy file for smooth editing.
-
-        Supported formats:
-        - h264: H.264 (libx264) - Good compatibility, small size
-        - prores: ProRes Proxy - Best for Mac/Resolve editing
-        - dnxhr: DNxHR LB - Best for Windows/Avid editing
-
-        Args:
-            source_path: Path to original video file
-            format: Proxy format ('h264', 'prores', 'dnxhr')
-
-        Returns:
-            Path to proxy file, or None if failed
+        Generate proxy using ProxyGenerator service.
+        Delegate method to maintain API compatibility while using shared logic.
         """
-        source_name = os.path.basename(source_path)
-        ext_map = {
-            "h264": ".mp4",
-            "prores": ".mov",
-            "dnxhr": ".mov"
-        }
-        ext = ext_map.get(format, ".mp4")
-        proxy_name = f"proxy_{os.path.splitext(source_name)[0]}{ext}"
-        proxy_path = os.path.join(self.proxy_dir, proxy_name)
-
-        # Skip if proxy already exists
-        if os.path.exists(proxy_path):
-            return proxy_path
-
-        # Base command
-        cmd = build_ffmpeg_cmd(["-i", source_path])
-
-        # Format specific settings
-        if format == "prores":
-            # ProRes Proxy (profile 0)
-            # Scale to 960x540 (qscale -1 maintains aspect ratio)
-            cmd.extend([
-                "-c:v", "prores_ks",
-                "-profile:v", "0",
-                "-vf", "scale=-1:540",
-                "-c:a", "pcm_s16le"
-            ])
-        elif format == "dnxhr":
-            # DNxHR LB (Low Bandwidth)
-            cmd.extend([
-                "-c:v", "dnxhd",
-                "-profile:v", "dnxhr_lb",
-                "-vf", "scale=-1:540,format=yuv422p",
-                "-c:a", "pcm_s16le"
-            ])
-        else:
-            # Default H.264
-            cmd.extend([
-                "-vf", "scale=-1:540",
-                "-c:v", "libx264",
-                "-preset", "fast",
-                "-b:v", "5M",
-                "-c:a", "aac",
-                "-b:a", "128k"
-            ])
-
-        cmd.append(proxy_path)
-
-        try:
-            subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            return proxy_path
-        except subprocess.CalledProcessError:
-            logger.warning(f"   ⚠️ Proxy generation failed: {source_name}")
-            return None
+        generator = ProxyGenerator(self.proxy_dir)
+        path = generator.ensure_proxy(source_path, format=format)
+        return str(path) if path else None
 
     def _export_otio(self, timeline: Timeline, link_to_source: bool = False) -> Optional[str]:
         """

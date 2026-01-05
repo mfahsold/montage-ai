@@ -7,8 +7,10 @@ Beat-synced video editing with scene detection and intelligent clip selection.
 from typing import Any, Optional, Dict
 from pathlib import Path
 
-from .workflow import VideoWorkflow, WorkflowOptions
+from .workflow import VideoWorkflow, WorkflowOptions, WorkflowPhase
 from ..logger import logger
+from .montage_builder import MontageBuilder
+from ..config import get_settings
 
 
 class MontageWorkflow(VideoWorkflow):
@@ -22,11 +24,13 @@ class MontageWorkflow(VideoWorkflow):
     4. Process: Clip selection + sequencing
     5. Render: FFmpeg rendering with effects
     6. Export: Finalize output
-    
-    NOTE: This is a placeholder for future refactoring.
-    Current montage creation uses `montage_builder.py` directly.
     """
     
+    def __init__(self, options: WorkflowOptions):
+        super().__init__(options)
+        self.builder: Optional[MontageBuilder] = None
+        self.settings = get_settings()
+
     @property
     def workflow_name(self) -> str:
         return "Montage Creator"
@@ -36,43 +40,95 @@ class MontageWorkflow(VideoWorkflow):
         return "montage"
     
     # =========================================================================
-    # Workflow Steps (Placeholder)
+    # Workflow Steps
     # =========================================================================
     
     def initialize(self) -> None:
         """Initialize montage builder."""
-        # TODO: Initialize MontageBuilder, AudioAnalyzer, etc.
-        logger.info("MontageWorkflow.initialize() - Placeholder")
+        # Extract variant_id from options.extras or default to 1
+        variant_id = self.options.extras.get('variant_id', 1)
+        editing_instructions = self.options.extras.get('editing_instructions', {})
+        
+        # Define progress callback wrapper
+        def builder_progress_callback(percent: int, message: str):
+            # Map builder progress (0-100 of a specific phase) to global workflow progress
+            # This is a simplification; ideally we map phases more accurately
+            if self.current_phase == WorkflowPhase.ANALYZING:
+                # Analyzing is 10-40% of standard workflow
+                global_percent = 10 + int(percent * 0.3)
+                self._update_progress(global_percent, message)
+            elif self.current_phase == WorkflowPhase.RENDERING:
+                # Rendering is 60-90% of standard workflow
+                global_percent = 60 + int(percent * 0.3)
+                self._update_progress(global_percent, message)
+            else:
+                # Default pass-through
+                self._update_progress(percent, message)
+
+        # Initialize builder
+        self.builder = MontageBuilder(
+            variant_id=variant_id,
+            settings=self.settings,
+            editing_instructions=editing_instructions,
+            job_id=self.options.job_id,
+            progress_callback=builder_progress_callback
+        )
+        
+        # Apply workflow options to builder context
+        self.builder.ctx.stabilize = self.options.stabilize
+        self.builder.ctx.upscale = self.options.upscale
+        self.builder.ctx.enhance = self.options.enhance
+        
+        # Phase 1: Setup
+        self.builder.setup_workspace()
     
     def validate(self) -> None:
         """Validate inputs."""
-        # TODO: Check footage directory, music file, etc.
-        logger.info("MontageWorkflow.validate() - Placeholder")
+        # Basic validation
+        if not self.builder:
+            raise RuntimeError("Builder not initialized")
+            
+        # Check input directory
+        if not self.builder.ctx.paths.input_dir.exists():
+             logger.warning(f"Input directory does not exist: {self.builder.ctx.paths.input_dir}")
     
     def analyze(self) -> Any:
-        """Analyze footage and music."""
-        # TODO: Scene detection, beat detection, clip indexing
-        logger.info("MontageWorkflow.analyze() - Placeholder")
-        return {}
-    
+        """Analyze assets."""
+        if self.builder:
+            self.builder.analyze_assets()
+        return None
+
     def process(self, analysis_result: Any) -> Any:
-        """Process clips into sequence."""
-        # TODO: Clip selection, sequencing, transition planning
-        logger.info("MontageWorkflow.process() - Placeholder")
-        return {}
-    
+        """Plan montage."""
+        if self.builder:
+            self.builder.plan_montage()
+        return None
+
     def render(self, processing_result: Any) -> Any:
-        """Render final montage."""
-        # TODO: FFmpeg rendering with effects
-        logger.info("MontageWorkflow.render() - Placeholder")
-        return {}
-    
+        """Render output."""
+        if self.builder:
+            # Enhance if enabled (handled in builder based on ctx flags set in initialize)
+            if self.builder.ctx.stabilize or self.builder.ctx.upscale or self.builder.ctx.enhance:
+                self.builder.enhance_assets()
+            
+            self.builder.render_output()
+        return None
+
     def export(self, render_result: Any) -> str:
-        """Export final output."""
-        # TODO: Finalize output, generate timeline export
-        logger.info("MontageWorkflow.export() - Placeholder")
-        return "/path/to/output.mp4"
+        """Export timeline and return output path."""
+        if self.builder:
+            self.builder.export_timeline()
+            # Save episodic memory
+            self.builder._save_episodic_memory()
+            
+            return str(self.builder.ctx.output_filename)
+        return ""
     
+    def cleanup(self) -> None:
+        """Cleanup."""
+        if self.builder:
+            self.builder.cleanup()
+
     def get_metadata(self) -> Dict[str, Any]:
         """Get montage-specific metadata."""
         base = super().get_metadata()

@@ -127,6 +127,20 @@ redis_conn = Redis(host=redis_host, port=redis_port)
 q = Queue(connection=redis_conn)
 job_store = JobStore()
 
+def redis_listener():
+    """Listen for updates from Redis and broadcast to SSE clients."""
+    # Create a dedicated connection for pubsub to avoid conflicts
+    pubsub_conn = Redis(host=redis_host, port=redis_port, decode_responses=True)
+    pubsub = pubsub_conn.pubsub()
+    pubsub.subscribe('job_updates')
+    
+    for message in pubsub.listen():
+        if message['type'] == 'message':
+            announcer.announce(message['data'])
+
+# Start background thread
+threading.Thread(target=redis_listener, daemon=True).start()
+
 # jobs = {} # Removed
 # job_lock = threading.Lock() # Removed
 # job_queue = deque() # Removed
@@ -595,7 +609,23 @@ def stream():
         messages = announcer.listen()
         while True:
             msg = messages.get()  # blocks until a new message arrives
-            yield msg
+            yield format_sse(msg)
+    return Response(event_stream(), mimetype='text/event-stream')
+
+
+@app.route('/api/progress/<job_id>')
+def progress_stream(job_id):
+    """SSE stream filtered for a specific job."""
+    def event_stream():
+        messages = announcer.listen()
+        while True:
+            msg = messages.get()
+            try:
+                data = json.loads(msg)
+                if data.get('job_id') == job_id:
+                    yield format_sse(msg)
+            except Exception:
+                pass
     return Response(event_stream(), mimetype='text/event-stream')
 
 
@@ -1992,6 +2022,9 @@ def api_shorts_render():
     """
     data = request.json or {}
     video_path = data.get('video_path')
+    workflow_type = data.get('workflow_type', 'reframe')
+    style = data.get('style', 'dynamic')
+
     reframe_mode = data.get('reframeMode', data.get('reframe_mode', 'auto'))
     caption_style = data.get('captionStyle', data.get('caption_style', 'tiktok'))
     add_captions = data.get('autoCaptions', data.get('add_captions', True))
@@ -2004,29 +2037,48 @@ def api_shorts_render():
     # Generate job ID
     job_id = f"shorts_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
-    # Create job record
-    job = {
-        "id": job_id,
-        "type": "shorts_reframe",
-        "status": "queued",
-        "options": {
-            "video_path": video_path,
-            "reframe_mode": reframe_mode,
-            "caption_style": caption_style,
-            "add_captions": add_captions,
-            "platform": platform,
-            "clean_audio": clean_audio
-        },
-        "phase": JobPhase.initial().to_dict(),
-        "created_at": datetime.now().isoformat()
-    }
-    
-    # Store in Redis
-    job_store.create_job(job_id, job)
-    
-    # Enqueue for async processing
-    from ..tasks import run_shorts_reframe
-    q.enqueue(run_shorts_reframe, job_id, job['options'])
+    if workflow_type == 'montage':
+        # MONTAGE WORKFLOW (Vertical)
+        job = {
+            "id": job_id,
+            "type": "montage_shorts",
+            "style": style,
+            "status": "queued",
+            "options": {
+                "video_path": video_path,
+                "workflow_type": "montage",
+                "shorts_mode": True,
+                "style": style,
+                "captions": add_captions,
+                "clean_audio": clean_audio
+            },
+            "phase": JobPhase.initial().to_dict(),
+            "created_at": datetime.now().isoformat()
+        }
+        job_store.create_job(job_id, job)
+        from ..tasks import run_montage
+        q.enqueue(run_montage, job_id, style, job['options'])
+    else:
+        # REFRAME WORKFLOW (Default)
+        job = {
+            "id": job_id,
+            "type": "shorts_reframe",
+            "status": "queued",
+            "options": {
+                "video_path": video_path,
+                "workflow_type": "reframe",
+                "reframe_mode": reframe_mode,
+                "caption_style": caption_style,
+                "add_captions": add_captions,
+                "platform": platform,
+                "clean_audio": clean_audio
+            },
+            "phase": JobPhase.initial().to_dict(),
+            "created_at": datetime.now().isoformat()
+        }
+        job_store.create_job(job_id, job)
+        from ..tasks import run_shorts_reframe
+        q.enqueue(run_shorts_reframe, job_id, job['options'])
     
     return jsonify({
         "success": True,

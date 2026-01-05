@@ -1,5 +1,4 @@
 import random
-
 import pytest
 from unittest.mock import MagicMock, patch
 from montage_ai.core.montage_builder import MontageBuilder, MontageContext
@@ -12,6 +11,7 @@ def mock_settings():
     settings.paths.music_dir = "/tmp/music"
     settings.paths.output_dir = "/tmp/output"
     settings.paths.temp_dir = "/tmp/temp"
+    settings.features.shorts_mode = False
     return settings
 
 @pytest.fixture
@@ -31,12 +31,16 @@ def test_broll_planning_integration(mock_settings, mock_broll_planner):
     mock_plan = [
         {
             "segment": "The athlete runs",
+            "start_time": 0.0,
+            "end_time": 5.0,
             "suggestions": [
                 {"clip": "/tmp/input/run.mp4", "score": 0.9}
             ]
         },
         {
             "segment": "The crowd cheers",
+            "start_time": 5.0,
+            "end_time": 10.0,
             "suggestions": [
                 {"clip": "/tmp/input/cheer.mp4", "score": 0.9}
             ]
@@ -45,42 +49,84 @@ def test_broll_planning_integration(mock_settings, mock_broll_planner):
     mock_broll_planner.return_value = mock_plan
     
     # Initialize builder
-    builder = MontageBuilder(settings=mock_settings, editing_instructions=instructions)
-    
-    # Mock audio result in context
-    mock_audio = MagicMock()
-    mock_audio.duration = 60.0
-    mock_audio.tempo = 120.0
-    mock_audio.beat_times = [0.5, 1.0, 1.5]
-    builder.ctx.audio_result = mock_audio
-    
-    # Mock internal components to avoid full execution
-    builder._setup_workspace = MagicMock()
-    builder._analyze_assets = MagicMock()
-    builder._render_output = MagicMock()
-    builder._run_assembly_loop = MagicMock() # We don't want to run the loop, just check planning
-    
-    # Run build
-    builder.build()
-    
-    # Verify BrollPlanner was called
-    mock_broll_planner.assert_called_once()
-    args, _ = mock_broll_planner.call_args
-    assert args[0] == "The athlete runs. The crowd cheers."
-    
-    # Verify plan is stored in context (we need to check if we implemented this)
-    # Since we haven't implemented it yet, this test would fail on the assertion below
-    # if we were checking ctx.broll_plan. 
-    # But for now, we just check the call.
+    # We patch initialization phases to prevent full setup
+    with patch.object(MontageBuilder, 'setup_workspace'), \
+         patch.object(MontageBuilder, 'analyze_assets'), \
+         patch.object(MontageBuilder, '_run_assembly_loop'), \
+         patch.object(MontageBuilder, 'render_output'), \
+         patch('montage_ai.core.montage_builder.get_resource_manager') :
+         
+        builder = MontageBuilder(settings=mock_settings, editing_instructions=instructions)
+        
+        # Mock audio result to prevent errors if invoked
+        mock_audio = MagicMock()
+        mock_audio.duration = 60.0
+        mock_audio.tempo = 120.0
+        mock_audio.beat_times = [0.5, 1.0, 1.5]
+        builder.ctx.media.audio_result = mock_audio
+        builder.ctx.creative.broll_plan = None # Ensure it starts empty
+        
+        # Run build (which calls _plan_broll_sequence)
+        # We assume build calls _plan_broll_sequence. 
+        # Since analyze_assets is mocked (where it might be called), we simulate the call manually
+        # mirroring how build() or analyze_assets() would do it.
+        # However, checking MontageBuilder definition:
+        # build() calls analyze_assets(), then _plan_broll_sequence() is inside build() or analyze_assets()?
+        # We saw line 879: self._plan_broll_sequence() is in build().
+        # So mocking analyze_assets is fine.
+        
+        builder.build()
+        
+        # Verify BrollPlanner was called
+        mock_broll_planner.assert_called_once()
+        args, _ = mock_broll_planner.call_args
+        assert args[0] == "The athlete runs. The crowd cheers."
+        
+        # Verify plan is stored in context
+        assert builder.ctx.creative.broll_plan == mock_plan
 
-def test_broll_selection_logic(mock_settings):
+def test_score_broll_match_unit(mock_settings):
+    """Test _score_broll_match logic in isolation."""
+    builder = MontageBuilder(settings=mock_settings)
+    
+    # Setup Context with a plan
+    builder.ctx.creative.broll_plan = [
+        {
+            "segment": "Target Segment",
+            "start_time": 0.0,
+            "end_time": 10.0,
+            "suggestions": [
+                {"clip": "/path/to/target.mp4", "score": 0.9}
+            ]
+        }
+    ]
+    
+    # Case 1: Matching Time & Clip
+    builder.ctx.timeline.current_time = 5.0
+    scene = {"path": "/path/to/target.mp4"}
+    meta = {}
+    
+    score = builder._score_broll_match(scene, meta)
+    assert score == 100.0, "Should get max score for direct suggestion match"
+    
+    # Case 2: Matching Time, Non-Matching Clip
+    scene_wrong = {"path": "/path/to/random.mp4"}
+    score = builder._score_broll_match(scene_wrong, meta)
+    assert score == 0.0, "Should get 0 for non-suggested clip"
+    
+    # Case 3: Wrong Time
+    builder.ctx.timeline.current_time = 15.0
+    score = builder._score_broll_match(scene, meta)
+    assert score == 0.0, "Should get 0 if current time is outside segment"
+
+def test_broll_selection_integration(mock_settings):
     """Test that _select_clip prioritizes B-Roll plan suggestions."""
-    # Seed RNG for deterministic test results
+    # Seed RNG
     random.seed(42)
     
     builder = MontageBuilder(settings=mock_settings)
     
-    # Setup available footage
+    # Setup candidate scenes
     scene_match = {
         "path": "/path/to/run.mp4",
         "start": 0.0,
@@ -96,8 +142,8 @@ def test_broll_selection_logic(mock_settings):
         "meta": {"tags": ["walking"]}
     }
     
-    # Setup context with a B-Roll plan that suggests the run.mp4
-    builder.ctx.broll_plan = [
+    # Setup Context
+    builder.ctx.creative.broll_plan = [
         {
             "segment": "The athlete runs",
             "start_time": 0.0,
@@ -107,44 +153,45 @@ def test_broll_selection_logic(mock_settings):
             ]
         }
     ]
-    builder.ctx.current_time = 2.0  # Inside the segment
-    builder.ctx.all_scenes_dicts = [scene_match, scene_other]
+    builder.ctx.timeline.current_time = 2.0
     
-    # Mock footage pool - use the actual scene objects so id() matches
-    class MockClip:
+    # This mock is needed for _get_candidate_scenes
+    builder.ctx.media.all_scenes_dicts = [scene_match, scene_other]
+    
+    class MockClipUsage:
         def __init__(self, scene):
             self.clip_id = id(scene)
             self.usage_count = 0
+            self.last_used_time = -1
     
-    # CRITICAL: Create MockClips from the SAME scene objects in all_scenes_dicts
-    available_footage = [
-        MockClip(builder.ctx.all_scenes_dicts[0]),  # scene_match
-        MockClip(builder.ctx.all_scenes_dicts[1])   # scene_other
-    ]
+    available_footage = [MockClipUsage(scene_match), MockClipUsage(scene_other)]
     
-    # Mock helpers
-    builder._get_energy_at_time = MagicMock(return_value=0.5)
-    builder.ctx.last_used_path = None
-    builder.ctx.last_shot_type = None
-    builder.ctx.last_clip_end_time = None
-    builder.ctx.semantic_query = None
-    builder.ctx.audio_result = None
+    # Mock methods called by _select_clip
+    builder._get_candidate_scenes = MagicMock(return_value=[scene_match, scene_other])
+    builder._resolve_scoring_rules = MagicMock(return_value={
+        "fresh_clip_bonus": 10,
+        "jump_cut_penalty": -10,
+        "shot_variation_bonus": 5,
+        "shot_repetition_penalty": -5
+    })
+    builder._get_current_music_section = MagicMock(return_value={})
     
-    # Run selection
-    selected, score = builder._select_clip(available_footage, 0.5, 2)
+    # Mock internal scoring methods to return 0 except broll
+    builder._score_usage_and_story_phase = MagicMock(return_value=0)
+    builder._score_jump_cut = MagicMock(return_value=0)
+    builder._score_action_energy = MagicMock(return_value=0)
+    builder._score_style_preferences = MagicMock(return_value=0)
+    builder._score_shot_variation = MagicMock(return_value=0)
+    builder._score_match_cut = MagicMock(return_value=0)
+    builder._score_semantic_match = MagicMock(return_value=0)
     
-    # Expect the matching scene (run.mp4) to be selected due to +100 broll boost
-    assert selected is not None, "A clip should be selected"
-    assert selected["path"] == "/path/to/run.mp4", f"Expected run.mp4, got {selected['path']}"
-    # The score should be positive (base + 100 boost - any penalties)
-    assert score > 0, f"Expected positive score, got {score}"
-
-def test_broll_timing_estimation():
-    """Test that we can estimate segment duration from text."""
-    # This logic will be inside MontageBuilder or a helper
-    text = "This is a test sentence."
-    # 5 words. At 2.5 words/sec -> 2 seconds.
-    expected_duration = 2.0 
+    # Ensure _score_broll_match uses the real logic from the class
+    # We didn't mock it, so it should be fine.
     
-    # We will implement a helper _estimate_script_timing
-    pass
+    builder._intelligent_selector = None # Ensure probabilistic fallback
+    
+    selected, score = builder._select_clip(available_footage, 0.5, 0)
+    
+    assert selected is not None
+    assert selected["path"] == "/path/to/run.mp4"
+    assert selected["_heuristic_score"] >= 85 # 100 + random(-15, 15)
