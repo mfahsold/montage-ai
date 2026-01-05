@@ -106,18 +106,11 @@ FROM realesrgan AS runtime
 
 WORKDIR /app
 
-# Copy only pyproject.toml first (for dependency metadata)
+# Copy pyproject.toml and source code together
 COPY pyproject.toml .
-
-# Create minimal src structure for editable install
-RUN mkdir -p /app/src/montage_ai && \
-    touch /app/src/montage_ai/__init__.py
-
-# Install package in editable mode (cached unless pyproject.toml changes)
-RUN pip install --no-cache-dir -e .
-
-# Copy application code (changes most frequently - final layer)
 COPY src/ /app/src/
+
+# Install package in editable mode
 RUN pip install --no-cache-dir -e .
 
 # Vulkan headless environment

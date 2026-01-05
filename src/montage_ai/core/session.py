@@ -28,7 +28,9 @@ SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
 # Redis Configuration
 REDIS_HOST = os.environ.get("REDIS_HOST")
-REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+# Note: Kubernetes sets REDIS_PORT as URL when service named 'redis' exists
+_redis_port_env = os.environ.get("REDIS_SERVICE_PORT", os.environ.get("REDIS_PORT", "6379"))
+REDIS_PORT = int(_redis_port_env) if _redis_port_env.isdigit() else 6379
 redis_client = None
 
 if REDIS_HOST and redis:
