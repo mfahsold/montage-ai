@@ -32,8 +32,15 @@ def mock_timeline(tmp_path):
         project_name="test_project"
     )
 
-@patch('montage_ai.timeline_exporter.subprocess.run')
-def test_proxy_generation_h264(mock_run, mock_timeline, tmp_path):
+@patch('subprocess.Popen')
+def test_proxy_generation_h264(mock_popen, mock_timeline, tmp_path):
+    # Setup mock process
+    mock_process = MagicMock()
+    mock_process.communicate.return_value = ("stdout", "stderr")
+    mock_process.returncode = 0
+    mock_process.__enter__.return_value = mock_process
+    mock_popen.return_value = mock_process
+
     exporter = TimelineExporter(output_dir=str(tmp_path))
     
     # Test H.264 (default)
@@ -43,12 +50,19 @@ def test_proxy_generation_h264(mock_run, mock_timeline, tmp_path):
     assert "proxy_clip1.mp4" in proxy_path
     
     # Verify ffmpeg command
-    args = mock_run.call_args[0][0]
+    args = mock_popen.call_args[0][0]
     assert "libx264" in args
     assert "-preset" in args
 
-@patch('montage_ai.timeline_exporter.subprocess.run')
-def test_proxy_generation_prores(mock_run, mock_timeline, tmp_path):
+@patch('subprocess.Popen')
+def test_proxy_generation_prores(mock_popen, mock_timeline, tmp_path):
+    # Setup mock process
+    mock_process = MagicMock()
+    mock_process.communicate.return_value = ("stdout", "stderr")
+    mock_process.returncode = 0
+    mock_process.__enter__.return_value = mock_process
+    mock_popen.return_value = mock_process
+
     exporter = TimelineExporter(output_dir=str(tmp_path))
     
     # Test ProRes
@@ -58,12 +72,19 @@ def test_proxy_generation_prores(mock_run, mock_timeline, tmp_path):
     assert "proxy_clip1.mov" in proxy_path
     
     # Verify ffmpeg command
-    args = mock_run.call_args[0][0]
+    args = mock_popen.call_args[0][0]
     assert "prores_ks" in args
     assert "-profile:v" in args
 
-@patch('montage_ai.timeline_exporter.subprocess.run')
-def test_proxy_generation_dnxhr(mock_run, mock_timeline, tmp_path):
+@patch('subprocess.Popen')
+def test_proxy_generation_dnxhr(mock_popen, mock_timeline, tmp_path):
+    # Setup mock process
+    mock_process = MagicMock()
+    mock_process.communicate.return_value = ("stdout", "stderr")
+    mock_process.returncode = 0
+    mock_process.__enter__.return_value = mock_process
+    mock_popen.return_value = mock_process
+
     exporter = TimelineExporter(output_dir=str(tmp_path))
     
     # Test DNxHR
@@ -73,7 +94,7 @@ def test_proxy_generation_dnxhr(mock_run, mock_timeline, tmp_path):
     assert "proxy_clip1.mov" in proxy_path
     
     # Verify ffmpeg command
-    args = mock_run.call_args[0][0]
+    args = mock_popen.call_args[0][0]
     assert "dnxhd" in args
     assert "dnxhr_lb" in args
 
@@ -92,7 +113,7 @@ def test_relink_readme_generation(mock_timeline, tmp_path):
     assert "DaVinci Resolve" in content
     assert "Adobe Premiere Pro" in content
 
-@patch('montage_ai.timeline_exporter.subprocess.run')
+@patch('subprocess.run')
 def test_full_export_flow(mock_run, mock_timeline, tmp_path):
     exporter = TimelineExporter(output_dir=str(tmp_path))
     

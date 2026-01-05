@@ -17,7 +17,12 @@ echo "   Platforms: $PLATFORMS"
 if ! docker buildx inspect "$BUILDER_NAME" > /dev/null 2>&1; then
     echo "Creating new buildx builder: $BUILDER_NAME"
     # Create with access to host network for registry access
-    docker buildx create --name "$BUILDER_NAME" --driver docker-container --driver-opt network=host --use --bootstrap
+    CONFIG_ARG=""
+    if [ -f "buildkitd.toml" ]; then
+        echo "   Using buildkitd.toml configuration"
+        CONFIG_ARG="--config buildkitd.toml"
+    fi
+    docker buildx create --name "$BUILDER_NAME" --driver docker-container --driver-opt network=host $CONFIG_ARG --use --bootstrap
 else
     echo "Using existing builder: $BUILDER_NAME"
     docker buildx use "$BUILDER_NAME"

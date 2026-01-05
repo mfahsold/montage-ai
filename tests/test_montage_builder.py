@@ -165,15 +165,21 @@ class TestMontageContext:
         mock_settings.return_value.paths.output_dir = Path("/output")
         mock_settings.return_value.paths.temp_dir = Path("/tmp")
 
-        ctx = MontageContext(
-            job_id="test",
-            variant_id=1,
-            settings=mock_settings.return_value,
+        from src.montage_ai.core.montage_builder import MontagePaths
+
+        paths = MontagePaths(
             input_dir=Path("/input"),
             music_dir=Path("/music"),
             assets_dir=Path("/assets"),
             output_dir=Path("/output"),
             temp_dir=Path("/tmp"),
+        )
+
+        ctx = MontageContext(
+            job_id="test",
+            variant_id=1,
+            settings=mock_settings.return_value,
+            paths=paths,
         )
         ctx.current_time = 30.0
         ctx.beat_idx = 10
@@ -196,15 +202,21 @@ class TestMontageContext:
         mock_settings.return_value.paths.output_dir = Path("/output")
         mock_settings.return_value.paths.temp_dir = Path("/tmp")
 
-        ctx = MontageContext(
-            job_id="test",
-            variant_id=1,
-            settings=mock_settings.return_value,
+        from src.montage_ai.core.montage_builder import MontagePaths
+
+        paths = MontagePaths(
             input_dir=Path("/input"),
             music_dir=Path("/music"),
             assets_dir=Path("/assets"),
             output_dir=Path("/output"),
             temp_dir=Path("/tmp"),
+        )
+        
+        ctx = MontageContext(
+            job_id="test",
+            variant_id=1,
+            settings=mock_settings.return_value,
+            paths=paths,
         )
         ctx.target_duration = 100.0
         ctx.current_time = 50.0
@@ -221,15 +233,21 @@ class TestMontageContext:
         mock_settings.return_value.paths.output_dir = Path("/output")
         mock_settings.return_value.paths.temp_dir = Path("/tmp")
 
-        ctx = MontageContext(
-            job_id="test",
-            variant_id=1,
-            settings=mock_settings.return_value,
+        from src.montage_ai.core.montage_builder import MontagePaths
+
+        paths = MontagePaths(
             input_dir=Path("/input"),
             music_dir=Path("/music"),
             assets_dir=Path("/assets"),
             output_dir=Path("/output"),
             temp_dir=Path("/tmp"),
+        )
+
+        ctx = MontageContext(
+            job_id="test",
+            variant_id=1,
+            settings=mock_settings.return_value,
+            paths=paths,
         )
         ctx.target_duration = 100.0
         ctx.current_time = 5.0
@@ -245,16 +263,22 @@ class TestMontageContext:
         mock_settings.return_value.paths.assets_dir = Path("/assets")
         mock_settings.return_value.paths.output_dir = Path("/output")
         mock_settings.return_value.paths.temp_dir = Path("/tmp")
+        
+        from src.montage_ai.core.montage_builder import MontagePaths
 
-        ctx = MontageContext(
-            job_id="test",
-            variant_id=1,
-            settings=mock_settings.return_value,
+        paths = MontagePaths(
             input_dir=Path("/input"),
             music_dir=Path("/music"),
             assets_dir=Path("/assets"),
             output_dir=Path("/output"),
             temp_dir=Path("/tmp"),
+        )
+        
+        ctx = MontageContext(
+            job_id="test",
+            variant_id=1,
+            settings=mock_settings.return_value,
+            paths=paths,
         )
         ctx.target_duration = 100.0
         ctx.current_time = 55.0

@@ -84,7 +84,9 @@ def test_montage_workflow_run_sequence(mock_settings, mock_builder_cls, mock_pro
     mock_builder_cls.assert_called_with(
         variant_id=2, 
         settings=ANY, 
-        editing_instructions={}
+        editing_instructions={},
+        job_id="test-job-123",
+        progress_callback=ANY
     )
     builder_instance.setup_workspace.assert_called_once()
     
