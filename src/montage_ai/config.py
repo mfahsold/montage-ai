@@ -159,6 +159,11 @@ class FeatureConfig:
     ))
     voice_isolation_model: str = field(default_factory=lambda: os.environ.get("VOICE_ISOLATION_MODEL", "htdemucs"))
 
+    # Noise Reduction: DeepFilterNet for lightweight noise removal (faster than voice_isolation)
+    # Use for podcasts, interviews, vlogs with background noise
+    noise_reduction: bool = field(default_factory=lambda: os.environ.get("NOISE_REDUCTION", "false").lower() == "true")
+    noise_reduction_strength: int = field(default_factory=lambda: int(os.environ.get("NOISE_REDUCTION_STRENGTH", "100")))
+
     # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)
     low_memory_mode: bool = field(default_factory=lambda: os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true")
 

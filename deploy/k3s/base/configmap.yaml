@@ -44,6 +44,8 @@ data:
   CAPTIONS: "true"
   CAPTIONS_STYLE: "youtube"
   VOICE_ISOLATION: "true"
+  NOISE_REDUCTION: "false"  # DeepFilterNet noise removal (lighter than voice_isolation)
+  NOISE_REDUCTION_STRENGTH: "100"  # 0-100, higher = more aggressive
   EPISODIC_MEMORY: "true"
   CREATIVE_LOOP: "true"
   

@@ -1779,6 +1779,138 @@ def shorts_visualize():
         return jsonify({'error': str(e)}), 500
 
 
+def _apply_clean_audio(video_path: str) -> str:
+    """
+    Apply clean audio processing: voice isolation + noise reduction.
+
+    Uses SNR check to determine appropriate processing:
+    - SNR >= 40dB: Excellent audio, skip processing
+    - SNR 25-40dB: Good audio, light noise reduction only
+    - SNR 15-25dB: Fair audio, noise reduction
+    - SNR < 15dB: Poor audio, voice isolation + noise reduction
+
+    Returns the path to a video with cleaned audio, or original path on failure.
+    """
+    try:
+        from ..cgpu_jobs import VoiceIsolationJob, NoiseReductionJob
+        from ..cgpu_utils import is_cgpu_available
+        from ..audio_analysis import estimate_audio_snr
+
+        # Step 0: Check SNR to determine processing needs
+        try:
+            quality = estimate_audio_snr(video_path)
+            snr_db = quality.snr_db
+            logger.info(f"Clean audio: SNR = {snr_db:.1f}dB ({quality.quality_level})")
+
+            # Excellent audio - skip processing
+            if snr_db >= 40:
+                logger.info("Clean audio: Excellent quality, skipping processing")
+                return video_path
+        except Exception as e:
+            logger.warning(f"SNR estimation failed: {e}, proceeding with full cleanup")
+            snr_db = 0  # Assume needs cleanup
+
+        if not is_cgpu_available():
+            logger.warning("Clean audio: CGPU not available, using FFmpeg fallback")
+            return _apply_ffmpeg_noise_reduction(video_path)
+
+        input_path = Path(video_path)
+        timestamp_polish = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Step 1: Voice isolation (only for poor quality audio < 25dB SNR)
+        vocals_path = None
+        if snr_db < 25:
+            try:
+                job = VoiceIsolationJob(
+                    audio_path=str(input_path),
+                    model="htdemucs",
+                    two_stems=True,
+                    keep_all_stems=True
+                )
+                result = job.execute()
+                if result.success and result.metadata.get("stems", {}).get("vocals"):
+                    vocals_path = result.metadata["stems"]["vocals"]
+                    logger.info("Clean audio: Voice isolation successful")
+            except Exception as e:
+                logger.warning(f"Voice isolation failed: {e}")
+        else:
+            logger.info("Clean audio: Good SNR, skipping voice isolation")
+
+        # Step 2: Noise reduction (adaptive strength based on SNR)
+        audio_to_clean = vocals_path or str(input_path)
+        cleaned_audio = None
+
+        # Determine noise reduction strength based on SNR
+        if snr_db >= 35:
+            attenuation = 50  # Light cleanup
+        elif snr_db >= 25:
+            attenuation = 75  # Moderate cleanup
+        else:
+            attenuation = 100  # Full cleanup
+
+        try:
+            noise_job = NoiseReductionJob(audio_path=audio_to_clean, attenuation_limit=attenuation)
+            noise_result = noise_job.execute()
+            if noise_result.success and noise_result.output_path:
+                cleaned_audio = noise_result.output_path
+                logger.info(f"Clean audio: Noise reduction successful (strength: {attenuation}%)")
+        except Exception as e:
+            logger.warning(f"Noise reduction failed: {e}")
+
+        # Use best available cleaned audio
+        final_audio = cleaned_audio or vocals_path
+        if not final_audio:
+            logger.warning("Clean audio: all processing failed, using original")
+            return video_path
+
+        # Step 3: Replace audio in video
+        polished_video_path = OUTPUT_DIR / f"shorts_cleaned_{timestamp_polish}.mp4"
+        cmd = build_ffmpeg_cmd([
+            "-i", video_path,
+            "-i", final_audio,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            str(polished_video_path)
+        ])
+        subprocess.run(cmd, check=True, capture_output=True)
+        return str(polished_video_path)
+
+    except Exception as e:
+        logger.error(f"Clean audio pipeline failed: {e}")
+        return video_path
+
+
+def _apply_ffmpeg_noise_reduction(video_path: str) -> str:
+    """FFmpeg fallback for noise reduction when CGPU is not available."""
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = OUTPUT_DIR / f"shorts_denoised_{timestamp}.mp4"
+
+        # Adaptive FFT-based denoiser + EQ + light compression
+        noise_filter = (
+            "afftdn=nf=-25:nr=10:nt=w"
+            ",highpass=f=80"
+            ",lowpass=f=14000"
+            ",compand=attacks=0.3:decays=0.8:points=-80/-900|-45/-15|-27/-9|0/-7:soft-knee=6:gain=3"
+        )
+
+        cmd = build_ffmpeg_cmd([
+            "-i", video_path,
+            "-c:v", "copy",
+            "-af", noise_filter,
+            "-c:a", "aac",
+            str(output_path)
+        ])
+        subprocess.run(cmd, check=True, capture_output=True)
+        return str(output_path)
+
+    except Exception as e:
+        logger.warning(f"FFmpeg noise reduction failed: {e}")
+        return video_path
+
+
 @app.route('/api/shorts/render', methods=['POST'])
 def api_shorts_render():
     """Render vertical video with smart reframing and captions."""
@@ -1789,50 +1921,16 @@ def api_shorts_render():
     add_captions = data.get('autoCaptions', data.get('add_captions', True))
     platform = data.get('platform', 'tiktok')
     duration = int(data.get('duration', 60))
-    audio_polish = data.get('audioPolish', False)
-    
+    # Support both old (audioPolish) and new (cleanAudio) parameter names
+    clean_audio = data.get('cleanAudio', data.get('audioPolish', False))
+
     if not video_path or not Path(video_path).exists():
         return jsonify({"error": "Video file not found"}), 404
-    
+
     try:
-        # Apply Audio Polish if requested
-        if audio_polish:
-            try:
-                from ..cgpu_jobs import VoiceIsolationJob
-                from ..cgpu_utils import is_cgpu_available
-                
-                if is_cgpu_available():
-                    job = VoiceIsolationJob(
-                        audio_path=video_path,
-                        model="htdemucs",
-                        two_stems=True,
-                        keep_all_stems=True
-                    )
-                    result = job.execute()
-                    
-                    if result.success and result.metadata.get("stems", {}).get("vocals"):
-                        vocals_path = result.metadata["stems"]["vocals"]
-                        # Create a temp video with replaced audio
-                        timestamp_polish = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        polished_video_path = OUTPUT_DIR / f"shorts_polished_{timestamp_polish}.mp4"
-                        
-                        # Use ffmpeg to replace audio
-                        cmd = build_ffmpeg_cmd([
-                            "-i", video_path,
-                            "-i", vocals_path,
-                            "-c:v", "copy",
-                            "-c:a", "aac",
-                            "-map", "0:v:0",
-                            "-map", "1:a:0",
-                            str(polished_video_path)
-                        ])
-                        subprocess.run(cmd, check=True, capture_output=True)
-                        
-                        # Update video_path to point to the polished version
-                        video_path = str(polished_video_path)
-            except Exception as e:
-                print(f"Audio polish failed: {e}")
-                # Continue with original audio
+        # Apply Clean Audio if requested (voice isolation + noise reduction)
+        if clean_audio:
+            video_path = _apply_clean_audio(video_path)
 
         from ..auto_reframe import AutoReframeEngine as SmartReframer
         

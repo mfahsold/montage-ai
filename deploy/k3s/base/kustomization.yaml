@@ -8,6 +8,7 @@ resources:
   - configmap.yaml
   - pvc.yaml
   - job.yaml
+  - web-service.yaml
   - cgpu-server.yaml
   - registry.yaml
   - network-policies/networkpolicy-default-deny.yaml

@@ -529,8 +529,8 @@
                         <div class="toggle-switch" onclick="toggleHighlights(this)" id="highlightsToggle"></div>
                     </div>
                     <div class="toggle-row">
-                        <span class="toggle-label">Audio Polish (Voice Isolation)</span>
-                        <div class="toggle-switch" onclick="toggleAudioPolish(this)" id="audioPolishToggle"></div>
+                        <span class="toggle-label">Clean Audio</span>
+                        <div class="toggle-switch" onclick="toggleCleanAudio(this)" id="cleanAudioToggle"></div>
                     </div>
                 </div>
 
@@ -650,7 +650,7 @@
             showSafeZones: true,
             autoCaptions: true,
             detectHighlights: false,
-            audioPolish: false,
+            cleanAudio: false,  // Combines voice_isolation + noise_reduction
             platform: 'tiktok',
             duration: 60
         };
@@ -764,10 +764,10 @@
             client.saveState({ detectHighlights: currentSettings.detectHighlights });
         }
 
-        function toggleAudioPolish(el) {
+        function toggleCleanAudio(el) {
             el.classList.toggle('active');
-            currentSettings.audioPolish = el.classList.contains('active');
-            client.saveState({ audioPolish: currentSettings.audioPolish });
+            currentSettings.cleanAudio = el.classList.contains('active');
+            client.saveState({ cleanAudio: currentSettings.cleanAudio });
         }
 
         function loadVideo(input) {
@@ -1041,20 +1041,20 @@
                 client.showToast('Load a video first', 'warning');
                 return;
             }
-            
+
             const btn = document.getElementById('renderPreviewBtn');
             btn.disabled = true;
             btn.innerHTML = '<span class="icon">⏳</span><span class="label">Rendering...</span>';
-            
+
             try {
                 // Save current crop state if manual
                 // await client.saveState({ ... });
-                
-                const data = await client.renderPreview({ 
+
+                const data = await client.renderPreview({
                     type: 'clip',
-                    timestamp: sourcePlayer.currentTime 
+                    timestamp: sourcePlayer.currentTime
                 });
-                
+
                 if (data.url) {
                     const previewPlayer = document.getElementById('previewPlayer');
                     previewPlayer.src = data.url;
@@ -1069,6 +1069,137 @@
                 btn.disabled = false;
                 btn.innerHTML = '<span class="icon">▶️</span><span class="label">Render Preview</span>';
             }
+        }
+
+        // ============================================================
+        // CREATE SHORT (Renders full vertical video with all settings)
+        // ============================================================
+        async function createShort() {
+            if (!client.sessionId) {
+                client.showToast('Load a video first', 'warning');
+                return;
+            }
+
+            // Get video path from session state
+            const mainAsset = client.state?.assets?.find(a => a.type === 'video');
+            if (!mainAsset || !mainAsset.path) {
+                client.showToast('No video loaded in session', 'error');
+                return;
+            }
+
+            // Gather current settings from UI
+            const platform = document.getElementById('platformSelect')?.value || currentSettings.platform;
+            const duration = parseInt(document.getElementById('durationSelect')?.value || currentSettings.duration);
+
+            const payload = {
+                video_path: mainAsset.path,
+                reframeMode: currentSettings.reframeMode,
+                captionStyle: currentSettings.captionStyle,
+                autoCaptions: currentSettings.autoCaptions,
+                platform: platform,
+                duration: duration,
+                cleanAudio: currentSettings.cleanAudio  // Voice isolation + noise reduction
+            };
+
+            // Add manual keyframes if in manual mode
+            if (currentSettings.reframeMode === 'manual' && manualKeyframes.length > 0) {
+                payload.keyframes = manualKeyframes;
+            }
+
+            // Add selected highlights if any
+            if (highlightsData.length > 0) {
+                payload.highlights = highlightsData;
+            }
+
+            const btn = document.querySelector('button[onclick="createShort()"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Rendering...';
+
+            try {
+                const response = await fetch('/api/shorts/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Render failed');
+                }
+
+                // Success - show result
+                if (data.output_path) {
+                    client.showToast(`Short created: ${data.output_path.split('/').pop()}`, 'success');
+
+                    // Update preview player with result if URL available
+                    if (data.url) {
+                        previewPlayer.src = data.url;
+                        previewPlayer.load();
+                    }
+
+                    // Save to session state
+                    client.saveState({
+                        lastRender: {
+                            path: data.output_path,
+                            timestamp: new Date().toISOString(),
+                            settings: payload
+                        }
+                    });
+                } else {
+                    client.showToast('Short created successfully', 'success');
+                }
+
+            } catch (e) {
+                console.error('Create short error:', e);
+                client.showToast('Failed to create short: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // ============================================================
+        // EXPORT SETTINGS (Download current settings as JSON)
+        // ============================================================
+        function exportSettings() {
+            // Gather all current settings
+            const platform = document.getElementById('platformSelect')?.value || currentSettings.platform;
+            const duration = parseInt(document.getElementById('durationSelect')?.value || currentSettings.duration);
+
+            const exportData = {
+                version: '1.0',
+                exportedAt: new Date().toISOString(),
+                settings: {
+                    reframeMode: currentSettings.reframeMode,
+                    captionStyle: currentSettings.captionStyle,
+                    showSafeZones: currentSettings.showSafeZones,
+                    autoCaptions: currentSettings.autoCaptions,
+                    detectHighlights: currentSettings.detectHighlights,
+                    cleanAudio: currentSettings.cleanAudio,
+                    platform: platform,
+                    duration: duration
+                },
+                keyframes: manualKeyframes.length > 0 ? manualKeyframes : undefined,
+                highlights: highlightsData.length > 0 ? highlightsData : undefined,
+                videoInfo: client.state?.assets?.find(a => a.type === 'video') || null
+            };
+
+            // Create downloadable JSON file
+            const json = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `shorts-settings-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            client.showToast('Settings exported', 'success');
         }
     </script>
 </body>

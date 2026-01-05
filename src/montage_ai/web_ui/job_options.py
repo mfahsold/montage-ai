@@ -116,6 +116,7 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
         "cloud_acceleration": cloud_acceleration,
         "cgpu": cloud_acceleration,
         "clean_audio": get_bool("clean_audio"),
+        "noise_reduction": get_bool("noise_reduction"),
         "voice_isolation": get_bool("voice_isolation"),
         "story_arc": str(opts.get("story_arc", data.get("story_arc", ""))),
         "reframe_mode": str(opts.get("reframe_mode", data.get("reframe_mode", "auto"))),

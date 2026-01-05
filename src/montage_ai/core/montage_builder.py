@@ -1148,6 +1148,10 @@ class MontageBuilder:
         elif self.settings.features.voice_isolation:
             music_path = self._apply_voice_isolation(music_path)
 
+        # Apply noise reduction if enabled (can stack with voice_isolation or run standalone)
+        if self.settings.features.noise_reduction:
+            music_path = self._apply_noise_reduction(music_path)
+
         # Try cache first
         cache = get_analysis_cache()
         cached = cache.load_audio(music_path)
@@ -1464,6 +1468,52 @@ class MontageBuilder:
             if self.settings.features.strict_cloud_compute:
                 raise RuntimeError(f"Strict cloud compute enabled: Voice isolation error: {e}")
             logger.warning(f"   Voice isolation error: {e}")
+            return audio_path
+
+    def _apply_noise_reduction(self, audio_path: str) -> str:
+        """
+        Apply noise reduction to audio using DeepFilterNet via cgpu.
+
+        Lighter/faster than voice_isolation - good for podcasts, interviews,
+        vlogs with background noise.
+
+        Args:
+            audio_path: Path to original audio file
+
+        Returns:
+            Path to cleaned audio (or original if reduction fails)
+        """
+        strength = self.settings.features.noise_reduction_strength
+        logger.info(f"\n🔇 Applying noise reduction (strength: {strength})...")
+
+        try:
+            from ..cgpu_utils import is_cgpu_available
+            if not is_cgpu_available():
+                if self.settings.features.strict_cloud_compute:
+                    raise RuntimeError("Strict cloud compute enabled: cgpu noise reduction not available.")
+                logger.warning("   Noise reduction requires cgpu - using original audio")
+                return audio_path
+
+            from ..cgpu_jobs import NoiseReductionJob
+            job = NoiseReductionJob(
+                audio_path=audio_path,
+                attenuation_limit=strength,
+            )
+            result = job.execute()
+
+            if result.success and result.output_path:
+                logger.info(f"   ✅ Noise reduced: {result.output_path}")
+                return result.output_path
+            else:
+                if self.settings.features.strict_cloud_compute:
+                    raise RuntimeError(f"Strict cloud compute enabled: Noise reduction failed: {result.error}")
+                logger.warning(f"   Noise reduction failed: {result.error}")
+                return audio_path
+
+        except Exception as e:
+            if self.settings.features.strict_cloud_compute:
+                raise RuntimeError(f"Strict cloud compute enabled: Noise reduction error: {e}")
+            logger.warning(f"   Noise reduction error: {e}")
             return audio_path
 
     def _get_files(self, directory: Path, extensions: Tuple[str, ...]) -> List[str]:
