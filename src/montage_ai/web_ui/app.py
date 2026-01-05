@@ -1287,14 +1287,39 @@ def api_session_render_preview(session_id):
                 # Check if we have dynamic crops (keyframes)
                 keyframes = session.state.get('crops_auto', [])
                 
-                # If no keyframes, try to generate them on the fly?
-                # This might be too slow for a "preview" button if it takes minutes.
-                # But if the user hasn't run analysis, we should probably warn them or run a fast version.
-                
+                # If no keyframes, run analysis on the fly
                 if not keyframes:
-                    # Trigger fast analysis or just use center crop
-                    # For now, use center crop
-                    pass
+                    logger.info(f"No cached crops found for session {session.id}. Running auto-reframe analysis...")
+                    try:
+                        from ..auto_reframe import AutoReframeEngine
+                        reframer = AutoReframeEngine(target_aspect=9/16)
+                        # Run analysis (blocking)
+                        crop_data = reframer.analyze(main_video.path)
+                        
+                        # Convert to JSON-serializable format
+                        crops_json = [
+                            {
+                                "time": c.time,
+                                "x": c.x,
+                                "y": c.y,
+                                "width": c.width,
+                                "height": c.height,
+                                "score": c.score
+                            }
+                            for c in crop_data
+                        ]
+                        
+                        # Update session state
+                        session.update_state('crops_auto', crops_json)
+                        keyframes = crops_json
+                        
+                        # Update the single frame crop as well since we now have data
+                        crop = next((c for c in keyframes if c['time'] >= timestamp), keyframes[-1] if keyframes else None)
+                        
+                    except Exception as e:
+                        logger.error(f"Auto-reframe analysis failed during preview: {e}")
+                        # Fallback to center crop is handled by generate_shorts_preview if keyframes is None/Empty
+                        pass
 
                 output_path = generator.generate_shorts_preview(
                     main_video.path, 
@@ -2292,8 +2317,12 @@ def api_audio_clean():
             import shutil
             shutil.copy(input_path, output_path)
         
-        # Calculate SNR improvement estimate (simplified)
-        snr_improvement = "~6dB" if voice_isolated else "~3dB"
+        # Calculate actual SNR improvement
+        from ..audio_analysis import estimate_audio_snr
+        
+        snr_before = estimate_audio_snr(str(Path(audio_path)))
+        snr_after = estimate_audio_snr(str(output_path))
+        snr_improvement_db = snr_after.snr_db - snr_before.snr_db
         
         return jsonify({
             "success": True,
@@ -2301,7 +2330,11 @@ def api_audio_clean():
             "path": str(output_path),
             "voice_isolated": voice_isolated,
             "noise_reduced": reduce_noise,
-            "snr_improvement": snr_improvement,
+            "snr_before_db": round(snr_before.snr_db, 1),
+            "snr_after_db": round(snr_after.snr_db, 1),
+            "snr_improvement": f"+{snr_improvement_db:.1f}dB" if snr_improvement_db > 0 else f"{snr_improvement_db:.1f}dB",
+            "quality_before": snr_before.quality_tier,
+            "quality_after": snr_after.quality_tier,
             "method": "cgpu+ffmpeg" if voice_isolated else "ffmpeg"
         })
         
@@ -2366,21 +2399,28 @@ def api_audio_analyze():
                 except:
                     pass
         
-        # Estimate quality and recommendations
-        quality = "good"
+        # Use proper SNR estimation from audio_analysis module
+        from ..audio_analysis import estimate_audio_snr
+        audio_quality = estimate_audio_snr(str(audio_path))
+        
+        # Build recommendations based on actual quality
         recommendations = []
         
-        if mean_volume < -30:
-            quality = "low"
+        if audio_quality.mean_volume_db < -30:
             recommendations.append("Audio is very quiet - consider normalizing")
-        elif mean_volume > -10:
-            quality = "warning"
+        elif audio_quality.max_volume_db > -1:
             recommendations.append("Audio may be clipping - check peaks")
         
         # Dynamic range check
-        dynamic_range = max_volume - mean_volume
+        dynamic_range = audio_quality.max_volume_db - audio_quality.mean_volume_db
         if dynamic_range > 20:
             recommendations.append("High dynamic range - consider compression for social media")
+        
+        # SNR-based recommendations
+        if audio_quality.quality_tier in ("poor", "unusable"):
+            recommendations.append(f"Low SNR ({audio_quality.snr_db:.1f}dB) - audio cleaning recommended")
+        elif audio_quality.quality_tier == "acceptable":
+            recommendations.append(f"Moderate SNR ({audio_quality.snr_db:.1f}dB) - audio cleaning may help")
         
         # Check if CGPU available for voice isolation
         if is_cgpu_available():
@@ -2389,10 +2429,12 @@ def api_audio_analyze():
         response_data = {
             "success": True,
             "analysis": {
-                "mean_volume": round(mean_volume, 1),
-                "max_volume": round(max_volume, 1),
+                "snr_db": round(audio_quality.snr_db, 1),
+                "mean_volume": round(audio_quality.mean_volume_db, 1),
+                "max_volume": round(audio_quality.max_volume_db, 1),
                 "dynamic_range": round(dynamic_range, 1),
-                "quality_estimate": quality,
+                "quality_tier": audio_quality.quality_tier,
+                "is_usable": audio_quality.is_usable,
                 "sample_rate": probe_data.get('streams', [{}])[0].get('sample_rate', 'unknown'),
                 "channels": probe_data.get('streams', [{}])[0].get('channels', 1),
             },

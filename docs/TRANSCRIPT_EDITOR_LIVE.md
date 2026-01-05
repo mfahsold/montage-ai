@@ -17,7 +17,8 @@ The Transcript Editor Live feature enables Descript-style text-based video editi
 - **360p Fast Preview**: Automatic generation 2 seconds after edits (debounced)
 - **Preview API**: `/api/session/<session_id>/render_preview` endpoint
 - **Segment-Based Rendering**: Uses FFmpeg complex filter for fast concatenation
-- **Quality Profile**: `ultrafast` preset, CRF 28 for speed
+- **Quality Profile**: `ultrafast` preset (or HW equivalent), CRF 28 for speed
+- **Hardware Acceleration**: Auto-detects NVENC/VAAPI/VideoToolbox for faster encoding
 
 ### 2. **Word-Level Editing**
 - **Click to Toggle**: Click any word to mark for removal (strikethrough)

@@ -6,9 +6,12 @@
 # Configuration
 IMAGE_NAME ?= ghcr.io/mfahsold/montage-ai
 IMAGE_TAG ?= latest
-REGISTRY ?= 192.168.1.12:5000
+REGISTRY ?= 10.43.17.166:5000
+CLUSTER_REGISTRY ?= $(REGISTRY)
 NAMESPACE ?= montage-ai
 PLATFORM ?= linux/amd64
+PLATFORMS ?= linux/amd64,linux/arm64
+CACHE_DIR ?= /tmp/buildx-cache
 
 # Colors
 CYAN := \033[36m
@@ -17,39 +20,23 @@ YELLOW := \033[33m
 RESET := \033[0m
 
 help: ## Show this help
-	@echo "$(CYAN)Montage AI - Development Commands$(RESET)"
+	@echo "$(CYAN)Montage AI - Golden Path$(RESET)"
 	@echo ""
-	@echo "$(GREEN)Web UI (Self-Hosted):$(RESET)"
-	@echo "  make web            Start web UI (http://localhost:5000)"
-	@echo "  make web-deploy     Deploy web UI to K8s cluster"
+	@echo "$(GREEN)📖 Read First: docs/DX.md$(RESET)"
 	@echo ""
-	@echo "$(GREEN)Local Development:$(RESET)"
-	@echo "  make build          Build Docker image (local arch)"
-	@echo "  make run            Run montage locally"
-	@echo "  make preview        Fast preview render"
-	@echo "  make hq             High-quality render"
-	@echo "  make shell          Interactive shell in container"
+	@echo "$(GREEN)Local Development (5 sec feedback):$(RESET)"
+	@echo "  make dev            Build base image with cache (once)"
+	@echo "  make dev-test       Run with volume mounts (instant)"
+	@echo "  make dev-shell      Interactive shell for debugging"
 	@echo ""
-	@echo "$(GREEN)Cluster Deployment:$(RESET)"
-	@echo "  make build-amd64    Build for amd64 (cluster)"
-	@echo "  make push           Push to local registry"
-	@echo "  make push-ghcr      Push to GitHub Container Registry"
-	@echo "  make deploy         Deploy to K8s cluster (base)"
-	@echo "  make deploy-prod    Deploy to K8s cluster (production)"
-	@echo "  make deploy-dev     Deploy to K8s cluster (dev)"
-	@echo "  make job            Start render job in cluster"
-	@echo "  make logs           View job logs"
-	@echo "  make status         Show cluster status"
-	@echo ""
-	@echo "$(GREEN)Testing:$(RESET)"
-	@echo "  make test           Run all tests"
-	@echo "  make test-local     Test local Docker workflow"
-	@echo "  make test-k8s       Test Kubernetes deployment"
+	@echo "$(GREEN)Cluster Deployment (2-15 min):$(RESET)"
+	@echo "  make cluster        Build + push + deploy (all-in-one)"
 	@echo ""
 	@echo "$(GREEN)Maintenance:$(RESET)"
-	@echo "  make clean          Clean up local resources"
-	@echo "  make clean-k8s      Clean up Kubernetes resources"
-	@echo "  make validate       Validate all manifests"
+	@echo "  make clean          Clean local caches"
+	@echo "  make test           Run all tests"
+	@echo ""
+	@echo "$(YELLOW)Legacy commands available, see: make help-all$(RESET)"
 
 # ============================================================================
 # WEB UI (SELF-HOSTED)
@@ -80,12 +67,73 @@ web-deploy: ## Deploy web UI to Kubernetes
 # Get current git commit hash for version tracking
 GIT_COMMIT := $(shell git rev-parse --short=8 HEAD 2>/dev/null || echo "dev")
 
+# ============================================================================
+# GOLDEN PATH: LOCAL DEVELOPMENT
+# ============================================================================
+
+dev: ## Build base image with local cache (run once)
+	@echo "$(CYAN)Building base image with local cache...$(RESET)"
+	@echo "$(YELLOW)First build: 8-12 min | Subsequent: ~1 min$(RESET)"
+	CACHE_DIR=$(CACHE_DIR) TAG=dev LOAD=true ./scripts/build_local_cache.sh
+	@echo "$(GREEN)✓ Ready for development!$(RESET)"
+	@echo "$(GREEN)→ Run: make dev-test$(RESET)"
+
+dev-test: ## Run with volume mounts (instant code changes)
+	@echo "$(CYAN)Running with volume mounts (instant reload)...$(RESET)"
+	docker run --rm -it \
+		-v $(PWD)/src:/app/src \
+		-v $(PWD)/data:/data \
+		montage-ai:dev \
+		montage-ai run --style dynamic
+
+dev-shell: ## Interactive shell for debugging
+	@echo "$(CYAN)Opening interactive shell...$(RESET)"
+	docker run --rm -it \
+		-v $(PWD)/src:/app/src \
+		-v $(PWD)/data:/data \
+		--entrypoint /bin/bash \
+		montage-ai:dev
+
+# ============================================================================
+# GOLDEN PATH: CLUSTER DEPLOYMENT
+# ============================================================================
+
+cluster: cluster-build cluster-deploy ## Build + deploy to cluster (all-in-one)
+
+cluster-build: ## Build multi-arch with registry cache
+	@echo "$(CYAN)Building for cluster (multi-arch)...$(RESET)"
+	@echo "$(YELLOW)First build: 15-20 min | Incremental: ~2 min$(RESET)"
+	REGISTRY=$(CLUSTER_REGISTRY) TAG=$(IMAGE_TAG) PUSH=true ./scripts/build_with_cache.sh
+	@echo "$(GREEN)✓ Image pushed to registry$(RESET)"
+
+cluster-deploy: ## Deploy to Kubernetes cluster
+	@echo "$(CYAN)Deploying to cluster...$(RESET)"
+	kubectl set image deployment/montage-ai-worker \
+		montage-ai=$(CLUSTER_REGISTRY)/montage-ai:$(IMAGE_TAG) \
+		-n $(NAMESPACE)
+	kubectl rollout status deployment/montage-ai-worker -n $(NAMESPACE)
+	@echo "$(GREEN)✓ Deployment complete$(RESET)"
+
+# ============================================================================
+# MAINTENANCE
+# ============================================================================
+
+clean: ## Clean local caches and Docker resources
+	@echo "$(CYAN)Cleaning local caches...$(RESET)"
+	rm -rf $(CACHE_DIR)
+	docker buildx prune -f
+	@echo "$(GREEN)✓ Caches cleared$(RESET)"
+
+# ============================================================================
+# LEGACY COMMANDS (use golden path above)
+# ============================================================================
+
 build: ## Build Docker image for local architecture
-	@echo "$(CYAN)Building montage-ai (local arch, commit: $(GIT_COMMIT))...$(RESET)"
+	@echo "$(YELLOW)⚠ Legacy command. Use 'make dev' instead.$(RESET)"
 	docker build --build-arg GIT_COMMIT=$(GIT_COMMIT) -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
-build-multiarch: ## Build Docker image for amd64 and arm64
-	@echo "$(CYAN)Building montage-ai for linux/amd64,linux/arm64 (commit: $(GIT_COMMIT))...$(RESET)"
+build-multiarch: ## [LEGACY] Use 'make cluster' instead
+	@echo "$(YELLOW)⚠ Legacy command. Use 'make cluster' instead.$(RESET)"
 	docker buildx build --platform linux/amd64,linux/arm64 \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		--cache-from type=registry,ref=$(IMAGE_NAME):build-cache \
@@ -93,32 +141,31 @@ build-multiarch: ## Build Docker image for amd64 and arm64
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \
 		--push .
 
-build-amd64: ## Build Docker image for amd64 (cluster deployment)
-	@echo "$(CYAN)Building montage-ai for linux/amd64 (commit: $(GIT_COMMIT))...$(RESET)"
+build-amd64: ## [LEGACY] Use 'make cluster' instead
+	@echo "$(YELLOW)⚠ Legacy command. Use 'make cluster' instead.$(RESET)"
 	docker buildx build --platform linux/amd64 \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \
 		--load .
 
-run: build ## Run montage with default settings
-	@echo "$(CYAN)Running montage-ai...$(RESET)"
+run: build ## [LEGACY] Use 'make dev-test' instead
+	@echo "$(YELLOW)⚠ Legacy command. Use 'make dev-test' instead.$(RESET)"
 	./montage-ai.sh run
 
-preview: build ## Fast preview render
+preview: build ## [LEGACY] Use 'make dev-test' instead
+	@echo "$(YELLOW)⚠ Legacy command. Use 'make dev-test' instead.$(RESET)"
 	./montage-ai.sh preview
 
-hq: build ## High-quality render
+hq: build ## [LEGACY] Use 'make dev-test' instead
+	@echo "$(YELLOW)⚠ Legacy command. Use 'make dev-test' instead.$(RESET)"
 	./montage-ai.sh hq
 
-shell: ## Interactive shell in container
+shell: ## [LEGACY] Use 'make dev-shell' instead
+	@echo "$(YELLOW)⚠ Legacy command. Use 'make dev-shell' instead.$(RESET)"
 	docker compose run --rm --entrypoint /bin/bash montage-ai
 
-# ============================================================================
-# CLUSTER DEPLOYMENT
-# ============================================================================
-
-push: build-amd64 ## Push image to local registry
-	@echo "$(CYAN)Pushing to local registry $(REGISTRY)...$(RESET)"
+push: build-amd64 ## [LEGACY] Use 'make cluster' instead
+	@echo "$(YELLOW)⚠ Legacy command. Use 'make cluster' instead.$(RESET)"
 	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(REGISTRY)/montage-ai:$(IMAGE_TAG)
 	docker push $(REGISTRY)/montage-ai:$(IMAGE_TAG)
 

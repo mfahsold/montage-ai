@@ -1,4 +1,4 @@
-# Montage AI
+# Montage AI — Free AI Video Editor for Rough Cuts (Offline Descript Alternative)
 
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm--NC-purple.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -6,18 +6,29 @@
 
 > **We polish pixels, we don't generate them.**
 
-AI-powered rough cuts with beat-sync, story arcs, and NLE export. Local-first, privacy-first.
+Free, open-source AI video editor for rough cuts: beat-sync, story arcs, OTIO/EDL export. Offline Descript alternative that is local-first and privacy-first.
 
 ## Quick Start
 
+**Two workflows. No choices. [→ Read DX Guide](docs/DX.md)**
+
+### Local Development (5 sec feedback)
 ```bash
-git clone https://github.com/mfahsold/montage-ai.git
-cd montage-ai
-./montage-ai.sh web        # Web UI at http://localhost:5001
+make dev       # Build once
+make dev-test  # Code → test (instant)
 ```
 
-Or via CLI:
+### Cluster Deployment (2-15 min)
+```bash
+make cluster   # Build + push + deploy
+```
 
+### Or use Web UI
+```bash
+./montage-ai.sh web  # http://localhost:5001
+```
+
+### Or traditional CLI
 ```bash
 cp your_videos/*.mp4 data/input/
 cp your_music.mp3 data/music/
@@ -52,9 +63,12 @@ Or use natural language: `CREATIVE_PROMPT="90s skateboard vibe" ./montage-ai.sh 
 
 ## Documentation
 
+**Start here:** [DX Guide](docs/DX.md) — Golden Path (4 commands, 90% of work)
+
 - [Getting Started](docs/getting-started.md) — Installation & first montage
-- [Features](docs/features.md) — All capabilities explained
+- [Features](docs/features.md) — All capabilities
 - [Configuration](docs/configuration.md) — Environment variables
+- [Cluster Deployment](deploy/CLUSTER_WORKFLOW.md) — Multi-arch builds
 - [Competitive Analysis](docs/COMPETITIVE_ANALYSIS.md) — Market positioning
 
 ## License

@@ -24,6 +24,7 @@ from .ffmpeg_config import (
     PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_CRF, PREVIEW_PRESET,
     STANDARD_AUDIO_CODEC, STANDARD_AUDIO_BITRATE
 )
+from .core.hardware import get_best_hwaccel
 
 # Maximum preview duration in seconds (for speed)
 MAX_PREVIEW_DURATION = 30.0
@@ -34,6 +35,23 @@ class PreviewGenerator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.max_duration = max_duration
 
+    def _get_encoder_settings(self, encoder: str) -> List[str]:
+        """Get speed-optimized settings for the specific encoder."""
+        if "libx264" in encoder:
+            return ["-preset", PREVIEW_PRESET, "-tune", "zerolatency", "-crf", str(PREVIEW_CRF)]
+        elif "nvenc" in encoder:
+            # p1 is fastest (lowest quality), ull = ultra low latency
+            return ["-preset", "p1", "-tune", "ull", "-rc", "constqp", "-qp", str(PREVIEW_CRF)]
+        elif "vaapi" in encoder:
+            # VAAPI doesn't use -preset ultrafast usually
+            return ["-qp", str(PREVIEW_CRF)]
+        elif "videotoolbox" in encoder:
+            # 0-100, 60 is roughly CRF 23-28 range
+            return ["-realtime", "true", "-q:v", "60"]
+        else:
+            # Fallback for unknown encoders (e.g. qsv, nvmpi)
+            return []
+
     def generate_transcript_preview(self, source_path: str, segments: List[Tuple[float, float]], output_filename: str) -> str:
         """
         Generate a preview by concatenating kept segments.
@@ -43,6 +61,7 @@ class PreviewGenerator:
         - Uses multi-threading
         - Uses zerolatency tuning
         - Adds faststart flag for streaming
+        - Uses Hardware Acceleration if available
         
         Args:
             source_path: Path to source video.
@@ -73,6 +92,9 @@ class PreviewGenerator:
             # Fallback: at least first 5 seconds
             limited_segments = [(0, min(5.0, self.max_duration))]
         
+        # Detect hardware acceleration
+        hw_config = get_best_hwaccel()
+
         # Construct complex filter for trimming and concatenation
         filter_complex = ""
         
@@ -85,20 +107,32 @@ class PreviewGenerator:
         inputs = "".join([f"[v{i}][a{i}]" for i in range(len(limited_segments))])
         concat_part = f"{inputs}concat=n={len(limited_segments)}:v=1:a=1[outv][outa]"
         filter_complex += concat_part
+
+        # If VAAPI, we need to upload to GPU memory before encoding
+        if hw_config.hwupload_filter:
+             filter_complex = filter_complex.replace("[outv]", "[outv_sw]")
+             filter_complex += f";[outv_sw]{hw_config.hwupload_filter}[outv]"
         
-        cmd = build_ffmpeg_cmd([
+        cmd_args = [
             "-threads", "0",  # Use all available CPU cores
             "-i", source_path,
             "-filter_complex", filter_complex,
             "-map", "[outv]", "-map", "[outa]",
-            "-c:v", "libx264",
-            "-preset", PREVIEW_PRESET,  # ultrafast
-            "-tune", "zerolatency",  # Minimize latency
-            "-crf", str(PREVIEW_CRF),
+        ]
+
+        # Add encoder args (e.g. -c:v h264_nvenc)
+        cmd_args.extend(hw_config.encoder_args)
+
+        # Add optimized settings for the specific encoder
+        cmd_args.extend(self._get_encoder_settings(hw_config.encoder))
+
+        cmd_args.extend([
             "-c:a", STANDARD_AUDIO_CODEC, "-b:a", STANDARD_AUDIO_BITRATE,
             "-movflags", "+faststart",  # Enable streaming
             str(output_path)
         ])
+
+        cmd = build_ffmpeg_cmd(cmd_args)
         
         logger.info(f"Generating transcript preview ({len(limited_segments)} segments, max {self.max_duration}s): {output_path}")
         try:
@@ -178,19 +212,29 @@ class PreviewGenerator:
                     f"scale={PREVIEW_HEIGHT*9//16}:{PREVIEW_HEIGHT}"
                 )
             
-            cmd = build_ffmpeg_cmd([
+            # Detect hardware acceleration
+            hw_config = get_best_hwaccel()
+
+            cmd_args = [
                 "-threads", "0",  # Use all available cores
                 "-t", str(self.max_duration),  # Limit preview duration
                 "-i", source_path,
                 "-vf", crop_filter,
-                "-c:v", "libx264",
-                "-preset", PREVIEW_PRESET,
-                "-tune", "zerolatency",
-                "-crf", str(PREVIEW_CRF),
+            ]
+
+            # Add encoder args (e.g. -c:v h264_nvenc)
+            cmd_args.extend(hw_config.encoder_args)
+
+            # Add optimized settings for the specific encoder
+            cmd_args.extend(self._get_encoder_settings(hw_config.encoder))
+
+            cmd_args.extend([
                 "-c:a", STANDARD_AUDIO_CODEC, "-b:a", STANDARD_AUDIO_BITRATE,
                 "-movflags", "+faststart",
                 str(output_path)
             ])
+
+            cmd = build_ffmpeg_cmd(cmd_args)
             
             logger.info(f"Generating shorts preview (max {self.max_duration}s): {output_path}")
             subprocess.run(cmd, check=True, capture_output=True, timeout=60)

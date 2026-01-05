@@ -1,53 +1,67 @@
-# Documentation
+# Montage AI Documentation
 
-Welcome to Montage AI documentation.
+> **We polish pixels, we don't generate them.**
 
-> **Montage AI** is the free, open-source, privacy-first AI rough-cut tool for creators and professionals.
-> 
-> Drop your clips + music → Beat-synced edit → Professional NLE handoff (OTIO/EDL).
-> 
-> **Cost:** Free (OSS) | **Privacy:** 100% local | **Interop:** OTIO-native
+Free, open-source, privacy-first AI rough-cut tool for creators and professionals.
 
 ---
 
-## Quick Links (First Time Here?)
+## 🚀 Start Here
 
-- 🚀 **[Getting Started](getting-started.md)** — Install and create your first montage in 5 minutes
-- 🎯 **[Features Overview](features.md)** — Transcript Editor, Shorts Studio, Quality Profiles, Pro Handoff
-- 📖 **[Full Architecture](architecture.md)** — How the system works under the hood
-- 🤔 **[Why Montage AI?](../docs/COMPETITIVE_ANALYSIS.md)** — How we compare to Descript, Adobe, Opus Clip
-- 💼 **[Business Plan](../docs/BUSINESS_PLAN.md)** — For investors and enterprise partners
+**[DX Guide](DX.md)** - The Golden Path  
+Two workflows. Four commands. 90% of your work.
 
----
-
-## For Users
-
-| Doc | Description |
-|-----|-------------|
-| [Getting Started](getting-started.md) | Installation, first montage, Web UI & CLI |
-| [Configuration](configuration.md) | All environment variables explained |
-| [Features](features.md) | Styles, Creative Loop, enhancements, timeline export |
-| [Responsible AI](responsible_ai.md) | Transparency, data handling, OSS-first policy |
-| [Troubleshooting](troubleshooting.md) | Common issues and fixes |
+```bash
+make dev       # Local development (5 sec feedback)
+make cluster   # Cluster deployment (2-15 min)
+```
 
 ---
 
-## For Decision Makers
+## 📚 Documentation Index
 
-| Doc | Description |
-|-----|-------------|
-| [Competitive Analysis](COMPETITIVE_ANALYSIS.md) | How we compare to Descript, Adobe, Opus Clip (with scoring) |
-| [Business Plan](BUSINESS_PLAN.md) | Market fit, revenue model, financials, investor thesis |
-| [Strategic Roadmap](STRATEGY.md) | Q1-Q4 2026 priorities, market positioning, consolidation plan |
-| [Marketing Playbook](MARKETING_PLAYBOOK.md) | LinkedIn, Twitter, Product Hunt, email templates |
+### For Users
+- **[Getting Started](getting-started.md)** - Installation & first montage
+- **[Features](features.md)** - What Montage AI can do
+- **[Configuration](configuration.md)** - Environment variables
+
+### For Developers
+- **[DX Guide](DX.md)** - Development workflow ⭐ Start here!
+- **[Architecture](architecture.md)** - System design
+- **[LLM Agents](llm-agents.md)** - AI coding guidelines
+- **[Descript Alternative (Offline)](blog/descript-alternative.md)** - SEO landing & positioning
+
+### For Operators
+- **[Cluster Workflow](../deploy/CLUSTER_WORKFLOW.md)** - Kubernetes
+- **[Troubleshooting](troubleshooting.md)** - Common issues
+
+### Strategy
+- **[Competitive Analysis](COMPETITIVE_ANALYSIS.md)** - Market position
+- **[Strategy](STRATEGY.md)** - Product vision
+- **[Marketing Playbook](MARKETING_PLAYBOOK.md)** - GTM strategy
 
 ---
 
-## For Developers
+## 🎯 Quick Navigation
 
-| Doc | Description |
-|-----|-------------|
-| [Architecture](architecture.md) | System design, three-stage pipeline, module overview |
+| I want to... | Read this |
+|--------------|-----------|
+| **Get started** | [Getting Started](getting-started.md) |
+| **Develop locally** | [DX Guide](DX.md) |
+| **Deploy to cluster** | [DX Guide](DX.md) |
+| **Understand internals** | [Architecture](architecture.md) |
+| **See all features** | [Features](features.md) |
+| **Fix an error** | [Troubleshooting](troubleshooting.md) |
+
+---
+
+**Archive:** [archive/](archive/) - Historical docs
+
+**Principles:**
+1. DX.md is the starting point
+2. Each doc has one clear purpose
+3. Examples over theory
+4. Archive, don't delete
 | [Algorithms](algorithms.md) | Beat detection, scene analysis, clip selection |
 | [AI Director](AI_DIRECTOR.md) | LLM prompt interpretation and fallback chain |
 | [Models](models.md) | AI/ML libraries used and why |

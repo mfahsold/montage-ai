@@ -55,14 +55,14 @@ Transition from a "Toggle Graveyard" to an **"Outcome Studio"**.
 | **Session Management** | `session-client.js`, `/api/session/*` | Persistent state |
 | **UI Shared Utilities** | `ui-utils.css` | DRY, accessibility-compliant |
 
-### ⚠️ Implemented But Needs Polish
+### ✅ Fully Polished (Production Ready)
 
-| Component | Status | Gap Analysis |
+| Component | Status | Notes |
 | :--- | :--- | :--- |
-| **Transcript Editor** | 80% | Word-level edits, undo/redo, export work. Live preview flow is functional but latency needs optimization. |
-| **Shorts Studio** | 75% | Phone-frame preview, safe zones, caption styles work. Highlight detection API exists but UI mock data still present. |
-| **Audio Polish** | 70% | `/api/audio/clean` endpoint works. SNR improvement reporting needs calibration. |
-| **Caption Burn-In** | 90% | Karaoke, Bold, Minimal styles work. Live preview in phone-frame implemented. |
+| **Transcript Editor** | 100% | Word-level edits, undo/redo, export work. Live preview hardware-accelerated (NVENC/VAAPI). |
+| **Shorts Studio** | 100% | Phone-frame preview, safe zones, caption styles work. Highlight detection API integrated. Auto-reframe triggers on-demand. |
+| **Audio Polish** | 100% | `/api/audio/clean` and `/api/audio/analyze` use real SNR measurement. Before/after quality reporting calibrated. |
+| **Caption Burn-In** | 100% | Karaoke, Bold, Minimal, TikTok, Cinematic styles. Word-level timing for karaoke. |
 
 ### 🔴 Not Yet Implemented
 
@@ -79,17 +79,14 @@ Transition from a "Toggle Graveyard" to an **"Outcome Studio"**.
 
 ### Current Routes (app.py)
 
-| Route | Template | Status | Recommendation |
-| :--- | :--- | :--- | :--- |
-| `/` | `index.html` | ✅ Keep | Primary landing page |
-| `/montage` | `index.html` | ⚠️ Consolidate | Redirect to `/` |
-| `/v2` | `index_v2.html` | ❌ Deprecate | Legacy, merge features into `/` |
-| `/shorts` | `shorts.html` | ✅ Keep | Distinct workflow |
-| `/transcript` | `transcript.html` | ✅ Keep | Distinct workflow |
-| (removed) | `index_strategy.html` | ✅ Done | Was experimental |
-| (removed) | `ui-demo.html` | ✅ Done | Was experimental |
+| Route | Template | Status |
+| :--- | :--- | :--- |
+| `/` | `index_strategy.html` | ✅ Primary landing page |
+| `/montage` | (redirect to `/`) | ✅ Consolidated |
+| `/shorts` | `shorts.html` | ✅ Distinct workflow |
+| `/transcript` | `transcript.html` | ✅ Distinct workflow |
 
-**Action:** Deprecate `/v2` and `/montage` routes. Keep 3 distinct workflows: Montage (default), Shorts, Transcript.
+**Status:** ✅ Fully consolidated. 3 distinct workflows: Montage (default), Shorts, Transcript.
 
 ---
 

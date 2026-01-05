@@ -69,14 +69,12 @@ RUN conda install -y -c conda-forge \
     numba=0.60.0 \
     numpy=1.26.4 \
     scipy \
-    wget && \ - invalidates only when requirements change)
+    wget && \
+    conda clean -afy
+
 COPY requirements.txt .
 
 # Install pip dependencies (no-cache-dir to keep image small, but layer is cached by BuildKit)
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip list > /tmp/installed_package
-
-# Install pip dependencies using pip (uv not available in conda image)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # -----------------------------------------------------------------------------
