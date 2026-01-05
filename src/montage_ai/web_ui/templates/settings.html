@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Voxel Studio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <span>MONTAGE</span> AI
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">DASHBOARD</a>
+            <a href="/montage" class="nav-link">CREATOR</a>
+            <a href="/gallery" class="nav-link">GALLERY</a>
+            <a href="/settings" class="nav-link active">SETTINGS</a>
+        </div>
+    </nav>
+
+    <div class="container voxel-container">
+        <div class="mb-8">
+            <h1 class="voxel-title">SETTINGS</h1>
+            <p class="text-xs text-muted">SYSTEM CONFIGURATION AND AI PARAMETERS.</p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4">
+            <div class="voxel-card">
+                <h3 class="mb-2">HARDWARE ACCELERATION</h3>
+                <p class="text-xs text-muted mb-4">Configure how the system utilizes your GPU for rendering and AI inference.</p>
+                <div class="flex justify-between items-center p-4 border border-muted mb-4">
+                    <div>
+                        <div class="text-sm font-bold">GPU ENCODING</div>
+                        <div class="text-xs text-muted">Intel QSV / NVIDIA NVENC / Apple Silicon</div>
+                    </div>
+                    <div class="voxel-badge voxel-badge-primary">ENABLED</div>
+                </div>
+            </div>
+
+            <div class="voxel-card">
+                <h3 class="mb-2">AI MODELS</h3>
+                <p class="text-xs text-muted mb-4">Active LLM and Vision models used for scene analysis and creative direction.</p>
+                <div class="flex justify-between items-center p-4 border border-muted mb-4">
+                    <div>
+                        <div class="text-sm font-bold">CREATIVE DIRECTOR</div>
+                        <div class="text-xs text-muted">Gemini 1.5 Flash (Cloud)</div>
+                    </div>
+                    <div class="voxel-badge voxel-badge-secondary">CONNECTED</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

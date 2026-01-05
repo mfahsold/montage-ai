@@ -5,9 +5,9 @@ import re
 import json
 from datetime import datetime
 from pathlib import Path
-from src.montage_ai.core.job_store import JobStore
-from src.montage_ai.env_mapper import map_options_to_env
-from src.montage_ai.config import get_settings
+from montage_ai.core.job_store import JobStore
+from montage_ai.env_mapper import map_options_to_env
+from montage_ai.config import get_settings
 
 # We need to know paths.
 settings = get_settings()

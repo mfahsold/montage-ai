@@ -213,6 +213,18 @@ def transcript_editor():
     return render_template('transcript.html', version=VERSION)
 
 
+@app.route('/gallery')
+def gallery():
+    """Gallery - view completed projects."""
+    return render_template('gallery.html', version=VERSION)
+
+
+@app.route('/settings')
+def settings():
+    """Settings - system configuration."""
+    return render_template('settings.html', version=VERSION)
+
+
 @app.route('/api/status')
 def api_status():
     """API health check with system stats."""

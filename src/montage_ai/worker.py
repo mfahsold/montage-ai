@@ -1,7 +1,7 @@
 import os
 import redis
 from rq import Worker, Queue, Connection
-from src.montage_ai.config import get_settings
+from montage_ai.config import get_settings
 
 listen = ['default']
 

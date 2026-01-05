@@ -33,9 +33,6 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then         echo "Downloading Real-ESRGAN f
 # Copy application code
 COPY . .
 
-# Install the package
-RUN pip install .
-
 # Expose port for web UI
 EXPOSE 5000
 

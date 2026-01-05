@@ -3,7 +3,7 @@ import redis
 import os
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from src.montage_ai.config import get_settings
+from montage_ai.config import get_settings
 
 class JobStore:
     def __init__(self):

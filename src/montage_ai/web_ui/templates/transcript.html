@@ -4,12 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Montage AI - Transcript Editor</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='elegant.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='ui-utils.css') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
     <style>
         .editor-container {
             display: grid;
@@ -129,56 +124,56 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo-container">
-                <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="4" fill="none"/>
-                    <circle cx="32" cy="14" r="4" fill="currentColor"/>
-                    <circle cx="32" cy="50" r="4" fill="currentColor"/>
-                    <circle cx="14" cy="32" r="4" fill="currentColor"/>
-                    <circle cx="50" cy="32" r="4" fill="currentColor"/>
-                    <rect x="24" y="24" width="16" height="16" fill="currentColor"/>
-                </svg>
-                <div class="logo-text">
-                    <h1>Montage<span class="logo-ai">AI</span></h1>
-                    <p class="subtitle">// TRANSCRIPT_EDITOR // v{{ version }}</p>
-                </div>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <span>MONTAGE</span> AI
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">DASHBOARD</a>
+            <a href="/montage" class="nav-link">CREATOR</a>
+            <a href="/gallery" class="nav-link">GALLERY</a>
+            <a href="/settings" class="nav-link">SETTINGS</a>
+        </div>
+    </nav>
+
+    <div class="container voxel-container">
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="voxel-title">TRANSCRIPT EDITOR</h1>
+                <p class="text-xs text-muted">TEXT-BASED VIDEO EDITING // AI TRANSCRIPTION.</p>
             </div>
-            <div class="version-badge">SYS.READY</div>
-        </header>
+            <div class="flex gap-4">
+                <div class="voxel-badge voxel-badge-primary">SYSTEM ONLINE</div>
+                <div class="voxel-badge voxel-badge-secondary">GPU READY</div>
+            </div>
+        </div>
 
-        <nav class="nav-bar voxel-card nav-inline">
-            <a href="/" class="btn btn-secondary link-clean">🏠 Montage Wizard</a>
-            <a href="/transcript" class="btn btn-primary link-clean">📝 Transcript Editor</a>
-            <a href="/shorts" class="btn btn-secondary link-clean">📱 Shorts Studio</a>
-        </nav>
+        <div class="voxel-card mb-8 flex items-center gap-4">
+            <div class="flex-1">
+                <h3 class="mb-1">TEXT-BASED EDITING</h3>
+                <p class="text-xs text-muted">Edit your video by editing the text. Delete words to cut the video, or use the "Remove Fillers" button to automatically clean up "umms" and "ahhs".</p>
+            </div>
+            <div class="flex gap-2">
+                <input type="file" id="videoInput" accept="video/*" style="display:none" onchange="loadVideo(this)">
+                <button class="voxel-btn voxel-btn-secondary" onclick="document.getElementById('videoInput').click()">
+                    📹 SELECT VIDEO
+                </button>
+                <button id="removeFillersBtn" class="voxel-btn voxel-btn-primary">
+                    ✨ REMOVE FILLERS
+                </button>
+            </div>
+        </div>
 
-        <div class="toolbar">
-            <input type="file" id="videoInput" accept="video/*" class="hidden-input" aria-label="Select video for transcript" onchange="loadVideo(this)">
-            <button class="voxel-btn voxel-btn-secondary" onclick="document.getElementById('videoInput').click()">
-                📹 Select Video
-            </button>
-            <span id="currentFilename" class="text-faint-sm ml-05"></span>
-            
+        <div class="toolbar mb-4 flex gap-2 items-center">
+            <span id="currentFilename" class="text-xs text-muted"></span>
             <div class="flex-1"></div>
-
-            <button id="removeFillersBtn" class="voxel-btn">Remove Fillers</button>
-            <button id="undoBtn" class="voxel-btn" disabled>Undo</button>
-            <button id="redoBtn" class="voxel-btn" disabled>Redo</button>
-            <button id="saveEditsBtn" class="voxel-btn">Save Edits</button>
-            <label class="checkbox-inline">
-                <input type="checkbox" id="autoPreviewCheck" checked> Auto-Preview
+            <button id="undoBtn" class="voxel-btn text-xs" disabled>UNDO</button>
+            <button id="redoBtn" class="voxel-btn text-xs" disabled>REDO</button>
+            <button id="saveEditsBtn" class="voxel-btn text-xs">SAVE</button>
+            <label class="flex items-center gap-2 cursor-pointer text-xs">
+                <input type="checkbox" id="autoPreviewCheck" class="voxel-checkbox" checked> AUTO-PREVIEW
             </label>
-            <div class="dropdown">
-                <button id="exportBtn" class="voxel-btn">Export ▾</button>
-                <div id="exportMenu" class="dropdown-content">
-                    <a href="#" onclick="exportProject('video')">Video (MP4)</a>
-                    <a href="#" onclick="exportProject('edl')">EDL (Premiere)</a>
-                    <a href="#" onclick="exportProject('otio')">OTIO (Resolve)</a>
-                </div>
-            </div>
-            <button id="previewBtn" class="voxel-btn btn-primary">Generate Preview</button>
+            <button id="previewBtn" class="voxel-btn voxel-btn-primary text-xs">GENERATE PREVIEW</button>
         </div>
 
         <div class="editor-container">

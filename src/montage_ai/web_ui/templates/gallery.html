@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery - Voxel Studio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <span>MONTAGE</span> AI
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">DASHBOARD</a>
+            <a href="/montage" class="nav-link">CREATOR</a>
+            <a href="/gallery" class="nav-link active">GALLERY</a>
+            <a href="/settings" class="nav-link">SETTINGS</a>
+        </div>
+    </nav>
+
+    <div class="container voxel-container">
+        <div class="mb-8">
+            <h1 class="voxel-title">GALLERY</h1>
+            <p class="text-xs text-muted">ARCHIVE OF COMPLETED AI-DIRECTED MASTERPIECES.</p>
+        </div>
+
+        <div class="voxel-card text-center py-12">
+            <h3 class="text-muted mb-4">NO VIDEOS FOUND</h3>
+            <p class="text-xs text-muted mb-8">The vault is empty. Start a new project to see your AI-polished footage here.</p>
+            <a href="/montage" class="voxel-btn voxel-btn-primary">CREATE NEW MONTAGE</a>
+        </div>
+    </div>
+</body>
+</html>

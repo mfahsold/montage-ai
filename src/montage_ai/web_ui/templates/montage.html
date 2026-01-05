@@ -30,7 +30,8 @@
             <div class="voxel-card">
                 <form action="/api/jobs" method="POST" id="montageForm">
                     <div class="mb-8">
-                        <h3 class="mb-4">1. STYLE</h3>
+                        <h3 class="mb-1">1. STYLE</h3>
+                        <p class="text-xs text-muted mb-4">Select the editing rhythm and visual language.</p>
                         <div class="grid grid-cols-2 gap-2">
                             <label class="voxel-btn text-sm" style="text-align: center;">
                                 <input type="radio" name="style" value="dynamic" checked style="display:none" onchange="selectStyle(this)">
@@ -52,24 +53,35 @@
                     </div>
 
                     <div class="mb-8">
-                        <h3 class="mb-4">2. DIRECTOR'S PROMPT</h3>
+                        <h3 class="mb-1">2. DIRECTOR'S PROMPT</h3>
+                        <p class="text-xs text-muted mb-4">Guide the AI with natural language instructions.</p>
                         <textarea class="voxel-input" name="prompt" rows="4" placeholder="Describe the vibe (e.g., 'High energy skate video with fast cuts on the beat')..."></textarea>
                     </div>
 
                     <div class="mb-8">
-                        <h3 class="mb-4">3. OPTIONS</h3>
+                        <h3 class="mb-1">3. OPTIONS</h3>
+                        <p class="text-xs text-muted mb-4">Additional AI processing steps.</p>
                         <div class="flex flex-col gap-2">
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" name="upscale" class="voxel-checkbox">
-                                <span>AI Upscale (4K)</span>
+                                <div class="flex flex-col">
+                                    <span class="text-sm">AI UPSCALE (4K)</span>
+                                    <span class="text-xs text-muted">Enhance resolution using Real-ESRGAN.</span>
+                                </div>
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" name="stabilize" class="voxel-checkbox" checked>
-                                <span>Stabilize Footage</span>
+                                <div class="flex flex-col">
+                                    <span class="text-sm">STABILIZE FOOTAGE</span>
+                                    <span class="text-xs text-muted">Remove camera shake via vid.stab.</span>
+                                </div>
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" name="auto_reframe" class="voxel-checkbox">
-                                <span>Auto-Reframe (9:16)</span>
+                                <div class="flex flex-col">
+                                    <span class="text-sm">AUTO-REFRAME (9:16)</span>
+                                    <span class="text-xs text-muted">Smart crop for vertical social media.</span>
+                                </div>
                             </label>
                         </div>
                     </div>

@@ -1,67 +1,70 @@
 /* Montage AI - Voxel Dark Mode Theme */
 /* Inspired by Pxltshirt / Nightfly Studio */
 
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
 :root {
-  /* Dark Mode Palette */
+  /* --- COLOR SYSTEM --- */
   --background: #050505;
   --foreground: #e0e0e0;
   
-  --card: #121212;
+  --card: #0d0d0d;
   --card-foreground: #e0e0e0;
   
-  --popover: #121212;
-  --popover-foreground: #e0e0e0;
-  
-  --primary: #0044cc; /* Klein Blue adapted */
+  --primary: #0055ff; /* Electric Blue */
+  --primary-muted: #002266;
   --primary-foreground: #ffffff;
   
-  --secondary: #ff4d00; /* Safety Orange */
+  --secondary: #ff5500; /* Neon Orange */
+  --secondary-muted: #662200;
   --secondary-foreground: #ffffff;
   
-  --muted: #2a2a2a;
-  --muted-foreground: #a0a0a0;
+  --muted: #1a1a1a;
+  --muted-foreground: #888888;
   
-  --accent: #2a2a2a;
+  --accent: #222222;
   --accent-foreground: #ffffff;
   
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  --border: #222222;
+  --border-bright: #444444;
+  --input: #0a0a0a;
   
-  --border: #333333;
-  --input: #1a1a1a;
-  --ring: #0044cc;
+  --success: #00ff88;
+  --warning: #ffcc00;
+  --destructive: #ff3333;
   
   --radius: 0px; /* Hard edges for Voxel look */
   
-  /* Shadows */
+  /* --- TYPOGRAPHY SYSTEM --- */
+  --font-main: 'Share Tech Mono', monospace;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  
+  /* --- SHADOWS & EFFECTS --- */
   --shadow-voxel-sm: 2px 2px 0px 0px var(--border);
   --shadow-voxel: 4px 4px 0px 0px var(--border);
-  --shadow-voxel-hover: 6px 6px 0px 0px var(--primary);
-  --shadow-voxel-active: 2px 2px 0px 0px var(--primary);
-  
-  /* Fonts */
-  --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Courier New', monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --shadow-voxel-hover: 4px 4px 0px 0px var(--primary);
+  --shadow-voxel-active: 1px 1px 0px 0px var(--primary);
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-mono);
+  font-family: var(--font-main);
   margin: 0;
   padding: 0;
   overflow-x: hidden;
-  /* Scanline effect */
-  background-image: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 254, 0.03));
-  background-size: 100% 4px, 3px 100%;
-}
+  line-height: 1.6;
+  
   /* Dark Grid Pattern */
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 40px 40px;
-  margin: 0;
-  line-height: 1.5;
 }
 
 /* Layout Utilities */
@@ -98,35 +101,36 @@ body {
 
 /* Typography */
 .voxel-title {
-  font-size: 3.5rem;
+  font-size: var(--font-size-2xl);
   font-weight: 900;
-  letter-spacing: -3px;
+  letter-spacing: -1px;
   text-transform: uppercase;
   margin: 0;
   color: var(--primary);
-  text-shadow: 4px 4px 0px var(--secondary);
+  text-shadow: 2px 2px 0px var(--secondary);
   line-height: 1;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-sans);
+  font-family: var(--font-main);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   margin-top: 0;
 }
 
-h1 { font-size: 2.5rem; line-height: 1.2; }
-h2 { font-size: 2rem; line-height: 1.2; }
-h3 { font-size: 1.5rem; line-height: 1.2; }
+h1 { font-size: var(--font-size-xl); line-height: 1.2; }
+h2 { font-size: var(--font-size-lg); line-height: 1.2; }
+h3 { font-size: var(--font-size-base); line-height: 1.2; }
 
 .text-primary { color: var(--primary); }
 .text-secondary { color: var(--secondary); }
 .text-muted { color: var(--muted-foreground); }
-.text-sm { font-size: 0.875rem; }
-.text-xs { font-size: 0.75rem; }
-.font-mono { font-family: var(--font-mono); }
+.text-sm { font-size: var(--font-size-sm); }
+.text-xs { font-size: var(--font-size-xs); }
 .uppercase { text-transform: uppercase; }
-.tracking-wider { letter-spacing: 0.05em; }
+.tracking-wider { letter-spacing: 0.1em; }
+.font-bold { font-weight: 700; }
 
 /* Components */
 
@@ -552,3 +556,119 @@ hr {
   background: var(--secondary);
   color: var(--secondary-foreground);
 }
+
+/* Voxel Inputs */
+.voxel-input {
+  width: 100%;
+  background-color: var(--input);
+  border: 2px solid var(--border);
+  color: var(--foreground);
+  padding: 0.75rem;
+  font-family: var(--font-main);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-voxel-sm);
+  outline: none;
+  transition: border-color 0.1s steps(2);
+}
+
+.voxel-input:focus {
+  border-color: var(--primary);
+}
+
+/* Voxel Checkbox */
+.voxel-checkbox {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  background-color: var(--input);
+  cursor: pointer;
+  position: relative;
+  box-shadow: 2px 2px 0px 0px var(--border);
+}
+
+.voxel-checkbox:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.voxel-checkbox:checked::after {
+  content: 'X';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* Progress Bar */
+.progress-container {
+  width: 100%;
+  height: 12px;
+  background-color: var(--muted);
+  border: 2px solid var(--border);
+  box-shadow: 2px 2px 0px 0px var(--border);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: var(--primary);
+  transition: width 0.3s ease;
+}
+
+/* Navbar */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: var(--card);
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 2rem;
+}
+
+.nav-brand {
+  font-size: var(--font-size-lg);
+  font-weight: 900;
+  text-decoration: none;
+  color: var(--foreground);
+}
+
+.nav-brand span {
+  color: var(--primary);
+}
+
+.nav-links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  transition: color 0.1s steps(2);
+}
+
+.nav-link:hover, .nav-link.active {
+  color: var(--primary);
+}
+
+/* Utilities */
+.text-muted { color: var(--muted-foreground); }
+.text-xs { font-size: var(--font-size-xs); }
+.text-sm { font-size: var(--font-size-sm); }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-8 { margin-bottom: 2rem; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }

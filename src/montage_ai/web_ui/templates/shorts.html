@@ -423,35 +423,36 @@
         }
     </style>
 </head>
-<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <span>MONTAGE</span> AI
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">DASHBOARD</a>
+            <a href="/montage" class="nav-link">CREATOR</a>
+            <a href="/gallery" class="nav-link">GALLERY</a>
+            <a href="/settings" class="nav-link">SETTINGS</a>
+        </div>
+    </nav>
+
     <div class="container voxel-container">
-        <header class="mb-8">
-            <div class="logo-container">
-                <a href="/" class="link-clean flex-row">
-                    <div class="logo-text">
-                        <h1 class="voxel-title">MONTAGE AI</h1>
-                        <p class="text-muted">// SHORTS_STUDIO // 9:16 Creator</p>
-                    </div>
-                </a>
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="voxel-title">SHORTS STUDIO</h1>
+                <p class="text-xs text-muted">AI-POWERED VERTICAL VIDEO CREATOR // 9:16 OPTIMIZATION.</p>
             </div>
             <div class="flex gap-4">
                 <div class="voxel-badge voxel-badge-primary">SYSTEM ONLINE</div>
+                <div class="voxel-badge voxel-badge-secondary">GPU READY</div>
             </div>
-        </header>
-
-        <!-- Navigation Bar -->
-        <nav class="nav-inline mb-8 flex gap-4">
-            <a href="/" class="voxel-btn voxel-btn-secondary link-clean">🏠 DASHBOARD</a>
-            <a href="/transcript" class="voxel-btn voxel-btn-secondary link-clean">📝 TRANSCRIPT</a>
-            <a href="/shorts" class="voxel-btn voxel-btn-primary link-clean">📱 SHORTS</a>
-        </nav>
+        </div>
 
         <section class="voxel-card mb-8">
             <div class="flex items-center gap-4">
                 <span class="icon-xl">📱</span>
                 <div>
-                    <h2 class="text-primary">SHORTS STUDIO</h2>
-                    <p class="text-muted">Create vertical videos for TikTok, Reels, and Shorts. Smart reframing keeps subjects in frame.</p>
+                    <h2 class="text-primary">VERTICAL OPTIMIZATION</h2>
+                    <p class="text-xs text-muted">Transform horizontal footage into high-impact vertical content. Our AI automatically tracks subjects and detects highlights to ensure your message fits the frame.</p>
                 </div>
             </div>
         </section>
@@ -460,69 +461,84 @@
             <!-- Left Panel: Settings -->
             <div class="voxel-card settings-panel">
                 <div class="settings-group">
-                    <h3>🎯 Reframe Mode</h3>
+                    <h3 class="mb-1">🎯 REFRAME MODE</h3>
+                    <p class="text-xs text-muted mb-4">Choose how the AI crops your video.</p>
                     <div class="reframe-modes">
                         <button class="voxel-btn selected" onclick="selectReframe('auto')" data-mode="auto">
                             <span class="icon">🤖</span>
-                            <span class="label">Auto (AI)</span>
+                            <span class="label">AUTO (AI)</span>
                         </button>
                         <button class="voxel-btn" onclick="selectReframe('face')" data-mode="face">
                             <span class="icon">👤</span>
-                            <span class="label">Face Track</span>
+                            <span class="label">FACE TRACK</span>
                         </button>
                         <button class="voxel-btn" onclick="selectReframe('center')" data-mode="center">
                             <span class="icon">⬛</span>
-                            <span class="label">Center</span>
+                            <span class="label">CENTER</span>
                         </button>
                         <button class="voxel-btn" onclick="selectReframe('manual')" data-mode="manual">
                             <span class="icon">✋</span>
-                            <span class="label">Manual</span>
+                            <span class="label">MANUAL</span>
                         </button>
                         <button class="voxel-btn" onclick="visualizeReframing()" id="visualizeBtn">
                             <span class="icon">👁️</span>
-                            <span class="label">Overlay</span>
+                            <span class="label">OVERLAY</span>
                         </button>
                         <button class="voxel-btn" onclick="generatePreviewVideo()" id="renderPreviewBtn">
                             <span class="icon">▶️</span>
-                            <span class="label">Render Preview</span>
+                            <span class="label">RENDER</span>
                         </button>
                     </div>
                 </div>
 
                 <div class="settings-group">
-                    <h3>💬 Caption Style</h3>
+                    <h3 class="mb-1">💬 CAPTION STYLE</h3>
+                    <p class="text-xs text-muted mb-4">Visual style for burned-in subtitles.</p>
                     <div class="caption-styles">
                         <button class="voxel-btn style-default selected" onclick="selectCaptionStyle('default')">
-                            Default
+                            DEFAULT
                         </button>
                         <button class="voxel-btn style-bold" onclick="selectCaptionStyle('bold')">
-                            Bold
+                            BOLD
                         </button>
                         <button class="voxel-btn style-minimal" onclick="selectCaptionStyle('minimal')">
-                            Minimal
+                            MINIMAL
                         </button>
                         <button class="voxel-btn style-gradient" onclick="selectCaptionStyle('gradient')">
-                            Gradient
+                            GRADIENT
                         </button>
                     </div>
                 </div>
 
                 <div class="settings-group">
-                    <h3>⚙️ Options</h3>
+                    <h3 class="mb-1">⚙️ OPTIONS</h3>
+                    <p class="text-xs text-muted mb-4">Additional processing steps.</p>
                     <div class="toggle-row">
-                        <span class="toggle-label">Show Safe Zones</span>
+                        <div class="flex flex-col">
+                            <span class="toggle-label">SAFE ZONES</span>
+                            <span class="text-xs text-muted">Show UI overlays.</span>
+                        </div>
                         <div class="toggle-switch active" onclick="toggleSafeZones(this)" id="safeZonesToggle"></div>
                     </div>
                     <div class="toggle-row">
-                        <span class="toggle-label">Auto Captions</span>
+                        <div class="flex flex-col">
+                            <span class="toggle-label">AUTO CAPTIONS</span>
+                            <span class="text-xs text-muted">AI transcription.</span>
+                        </div>
                         <div class="toggle-switch active" onclick="toggleCaptions(this)" id="captionsToggle"></div>
                     </div>
                     <div class="toggle-row">
-                        <span class="toggle-label">Detect Highlights</span>
+                        <div class="flex flex-col">
+                            <span class="toggle-label">HIGHLIGHTS</span>
+                            <span class="text-xs text-muted">Find viral moments.</span>
+                        </div>
                         <div class="toggle-switch" onclick="toggleHighlights(this)" id="highlightsToggle"></div>
                     </div>
                     <div class="toggle-row">
-                        <span class="toggle-label">Clean Audio</span>
+                        <div class="flex flex-col">
+                            <span class="toggle-label">CLEAN AUDIO</span>
+                            <span class="text-xs text-muted">Remove background noise.</span>
+                        </div>
                         <div class="toggle-switch" onclick="toggleCleanAudio(this)" id="cleanAudioToggle"></div>
                     </div>
                 </div>
