@@ -30,8 +30,15 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.package-data]
-"montage_ai" = ["styles/*.json"]
+"montage_ai" = [
+    "styles/*.json",
+    "web_ui/templates/*.html",
+    "web_ui/static/**/*"
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "montage_ai._version.VERSION"}  # Fallback, actual version from GIT_COMMIT env

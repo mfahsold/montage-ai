@@ -2,17 +2,18 @@
 FROM python:3.10-slim-bookworm
 
 # Install system dependencies
-# ffmpeg: for video processing
-# libsndfile1: for audio analysis (librosa)
-# libgl1: for opencv
-# curl, unzip: for downloading assets
-# build-essential: for compiling some python packages
-RUN apt-get update && apt-get install -y --no-install-recommends     ffmpeg     libsndfile1     libgl1     curl     unzip     build-essential     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    libgl1 \
+    curl \
+    unzip \
+    build-essential \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install cgpu CLI
-# Note: nodejs is not installed in python-slim by default.
-# We need to install nodejs first if we want npm.
-RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm && rm -rf /var/lib/apt/lists/*
 RUN npm install -g cgpu@latest
 
 WORKDIR /app
@@ -32,6 +33,9 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then         echo "Downloading Real-ESRGAN f
 # Copy application code
 COPY . .
 
+# Install the package
+RUN pip install .
+
 # Expose port for web UI
 EXPOSE 5000
 
@@ -39,5 +43,9 @@ EXPOSE 5000
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=src/montage_ai/web_ui/app.py
 
+# Set PYTHONPATH to include the source directory
+ENV PYTHONPATH=/app/src
+
 # Default command
-CMD ["./montage-ai.sh", "web"]
+WORKDIR /app/src
+CMD ["sh", "-c", "../montage-ai.sh cgpu-start && python3 -m montage_ai.web_ui.app"]

@@ -16,6 +16,11 @@ This list contains tasks that require manual intervention, access to external sy
 - [ ] **Finalize Terms of Service**: Update the website with a proper ToS that covers the "Source Available" license and Cloud usage.
 - [ ] **Privacy Policy**: Update to include data handling for Cloud GPU offloading (what data is sent, how long it's stored).
 
-## 4. Marketing & Launch (Priority: Low - 1 Month out)
-- [ ] **Restore Strategy Docs**: Once the repo history is clean, restore the strategy documents into the `private/` folder (locally) for your own reference.
-- [ ] **Prepare Launch Content**: Create the "Before vs. After" videos mentioned in the social media strategy.
+## 5. Multi-Arch Infrastructure (Priority: Medium)
+- [x] **Distributed Buildx Cluster**: Configured a 4-node cluster (AMD64/ARM64) for native multi-arch builds.
+    - Nodes: `.16` (AMD64), `.12` (ARM64/Pi5), `.37` (AMD64), `.15` (ARM64/Jetson).
+- [x] **Local Registry**: Set up an insecure local registry at `192.168.1.12:5000` for fast image distribution.
+- [x] **Multi-Arch Build**: Successfully built and pushed `linux/amd64` and `linux/arm64` images to the local registry.
+    - *Note*: Verified on Snapdragon X Elite (ARM64) and Pi5/Jetson.
+- [ ] **Registry Security**: (Optional) Configure TLS for the local registry and update `buildkitd.toml` to remove `insecure = true`.
+- [x] **Node Maintenance**: All 4 nodes are bootstrapped and active in the `distributed-builder`.

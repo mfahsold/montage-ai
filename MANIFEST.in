@@ -1,0 +1,3 @@
+recursive-include src/montage_ai/web_ui/templates *.html
+recursive-include src/montage_ai/web_ui/static *
+recursive-include src/montage_ai/styles *.json

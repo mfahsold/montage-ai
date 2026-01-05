@@ -4,12 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Montage AI - Shorts Studio</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='elegant.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='ui-utils.css') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
     <style>
         :root {
             /* Inherit from style.css, but define local overrides if needed */
@@ -429,36 +424,34 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
+    <div class="container voxel-container">
+        <header class="mb-8">
             <div class="logo-container">
                 <a href="/" class="link-clean flex-row">
-                    <div class="logo-icon">M</div>
                     <div class="logo-text">
-                        <h1>Montage<span class="logo-ai">AI</span></h1>
-                        <p class="subtitle">// SHORTS_STUDIO // 9:16 Creator</p>
+                        <h1 class="voxel-title">MONTAGE AI</h1>
+                        <p class="text-muted">// SHORTS_STUDIO // 9:16 Creator</p>
                     </div>
                 </a>
             </div>
-            <div class="status-indicator">
-                <span class="status-dot"></span>
-                SYSTEM ONLINE
+            <div class="flex gap-4">
+                <div class="voxel-badge voxel-badge-primary">SYSTEM ONLINE</div>
             </div>
         </header>
 
         <!-- Navigation Bar -->
-        <nav class="voxel-card nav-inline">
-            <a href="/" class="voxel-btn voxel-btn-secondary link-clean">🏠 Montage Wizard</a>
-            <a href="/transcript" class="voxel-btn voxel-btn-secondary link-clean">📝 Transcript Editor</a>
-            <a href="/shorts" class="voxel-btn voxel-btn-primary link-clean">📱 Shorts Studio</a>
+        <nav class="nav-inline mb-8 flex gap-4">
+            <a href="/" class="voxel-btn voxel-btn-secondary link-clean">🏠 DASHBOARD</a>
+            <a href="/transcript" class="voxel-btn voxel-btn-secondary link-clean">📝 TRANSCRIPT</a>
+            <a href="/shorts" class="voxel-btn voxel-btn-primary link-clean">📱 SHORTS</a>
         </nav>
 
-        <section class="voxel-card info-card info-card-spacing">
-            <div class="flex-row">
+        <section class="voxel-card mb-8">
+            <div class="flex items-center gap-4">
                 <span class="icon-xl">📱</span>
                 <div>
-                    <h2 class="info-card-heading">Shorts Studio</h2>
-                    <p class="info-card-subtext">Create vertical videos for TikTok, Reels, and Shorts. Smart reframing keeps subjects in frame.</p>
+                    <h2 class="text-primary">SHORTS STUDIO</h2>
+                    <p class="text-muted">Create vertical videos for TikTok, Reels, and Shorts. Smart reframing keeps subjects in frame.</p>
                 </div>
             </div>
         </section>

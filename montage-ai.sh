@@ -103,6 +103,18 @@ run_web() {
     docker compose -f docker-compose.web.yml up "$@"
 }
 
+run_serve() {
+    echo -e "${GREEN}🚀 Starting Web UI (Production)...${NC}"
+    
+    # Auto-start cgpu serve
+    cgpu_start || echo -e "${YELLOW}⚠️ Continuing without cgpu...${NC}"
+
+    # Run the app directly from source to ensure templates/static are found
+    # We use the installed package for dependencies but run from the source tree
+    export PYTHONPATH="/app/src:$PYTHONPATH"
+    python3 -m montage_ai.web_ui.app
+}
+
 run_script() {
     local SCRIPT="$1"
     shift
@@ -322,6 +334,11 @@ case "${1:-run}" in
     web)
         shift
         run_web "$@"
+        exit 0
+        ;;
+    serve)
+        shift
+        run_serve "$@"
         exit 0
         ;;
     build)
