@@ -36,3 +36,7 @@ pytest>=8.0.0
 pytest-flask>=1.3.0
 redis>=5.0.0
 rq>=1.16.0
+
+# Audio Analysis
+librosa>=0.10.2
+numba>=0.60.0

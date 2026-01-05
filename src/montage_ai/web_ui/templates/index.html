@@ -3,670 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage AI - Creative Director</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            /* Dark Mode Palette (pxltshirt-inspired) */
-            --bg-dark: #0a0a0a;
-            --bg-darker: #050505;
-            --bg-card: #1a1a1a;
-            --bg-input: #141414;
-            --text-primary: #ffffff;
-            --text-secondary: #b0b0b0;
-            --accent-primary: #6366f1;  /* Indigo */
-            --accent-secondary: #ec4899; /* Pink */
-            --accent-tertiary: #8b5cf6;  /* Purple */
-            --border-color: #2a2a2a;
-            --success: #10b981;
-            --error: #ef4444;
-            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
-            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
-        }
-
-        body {
-            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darker) 100%);
-            color: var(--text-primary);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-
-        /* ==================== HEADER ==================== */
-        header {
-            background: rgba(10, 10, 10, 0.8);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border-color);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-        }
-
-        .health-status {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid var(--success);
-            border-radius: 6px;
-            font-size: 0.875rem;
-            color: var(--success);
-        }
-
-        .health-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--success);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* ==================== MAIN LAYOUT ==================== */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-            display: grid;
-            grid-template-columns: 300px 1fr;
-            gap: 2rem;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-                padding: 1rem;
-            }
-        }
-
-        /* ==================== SIDEBAR ==================== */
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: var(--shadow-md);
-            transition: all 0.3s ease;
-        }
-
-        .card:hover {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
-        }
-
-        .card-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            margin-bottom: 1rem;
-        }
-
-        /* ==================== STYLE SELECTOR ==================== */
-        .style-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 0.75rem;
-        }
-
-        .style-btn {
-            padding: 0.75rem 1rem;
-            background: var(--bg-input);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            text-align: left;
-            font-size: 0.875rem;
-        }
-
-        .style-btn:hover {
-            border-color: var(--accent-primary);
-            background: rgba(99, 102, 241, 0.1);
-        }
-
-        .style-btn.active {
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
-            border-color: transparent;
-            color: white;
-            box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
-        }
-
-        /* ==================== MAIN CONTENT ==================== */
-        .main-content {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
-
-        /* ==================== UPLOAD SECTION ==================== */
-        .upload-card {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .upload-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
-        }
-
-        .upload-area {
-            border: 2px dashed var(--accent-primary);
-            border-radius: 8px;
-            padding: 3rem 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(99, 102, 241, 0.05);
-        }
-
-        .upload-area:hover {
-            border-color: var(--accent-secondary);
-            background: rgba(99, 102, 241, 0.1);
-        }
-
-        .upload-area.dragging {
-            border-color: var(--accent-secondary);
-            background: rgba(236, 72, 153, 0.15);
-        }
-
-        .upload-icon {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .upload-text {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .upload-hint {
-            color: var(--text-secondary);
-            opacity: 0.6;
-            font-size: 0.75rem;
-        }
-
-        /* ==================== PROMPT SECTION ==================== */
-        .prompt-section {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .label {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .char-count {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-
-        .prompt-input {
-            width: 100%;
-            padding: 1rem;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-family: 'Inter', monospace;
-            font-size: 0.875rem;
-            line-height: 1.6;
-            resize: vertical;
-            min-height: 120px;
-            transition: all 0.2s ease;
-        }
-
-        .prompt-input:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        /* ==================== QUALITY SELECTOR ==================== */
-        .quality-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
-        }
-
-        @media (max-width: 768px) {
-            .quality-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .quality-btn {
-            padding: 0.875rem;
-            background: var(--bg-input);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 0.875rem;
-            transition: all 0.2s ease;
-            text-align: center;
-        }
-
-        .quality-btn:hover {
-            border-color: var(--accent-primary);
-        }
-
-        .quality-btn.selected {
-            background: var(--accent-primary);
-            border-color: var(--accent-primary);
-            color: white;
-            box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
-        }
-
-        /* ==================== BUTTON ==================== */
-        .btn {
-            padding: 1rem 2rem;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            color: white;
-            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
-            width: 100%;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 0 30px rgba(99, 102, 241, 0.5);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* ==================== MONTAGE CREATOR ==================== */
-        .montage-creator {
-            display: flex;
-            gap: 1rem;
-            align-items: flex-end;
-        }
-
-        .creator-btn {
-            flex: 1;
-            padding: 1rem;
-            background: rgba(139, 92, 246, 0.1);
-            border: 2px dashed var(--accent-tertiary);
-            border-radius: 8px;
-            color: var(--accent-tertiary);
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            min-height: 120px;
-        }
-
-        .creator-btn:hover {
-            background: rgba(139, 92, 246, 0.2);
-            border-color: var(--accent-secondary);
-            color: var(--accent-secondary);
-        }
-
-        .creator-icon {
-            font-size: 2rem;
-        }
-
-        /* ==================== INFO PANELS ==================== */
-        .info-panel {
-            display: flex;
-            align-items: flex-start;
-            gap: 1rem;
-            padding: 1rem;
-            background: rgba(99, 102, 241, 0.05);
-            border-left: 3px solid var(--accent-primary);
-            border-radius: 6px;
-        }
-
-        .info-icon {
-            font-size: 1.25rem;
-            flex-shrink: 0;
-            color: var(--accent-primary);
-        }
-
-        .info-text {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-
-        /* ==================== FOOTER ==================== */
-        footer {
-            background: var(--bg-card);
-            border-top: 1px solid var(--border-color);
-            padding: 2rem;
-            margin-top: 4rem;
-        }
-
-        .footer-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-
-        /* ==================== ANIMATIONS ==================== */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .card {
-            animation: fadeIn 0.4s ease forwards;
-        }
-
-        @keyframes shimmer {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
-        }
-
-        .loading {
-            animation: shimmer 1.5s infinite;
-        }
-
-        /* ==================== RESPONSIVE ==================== */
-        @media (max-width: 1024px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-
-            .sidebar {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            }
-        }
-    </style>
+    <title>Montage AI - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
 </head>
 <body>
-    <!-- Header -->
-    <header>
-        <div class="header-content">
-            <div class="logo">
-                <div class="logo-icon">🎬</div>
-                Montage AI
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <span>MONTAGE</span> AI
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link active">DASHBOARD</a>
+            <a href="/montage" class="nav-link">CREATOR</a>
+            <a href="/gallery" class="nav-link">GALLERY</a>
+            <a href="/settings" class="nav-link">SETTINGS</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h1>DASHBOARD</h1>
+                <p class="text-muted">AI Post-Production Assistant // v2.2</p>
             </div>
-            <div class="health-status">
-                <div class="health-dot"></div>
-                Service Healthy
+            <div class="flex gap-4">
+                <div class="badge badge-primary">SYSTEM ONLINE</div>
+                <div class="badge badge-secondary">GPU READY</div>
             </div>
         </div>
-    </header>
 
-    <!-- Main Container -->
-    <div class="container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <!-- Style Selector -->
-            <div class="card">
-                <h3 class="card-title">Cut Style</h3>
-                <div class="style-grid">
-                    <button class="style-btn active" data-style="dynamic">⚡ Dynamic</button>
-                    <button class="style-btn" data-style="hitchcock">🎭 Hitchcock</button>
-                    <button class="style-btn" data-style="mtv">📺 MTV</button>
-                    <button class="style-btn" data-style="action">💥 Action</button>
-                    <button class="style-btn" data-style="documentary">🎥 Documentary</button>
-                    <button class="style-btn" data-style="minimalist">⬜ Minimalist</button>
-                    <button class="style-btn" data-style="wes_anderson">🎨 Wes Anderson</button>
+        <div class="grid grid-cols-3 mb-8">
+            <!-- Quick Action: New Montage -->
+            <a href="/montage" class="voxel-card flex flex-col justify-between" style="text-decoration: none; height: 200px;">
+                <div>
+                    <h3 class="text-primary mb-4">NEW PROJECT</h3>
+                    <p class="text-muted">Start a new AI-directed video montage from your footage.</p>
                 </div>
-            </div>
-
-            <!-- Info -->
-            <div class="card" style="padding: 1rem;">
-                <div class="info-panel">
-                    <div class="info-icon">ℹ️</div>
-                    <div class="info-text">
-                        <strong>Tip:</strong> Upload your source video, write a creative prompt, and let the AI director work its magic.
-                    </div>
+                <div class="flex justify-between items-center mt-4">
+                    <span class="voxel-btn voxel-btn-primary">LAUNCH CREATOR</span>
                 </div>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Upload Section -->
-            <div class="card upload-card">
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">📹</div>
-                    <div class="upload-text">Drop your video here or click to select</div>
-                    <div class="upload-hint">Supports MP4, WebM, MOV (Max 2GB)</div>
-                    <input type="file" id="fileInput" style="display: none;" accept="video/*">
-                </div>
-            </div>
-
-            <!-- Prompt Section -->
-            <div class="card">
-                <h3 class="card-title">Creative Direction</h3>
-                <div class="prompt-section">
-                    <div>
-                        <label class="label">
-                            <span>What do you want to create?</span>
-                            <span class="char-count"><span id="charCount">0</span>/1000</span>
-                        </label>
-                        <textarea 
-                            class="prompt-input" 
-                            id="promptInput" 
-                            placeholder="e.g., Fast-paced action montage with transitions every 2 seconds, match cuts to music beat..."
-                            maxlength="1000"
-                        ></textarea>
-                    </div>
-
-                    <!-- Quality Selector -->
-                    <div>
-                        <label class="label">Output Quality</label>
-                        <div class="quality-grid">
-                            <button class="quality-btn selected" data-quality="preview">
-                                <div>⚡ Preview</div>
-                                <div style="font-size: 0.75rem; opacity: 0.7;">360p / Fast</div>
-                            </button>
-                            <button class="quality-btn" data-quality="standard">
-                                <div>🎬 Standard</div>
-                                <div style="font-size: 0.75rem; opacity: 0.7;">1080p</div>
-                            </button>
-                            <button class="quality-btn" data-quality="high">
-                                <div>✨ High</div>
-                                <div style="font-size: 0.75rem; opacity: 0.7;">4K</div>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Create Button -->
-                    <button class="btn btn-primary" id="createBtn">
-                        <span>🚀</span>
-                        Create Montage
-                    </button>
-                </div>
-            </div>
-
-            <!-- Creator Button -->
-            <a href="/montage" class="creator-btn">
-                <div class="creator-icon">✏️</div>
-                <div>Open Montage Creator</div>
-                <div style="font-size: 0.75rem; opacity: 0.8;">Advanced Editing</div>
             </a>
 
-            <!-- Info Section -->
-            <div class="card">
-                <h3 class="card-title">How It Works</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                    <div style="padding: 1rem; background: rgba(99, 102, 241, 0.05); border-radius: 8px;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">1. Upload</div>
-                        <div style="font-size: 0.875rem; color: var(--text-secondary);">Provide your source footage</div>
+            <!-- Quick Action: Shorts -->
+            <a href="/shorts" class="voxel-card flex flex-col justify-between" style="text-decoration: none; height: 200px;">
+                <div>
+                    <h3 class="text-secondary mb-4">SHORTS GENERATOR</h3>
+                    <p class="text-muted">Create 9:16 vertical content for TikTok/Reels.</p>
+                </div>
+                <div class="flex justify-between items-center mt-4">
+                    <span class="voxel-btn voxel-btn-secondary">CREATE SHORT</span>
+                </div>
+            </a>
+
+            <!-- Stats -->
+            <div class="voxel-card flex flex-col justify-between" style="height: 200px;">
+                <div>
+                    <h3 class="mb-4">SYSTEM STATS</h3>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-muted">Storage</span>
+                        <span>45% Used</span>
                     </div>
-                    <div style="padding: 1rem; background: rgba(139, 92, 246, 0.05); border-radius: 8px;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">2. Direct</div>
-                        <div style="font-size: 0.875rem; color: var(--text-secondary);">AI analyzes your creative vision</div>
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: 45%"></div>
                     </div>
-                    <div style="padding: 1rem; background: rgba(236, 72, 153, 0.05); border-radius: 8px;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">3. Create</div>
-                        <div style="font-size: 0.875rem; color: var(--text-secondary);">Polish your final masterpiece</div>
+                    <div class="flex justify-between mt-4 mb-2">
+                        <span class="text-muted">Queue</span>
+                        <span>Idle</span>
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
-
-    <!-- Footer -->
-    <footer>
-        <div class="footer-content">
-            <p>Montage AI v2.0 • We do not generate pixels; we polish them. 🎬</p>
         </div>
-    </footer>
 
-    <!-- Scripts -->
-    <script>
-        // Upload handling
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
+        <h2 class="mb-4">RECENT JOBS</h2>
+        <div class="grid grid-cols-1">
+            <!-- Job List (Placeholder) -->
+            <div class="voxel-card flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <div style="width: 12px; height: 12px; background: #10b981; border: 1px solid #10b981;"></div>
+                    <div>
+                        <h4>PROJECT_ALPHA_V2</h4>
+                        <span class="text-xs text-muted">Hitchcock Style • 1080p</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="badge">COMPLETED</span>
+                    <span class="text-sm text-muted">2h ago</span>
+                    <button class="voxel-btn text-sm">DOWNLOAD</button>
+                </div>
+            </div>
 
-        uploadArea.addEventListener('click', () => fileInput.click());
-
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragging');
-        });
-
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragging');
-        });
-
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragging');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                uploadArea.innerHTML = `<div style="color: var(--success); font-weight: 600;">✅ ${files[0].name}</div>`;
-            }
-        });
-
-        // Character count
-        const promptInput = document.getElementById('promptInput');
-        const charCount = document.getElementById('charCount');
-
-        promptInput.addEventListener('input', () => {
-            charCount.textContent = promptInput.value.length;
-        });
-
-        // Style selector
-        document.querySelectorAll('.style-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-            });
-        });
-
-        // Quality selector
-        document.querySelectorAll('.quality-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('selected'));
-                this.classList.add('selected');
-            });
-        });
-
-        // Create button
-        document.getElementById('createBtn').addEventListener('click', () => {
-            if (fileInput.files.length === 0) {
-                alert('Please upload a video first!');
-                return;
-            }
-            if (promptInput.value.trim() === '') {
-                alert('Please enter a creative direction!');
-                return;
-            }
-            // TODO: Implement actual submission
-            alert('🚀 Creating your montage...\n(API integration coming soon)');
-        });
-    </script>
+            <div class="voxel-card flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <div style="width: 12px; height: 12px; background: var(--secondary); border: 1px solid var(--secondary);"></div>
+                    <div>
+                        <h4>SKATE_TRIP_2025</h4>
+                        <span class="text-xs text-muted">MTV Style • 4K Upscale</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="badge badge-secondary">PROCESSING</span>
+                    <span class="text-sm text-muted">5m remaining</span>
+                    <button class="voxel-btn text-sm" disabled>VIEW</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

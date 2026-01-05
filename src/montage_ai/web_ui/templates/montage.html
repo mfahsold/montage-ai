@@ -3,522 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage Creator - Advanced Editing</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg-dark: #0a0a0a;
-            --bg-darker: #050505;
-            --bg-card: #1a1a1a;
-            --bg-input: #141414;
-            --text-primary: #ffffff;
-            --text-secondary: #b0b0b0;
-            --accent-primary: #6366f1;
-            --accent-secondary: #ec4899;
-            --accent-tertiary: #8b5cf6;
-            --border-color: #2a2a2a;
-            --success: #10b981;
-            --warning: #f59e0b;
-        }
-
-        body {
-            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darker) 100%);
-            color: var(--text-primary);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            min-height: 100vh;
-            overflow: hidden;
-        }
-
-        /* Header */
-        header {
-            background: rgba(10, 10, 10, 0.9);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border-color);
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 100;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .breadcrumb {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-
-        .timeline-label {
-            background: rgba(99, 102, 241, 0.1);
-            border: 1px solid var(--accent-primary);
-            color: var(--accent-primary);
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            font-weight: 600;
-        }
-
-        /* Toolbar */
-        .toolbar {
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border-color);
-            padding: 1rem 2rem;
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .btn-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-primary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            font-size: 1rem;
-        }
-
-        .btn-icon:hover {
-            border-color: var(--accent-primary);
-            background: rgba(99, 102, 241, 0.1);
-        }
-
-        .divider {
-            width: 1px;
-            height: 30px;
-            background: var(--border-color);
-        }
-
-        /* Main Layout */
-        .main-layout {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            height: calc(100vh - 120px);
-            gap: 0;
-        }
-
-        .editor-area {
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-darker);
-            border-right: 1px solid var(--border-color);
-        }
-
-        /* Viewport */
-        .viewport {
-            flex: 1;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .viewport-content {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, rgba(0, 0, 0, 0.5) 100%);
-            border: 2px dashed var(--border-color);
-        }
-
-        .viewport-placeholder {
-            text-align: center;
-            color: var(--text-secondary);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .viewport-icon {
-            font-size: 3rem;
-            opacity: 0.5;
-        }
-
-        /* Timeline */
-        .timeline-area {
-            background: var(--bg-card);
-            border-top: 1px solid var(--border-color);
-            padding: 1rem;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .timeline-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .timeline-title {
-            font-weight: 600;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .timeline-controls {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .time-display {
-            font-family: monospace;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            background: var(--bg-input);
-            padding: 0.25rem 0.75rem;
-            border-radius: 4px;
-        }
-
-        .timeline-clip {
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
-            border-radius: 4px;
-            padding: 0.75rem;
-            margin-bottom: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .timeline-clip:hover {
-            box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
-            transform: translateY(-2px);
-        }
-
-        .clip-name {
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .clip-duration {
-            font-size: 0.75rem;
-            opacity: 0.8;
-        }
-
-        /* Sidebar Panel */
-        .sidebar {
-            background: var(--bg-card);
-            border-left: 1px solid var(--border-color);
-            padding: 1rem;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .panel {
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .panel-header {
-            background: var(--bg-input);
-            padding: 0.75rem;
-            font-weight: 600;
-            font-size: 0.875rem;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background 0.2s ease;
-        }
-
-        .panel-header:hover {
-            background: rgba(99, 102, 241, 0.1);
-        }
-
-        .panel-content {
-            padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .slider {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: var(--bg-input);
-            outline: none;
-            -webkit-appearance: none;
-            appearance: none;
-        }
-
-        .slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            cursor: pointer;
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
-        }
-
-        .slider::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
-        }
-
-        .label-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 0.75rem 1.5rem;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            width: 100%;
-            font-size: 0.875rem;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
-        }
-
-        .btn-secondary {
-            background: var(--bg-input);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--accent-primary);
-            background: rgba(99, 102, 241, 0.1);
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg-darker);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--text-secondary);
-        }
-    </style>
+    <title>Montage Creator - Voxel Studio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
 </head>
 <body>
-    <!-- Header -->
-    <header>
-        <div class="header-left">
-            <div class="logo">✏️ Montage Creator</div>
-            <span class="breadcrumb">/ Advanced Editing</span>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <span>MONTAGE</span> AI
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">DASHBOARD</a>
+            <a href="/montage" class="nav-link active">CREATOR</a>
+            <a href="/gallery" class="nav-link">GALLERY</a>
+            <a href="/settings" class="nav-link">SETTINGS</a>
         </div>
-        <div class="timeline-label" id="timeDisplay">00:00 / 00:00</div>
-    </header>
+    </nav>
 
-    <!-- Toolbar -->
-    <div class="toolbar">
-        <button class="btn-icon" title="Cut">✂️</button>
-        <button class="btn-icon" title="Trim">📏</button>
-        <button class="btn-icon" title="Split">🔀</button>
-        <div class="divider"></div>
-        <button class="btn-icon" title="Undo">↶</button>
-        <button class="btn-icon" title="Redo">↷</button>
-        <div class="divider"></div>
-        <button class="btn-icon" title="Play">▶️</button>
-        <button class="btn-icon" title="Pause">⏸️</button>
-        <button class="btn-icon" title="Stop">⏹️</button>
-        <div class="divider"></div>
-        <select class="btn-icon" style="cursor: pointer; font-size: 0.75rem;">
-            <option>1x</option>
-            <option>0.5x</option>
-            <option>2x</option>
-        </select>
-    </div>
-
-    <!-- Main Layout -->
-    <div class="main-layout">
-        <!-- Editor Area -->
-        <div class="editor-area">
-            <!-- Viewport -->
-            <div class="viewport">
-                <div class="viewport-content">
-                    <div class="viewport-placeholder">
-                        <div class="viewport-icon">🎬</div>
-                        <div>No video selected</div>
-                        <small>Load a clip from the timeline or create a new montage</small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Timeline -->
-            <div class="timeline-area">
-                <div class="timeline-header">
-                    <span class="timeline-title">Timeline</span>
-                    <div class="timeline-controls">
-                        <span class="time-display" id="currentTime">0:00</span>
-                        <span class="time-display">/</span>
-                        <span class="time-display" id="totalTime">0:00</span>
-                    </div>
-                </div>
-
-                <!-- Timeline Clips -->
-                <div id="clipsContainer">
-                    <div class="timeline-clip" style="cursor: pointer;">
-                        <div class="clip-name">📹 Clip 1</div>
-                        <div class="clip-duration">0:00 - 5:20</div>
-                    </div>
-                    <div class="timeline-clip" style="cursor: pointer;">
-                        <div class="clip-name">📹 Clip 2</div>
-                        <div class="clip-duration">5:20 - 12:15</div>
-                    </div>
-                    <div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem; text-align: center;">
-                        Click on clips to edit them
-                    </div>
-                </div>
-            </div>
+    <div class="container">
+        <div class="mb-8">
+            <h1>NEW PROJECT</h1>
+            <p class="text-muted">Configure your AI director parameters.</p>
         </div>
 
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <!-- Properties Panel -->
-            <div class="panel">
-                <div class="panel-header">
-                    ⚙️ Properties
-                </div>
-                <div class="panel-content">
-                    <div>
-                        <div class="label-row">
-                            <span>Speed</span>
-                            <span id="speedValue">100%</span>
+        <div class="grid grid-cols-3 gap-4">
+            <!-- Left Panel: Controls -->
+            <div class="voxel-card">
+                <form action="/api/jobs" method="POST" id="montageForm">
+                    <div class="mb-8">
+                        <h3 class="mb-4">1. STYLE</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="voxel-btn text-sm" style="text-align: center;">
+                                <input type="radio" name="style" value="dynamic" checked style="display:none" onchange="selectStyle(this)">
+                                DYNAMIC
+                            </label>
+                            <label class="voxel-btn text-sm" style="text-align: center;">
+                                <input type="radio" name="style" value="hitchcock" style="display:none" onchange="selectStyle(this)">
+                                HITCHCOCK
+                            </label>
+                            <label class="voxel-btn text-sm" style="text-align: center;">
+                                <input type="radio" name="style" value="mtv" style="display:none" onchange="selectStyle(this)">
+                                MTV
+                            </label>
+                            <label class="voxel-btn text-sm" style="text-align: center;">
+                                <input type="radio" name="style" value="minimalist" style="display:none" onchange="selectStyle(this)">
+                                MINIMAL
+                            </label>
                         </div>
-                        <input type="range" class="slider" min="10" max="200" value="100" id="speedSlider">
                     </div>
-                    <div>
-                        <div class="label-row">
-                            <span>Opacity</span>
-                            <span id="opacityValue">100%</span>
+
+                    <div class="mb-8">
+                        <h3 class="mb-4">2. DIRECTOR'S PROMPT</h3>
+                        <textarea class="voxel-input" name="prompt" rows="4" placeholder="Describe the vibe (e.g., 'High energy skate video with fast cuts on the beat')..."></textarea>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 class="mb-4">3. OPTIONS</h3>
+                        <div class="flex flex-col gap-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="upscale" class="voxel-checkbox">
+                                <span>AI Upscale (4K)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="stabilize" class="voxel-checkbox" checked>
+                                <span>Stabilize Footage</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="auto_reframe" class="voxel-checkbox">
+                                <span>Auto-Reframe (9:16)</span>
+                            </label>
                         </div>
-                        <input type="range" class="slider" min="0" max="100" value="100" id="opacitySlider">
                     </div>
-                    <div>
-                        <div class="label-row">
-                            <span>Volume</span>
-                            <span id="volumeValue">100%</span>
-                        </div>
-                        <input type="range" class="slider" min="0" max="100" value="100" id="volumeSlider">
-                    </div>
-                </div>
+
+                    <button type="submit" class="voxel-btn voxel-btn-primary w-full">START RENDER</button>
+                </form>
             </div>
 
-            <!-- Effects Panel -->
-            <div class="panel">
-                <div class="panel-header">
-                    ✨ Effects
+            <!-- Right Panel: Preview / Status -->
+            <div class="voxel-card" style="grid-column: span 2;">
+                <div class="flex justify-between items-center mb-4">
+                    <h3>PREVIEW</h3>
+                    <span class="badge">WAITING FOR INPUT</span>
                 </div>
-                <div class="panel-content">
-                    <button class="btn-secondary">Stabilize</button>
-                    <button class="btn-secondary">Color Correct</button>
-                    <button class="btn-secondary">Upscale</button>
-                    <button class="btn-secondary">Add Fade</button>
-                </div>
-            </div>
-
-            <!-- Export Panel -->
-            <div class="panel">
-                <div class="panel-header">
-                    📤 Export
-                </div>
-                <div class="panel-content">
-                    <div>
-                        <div class="label-row" style="margin-bottom: 0.5rem;">
-                            <span>Quality</span>
-                        </div>
-                        <select class="btn-secondary" style="appearance: auto; cursor: pointer;">
-                            <option>360p (Fast)</option>
-                            <option>1080p (Standard)</option>
-                            <option>4K (High)</option>
-                        </select>
+                
+                <!-- Placeholder for Video Player -->
+                <div style="background: #000; width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; border: 2px solid var(--border);">
+                    <div class="text-center">
+                        <p class="text-muted mb-2">NO PREVIEW AVAILABLE</p>
+                        <p class="text-xs text-muted">Upload footage to /data/input to begin</p>
                     </div>
-                    <button class="btn">🚀 Export</button>
+                </div>
+
+                <div class="mt-8">
+                    <h4 class="mb-2">LOGS</h4>
+                    <div class="voxel-input" style="height: 150px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; color: var(--muted-foreground);">
+                        [SYSTEM] Ready to process.
+                        [SYSTEM] GPU: NVIDIA A100 (Simulated)
+                        [SYSTEM] Storage: 100GB Free
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
     <script>
-        // Update time display
-        document.getElementById('speedSlider').addEventListener('input', (e) => {
-            document.getElementById('speedValue').textContent = e.target.value + '%';
-        });
-
-        document.getElementById('opacitySlider').addEventListener('input', (e) => {
-            document.getElementById('opacityValue').textContent = e.target.value + '%';
-        });
-
-        document.getElementById('volumeSlider').addEventListener('input', (e) => {
-            document.getElementById('volumeValue').textContent = e.target.value + '%';
-        });
-
-        // Clip selection
-        document.querySelectorAll('.timeline-clip').forEach(clip => {
-            clip.addEventListener('click', function() {
-                document.querySelectorAll('.timeline-clip').forEach(c => c.style.opacity = '0.6');
-                this.style.opacity = '1';
+        function selectStyle(radio) {
+            // Reset all buttons
+            document.querySelectorAll('input[name="style"]').forEach(el => {
+                el.parentElement.classList.remove('voxel-btn-primary');
             });
-        });
+            // Highlight selected
+            if(radio.checked) {
+                radio.parentElement.classList.add('voxel-btn-primary');
+            }
+        }
+        
+        // Initialize first selection
+        document.querySelector('input[name="style"]:checked').parentElement.classList.add('voxel-btn-primary');
     </script>
 </body>
 </html>
