@@ -1,75 +1,68 @@
-# Montage AI — Free AI Video Editor for Rough Cuts (Offline Descript Alternative)
+# Montage AI — AI Video Editor. Polish, Don't Generate.
 
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm--NC-purple.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 
-> **We polish pixels, we don't generate them.**
+> **We do not generate pixels. We polish them.**
 
-Free, open-source AI video editor for rough cuts: beat-sync, story arcs, OTIO/EDL export. Offline Descript alternative that is local-first and privacy-first.
+Free, open-source AI video editor: beat-sync montages, transcript editing, OTIO/EDL export. Local-first, privacy-first alternative to Descript.
 
 ## Quick Start
 
-**Two workflows. No choices. [→ Read DX Guide](docs/DX.md)**
+**Three ways. Pick your workflow. [→ Full Setup Guide](docs/getting-started.md)**
 
-### Local Development (5 sec feedback)
+### Web UI (Easiest)
 ```bash
-make dev       # Build once
-make dev-test  # Code → test (instant)
+./montage-ai.sh web
+# Open http://localhost:5001 in your browser
 ```
 
-### Cluster Deployment (2-15 min)
-```bash
-make cluster   # Build + push + deploy
-```
-
-### Or use Web UI
-```bash
-./montage-ai.sh web  # http://localhost:5001
-```
-
-### Or traditional CLI
+### Command Line (Fastest)
 ```bash
 cp your_videos/*.mp4 data/input/
-cp your_music.mp3 data/music/
-./montage-ai.sh run hitchcock --quality high
+./montage-ai.sh run dynamic --quality high
+```
+
+### Docker (Reproducible)
+```bash
+docker-compose up -d
+# Same web UI, containerized
 ```
 
 ## Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Beat-Sync** | Cuts aligned to music rhythm (librosa) |
-| **Story Arc** | 5-phase narrative structure |
-| **Pro Handoff** | OTIO/EDL export to DaVinci/Premiere |
-| **Shorts Studio** | Vertical video with auto-reframe |
-| **Quality Profiles** | Preview → Standard → High → Master |
+| Feature | What It Does |
+|---------|------------|
+| **Beat-Sync** | Cuts aligned to music rhythm |
+| **Transcript Editor** | Text-based video editing |
+| **Shorts Studio** | Auto-reframe to 9:16 vertical |
+| **Pro Export** | OTIO/EDL for DaVinci, Premiere |
+| **Quality Profiles** | Preview → Standard → High |
 
-## Styles
+## Editing Styles
 
-`dynamic` · `hitchcock` · `mtv` · `action` · `documentary` · `minimalist` · `wes_anderson` · `viral`
+`dynamic` · `hitchcock` · `mtv` · `action` · `documentary` · `minimalist` · `wes_anderson`
 
-Or use natural language: `CREATIVE_PROMPT="90s skateboard vibe" ./montage-ai.sh run`
+Or natural language: `CREATIVE_PROMPT="90s skateboard" ./montage-ai.sh run`
 
-## Why Montage AI?
+## How It Compares
 
-| | Montage AI | Descript | Frame | AutoClip |
+| | Montage AI | Descript | Frame | Adobe |
 |---|---|---|---|---|
-| **Cost** | Free | $12-30/mo | Free | Free |
-| **Local** | ✅ | ❌ Cloud | ✅ | ✅ |
-| **Beat-Sync** | ✅ librosa | ⚠️ | ❌ | ⚠️ |
-| **Story Arc** | ✅ 5-phase | ❌ | ❌ | ❌ |
-| **NLE Export** | ✅ OTIO | ⚠️ MP4 | ❌ | ❌ |
+| **Cost** | Free | $12/mo | Free | $55+/mo |
+| **Local** | ✅ | ❌ | ✅ | ❌ |
+| **Beat-Sync** | ✅ | Limited | ❌ | No |
+| **Auto-Reframe** | ✅ | ❌ | ✅ | No |
+| **Export OTIO/EDL** | ✅ | No | No | Limited |
 
 ## Documentation
 
-**Start here:** [DX Guide](docs/DX.md) — Golden Path (4 commands, 90% of work)
-
-- [Getting Started](docs/getting-started.md) — Installation & first montage
-- [Features](docs/features.md) — All capabilities
-- [Configuration](docs/configuration.md) — Environment variables
-- [Cluster Deployment](deploy/CLUSTER_WORKFLOW.md) — Multi-arch builds
-- [Competitive Analysis](docs/COMPETITIVE_ANALYSIS.md) — Market positioning
+- **[Getting Started](docs/getting-started.md)** — Installation & first project
+- **[Features](docs/features.md)** — Complete capabilities guide
+- **[Configuration](docs/configuration.md)** — All settings & environment variables
+- **[Architecture](docs/architecture.md)** — How it works (for developers)
+- **[Troubleshooting](docs/troubleshooting.md)** — Common issues & fixes
 
 ## License
 

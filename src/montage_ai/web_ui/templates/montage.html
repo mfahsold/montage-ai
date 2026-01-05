@@ -131,7 +131,7 @@
     <div class="container">
         <div class="mb-8">
             <h1 class="voxel-title">PROJECT CREATOR</h1>
-            <p class="text-muted">Configure your montage with AI-powered editing. Source footage from /data/input.</p>
+            <p class="text-muted">Compose your montage. Configure AI editing. Source from /data/input.</p>
         </div>
 
         <form action="/api/jobs" method="POST" id="montageForm">
@@ -139,14 +139,14 @@
             <div class="mb-8">
                 <div class="voxel-card">
                     <h3 class="mb-3 text-primary">STEP 1: SELECT STYLE</h3>
-                    <p class="text-xs text-muted mb-4">Choose the editing rhythm and visual language. Each style dictates pacing, transitions, and cut timing.</p>
+                    <p class="text-xs text-muted mb-4">Choose editing rhythm and visual language. Pacing, transitions, cut timing vary by style.</p>
                     
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <!-- DYNAMIC -->
                         <label class="style-card active" onclick="selectStyle('dynamic')">
                             <input type="radio" name="style" value="dynamic" checked style="display:none">
                             <h5>DYNAMIC</h5>
-                            <p>Fast cuts on the beat. High energy. Perfect for action & sports.</p>
+                            <p>Fast cuts on the beat. High energy. Action & sports.</p>
                         </label>
 
                         <!-- HITCHCOCK -->
@@ -160,14 +160,14 @@
                         <label class="style-card" onclick="selectStyle('mtv')">
                             <input type="radio" name="style" value="mtv" style="display:none">
                             <h5>MTV</h5>
-                            <p>Quick MTV-style cuts. Energetic transitions. Music-driven.</p>
+                            <p>Quick cuts. Energetic transitions. Music-synced.</p>
                         </label>
 
                         <!-- MINIMALIST -->
                         <label class="style-card" onclick="selectStyle('minimalist')">
                             <input type="radio" name="style" value="minimalist" style="display:none">
                             <h5>MINIMAL</h5>
-                            <p>Subtle, intentional. Long takes. Let footage breathe.</p>
+                            <p>Subtle cuts. Long takes. Let footage breathe.</p>
                         </label>
                     </div>
                 </div>
@@ -177,7 +177,7 @@
             <div class="mb-8">
                 <div class="voxel-card">
                     <h3 class="mb-3 text-primary">STEP 2: CREATIVE DIRECTION</h3>
-                    <p class="text-xs text-muted mb-4">Guide the AI with natural language. Describe mood, pacing, and artistic intent. The AI director will interpret these instructions.</p>
+                    <p class="text-xs text-muted mb-4">Describe mood, pacing, and intent. AI interprets your creative vision naturally.</p>
                     
                     <label class="tech-label">CREATIVE PROMPT</label>
                     <textarea 
@@ -187,7 +187,7 @@
                         placeholder="Examples:&#10;• High-energy skate montage with fast cuts on kick tricks&#10;• Cinematic interview piece with slow zooms and depth&#10;• Music video style with synchronized beat-cuts&#10;• Documentary feel with natural transitions">
                     </textarea>
                     
-                    <p class="text-xs text-muted">💡 <strong>Tip:</strong> Be specific about mood, pace, and subject matter. The AI learns from your descriptions.</p>
+                    <p class="text-xs text-muted">💡 <strong>Tip:</strong> Be specific about mood, pace, and subject. AI learns from detail.</p>
                 </div>
             </div>
 
@@ -195,7 +195,7 @@
             <div class="mb-8">
                 <div class="voxel-card">
                     <h3 class="mb-3 text-primary">STEP 3: PROCESSING OPTIONS</h3>
-                    <p class="text-xs text-muted mb-4">Choose additional AI enhancements to apply during rendering.</p>
+                    <p class="text-xs text-muted mb-4">Optional AI enhancements applied during rendering.</p>
                     
                     <!-- Video Enhancement -->
                     <div class="option-group">
@@ -204,14 +204,14 @@
                             <input type="checkbox" name="upscale" id="upscale">
                             <div class="option-label">
                                 <div class="option-label-title">AI UPSCALE (4K)</div>
-                                <div class="option-label-desc">Enhance resolution using Real-ESRGAN. Increases file size and render time.</div>
+                                <div class="option-label-desc">Real-ESRGAN enhancement. Increases file size and render time.</div>
                             </div>
                         </div>
                         <div class="option-item">
                             <input type="checkbox" name="stabilize" id="stabilize" checked>
                             <div class="option-label">
                                 <div class="option-label-title">STABILIZE FOOTAGE</div>
-                                <div class="option-label-desc">Remove camera shake using vid.stab. Recommended for handheld footage.</div>
+                                <div class="option-label-desc">Remove camera shake. Recommended for handheld footage.</div>
                             </div>
                         </div>
                     </div>
@@ -223,7 +223,7 @@
                             <input type="checkbox" name="auto_reframe" id="auto_reframe">
                             <div class="option-label">
                                 <div class="option-label-title">AUTO-REFRAME (9:16)</div>
-                                <div class="option-label-desc">Generate vertical version for TikTok/Reels. Creates additional output file.</div>
+                                <div class="option-label-desc">Generate vertical version. Creates additional output file.</div>
                             </div>
                         </div>
                     </div>
@@ -234,7 +234,7 @@
             <div class="mb-8">
                 <div class="voxel-card">
                     <h3 class="mb-3 text-primary">STEP 4: QUALITY PROFILE</h3>
-                    <p class="text-xs text-muted mb-4">Balance between render speed and output quality.</p>
+                    <p class="text-xs text-muted mb-4">Balance speed vs. quality. Choose based on your goal.</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <label class="quality-card">
@@ -266,8 +266,8 @@
             <div class="mb-8">
                 <div class="voxel-card">
                     <h3 class="mb-3 text-primary">STEP 5: START RENDER</h3>
-                    <p class="text-xs text-muted mb-4">Review your settings and submit. Montage AI will process your footage and create a finished video.</p>
-                    <button type="submit" class="voxel-btn voxel-btn-primary w-full">START RENDER</button>
+                    <p class="text-xs text-muted mb-4">Review settings and submit. AI processes your footage into finished video.</p>
+                    <button type="submit" class="voxel-btn voxel-btn-primary w-full">Start Render</button>
                 </div>
             </div>
         </form>

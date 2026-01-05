@@ -1,33 +1,30 @@
 # Features
 
-> **Strategic Context:** See [STRATEGY.md](STRATEGY.md) for our 2026 "Polish, Don't Generate" vision.
+> **Philosophy:** We do not generate pixels. We polish them.
 
-Everything Montage AI can do for you.
-
-> **Philosophy:** We polish pixels, we don't generate them.
+Complete guide to Montage AI capabilities.
 
 ---
 
-## 🆕 New in 2026
+## 🆕 2026 Releases
 
 ### Transcript Editor
 
-Edit video by editing text — inspired by Descript's revolutionary approach.
+Edit video by removing text. AI handles the cuts.
 
-**How it works:**
-1. Upload video → automatic transcription via Whisper
+**Workflow:**
+1. Upload video → Auto-transcribe (Whisper)
 2. View transcript with word-level timestamps
-3. Delete text to remove video segments
-4. Rearrange paragraphs to reorder scenes
-5. Export final cut or OTIO timeline
+3. Delete words to remove segments
+4. Rearrange to reorder scenes
+5. Export video or OTIO timeline
 
-**Features:**
-- **Live Preview:** Auto-generates 360p preview 2 seconds after edits.
-- **Undo/Redo:** Full history stack for non-destructive editing.
-- **Word-level sync:** Click any word to seek video.
-- **Filler word detection:** Highlights "um", "uh", "like" for easy removal.
-- **Silence removal:** Adjustable threshold for automatic gap removal.
-- **Export formats:** Video (MP4), EDL (Premiere), OTIO (Resolve).
+**Capabilities:**
+- **Live Preview:** 360p preview updates 2 seconds after edits
+- **Word-Level Sync:** Click any word to seek
+- **Filler Detection:** Highlights "um", "uh", "like" for removal
+- **Silence Removal:** Auto-gap detection
+- **Export:** MP4, EDL (Premiere), OTIO (Resolve)
 
 **Access:** Web UI at `/transcript`
 
@@ -35,59 +32,41 @@ Edit video by editing text — inspired by Descript's revolutionary approach.
 
 ### Pro Handoff (Timeline Export)
 
-Seamlessly move from Montage AI to professional NLEs.
+Move from Montage AI to professional NLEs (DaVinci, Premiere, Resolve).
+
+**Formats:**
+- **OTIO (.otio):** Native for Resolve, Premiere, Nuke
+- **FCP XML (.xml):** Universal standard
+- **EDL (.edl):** Legacy fallback
 
 **Features:**
-- **Source Relinking:** Option to link XML/OTIO to original high-res source files instead of proxies.
-- **Conform Guide:** Automatically generates `HOW_TO_CONFORM.md` with step-by-step instructions.
-- **Project Packaging:** Exports are bundled into a structured `{project}_PROJECT` folder.
-- **Proxy Generation:** Creates ProRes or DNxHR proxies for smooth editing.
-
-**Supported Formats:**
-- **OpenTimelineIO (.otio):** Modern standard for Resolve, Premiere, Nuke.
-- **FCP XML (.xml):** Universal exchange format.
-- **CMX 3600 EDL (.edl):** Legacy fallback.
+- Source relinking to original high-res files
+- Proxy generation (ProRes, DNxHR)
+- Conform guide with step-by-step instructions
 
 ---
 
 ### Shorts Studio
 
-Create vertical content optimized for TikTok, Instagram Reels, and YouTube Shorts.
+Auto-reframe to 9:16 for TikTok, Instagram, YouTube Shorts.
 
-**Phone-Frame Preview:**
-- Live 9:16 aspect ratio preview
-- Safe zone overlays (title-safe, action-safe)
-- Platform-specific guides (TikTok UI, Reels UI)
+**Preview:**
+- Live 9:16 phone frame
+- Safe zone overlays (title, action, platform UI)
+- Platform guides (TikTok, Instagram, YouTube)
 
-**Reframe Modes:**
-| Mode | Description |
-|------|-------------|
-| Auto | AI detects and follows primary subject |
-| Speaker | Face detection + tracking for talking heads |
-| Center | Simple center crop |
-| Custom | Manual positioning with keyframes |
+**Tracking Modes:**
+- **Auto:** AI detects and follows subject
+- **Face:** Face detection for talking heads
+- **Center:** Simple center crop
+- **Custom:** Manual keyframes
 
-**Auto Reframe Engine:**
-- **Cinematic Path Planning:** Uses convex optimization (L2 regularization) to simulate professional camera operation.
-- **Physics-Based Smoothing:** Minimizes velocity and acceleration changes for fluid motion.
-- **Subject Awareness:** Keeps subjects in the "golden zone" while avoiding jerky movements.
-- **AI Crop Visualization:** Preview the AI's tracking path in real-time before rendering.
-
-**Audio Polish (Voice Isolation):**
-- **Studio Quality:** Uses `demucs` (via cgpu) to isolate vocals from background noise and music.
-- **Clean Speech:** Ensures dialogue is crisp and clear, even in noisy environments.
-- **One-Click:** Toggle "Audio Polish" in the Shorts Studio to apply automatically.
-
-**Caption Styles:**
-- **TikTok** — White text, black stroke, bottom-aligned
-- **Minimal** — Clean sans-serif, subtle background
-- **Bold** — Large impact text, animated word-by-word
-- **Karaoke** — Highlighted current word, music-synced
-
-**Highlight Detection:**
-- AI identifies best moments based on audio energy, motion, faces
-- One-click extraction of highlights
-- Batch export multiple clips
+**Smart Features:**
+- **Cinema Path:** Convex optimization for fluid camera motion
+- **Subject Safety:** Keeps subjects in golden zone
+- **Voice Isolation:** Demucs for clean dialogue (denoising)
+- **Captions:** TikTok, Minimal, Bold, Karaoke styles
+- **Highlights:** Auto-detect best moments by energy/motion/faces
 
 **Access:** Web UI at `/shorts`
 

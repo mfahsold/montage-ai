@@ -1,16 +1,16 @@
 # Getting Started
 
-Everything you need to go from zero to your first montage.
+From zero to your first montage in 5 minutes.
 
 ---
 
 ## Requirements
 
 - **Docker** + Docker Compose v2
-- **8 GB RAM** minimum (16 GB recommended for high-quality mode)
+- **8 GB RAM** (16 GB for high quality)
 - Optional: [cgpu](https://github.com/RohanAdwankar/cgpu) for cloud GPU/LLM
 
-> **Laptop User?** Check out the [Hybrid Workflow](hybrid-workflow.md) to run Montage AI on 16GB RAM by offloading AI tasks to the cloud.
+> **Low RAM?** See [Hybrid Workflow](hybrid-workflow.md) to offload AI tasks to cloud.
 
 ---
 
@@ -21,63 +21,54 @@ git clone https://github.com/mfahsold/montage-ai.git
 cd montage-ai
 ```
 
-That's it. Everything runs in Docker.
+Everything runs in Docker.
 
 ---
 
-## Your First Montage
+## First Montage
 
-### Web UI (recommended)
+### Web UI (Easiest)
 
 ```bash
 make web
 ```
 
 1. Open **http://localhost:5001**
-2. Upload some video clips
-3. Upload a music track
-4. Pick a style (or type a prompt)
+2. Upload video clips
+3. Upload music track
+4. Pick a style (or natural language prompt)
 5. Click **Create Montage**
-6. Download your video
-
+6. Download video
 
 ### Command Line
 
 ```bash
-# 1. Add your media
+# Add media
 cp ~/Videos/*.mp4 data/input/
 cp ~/Music/track.mp3 data/music/
 
-# 2. Run
+# Run
 ./montage-ai.sh run
 
-# 3. Find output
+# Find output
 ls data/output/
 ```
 
 ## Test Assets
 
-The project includes scripts to download open-source test material.
+Included scripts download open-source media (Big Buck Bunny, Sintel, etc.).
 
-**Video (Open Movie Project):**
-- `BigBuckBunny.mp4` (151 MB)
-- `Sintel.mp4` (182 MB)
-- `TearsOfSteel.mp4` (178 MB)
+```bash
+make download-assets
+```
 
-**Audio (SoundHelix):**
-- `TestTrack1.mp3`
-- `TestTrack2.mp3`
-- `TestTrack3.mp3`
-
-These files are stored in `data/input/` and `data/music/`.
+Media goes into `data/input/` and `data/music/`.
 
 ---
 
 ## Run Options
 
-### Basic Styles
-
-```bash
+### Editing Styles
 ./montage-ai.sh run                # dynamic (default)
 ./montage-ai.sh run hitchcock      # suspense
 ./montage-ai.sh run mtv            # fast cuts

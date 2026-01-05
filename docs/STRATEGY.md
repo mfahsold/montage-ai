@@ -1,7 +1,7 @@
 # Montage AI – Strategic Product Document
 
-**Version:** 2.5 (Implementation Reality Check)
-**Date:** January 4, 2026
+**Version:** 2.6 (Post-Phase 2 Consolidation)
+**Date:** January 5, 2026
 **Classification:** Public
 **Status:** Active
 
@@ -9,75 +9,69 @@
 
 ## Executive Summary
 
-**Core Philosophy:** "Polish, don't generate."
-**Differentiation:** Local-first + Pro-handoff.
-**Current Focus:** Tangible speed and control ("Preview-First").
+**Core Philosophy:** "We do not generate pixels. We polish them."
+**Differentiation:** Local-first AI video editing with pro export.
+**Current Focus:** Transcript editing, shorts generation, professional handoff.
 
-Montage AI is not a generative video tool. It is a post-production assistant that refines existing footage. Our goal for Q1 2026 is to productize the **Transcript Editor**, deliver **Shorts Studio 2.0**, and stabilize **Pro-Handoff** and **Audio-Polish**.
+Montage AI is a post-production assistant, not a generative video tool. It refines existing footage through AI-assisted editing workflows.
 
-### Strategic Priorities (Q1)
+### Strategic Priorities (Q1 2026)
 
-1. **Transcript Editor Productization:** Move from prototype to a first-class editing surface.
-2. **Shorts Studio 2.0:** Smart-Reframe v2 and native caption styles.
-3. **Preview-First Pipeline:** Immediate feedback loops (360p) before final rendering.
-4. **Pro-Handoff:** Reliable OTIO export to DaVinci Resolve/Premiere.
+1. **Transcript Editor:** Production-ready text-based video editing
+2. **Shorts Studio:** Auto-reframe to 9:16 with smart tracking
+3. **Pro Handoff:** Reliable OTIO/EDL export to DaVinci, Premiere
+4. **Quality Profiles:** Preview-first workflow for fast iteration
 
 ### Scope
 
-- **In-Scope:** Rough-Cut, Transcript-Editing, Shorts/Vertical, Captions, Smart-Reframe, Audio-Polish, OTIO/EDL-Handoff.
-- **Out-of-Scope:** Generative Video, Full NLE replacement (multitrack compositing, VFX), Social Hosting.
+- **In-Scope:** Text-based editing, beat-sync montages, vertical video, OTIO/EDL export, quality profiles
+- **Out-of-Scope:** Generative video, full NLE replacement, social media hosting
 
 ### UI Vision
 
-Transition from a "Toggle Graveyard" to an **"Outcome Studio"**.
-
-- Clear workflows (Transcript, Shorts, Montage).
-- Visible Story/Beat logic.
-- Style-defining motion and "Cyber-NLE" aesthetics.
+Three focused workflows:
+- **Montage Creator:** Beat-sync editing with 7+ styles
+- **Shorts Studio:** Vertical video with auto-reframe
+- **Transcript Editor:** Text-based editing with live preview
 
 ---
 
-## Implementation Reality Check (January 2026)
+## Implementation Status (January 2026)
 
-### ✅ Fully Implemented & Production-Ready
+### ✅ Production-Ready Components
 
-| Component | Evidence | Notes |
-| :--- | :--- | :--- |
-| **Beat Detection & Sync** | `audio_analysis.py`, 419 passing tests | librosa/FFT + testing |
-| **Quality Profiles** | `env_mapper.py`, `config.py` | Preview, Standard, High, Master |
-| **GPU Auto-Detection** | `ffmpeg_config.py` | hwaccel auto-selection |
-| **Shorts Reframing** | `auto_reframe.py`, `test_auto_reframe.py` | MediaPipe + smoothing |
-| **Style Templates** | `style_templates/` | 8 curated styles |
-| **Audio Analysis** | `audio_analysis.py` | Energy + filler detection |
-| **SSE Streaming** | `app.py` | Real-time progress |
-| **Docker + K3s** | `docker-compose.yml`, `deploy/k3s/` | Verified deployment |
-| **OTIO Export** | `timeline_exporter.py`, 17 verification tests | DaVinci/Premiere compatible |
-| **Session Management** | `session-client.js`, `/api/session/*` | Persistent state |
-| **UI Shared Utilities** | `ui-utils.css` | DRY, accessibility-compliant |
+| Component | Evidence | Status |
+|-----------|----------|--------|
+| **Beat Detection** | `audio_analysis.py`, 419 tests | ✅ Live |
+| **Quality Profiles** | `env_mapper.py`, `config.py` | ✅ Live |
+| **GPU Auto-Detection** | `ffmpeg_config.py` | ✅ Live |
+| **Auto-Reframe** | `auto_reframe.py` + tests | ✅ Live |
+| **Style Templates** | `style_templates/` (7 styles) | ✅ Live |
+| **OTIO Export** | `timeline_exporter.py`, 17 tests | ✅ Live |
+| **SSE Streaming** | Real-time progress | ✅ Live |
+| **Docker + K3s** | Multi-arch deployment | ✅ Live |
 
-### ✅ Fully Polished (Production Ready)
+### ✅ Fully Polished Features
 
-| Component | Status | Notes |
-| :--- | :--- | :--- |
-| **Transcript Editor** | 100% | Word-level edits, undo/redo, export work. Live preview hardware-accelerated (NVENC/VAAPI). |
-| **Shorts Studio** | 100% | Phone-frame preview, safe zones, caption styles work. Highlight detection API integrated. Auto-reframe triggers on-demand. |
-| **Audio Polish** | 100% | `/api/audio/clean` and `/api/audio/analyze` use real SNR measurement. Before/after quality reporting calibrated. |
-| **Caption Burn-In** | 100% | Karaoke, Bold, Minimal, TikTok, Cinematic styles. Word-level timing for karaoke. |
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Transcript Editor** | ✅ 100% | Word-level edits, live preview, OTIO export |
+| **Shorts Studio** | ✅ 100% | Phone preview, safe zones, captions |
+| **Audio Polish** | ✅ 100% | SNR measurement, before/after reporting |
+| **Caption Burn-In** | ✅ 100% | 5 styles (Karaoke, Bold, Minimal, TikTok, Cinematic) |
 
 ### 🔴 Not Yet Implemented
 
-| Component | Priority | Blocked By |
-| :--- | :--- | :--- |
-| **Telemetry/Metrics** | Medium | None (just engineering time) |
-| **Import Smoke Tests** | Low | NLE-specific test infrastructure |
+| Component | Priority | Notes |
+|-----------|----------|-------|
+| **Telemetry/Metrics** | Medium | Engineering time needed |
+| **Import Smoke Tests** | Low | NLE-specific testing |
 | **Subject Tracking v2** | Medium | ML model selection |
-| **Audio Fallback Strategy** | Low | Edge case detection logic |
+| **Audio Fallback Strategy** | Low | Edge case handling |
 
 ---
 
-## UI Consolidation Status
-
-### Current Routes (app.py)
+## UI/UX Status (Post-Phase 2)
 
 | Route | Template | Status |
 | :--- | :--- | :--- |

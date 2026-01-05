@@ -1,103 +1,101 @@
-# Montage AI: Business Proposition & Investor Brief
+# Montage AI: Business Proposition & Market Positioning
 
 **For:** Creators, Studios, Investors, Enterprise Buyers  
-**Updated:** January 4, 2026  
-**TL;DR:** The open-source AI rough-cut tool trusted by professionals who value **privacy**, **control**, and **professional handoff**.
+**Updated:** January 5, 2026  
+**TL;DR:** Open-source AI video editor for professionals who value **privacy**, **control**, and **professional handoff**.
 
 ---
 
 ## The Problem
 
-**Every video team faces this workflow:**
+**Traditional video editing workflow:**
 
 ```
-Upload (Privacy Risk)
+Upload Footage (privacy risk)
     ↓ 
-Cloud Processing ($$$ per month)
+Cloud Processing ($12-55/mo per user)
     ↓
-Polished Output (Nice, but locked in)
+Locked Output (vendor lock-in)
     ↓
-Finish in NLE (Export → Re-import → Rework)
+Finish in NLE (export → re-import → rework)
 ```
 
-**Costs:** $12-54/month per user × team size  
-**Time:** 2-3x the editing time (rough cut → NLE → finish)  
-**Risk:** Footage leaves your machine, data goes to corporate servers
+**Costs:** $144-660/year per user × team size  
+**Time:** 2-3x editing time (rough cut → NLE → finish)  
+**Risk:** Footage uploaded to corporate servers
 
 ---
 
 ## The Solution: Montage AI
 
 ```
-Drop Clips
+Add Footage (local files)
     ↓
-AI Rough Cut (Local, 3 minutes)
+AI Processing (local, 3 minutes)
     ↓
-Export OTIO/EDL
+Export OTIO/EDL (industry standard)
     ↓
-Finish in DaVinci/Premiere (10 minutes)
+Finish in DaVinci/Premiere (seamless)
 ```
 
-**Cost:** Free (OSS) or commercial license  
+**Cost:** Free (open source) or commercial license  
 **Privacy:** 100% local processing  
-**Integration:** Native to professional NLEs (OTIO standard)
+**Integration:** Native OTIO/EDL export to professional NLEs
 
 ---
 
-## Market Fit
+## Target Markets
 
-### Personas
+### Creator Teams (100k+ addressable)
+- **Pain:** "Need shorts fast, can't afford SaaS subscriptions"
+- **Solution:** Shorts Studio with auto-reframe
+- **Savings:** $144-600/year per creator
 
-**1. Creator Teams** (100k+ addressable)
-- Pain: "We need shorts fast, not expensive SaaS"
-- Solution: Montage AI + Shorts Studio 2.0
-- Savings: $120-600/year per creator
+### Professional Editors (50k+ addressable)
+- **Pain:** "Rough cuts slow; Descript doesn't export OTIO"
+- **Solution:** AI rough cut → OTIO → finish in native NLE
+- **Benefit:** 40% faster workflow
 
-**2. Professional Editors** (50k+ addressable)
-- Pain: "Rough cuts in Adobe/Premiere are slow; Descript doesn't export OTIO"
-- Solution: AI rough cut → OTIO → finish in native NLE
-- Benefit: 40% faster workflow
+### Post-Production Studios (10k+ addressable)
+- **Pain:** "Need local processing for compliance; no vendor lock-in"
+- **Solution:** On-prem deployment, full audit trail
+- **Value:** HIPAA/GDPR compliance + cost control
 
-**3. Post-Production Studios** (10k+ addressable)
-- Pain: "We need local processing for HIPAA/GDPR; no vendor lock-in"
-- Solution: On-prem deployment, full audit trail
-- Value: Compliance + cost control
-
-**4. Indie Filmmakers** (1M+ addressable)
-- Pain: "I can't afford $50/mo editing tool"
-- Solution: Free, local, professional output
-- Benefit: Zero cost, full ownership
+### Indie Filmmakers (1M+ addressable)
+- **Pain:** "Can't afford $55/mo editing subscriptions"
+- **Solution:** Free, local, professional output
+- **Benefit:** Zero cost, full ownership
 
 ---
 
 ## Competitive Positioning
 
-### Montage AI ≠ Descript
-- ✅ Free forever (vs. $12-30/mo)
+### vs. Descript
+- ✅ Free (vs. $12/mo)
 - ✅ Local-first (vs. cloud-only)
-- ✅ Professional handoff (vs. MP4 export)
-- ❌ Less polished UI (opportunity)
+- ✅ OTIO/EDL export (vs. MP4 only)
+- ❌ Simpler UI (by design)
 
-### Montage AI ≠ Adobe Firefly
-- ✅ No Creative Cloud required
+### vs. Adobe Premiere
+- ✅ No Creative Cloud subscription
 - ✅ Privacy by design
-- ✅ Simple outcome-based UI
-- ❌ No generative features (intentional)
+- ✅ Faster rough cuts
+- ❌ Not a full NLE (intentional)
 
-### Montage AI ≠ Opus Clip
-- ✅ Free vs. $30-100/mo
-- ✅ For professionals (not just creators)
-- ✅ NLE integration
-- ❌ Smaller feature set (focused)
+### vs. Frame
+- ✅ Beat-sync editing
+- ✅ OTIO/EDL export
+- ✅ Auto-reframe
+- ❌ Smaller community (opportunity)
 
 ---
 
 ## Business Model
 
 ### Current (Q1 2026)
-- **Open Source (PolyForm NC):** Free for individuals
-- **Community:** GitHub stars, donations, word-of-mouth
-- **Early Monetization:** Beta enterprise partnerships
+- **Open Source (PolyForm NC):** Free for non-commercial use
+- **Community:** GitHub, documentation, word-of-mouth
+- **Enterprise Beta:** Early partnerships for on-prem deployments
 
 ### Projected Revenue Streams (2026-2027)
 
