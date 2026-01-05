@@ -3,12 +3,19 @@
 # =============================================================================
 # Stage 1: Build dependencies (cached)
 # Stage 2: Runtime (minimal)
+#
+# Build with cache:
+#   docker buildx build --builder multiarch-builder \
+#     --platform linux/amd64,linux/arm64 \
+#     --cache-from type=registry,ref=registry:5000/montage-ai:buildcache \
+#     --cache-to type=registry,ref=registry:5000/montage-ai:buildcache,mode=max \
+#     -t registry:5000/montage-ai:latest .
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # STAGE 1: Base with system dependencies
 # -----------------------------------------------------------------------------
-FROM continuumio/miniconda3 AS base
+FROM continuumio/miniconda3:latest AS base
 
 # Build arguments
 ARG GIT_COMMIT=dev
@@ -38,11 +45,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 20 LTS for cgpu (separate layer)
+# Install Node.js 20 LTS for cgpu (separate layer, cached)
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
-    rm -rf /var/lib/apt/lists/* && \
-    npm install -g cgpu @google/gemini-cli
+    rm -rf /var/lib/apt/lists/*
+
+# Install global npm packages (separate layer to cache better)
+RUN npm install -g cgpu@latest @google/gemini-cli && \
+    npm cache clean --force
 
 # -----------------------------------------------------------------------------
 # STAGE 2: Python dependencies (cached unless requirements change)
@@ -59,11 +69,12 @@ RUN conda install -y -c conda-forge \
     numba=0.60.0 \
     numpy=1.26.4 \
     scipy \
-    wget && \
-    conda clean -afy
-
-# Copy requirements first (cache layer)
+    wget && \ - invalidates only when requirements change)
 COPY requirements.txt .
+
+# Install pip dependencies (no-cache-dir to keep image small, but layer is cached by BuildKit)
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip list > /tmp/installed_package
 
 # Install pip dependencies using pip (uv not available in conda image)
 RUN pip install --no-cache-dir -r requirements.txt
@@ -97,11 +108,18 @@ FROM realesrgan AS runtime
 
 WORKDIR /app
 
-# Copy application code (changes most frequently - last layer)
-COPY src/ /app/src/
+# Copy only pyproject.toml first (for dependency metadata)
 COPY pyproject.toml .
 
-# Install package in editable mode
+# Create minimal src structure for editable install
+RUN mkdir -p /app/src/montage_ai && \
+    touch /app/src/montage_ai/__init__.py
+
+# Install package in editable mode (cached unless pyproject.toml changes)
+RUN pip install --no-cache-dir -e .
+
+# Copy application code (changes most frequently - final layer)
+COPY src/ /app/src/
 RUN pip install --no-cache-dir -e .
 
 # Vulkan headless environment
