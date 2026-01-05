@@ -14,7 +14,7 @@ spec:
   resources:
     requests:
       storage: 50Gi
-  # storageClassName: local-path  # Uncomment and adjust for your cluster
+  storageClassName: local-path  # Uncomment and adjust for your cluster
 ---
 # Music storage for audio tracks
 apiVersion: v1
@@ -31,7 +31,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  # storageClassName: local-path
+  storageClassName: local-path
 ---
 # Assets storage for overlays, logos
 apiVersion: v1
@@ -48,6 +48,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: local-path
   # storageClassName: local-path
 ---
 # Output storage for generated videos
@@ -65,4 +66,4 @@ spec:
   resources:
     requests:
       storage: 100Gi
-  # storageClassName: local-path
+  storageClassName: local-path
