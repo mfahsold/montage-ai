@@ -655,29 +655,182 @@ footer {
     .header-actions { width: 100%; justify-content: space-between; }
     .hero-stats { justify-content: space-around; }
     .profile-grid { grid-template-columns: repeat(2, 1fr); }
-    
+
     .feature-showcase {
         gap: 2rem;
     }
-    
+
     .ascii-demo {
         font-size: 0.55rem;
         padding: 0.4rem;
     }
-    
+
     .showcase-content h3 {
         font-size: 0.9rem;
     }
-    
+
     .feature-highlight {
         font-size: 0.85rem;
     }
-    
+
     .showcase-content > p {
         font-size: 0.8rem;
     }
-    
+
     .feature-specs li {
         font-size: 0.75rem;
+    }
+}
+
+/* ============================================
+   OSS LANDSCAPE SECTION
+   ============================================ */
+
+.oss-landscape {
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.05), rgba(245, 158, 11, 0.05));
+}
+
+.oss-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.oss-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.oss-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.oss-card.highlight {
+    border: 2px solid var(--accent);
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.1), rgba(13, 148, 136, 0.05));
+}
+
+.oss-card h4 {
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    color: var(--text);
+    margin-bottom: 1rem;
+    letter-spacing: 0.05em;
+}
+
+.oss-card.highlight h4 {
+    color: var(--accent);
+}
+
+.oss-features {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.oss-features li {
+    font-size: 0.85rem;
+    padding: 0.3rem 0;
+    font-family: 'Space Mono', monospace;
+}
+
+.oss-features li.has {
+    color: var(--accent);
+}
+
+.oss-features li.missing {
+    color: #ef4444;
+    opacity: 0.8;
+}
+
+.oss-features li.partial {
+    color: var(--accent-secondary);
+}
+
+.oss-badge {
+    position: absolute;
+    top: -0.5rem;
+    right: 1rem;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.05em;
+}
+
+.oss-link {
+    display: block;
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    text-decoration: none;
+}
+
+a.oss-link:hover {
+    color: var(--accent);
+}
+
+.oss-philosophy {
+    text-align: center;
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+}
+
+.oss-philosophy blockquote {
+    font-size: 1.5rem;
+    font-style: italic;
+    color: var(--accent);
+    margin: 0 0 1rem 0;
+    font-family: 'Inter', sans-serif;
+}
+
+.oss-philosophy p {
+    color: var(--muted);
+    font-size: 0.95rem;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* OSS Section Responsive */
+@media (max-width: 960px) {
+    .oss-grid {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .oss-philosophy blockquote {
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .oss-card {
+        padding: 1.25rem;
+    }
+
+    .oss-features li {
+        font-size: 0.8rem;
+    }
+
+    .oss-philosophy blockquote {
+        font-size: 1.1rem;
+    }
+
+    .oss-philosophy p {
+        font-size: 0.85rem;
     }
 }

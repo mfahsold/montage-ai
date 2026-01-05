@@ -229,6 +229,8 @@ More help → [docs/troubleshooting.md](docs/troubleshooting.md)
 
 ## 🎯 Why Montage AI?
 
+### vs. Commercial Tools
+
 | Dimension | Montage AI | Descript | Adobe Firefly | Opus Clip |
 | --- | --- | --- | --- | --- |
 | **Cost** | 🟢 Free | 🔴 $12-30/mo | 🔴 $54+/mo | 🔴 $30-100/mo |
@@ -238,6 +240,19 @@ More help → [docs/troubleshooting.md](docs/troubleshooting.md)
 | **Shorts-Native** | 🟢 Yes | 🔴 Afterthought | 🔴 No | 🟢 Yes |
 | **Open Source** | 🟢 Yes | 🔴 No | 🔴 No | 🔴 No |
 | **Text Editing** | 🟢 Yes | 🟢 Yes | 🔴 No | 🔴 No |
+
+### vs. Open Source Alternatives
+
+| Dimension | Montage AI | Frame | AutoClip | Open-Sora |
+| --- | --- | --- | --- | --- |
+| **Beat-Sync** | 🟢 librosa | 🔴 No | 🟡 Basic | 🔴 N/A |
+| **Story Arc** | 🟢 5-phase | 🔴 No | 🔴 No | 🔴 N/A |
+| **NLE Export** | 🟢 OTIO/EDL | 🔴 No | 🔴 No | 🔴 N/A |
+| **Distributed** | 🟢 K8s | 🔴 No | 🔴 No | 🔴 No |
+| **Style Presets** | 🟢 8+ | 🟡 Limited | 🔴 No | 🔴 N/A |
+| **Focus** | Edit | Edit | Highlights | Generate |
+
+> **Note:** Open-Sora generates video from text — we edit existing footage. Complementary, not competing.
 
 **Read more:** [Competitive Analysis](docs/COMPETITIVE_ANALYSIS.md)
 

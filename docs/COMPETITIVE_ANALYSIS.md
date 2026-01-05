@@ -76,6 +76,61 @@ Montage AI occupies a **unique niche** in the video editing landscape by being t
 
 ---
 
+## Open Source Landscape (2025)
+
+### AI Cutting & Editing Tools
+
+| Project | Stars | Beat-Sync | Story Arc | NLE Export | Distributed |
+|---------|-------|-----------|-----------|------------|-------------|
+| **Montage AI** | — | ✅ librosa | ✅ 5-phase | ✅ OTIO/EDL | ✅ K8s |
+| [Frame](https://github.com/aregrid/frame) | ~2k | ❌ | ❌ | ❌ | ❌ |
+| AutoClip | ~1k | ⚠️ basic | ❌ | ❌ | ❌ |
+| AI-Shorts-Generator | ~500 | ❌ | ❌ | ❌ | ❌ |
+
+**Analysis:**
+- **Frame** offers a Cursor-like UI for quick visual cuts but lacks audio analysis
+- **AutoClip** extracts highlights based on energy but has no narrative structure
+- **AI-Shorts-Generator** focuses on transcription-based clipping for vertical video
+
+**Montage AI's OSS Advantage:** We're the only source-available tool combining beat-synchronized editing, narrative story arcs, and professional NLE export.
+
+---
+
+### AI Video Generation (Not Our Scope)
+
+| Project | Stars | Focus | Relationship |
+|---------|-------|-------|--------------|
+| [Open-Sora](https://github.com/hpcaitech/Open-Sora) | ~22k | Text-to-Video | Complementary |
+| [VACE](https://github.com/ali-vilab/VACE) (Alibaba) | new | All-in-one creation | Different category |
+
+**Philosophy:** These tools **generate** video from text prompts. We **polish** existing footage. Our tagline: "We do not generate pixels; we polish them."
+
+**Complementary Use:** Generate B-roll with Open-Sora → Edit into real footage with Montage AI.
+
+---
+
+### AI Enhancement (Integrated)
+
+| Project | Stars | Focus | Integration Status |
+|---------|-------|-------|-------------------|
+| [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | ~28k | AI Upscaling | ✅ Via cgpu |
+| [Video2X](https://github.com/k4yt3x/video2x) | ~8k | ESRGAN Frontend | ✅ Compatible |
+| [Whisper](https://github.com/openai/whisper) | ~75k | Transcription | ✅ Via cgpu |
+
+**Integration:** These tools are upstream dependencies, not competitors. Montage AI integrates them through the cgpu cloud offloading system for upscaling (Quality Profile: Master) and transcription (Transcript Editor).
+
+---
+
+### Why Montage AI Stands Out in OSS
+
+1. **Narrative Intelligence** — Story Arc Engine with 5-phase structure (INTRO→BUILD→CLIMAX→SUSTAIN→OUTRO)
+2. **Professional Workflow** — OTIO/EDL export to real NLEs (DaVinci Resolve, Premiere, FCP)
+3. **Production Audio** — librosa-powered beat detection + energy analysis
+4. **Enterprise Ready** — K8s distributed rendering, ARM + AMD multi-architecture support
+5. **Style System** — 8 curated presets + LLM creative direction
+
+---
+
 ## Market Positioning: "The Open-Source Alternative"
 
 ### Montage AI's Unique Selling Propositions (USPs)
