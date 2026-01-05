@@ -20,100 +20,163 @@
     </nav>
 
     <div class="container">
-        <div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h1 class="voxel-title">DASHBOARD</h1>
-                <p class="text-xs text-muted">AI POST-PRODUCTION ASSISTANT // POLISH, DON'T GENERATE.</p>
-            </div>
-            <div class="flex gap-4">
-                <div class="voxel-badge voxel-badge-primary">SYSTEM ONLINE</div>
-                <div class="voxel-badge voxel-badge-secondary">GPU READY</div>
+        <!-- Header Section: Compact & Elegant -->
+        <div class="mb-12 pt-4">
+            <div class="flex flex-col md:flex-row justify-between items-start gap-6 md:items-end">
+                <div class="flex-1">
+                    <h1 class="voxel-title">DASHBOARD</h1>
+                    <p class="text-xs text-muted">AI POST-PRODUCTION ASSISTANT</p>
+                    <p class="text-xs text-muted">// POLISH, DON'T GENERATE.</p>
+                </div>
+                <div class="flex gap-3 flex-wrap justify-start md:justify-end">
+                    <div class="voxel-badge voxel-badge-primary">SYSTEM ONLINE</div>
+                    <div class="voxel-badge voxel-badge-secondary">GPU READY</div>
+                </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-auto mb-8">
+        <!-- Quick Actions: Two Main Features -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
             <!-- Quick Action: New Montage -->
-            <a href="/montage" class="voxel-card flex flex-col justify-between" style="text-decoration: none;">
-                <div>
-                    <h3 class="text-primary mb-2">NEW PROJECT</h3>
-                    <p class="text-xs text-muted mb-4">The core engine. Upload footage and let the AI Director assemble a cinematic montage based on your style and prompt.</p>
+            <a href="/montage" class="voxel-card workflow-card flex flex-col justify-between" style="text-decoration: none;">
+                <div class="mb-6">
+                    <div class="workflow-icon mb-3">📽️</div>
+                    <h3 class="text-primary mb-2">MONTAGE CREATOR</h3>
+                    <p class="text-xs text-muted leading-relaxed">Upload footage and let the AI Director assemble a cinematic montage. Choose from 7+ styles and customize with your creative vision.</p>
                 </div>
-                <div class="flex justify-between items-center mt-4">
-                    <span class="voxel-btn voxel-btn-primary text-xs">LAUNCH CREATOR</span>
-                </div>
+                <button class="voxel-btn voxel-btn-primary text-xs w-full justify-center">LAUNCH CREATOR →</button>
             </a>
 
             <!-- Quick Action: Shorts -->
-            <a href="/shorts" class="voxel-card flex flex-col justify-between" style="text-decoration: none;">
-                <div>
+            <a href="/shorts" class="voxel-card workflow-card flex flex-col justify-between" style="text-decoration: none;">
+                <div class="mb-6">
+                    <div class="workflow-icon mb-3">📱</div>
                     <h3 class="text-secondary mb-2">SHORTS GENERATOR</h3>
-                    <p class="text-xs text-muted mb-4">Optimized for social media. Automatically detects faces and points of interest to crop 16:9 footage into 9:16 vertical clips.</p>
+                    <p class="text-xs text-muted leading-relaxed">Auto-crop 16:9 footage to 9:16 vertical. Smart face detection, safe zones, and platform presets for TikTok, Instagram, and YouTube Shorts.</p>
                 </div>
-                <div class="flex justify-between items-center mt-4">
-                    <span class="voxel-btn voxel-btn-secondary text-xs">CREATE SHORT</span>
-                </div>
+                <button class="voxel-btn voxel-btn-secondary text-xs w-full justify-center">CREATE SHORT →</button>
             </a>
+        </div>
 
-            <!-- Stats -->
-            <div class="voxel-card flex flex-col justify-between">
-                <div>
-                    <h3 class="mb-2">SYSTEM STATUS</h3>
-                    <p class="text-xs text-muted mb-4">Real-time monitoring of local storage and AI processing queue.</p>
-                    <div class="flex justify-between mb-1">
-                        <span class="text-xs text-muted">STORAGE</span>
-                        <span class="text-xs">45%</span>
+        <!-- System Status & Features Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <!-- System Status Card -->
+            <div class="voxel-card">
+                <h4 class="text-primary mb-4 flex items-center gap-2">
+                    <span>⚙️</span> SYSTEM STATUS
+                </h4>
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-muted">STORAGE</span>
+                            <span class="text-xs font-bold text-primary">45%</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: 45%"></div>
+                        </div>
                     </div>
-                    <div class="progress-container">
-                        <div class="progress-bar" style="width: 45%"></div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-muted">QUEUE</span>
+                            <span class="text-xs font-bold text-success">IDLE</span>
+                        </div>
                     </div>
-                    <div class="flex justify-between mt-4 mb-1">
-                        <span class="text-xs text-muted">QUEUE</span>
-                        <span class="text-xs">IDLE</span>
+                    <div class="text-xs text-muted mt-4 pt-3 border-t border-border">
+                        Latest update: Just now
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats: Features -->
+            <div class="voxel-card">
+                <h4 class="text-secondary mb-4 flex items-center gap-2">
+                    <span>✨</span> FEATURES
+                </h4>
+                <ul class="space-y-2 text-xs text-muted">
+                    <li class="flex items-center gap-2">
+                        <span class="text-primary">✓</span>
+                        <span>AI-Powered Montage</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <span class="text-primary">✓</span>
+                        <span>Vertical Shorts (9:16)</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <span class="text-primary">✓</span>
+                        <span>Transcript Editing</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <span class="text-primary">✓</span>
+                        <span>Cloud GPU Upscaling</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Quick Actions: Secondary -->
+            <div class="voxel-card">
+                <h4 class="text-primary mb-4 flex items-center gap-2">
+                    <span>🎬</span> MORE TOOLS
+                </h4>
+                <div class="space-y-2">
+                    <a href="/transcript" class="voxel-btn voxel-btn-sm text-xs w-full justify-center text-center" style="text-decoration: none;">
+                        Transcript Edit
+                    </a>
+                    <a href="/gallery" class="voxel-btn voxel-btn-sm text-xs w-full justify-center text-center" style="text-decoration: none;">
+                        View Gallery
+                    </a>
+                    <a href="/settings" class="voxel-btn voxel-btn-sm text-xs w-full justify-center text-center" style="text-decoration: none;">
+                        Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Jobs Section -->
+        <div class="mb-12">
+            <h2 class="text-primary mb-6 flex items-center gap-2">
+                <span>📊</span> RECENT JOBS
+            </h2>
+            <div class="grid grid-cols-1 gap-3">
+                <!-- Job List (Placeholder) -->
+                <div class="voxel-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4 flex-1">
+                        <div style="width: 12px; height: 12px; background: #10b981; border: 2px solid #10b981; flex-shrink: 0;"></div>
+                        <div class="min-w-0">
+                            <h4 class="truncate">PROJECT_ALPHA_V2</h4>
+                            <span class="text-xs text-muted">Hitchcock Style • 1080p</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 flex-wrap justify-between md:justify-end">
+                        <span class="badge badge-success text-xs">COMPLETED</span>
+                        <span class="text-xs text-muted">2h ago</span>
+                        <button class="voxel-btn voxel-btn-primary text-xs">DOWNLOAD</button>
+                    </div>
+                </div>
+
+                <div class="voxel-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4 flex-1">
+                        <div style="width: 12px; height: 12px; background: var(--secondary); border: 2px solid var(--secondary); flex-shrink: 0;"></div>
+                        <div class="min-w-0">
+                            <h4 class="truncate">SKATE_TRIP_2025</h4>
+                            <span class="text-xs text-muted">MTV Style • 4K Upscale</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 flex-wrap justify-between md:justify-end">
+                        <span class="badge badge-secondary text-xs">PROCESSING</span>
+                        <span class="text-xs text-muted">5m remaining</span>
+                        <button class="voxel-btn text-xs" disabled>VIEW</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <h2 class="mb-4 text-primary">RECENT JOBS</h2>
-        <div class="grid grid-cols-1">
-            <!-- Job List (Placeholder) -->
-            <div class="voxel-card flex justify-between items-center">
-                <div class="flex items-center gap-4">
-                    <div style="width: 12px; height: 12px; background: #10b981; border: 1px solid #10b981;"></div>
-                    <div>
-                        <h4>PROJECT_ALPHA_V2</h4>
-                        <span class="text-xs text-muted">Hitchcock Style • 1080p</span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-4">
-                    <span class="badge">COMPLETED</span>
-                    <span class="text-sm text-muted">2h ago</span>
-                    <button class="voxel-btn text-sm">DOWNLOAD</button>
-                </div>
-            </div>
-
-            <div class="voxel-card flex justify-between items-center">
-                <div class="flex items-center gap-4">
-                    <div style="width: 12px; height: 12px; background: var(--secondary); border: 1px solid var(--secondary);"></div>
-                    <div>
-                        <h4>SKATE_TRIP_2025</h4>
-                        <span class="text-xs text-muted">MTV Style • 4K Upscale</span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-4">
-                    <span class="badge badge-secondary">PROCESSING</span>
-                    <span class="text-sm text-muted">5m remaining</span>
-                    <button class="voxel-btn text-sm" disabled>VIEW</button>
-                </div>
-            </div>
-        </div>
-
-        <footer class="mt-12 pt-8 border-t border-muted flex justify-between items-center text-xs text-muted">
-            <div>&copy; 2026 MONTAGE AI // ALL RIGHTS RESERVED</div>
-            <div class="flex gap-4">
-                <a href="#" class="nav-link">DOCUMENTATION</a>
-                <a href="#" class="nav-link">API REFERENCE</a>
-                <a href="#" class="nav-link">SUPPORT</a>
+        <!-- Footer -->
+        <footer class="pt-8 border-t border-border text-xs text-muted flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>&copy; 2026 MONTAGE AI // POLISH, DON'T GENERATE.</div>
+            <div class="flex gap-4 flex-wrap">
+                <a href="#" class="nav-link hover:text-primary">DOCS</a>
+                <a href="#" class="nav-link hover:text-primary">API</a>
+                <a href="#" class="nav-link hover:text-primary">SUPPORT</a>
             </div>
         </footer>
     </div>

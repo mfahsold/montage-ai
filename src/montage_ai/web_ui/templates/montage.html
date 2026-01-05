@@ -12,11 +12,13 @@
             cursor: pointer;
             transition: all 0.15s;
             text-align: center;
+            background: var(--card-bg);
         }
 
         .style-card:hover {
             border-color: var(--primary);
             background: var(--muted);
+            box-shadow: var(--shd-md);
         }
 
         .style-card.active {
@@ -33,7 +35,7 @@
 
         .style-card p {
             font-size: 0.7rem;
-            color: var(--muted-foreground);
+            color: var(--muted-fg);
         }
 
         .option-group {
@@ -41,6 +43,7 @@
             border: 1px solid var(--border);
             padding: 1rem;
             margin-bottom: 1rem;
+            border-radius: 2px;
         }
 
         .option-item {
@@ -67,13 +70,48 @@
         .option-label-title {
             font-weight: 600;
             font-size: 0.875rem;
-            color: var(--foreground);
+            color: var(--fg);
         }
 
         .option-label-desc {
             font-size: 0.75rem;
-            color: var(--muted-foreground);
+            color: var(--muted-fg);
             margin-top: 0.25rem;
+        }
+
+        /* Quality Profile Cards */
+        .quality-card {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            background: var(--card-bg);
+            transition: all 0.15s;
+        }
+
+        .quality-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shd-md);
+        }
+
+        .quality-card input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .quality-card-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--fg);
+        }
+
+        .quality-card-desc {
+            font-size: 0.75rem;
+            color: var(--muted-fg);
+            display: block;
         }
     </style>
 </head>
@@ -161,7 +199,7 @@
                     
                     <!-- Video Enhancement -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--primary); margin-bottom: 0.75rem;">VIDEO ENHANCEMENT</div>
+                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--primary); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📹 VIDEO ENHANCEMENT</div>
                         <div class="option-item">
                             <input type="checkbox" name="upscale" id="upscale">
                             <div class="option-label">
@@ -180,7 +218,7 @@
 
                     <!-- Output Format -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--primary); margin-bottom: 0.75rem;\">OUTPUT FORMAT</div>
+                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--secondary); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📱 OUTPUT FORMAT</div>
                         <div class="option-item">
                             <input type="checkbox" name="auto_reframe" id="auto_reframe">
                             <div class="option-label">
@@ -198,26 +236,26 @@
                     <h3 class="mb-3 text-primary">STEP 4: QUALITY PROFILE</h3>
                     <p class="text-xs text-muted mb-4">Balance between render speed and output quality.</p>
                     
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                        <label class="flex items-center gap-3 cursor-pointer p-3 border border-border rounded">
-                            <input type="radio" name="quality" value="preview" style="width: 18px; height: 18px;">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <label class="quality-card">
+                            <input type="radio" name="quality" value="preview">
                             <div>
-                                <div style="font-weight: 600; font-size: 0.9rem;">PREVIEW</div>
-                                <div style="font-size: 0.75rem; color: var(--muted-foreground);">360p • Ultrafast • Tests setup</div>
+                                <span class="quality-card-title">PREVIEW</span>
+                                <span class="quality-card-desc">360p • Ultrafast • Tests setup</span>
                             </div>
                         </label>
-                        <label class="flex items-center gap-3 cursor-pointer p-3 border border-border rounded" style="border-color: var(--secondary);">
-                            <input type="radio" name="quality" value="standard" checked style="width: 18px; height: 18px;">
+                        <label class="quality-card" style="border-color: var(--secondary); box-shadow: var(--shd-secondary);">
+                            <input type="radio" name="quality" value="standard" checked>
                             <div>
-                                <div style="font-weight: 600; font-size: 0.9rem;">STANDARD</div>
-                                <div style="font-size: 0.75rem; color: var(--muted-foreground);">1080p • Balanced • Recommended</div>
+                                <span class="quality-card-title">STANDARD</span>
+                                <span class="quality-card-desc">1080p • Balanced • Recommended</span>
                             </div>
                         </label>
-                        <label class="flex items-center gap-3 cursor-pointer p-3 border border-border rounded">
-                            <input type="radio" name="quality" value="high" style="width: 18px; height: 18px;">
+                        <label class="quality-card">
+                            <input type="radio" name="quality" value="high">
                             <div>
-                                <div style="font-weight: 600; font-size: 0.9rem;">HIGH</div>
-                                <div style="font-size: 0.75rem; color: var(--muted-foreground);">4K • Slow • Cinema-quality</div>
+                                <span class="quality-card-title">HIGH</span>
+                                <span class="quality-card-desc">4K • Slow • Cinema-quality</span>
                             </div>
                         </label>
                     </div>
