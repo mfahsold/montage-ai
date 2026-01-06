@@ -49,6 +49,11 @@ class MontageWorkflow(VideoWorkflow):
         variant_id = self.options.extras.get('variant_id', 1)
         editing_instructions = self.options.extras.get('editing_instructions', {}) or {}
         
+        # Override quality profile from runtime options (Essential for Preview Mode)
+        # This ensures MontageBuilder sees the correct profile for disabling stabilization/upscaling
+        if self.options.quality_profile:
+            self.settings.encoding.quality_profile = self.options.quality_profile
+        
         # Inject Music preferences into instructions (so Builder can find them)
         if self.options.extras.get('music_track'):
             editing_instructions['music_track'] = self.options.extras.get('music_track')

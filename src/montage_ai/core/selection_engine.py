@@ -18,15 +18,38 @@ class SelectionEngine:
     def __init__(self, ctx: MontageContext):
         self.ctx = ctx
         self._intelligent_selector = None
+        self._footage_pool = None
         self._init_intelligent_selector()
+
+    def init_footage_pool(self):
+        """Initialize footage pool manager."""
+        from ..footage_manager import integrate_footage_manager
+
+        # Use the same dict objects that are stored in context
+        # (important: id() matching requires same objects)
+        self._footage_pool = integrate_footage_manager(
+            self.ctx.media.all_scenes_dicts,
+            strict_once=False,
+        )
+        return self._footage_pool
+
+    def consume_clip(self, clip_id, timeline_position, used_in_point, used_out_point):
+        """Mark a clip as consumed in the pool."""
+        if self._footage_pool:
+            self._footage_pool.consume_clip(
+                clip_id=clip_id,
+                timeline_position=timeline_position,
+                used_in_point=used_in_point,
+                used_out_point=used_out_point
+            )
 
     def _init_intelligent_selector(self):
         """Initialize intelligent clip selector."""
         try:
             from ..clip_selector import IntelligentClipSelector
             style = "dynamic"
-            if self.ctx.creative.editing_instructions is not None:
-                style = self.ctx.creative.editing_instructions.get('style', {}).get('template', 'dynamic')
+            if self.ctx.creative.editing_instructions is not None and self.ctx.creative.editing_instructions.style:
+                style = self.ctx.creative.editing_instructions.style.name
             self._intelligent_selector = IntelligentClipSelector(style=style)
             logger.info(f"   🧠 Intelligent Clip Selector initialized (style={style})")
         except ImportError:
@@ -103,6 +126,10 @@ class SelectionEngine:
             
             score += self._score_semantic_match(meta)
             score += self._score_broll_match(scene, meta)
+            
+            # New Smart Selection logic (Roadmap 2B)
+            score += self._score_faces(meta)
+            score += self._score_visual_novelty(meta)
 
             score += random.randint(-15, 15)
             scene['_heuristic_score'] = score
@@ -299,6 +326,28 @@ class SelectionEngine:
             
         return 0.0
 
+    def _score_faces(self, meta: Dict[str, Any]) -> float:
+        """Score based on presence of faces."""
+        count = meta.get('face_count', 0)
+        if count > 0:
+            return 10.0
+        return 0.0
+
+    def _score_visual_novelty(self, meta: Dict[str, Any]) -> float:
+        """Score based on visual/semantic novelty (tags overlap)."""
+        current_tags = set(meta.get('tags', []))
+        last_tags = set(self.ctx.timeline.last_tags)
+        
+        if not current_tags or not last_tags:
+            return 0.0
+            
+        overlap = len(current_tags.intersection(last_tags))
+        if overlap >= 3:
+            return -30.0 # Repeated content penalty
+        elif overlap >= 2:
+            return -10.0
+        return 0.0
+
     def _select_probabilistic(self, candidates: List[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], float]:
         """Select a clip using weighted probability based on scores."""
         if not candidates:
@@ -386,3 +435,49 @@ class SelectionEngine:
             logger.warning(f"   ⚠️ Intelligent Selection Failed: {e}. Falling back.")
 
         return self._select_probabilistic(candidates)
+
+    def save_episodic_memory(self):
+        """
+        Save clip usage to episodic memory for future learning.
+
+        Only runs if EPISODIC_MEMORY feature flag is enabled.
+        Tracks which clips were used in which story phases.
+        """
+        if not self.ctx.settings.features.episodic_memory:
+            return
+
+        from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
+        
+        cache = get_analysis_cache()
+        montage_id = f"{self.ctx.job_id}_v{self.ctx.variant_id}"
+        total_duration = self.ctx.timeline.current_time or 1.0  # Avoid division by zero
+
+        saved_count = 0
+        for clip in self.ctx.timeline.clips_metadata:
+            # Calculate story phase based on timeline position
+            position = clip.timeline_start / total_duration
+            if position < 0.15:
+                phase = "intro"
+            elif position < 0.40:
+                phase = "build"
+            elif position < 0.70:
+                phase = "climax"
+            elif position < 0.90:
+                phase = "sustain"
+            else:
+                phase = "outro"
+
+            entry = EpisodicMemoryEntry(
+                clip_path=clip.source_path,
+                montage_id=montage_id,
+                story_phase=phase,
+                timestamp_used=clip.timeline_start,
+                clip_start=clip.start_time,
+                clip_end=clip.start_time + clip.duration,
+            )
+
+            if cache.save_episodic_memory(entry):
+                saved_count += 1
+
+        if saved_count > 0:
+            logger.info(f"   📝 Episodic memory: saved {saved_count} clip usage records")

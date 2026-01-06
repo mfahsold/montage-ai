@@ -1,7 +1,8 @@
 import random
 import pytest
 from unittest.mock import MagicMock, patch
-from montage_ai.core.montage_builder import MontageBuilder, MontageContext
+from montage_ai.core.montage_builder import MontageBuilder
+from montage_ai.core.context import MontageContext
 from montage_ai.config import Settings
 
 @pytest.fixture
@@ -106,21 +107,21 @@ def test_score_broll_match_unit(mock_settings):
     scene = {"path": "/path/to/target.mp4"}
     meta = {}
     
-    score = builder._score_broll_match(scene, meta)
+    score = builder._selection_engine._score_broll_match(scene, meta)
     assert score == 100.0, "Should get max score for direct suggestion match"
     
     # Case 2: Matching Time, Non-Matching Clip
     scene_wrong = {"path": "/path/to/random.mp4"}
-    score = builder._score_broll_match(scene_wrong, meta)
+    score = builder._selection_engine._score_broll_match(scene_wrong, meta)
     assert score == 0.0, "Should get 0 for non-suggested clip"
     
     # Case 3: Wrong Time
     builder.ctx.timeline.current_time = 15.0
-    score = builder._score_broll_match(scene, meta)
+    score = builder._selection_engine._score_broll_match(scene, meta)
     assert score == 0.0, "Should get 0 if current time is outside segment"
 
 def test_broll_selection_integration(mock_settings):
-    """Test that _select_clip prioritizes B-Roll plan suggestions."""
+    """Test that select_clip prioritizes B-Roll plan suggestions."""
     # Seed RNG
     random.seed(42)
     
@@ -166,32 +167,36 @@ def test_broll_selection_integration(mock_settings):
     
     available_footage = [MockClipUsage(scene_match), MockClipUsage(scene_other)]
     
-    # Mock methods called by _select_clip
-    builder._get_candidate_scenes = MagicMock(return_value=[scene_match, scene_other])
-    builder._resolve_scoring_rules = MagicMock(return_value={
-        "fresh_clip_bonus": 10,
-        "jump_cut_penalty": -10,
-        "shot_variation_bonus": 5,
-        "shot_repetition_penalty": -5
-    })
-    builder._get_current_music_section = MagicMock(return_value={})
+    # Use the SelectionEngine instance
+    engine = builder._selection_engine
     
     # Mock internal scoring methods to return 0 except broll
-    builder._score_usage_and_story_phase = MagicMock(return_value=0)
-    builder._score_jump_cut = MagicMock(return_value=0)
-    builder._score_action_energy = MagicMock(return_value=0)
-    builder._score_style_preferences = MagicMock(return_value=0)
-    builder._score_shot_variation = MagicMock(return_value=0)
-    builder._score_match_cut = MagicMock(return_value=0)
-    builder._score_semantic_match = MagicMock(return_value=0)
-    
-    # Ensure _score_broll_match uses the real logic from the class
-    # We didn't mock it, so it should be fine.
-    
-    builder._intelligent_selector = None # Ensure probabilistic fallback
-    
-    selected, score = builder._select_clip(available_footage, 0.5, 0)
-    
-    assert selected is not None
-    assert selected["path"] == "/path/to/run.mp4"
-    assert selected["_heuristic_score"] >= 85 # 100 + random(-15, 15)
+    # In SelectionEngine, these are instance methods
+    with patch.object(engine, '_score_usage_and_story_phase', return_value=0), \
+         patch.object(engine, '_score_jump_cut', return_value=0), \
+         patch.object(engine, '_score_action_energy', return_value=0), \
+         patch.object(engine, '_score_style_preferences', return_value=0), \
+         patch.object(engine, '_score_shot_variation', return_value=0), \
+         patch.object(engine, '_score_match_cut', return_value=0), \
+         patch.object(engine, '_score_semantic_match', return_value=0), \
+         patch.object(engine, '_resolve_scoring_rules', return_value={
+             "fresh_clip_bonus": 10,
+             "jump_cut_penalty": -10,
+             "shot_variation_bonus": 5,
+             "shot_repetition_penalty": -5
+         }):
+        
+        # Ensure probabilistic fallback
+        builder._intelligent_selector = None 
+        engine._intelligent_selector = None
+        
+        # Test selection
+        selected, score = engine.select_clip(
+            available_footage, 
+            current_energy=0.5, 
+            unique_videos=2
+        )
+        
+        assert selected is not None
+        assert selected["path"] == "/path/to/run.mp4"
+        assert selected["_heuristic_score"] >= 85 # 100 + random(-15, 15)

@@ -127,9 +127,7 @@ def test_montage_builder_integrates_proxy_generator(mock_settings, mock_proxy_ge
     with patch("montage_ai.core.montage_builder.ThreadPoolExecutor") as mock_executor:
          
          # Mock Context
-         builder.ctx.video_files = [Path("/mock/input/video1.mp4")]
-         builder.ctx.input_dir = Path("/mock/input")
-         builder.ctx.temp_dir = Path("/mock/temp")
+         builder.ctx.media.video_files = [Path("/mock/input/video1.mp4")]
          
          # Mock _executor on the builder INSTANCE, because analyze_assets accesses self._executor
          # ThreadPoolExecutor() in code creates a NEW instance, so patching the class works for creation
@@ -142,12 +140,14 @@ def test_montage_builder_integrates_proxy_generator(mock_settings, mock_proxy_ge
          mock_future = MagicMock()
          builder._executor.submit.return_value = mock_future
          
-         # Mock other calls in analyze_assets
-         builder._trigger_story_analysis = MagicMock()
-         builder._detect_scenes = MagicMock()
-         builder._analyze_music = MagicMock()
-         builder._determine_output_profile = MagicMock()
-         builder._init_footage_pool = MagicMock()
+         # Mock other calls in analyze_assets via Engines
+         builder._analyzer = MagicMock()
+         builder._pacing_engine = MagicMock()
+         builder._selection_engine = MagicMock()
+         builder._story_engine = MagicMock()
+         
+         # Mock internal helper if needed
+         builder._get_files = MagicMock(return_value=[Path("/mock/music/track1.mp3")])
 
          # Run Analysis
          builder.analyze_assets()

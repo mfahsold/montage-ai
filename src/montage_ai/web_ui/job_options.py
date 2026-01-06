@@ -20,19 +20,24 @@ def _parse_bool(value: Any) -> bool:
 
 def apply_preview_preset(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Apply fast preview overrides for /api/jobs preset=fast.
+    Apply fast preview overrides for /api/jobs preset=fast OR quality=preview.
     """
-    if data.get("preset") != "fast":
+    is_preview = data.get("preset") == "fast" or data.get("quality") == "preview"
+
+    if not is_preview:
         return data
 
     updated = copy.deepcopy(data)
     updated["style"] = "dynamic"
-    updated["target_duration"] = min(updated.get("target_duration", 30) or 30, 30)
+    updated["target_duration"] = min( updated.get("target_duration", 30) or 30, 30)
     updated["upscale"] = False
     updated["stabilize"] = False
     updated["enhance"] = False
     updated["cgpu"] = False
     updated["creative_loop"] = False
+    
+    # Ensure quality_profile is set for downstream components
+    updated["quality_profile"] = "preview"
 
     options = updated.setdefault("options", {})
     is_shorts = _parse_bool(options.get("shorts_mode", updated.get("shorts_mode", False)))
@@ -123,7 +128,7 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
         "music_start": music_start,
         "music_end": music_end,
         "music_track": music_track,
-        "preview": data.get("preset") == "fast",
+        "preview": data.get("preset") == "fast" or quality_profile == "preview",
         "quality_profile": quality_profile,
         "cloud_acceleration": cloud_acceleration,
         "cgpu": cloud_acceleration,

@@ -15,6 +15,7 @@ from typing import List, Optional, Any, Dict
 from ..audio_analysis import calculate_dynamic_cut_length
 from .context import MontageContext
 from ..utils import coerce_float
+from ..logger import logger
 
 class PacingEngine:
     """
@@ -23,6 +24,65 @@ class PacingEngine:
     def __init__(self, context: MontageContext):
         self.ctx = context
         self.settings = context.settings
+
+    def init_audio_duration(self):
+        """Initialize audio and calculate target duration."""
+        from ..utils import coerce_float
+        
+        # Get duration settings from config
+        target_duration_setting = self.settings.creative.target_duration
+        music_start = self.settings.creative.music_start
+        music_end = self.settings.creative.music_end
+
+        # Allow overrides from editing instructions
+        if self.ctx.creative.editing_instructions:
+            if self.ctx.creative.editing_instructions.music_start > 0:
+                music_start = self.ctx.creative.editing_instructions.music_start
+            
+            if self.ctx.creative.editing_instructions.music_end is not None:
+                music_end = self.ctx.creative.editing_instructions.music_end
+
+        audio_duration = self.ctx.media.audio_result.duration
+
+        # Apply music trimming
+        if music_end and music_end < audio_duration:
+            audio_duration = music_end - music_start
+        elif music_start > 0:
+            audio_duration = audio_duration - music_start
+
+        # Determine target duration
+        if target_duration_setting > 0:
+            self.ctx.timeline.target_duration = target_duration_setting
+        else:
+            self.ctx.timeline.target_duration = audio_duration
+
+        # Apply Creative Director constraints if provided (only when env didn't override)
+        if target_duration_setting <= 0 and self.ctx.creative.editing_instructions:
+            constraints = getattr(self.ctx.creative.editing_instructions, 'constraints', {})
+            target_override = coerce_float(constraints.get("target_duration_sec"))
+            if target_override and target_override > 0:
+                self.ctx.timeline.target_duration = min(audio_duration, target_override)
+
+        if self.settings.features.verbose:
+            logger.info(f"   ⏱️ Target duration: {self.ctx.timeline.target_duration:.1f}s")
+
+    def init_crossfade_settings(self):
+        """Initialize crossfade settings from config and Creative Director."""
+        enable_xfade = self.settings.creative.enable_xfade
+        xfade_duration = self.settings.creative.xfade_duration
+
+        if enable_xfade == "true":
+            self.ctx.timeline.enable_xfade = True
+        elif enable_xfade == "false":
+            self.ctx.timeline.enable_xfade = False
+        elif self.ctx.creative.editing_instructions is not None:
+            transitions = getattr(self.ctx.creative.editing_instructions, 'transitions', {})
+            transition_type = transitions.get('type', 'energy_aware')
+            xfade_duration = transitions.get('crossfade_duration_sec', xfade_duration)
+            if transition_type == 'crossfade':
+                self.ctx.timeline.enable_xfade = True
+
+        self.ctx.timeline.xfade_duration = xfade_duration
 
     def get_next_cut_duration(self, current_energy: float) -> float:
         """
@@ -141,7 +201,28 @@ class PacingEngine:
                     break
         
         if pacing_speed == "dynamic" and current_section:
-            if current_section.energy_level == "high":
+            # Structure-aware pacing
+            label = getattr(current_section, 'label', None)
+            
+            if label == 'intro':
+                return 16 if tempo > 120 else 8
+            elif label == 'outro':
+                return 16
+            elif label == 'build':
+                # Progressive build: 8 -> 4 -> 2 -> 1
+                duration = current_section.end_time - current_section.start_time
+                if duration > 1.0:
+                    progress = (current_time - current_section.start_time) / duration
+                    if progress < 0.25: return 8
+                    elif progress < 0.50: return 4
+                    elif progress < 0.75: return 2
+                    else: return 1
+                return 4
+            elif label == 'drop':
+                return 1 if tempo < 130 else 2
+
+            # Energy fallback
+            elif current_section.energy_level == "high":
                 # High energy section: 2 beats (fast) or 4 beats (medium-fast)
                 return 2 if tempo < 130 else 4
             elif current_section.energy_level == "low":

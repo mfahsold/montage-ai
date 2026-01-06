@@ -10,8 +10,8 @@ from unittest.mock import patch, MagicMock, Mock
 from pathlib import Path
 import numpy as np
 
-from src.montage_ai.core.montage_builder import (
-    MontageBuilder,
+from src.montage_ai.core.montage_builder import MontageBuilder
+from src.montage_ai.core.context import (
     MontageContext,
     MontageResult,
     AudioAnalysisResult,
@@ -181,16 +181,16 @@ class TestMontageContext:
             settings=mock_settings.return_value,
             paths=paths,
         )
-        ctx.current_time = 30.0
-        ctx.beat_idx = 10
-        ctx.cut_number = 5
+        ctx.timeline.current_time = 30.0
+        ctx.timeline.beat_idx = 10
+        ctx.timeline.cut_number = 5
 
         ctx.reset_timeline_state()
 
-        assert ctx.current_time == 0.0
-        assert ctx.beat_idx == 0
-        assert ctx.cut_number == 0
-        assert ctx.clips_metadata == []
+        assert ctx.timeline.current_time == 0.0
+        assert ctx.timeline.beat_idx == 0
+        assert ctx.timeline.cut_number == 0
+        assert ctx.timeline.clips_metadata == []
 
     @patch("src.montage_ai.core.montage_builder.get_settings")
     def test_get_story_position(self, mock_settings):
@@ -218,8 +218,8 @@ class TestMontageContext:
             settings=mock_settings.return_value,
             paths=paths,
         )
-        ctx.target_duration = 100.0
-        ctx.current_time = 50.0
+        ctx.timeline.target_duration = 100.0
+        ctx.timeline.current_time = 50.0
 
         assert ctx.get_story_position() == 0.5
 
@@ -249,8 +249,8 @@ class TestMontageContext:
             settings=mock_settings.return_value,
             paths=paths,
         )
-        ctx.target_duration = 100.0
-        ctx.current_time = 5.0
+        ctx.timeline.target_duration = 100.0
+        ctx.timeline.current_time = 5.0
 
         assert ctx.get_story_phase() == "intro"
 
@@ -280,8 +280,8 @@ class TestMontageContext:
             settings=mock_settings.return_value,
             paths=paths,
         )
-        ctx.target_duration = 100.0
-        ctx.current_time = 55.0
+        ctx.timeline.target_duration = 100.0
+        ctx.timeline.current_time = 55.0
 
         assert ctx.get_story_phase() == "climax"
 
@@ -357,7 +357,12 @@ class TestMontageBuilder:
         instructions = {"style": {"name": "dynamic"}}
         builder = MontageBuilder(variant_id=1, editing_instructions=instructions)
 
-        assert builder.ctx.editing_instructions == instructions
+        # Convert dict to model if needed by implementation, but test checked against dict?
+        # The implementation converts dict to EditingInstructions model.
+        # So builder.ctx.creative.editing_instructions is an object.
+        # If instructions is a dict, we should expect equality or attribute match.
+        inst = builder.ctx.creative.editing_instructions
+        assert inst.style.name == "dynamic"
 
     @patch("src.montage_ai.core.montage_builder.get_settings")
     def test_apply_creative_director_effects(self, mock_settings):
@@ -372,6 +377,7 @@ class TestMontageBuilder:
         mock_settings.return_value.features.stabilize = False
         mock_settings.return_value.features.upscale = False
         mock_settings.return_value.features.enhance = False
+        mock_settings.return_value.encoding.quality_profile = "standard"
 
         instructions = {
             "effects": {
@@ -383,9 +389,9 @@ class TestMontageBuilder:
         builder = MontageBuilder(variant_id=1, editing_instructions=instructions)
         builder._apply_creative_director_effects()
 
-        assert builder.ctx.stabilize is True
-        assert builder.ctx.upscale is True
-        assert builder.ctx.enhance is True
+        assert builder.ctx.features.stabilize is True
+        assert builder.ctx.features.upscale is True
+        assert builder.ctx.features.enhance is True
 
     @patch("src.montage_ai.core.montage_builder.get_settings")
     def test_env_overrides_template(self, mock_settings):
@@ -397,6 +403,7 @@ class TestMontageBuilder:
         mock_settings.return_value.paths.assets_dir = Path("/assets")
         mock_settings.return_value.paths.output_dir = Path("/output")
         mock_settings.return_value.paths.temp_dir = Path("/tmp")
+        mock_settings.return_value.encoding.quality_profile = "standard"
         # ENV says stabilize=True
         mock_settings.return_value.features.stabilize = True
         mock_settings.return_value.features.upscale = False
@@ -411,7 +418,7 @@ class TestMontageBuilder:
         builder._apply_creative_director_effects()
 
         # ENV should win
-        assert builder.ctx.stabilize is True
+        assert builder.ctx.features.stabilize is True
 
 
 class TestMontageBuilderHelpers:
@@ -435,8 +442,13 @@ class TestMontageBuilderHelpers:
 
         energy_times = np.array([0.0, 1.0, 2.0, 3.0])
         energy_values = np.array([0.2, 0.4, 0.6, 0.8])
+        
+        # Setup context for PacingEngine
+        builder.ctx.media.audio_result = MagicMock()
+        builder.ctx.media.audio_result.energy_times = energy_times
+        builder.ctx.media.audio_result.energy_values = energy_values
 
-        result = builder._get_energy_at_time(1.5, energy_times, energy_values)
+        result = builder._pacing_engine.get_energy_at_time(1.5)
         # Should return energy at index 2 (closest to 1.5)
         assert result == 0.6
 
@@ -455,6 +467,11 @@ class TestMontageBuilderHelpers:
         mock_settings.return_value.features.enhance = False
 
         builder = MontageBuilder(variant_id=1)
+        
+        # Setup empty contexts
+        builder.ctx.media.audio_result = MagicMock()
+        builder.ctx.media.audio_result.energy_times = np.array([])
+        builder.ctx.media.audio_result.energy_values = np.array([])
 
-        result = builder._get_energy_at_time(1.0, np.array([]), np.array([]))
+        result = builder._pacing_engine.get_energy_at_time(1.0)
         assert result == 0.5

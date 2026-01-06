@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from src.montage_ai.core.montage_builder import MontageBuilder, OutputProfile
+from src.montage_ai.core.montage_builder import MontageBuilder
+from src.montage_ai.core.context import OutputProfile
 
 @pytest.fixture
 def mock_settings():
@@ -29,7 +30,7 @@ def test_preview_mode_resolution(mock_settings):
     
     builder = MontageBuilder()
     # Mock context and video files
-    builder.ctx.video_files = ["test.mp4"]
+    builder.ctx.media.video_files = ["test.mp4"]
     
     # Mock determine_output_profile from video_metadata
     with patch('src.montage_ai.video_metadata.determine_output_profile') as mock_det:
@@ -49,11 +50,11 @@ def test_preview_mode_resolution(mock_settings):
         
         mock_det.return_value = mock_profile
         
-        builder._determine_output_profile()
+        builder._analyzer.determine_output_profile()
         
-        assert builder.ctx.output_profile.width == 640
-        assert builder.ctx.output_profile.height == 360
-        assert builder.ctx.output_profile.reason == "preview_mode"
+        assert builder.ctx.media.output_profile.width == 640
+        assert builder.ctx.media.output_profile.height == 360
+        assert builder.ctx.media.output_profile.reason == "preview_mode"
 
 def test_preview_mode_disables_effects(mock_settings):
     """Test that preview mode disables heavy effects."""
@@ -63,20 +64,27 @@ def test_preview_mode_disables_effects(mock_settings):
     mock_settings.features.enhance = True
     
     builder = MontageBuilder()
-    builder.ctx.editing_instructions = {'effects': {'stabilization': True, 'upscale': True, 'sharpness_boost': True}}
+    # Mock EditingInstructions object logic or just set dictionary?
+    # Implementation handles dict conversion if passed to init.
+    # Here we set direct attribute, which should be on ctx.creative.editing_instructions
+    # But builder._apply_creative_director_effects() checks ctx.creative.editing_instructions
+    
+    # We should setup builder properly
+    instructions = {'effects': {'stabilization': True, 'upscale': True, 'sharpness_boost': True}}
+    builder = MontageBuilder(editing_instructions=instructions)
     
     builder._apply_creative_director_effects()
     
-    assert builder.ctx.stabilize is False
-    assert builder.ctx.upscale is False
-    assert builder.ctx.enhance is False
+    assert builder.ctx.features.stabilize is False
+    assert builder.ctx.features.upscale is False
+    assert builder.ctx.features.enhance is False
 
 def test_preview_mode_vertical(mock_settings):
     """Test preview mode with vertical video."""
     mock_settings.encoding.quality_profile = "preview"
     
     builder = MontageBuilder()
-    builder.ctx.video_files = ["test.mp4"]
+    builder.ctx.media.video_files = ["test.mp4"]
     
     with patch('src.montage_ai.video_metadata.determine_output_profile') as mock_det:
         mock_profile = MagicMock()
@@ -94,8 +102,8 @@ def test_preview_mode_vertical(mock_settings):
         
         mock_det.return_value = mock_profile
         
-        builder._determine_output_profile()
+        builder._analyzer.determine_output_profile()
         
-        assert builder.ctx.output_profile.width == 360
-        assert builder.ctx.output_profile.height == 640
-        assert builder.ctx.output_profile.reason == "preview_mode"
+        assert builder.ctx.media.output_profile.width == 360
+        assert builder.ctx.media.output_profile.height == 640
+        assert builder.ctx.media.output_profile.reason == "preview_mode"

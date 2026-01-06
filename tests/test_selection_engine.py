@@ -40,6 +40,7 @@ class TestSelectionEngine(unittest.TestCase):
         # Timeline state
         self.ctx.timeline.last_used_path = None
         self.ctx.timeline.last_shot_type = None
+        self.ctx.timeline.last_tags = []
         self.ctx.get_story_phase.return_value = "build"
 
         self.engine = SelectionEngine(self.ctx)

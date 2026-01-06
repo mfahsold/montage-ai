@@ -8,8 +8,8 @@ Contains the core pipeline components:
 - EmbeddingSearchEngine: Fast similarity search for clips
 """
 
-from .montage_builder import (
-    MontageBuilder,
+from .montage_builder import MontageBuilder
+from .context import (
     MontageContext,
     MontageResult,
     AudioAnalysisResult,

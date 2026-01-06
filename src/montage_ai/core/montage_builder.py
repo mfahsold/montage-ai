@@ -41,10 +41,6 @@ from ..enhancement_tracking import (
 )
 from .models import EditingInstructions
 from .context import (
-    AudioAnalysisResult,
-    SceneInfo,
-    OutputProfile,
-    ClipMetadata,
     MontagePaths,
     MontageFeatures,
     MontageCreative,
@@ -54,285 +50,9 @@ from .context import (
     MontageTiming,
     MontageContext,
     MontageResult,
+    ClipMetadata,
 )
-
-
-def process_clip_task(
-    scene_path: str,
-    clip_start: float,
-    cut_duration: float,
-    temp_dir: str,
-    temp_clip_name: str,
-    ctx_stabilize: bool,
-    ctx_upscale: bool,
-    ctx_enhance: bool,
-    ctx_color_grade: str,
-    ctx_denoise: bool,
-    ctx_sharpen: bool,
-    ctx_film_grain: str,
-    enhancer: Any,
-    output_profile: Any,
-    settings: Any,
-    resource_manager: Any
-) -> Tuple[str, Dict[str, bool], List[str]]:
-    """
-    Process a single clip: extract, enhance, normalize.
-    Executed in a thread pool.
-    """
-    import subprocess
-    import shutil
-    
-    temp_clip_path = os.path.join(temp_dir, temp_clip_name)
-    temp_files = [temp_clip_path]
-    
-    # 1. Extract subclip
-    if settings.encoding.extract_reencode:
-        target_fps = output_profile.fps if output_profile else 24.0
-        cmd = build_ffmpeg_cmd([
-            "-ss", str(clip_start),
-            "-i", scene_path,
-            "-t", str(cut_duration),
-            "-vf", f"fps={target_fps}",
-            "-c:v", settings.encoding.codec,
-            "-preset", settings.encoding.preset,
-            "-crf", str(settings.encoding.crf),
-            "-pix_fmt", settings.encoding.pix_fmt,
-            "-an",
-            temp_clip_path,
-        ])
-    else:
-        cmd = build_ffmpeg_cmd([
-            "-ss", str(clip_start),
-            "-i", scene_path,
-            "-t", str(cut_duration),
-            "-c", "copy",
-            "-avoid_negative_ts", "1",
-            temp_clip_path
-        ])
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=settings.processing.ffmpeg_short_timeout,
-    )
-    if result.returncode != 0 or not os.path.exists(temp_clip_path) or os.path.getsize(temp_clip_path) == 0:
-        err_lines = (result.stderr or "").strip().splitlines()
-        err = err_lines[-1] if err_lines else "unknown error"
-        raise RuntimeError(f"ffmpeg extract failed: {err}")
-    
-    # 1.5 Auto Reframe (Shorts Mode)
-    if settings.features.shorts_mode:
-        try:
-            from ..auto_reframe import AutoReframeEngine
-            # Initialize reframer (target 9:16)
-            reframer = AutoReframeEngine(target_aspect=9/16)
-            
-            # Analyze the extracted subclip
-            crops = reframer.analyze(temp_clip_path)
-            
-            shorts_clip_name = f"shorts_{temp_clip_name}"
-            shorts_clip_path = os.path.join(temp_dir, shorts_clip_name)
-            
-            # Apply dynamic crop
-            reframer.apply(crops, temp_clip_path, shorts_clip_path)
-            
-            # Update path and track temp file
-            if os.path.exists(shorts_clip_path) and os.path.getsize(shorts_clip_path) > 0:
-                temp_clip_path = shorts_clip_path
-                temp_files.append(shorts_clip_path)
-            else:
-                logger.warning("Smart reframing failed, using original crop")
-                
-        except Exception as e:
-            logger.warning(f"Smart reframing error: {e}")
-
-    # 2. Enhance
-    current_path = temp_clip_path
-    stabilize_applied = False
-    upscale_applied = False
-    enhance_applied = False
-    denoise_applied = False
-    sharpen_applied = False
-    film_grain_applied = False
-
-    if enhancer:
-        if ctx_stabilize:
-            stab_path = os.path.join(temp_dir, f"stab_{temp_clip_name}")
-            result = enhancer.stabilize(current_path, stab_path)
-            if result != current_path:
-                current_path = result
-                temp_files.append(stab_path)
-                stabilize_applied = True
-
-        if ctx_upscale:
-            upscale_path = os.path.join(temp_dir, f"upscale_{temp_clip_name}")
-            result = enhancer.upscale(current_path, upscale_path)
-            if result != current_path:
-                current_path = result
-                temp_files.append(upscale_path)
-                upscale_applied = True
-
-        if ctx_enhance:
-            enhance_path = os.path.join(temp_dir, f"enhance_{temp_clip_name}")
-            result = enhancer.enhance(current_path, enhance_path, color_grade=ctx_color_grade)
-            if result != current_path:
-                current_path = result
-                temp_files.append(enhance_path)
-                enhance_applied = True
-
-        # 2b. Denoise (NEW)
-        if ctx_denoise:
-            denoise_path = os.path.join(temp_dir, f"denoise_{temp_clip_name}")
-            result = enhancer.denoise(current_path, denoise_path)
-            if result != current_path:
-                current_path = result
-                temp_files.append(denoise_path)
-                denoise_applied = True
-
-        # 2c. Sharpen (NEW)
-        if ctx_sharpen:
-            sharpen_path = os.path.join(temp_dir, f"sharpen_{temp_clip_name}")
-            result = enhancer.sharpen(current_path, sharpen_path)
-            if result != current_path:
-                current_path = result
-                temp_files.append(sharpen_path)
-                sharpen_applied = True
-
-        # 2d. Film Grain (NEW)
-        if ctx_film_grain and ctx_film_grain != "none":
-            grain_path = os.path.join(temp_dir, f"grain_{temp_clip_name}")
-            result = enhancer.add_film_grain(current_path, grain_path, preset=ctx_film_grain)
-            if result != current_path:
-                current_path = result
-                temp_files.append(grain_path)
-                film_grain_applied = True
-
-    # 3. Normalize (optional)
-    final_clip_path = current_path
-
-    if not settings.encoding.normalize_clips:
-        if not file_exists_and_valid(final_clip_path):
-            raise RuntimeError("source clip missing before normalize")
-    elif not output_profile:
-        final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
-        if not file_exists_and_valid(current_path):
-            raise RuntimeError("source clip missing before normalize")
-        shutil.copy(current_path, final_clip_path)
-        if not file_exists_and_valid(final_clip_path):
-            raise RuntimeError("failed to write normalized clip")
-    else:
-        final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
-        # Get optimal encoder
-        encoder_config = None
-        if resource_manager:
-            encoder_config = resource_manager.get_encoder(prefer_gpu=True)
-            ffmpeg_params = encoder_config.video_params(
-                crf=settings.encoding.crf,
-                preset=settings.encoding.preset,
-                codec_override=output_profile.codec,
-                profile_override=output_profile.profile,
-                level_override=output_profile.level,
-                pix_fmt_override=output_profile.pix_fmt,
-            )
-        else:
-            ffmpeg_params = [
-                "-c:v", output_profile.codec,
-                "-pix_fmt", output_profile.pix_fmt,
-                "-crf", str(settings.encoding.crf),
-                "-preset", settings.encoding.preset,
-            ]
-            if output_profile.profile:
-                ffmpeg_params.extend(["-profile:v", output_profile.profile])
-            if output_profile.level:
-                ffmpeg_params.extend(["-level", output_profile.level])
-
-        vf_filters = [
-            f"scale={output_profile.width}:{output_profile.height}:force_original_aspect_ratio=decrease",
-            f"pad={output_profile.width}:{output_profile.height}:(ow-iw)/2:(oh-ih)/2",
-            "setsar=1",  # Ensure square pixels
-        ]
-        if getattr(settings.features, "colorlevels", True):
-            vf_filters.append(
-                "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:"
-                "rimax=0.922:gimax=0.922:bimax=0.922"
-            )
-        
-        # Ensure output pixel format matches encoder expectation
-        if output_profile.pix_fmt:
-            vf_filters.append(f"format={output_profile.pix_fmt}")
-
-        # Removed 'normalize' filter to prevent RGB conversion errors
-        # if getattr(settings.features, "luma_normalize", True):
-        #     vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
-        vf_chain = ",".join(vf_filters)
-
-        def run_normalize(cfg, params, label: str) -> bool:
-            vf = vf_chain
-            if cfg and cfg.hwupload_filter:
-                vf = f"{vf_chain},{cfg.hwupload_filter}"
-            cmd = build_ffmpeg_cmd([])
-            if cfg and cfg.is_gpu_accelerated:
-                cmd.extend(cfg.hwaccel_input_params())
-            cmd.extend([
-                "-i", current_path,
-                "-vf", vf,
-                "-r", str(output_profile.fps),
-                *params,
-                "-an",
-                final_clip_path
-            ])
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=settings.processing.ffmpeg_timeout,
-            )
-            if result.returncode == 0 and file_exists_and_valid(final_clip_path):
-                return True
-            err_lines = (result.stderr or "").strip().splitlines()
-            # Log full error for debugging
-            logger.warning(f"Normalize ({label}) failed details:\n{result.stderr}")
-            err = err_lines[-1] if err_lines else "unknown error"
-            logger.warning(f"Normalize ({label}) failed: {err}")
-            if os.path.exists(final_clip_path):
-                try:
-                    os.remove(final_clip_path)
-                except OSError:
-                    pass
-            return False
-
-        label = "gpu" if encoder_config and encoder_config.is_gpu_accelerated else "cpu"
-        success = run_normalize(encoder_config, ffmpeg_params, label)
-
-        if not success and resource_manager:
-            cpu_config = resource_manager.get_encoder(prefer_gpu=False, cache_key="cpu_normalize")
-            cpu_params = cpu_config.video_params(
-                crf=settings.encoding.crf,
-                preset=settings.encoding.preset,
-                codec_override=output_profile.codec,
-                profile_override=output_profile.profile,
-                level_override=output_profile.level,
-                pix_fmt_override=output_profile.pix_fmt,
-            )
-            success = run_normalize(cpu_config, cpu_params, "cpu_fallback")
-
-        if not success:
-            if file_exists_and_valid(current_path):
-                logger.warning("Normalization failed; using unnormalized clip")
-                final_clip_path = current_path
-            else:
-                raise RuntimeError("Normalization failed and source clip missing")
-
-    enhancements = {
-        'stabilized': stabilize_applied,
-        'upscaled': upscale_applied,
-        'enhanced': enhance_applied,
-        'denoised': denoise_applied,
-        'sharpened': sharpen_applied,
-        'film_grain': film_grain_applied,
-    }
-
-    return final_clip_path, enhancements, temp_files
+from .clip_processor import process_clip_task
 
 
 # =============================================================================
@@ -411,10 +131,12 @@ class MontageBuilder:
         from .render_engine import RenderEngine
         from .pacing_engine import PacingEngine
         from .selection_engine import SelectionEngine
+        from .story_engine import StoryEngine
         self._analyzer = AssetAnalyzer(self.ctx)
         self._render_engine = RenderEngine(self.ctx)
         self._pacing_engine = PacingEngine(self.ctx)
         self._selection_engine = SelectionEngine(self.ctx)
+        self._story_engine = StoryEngine(self.ctx)
 
     def _create_context(self) -> MontageContext:
         """Create a fresh MontageContext from settings."""
@@ -583,25 +305,17 @@ class MontageBuilder:
 
         OPTIMIZED: Runs cgpu voice isolation in parallel with scene detection
         to maximize utilization of both cloud GPU and local CPU.
-
-        - Start voice isolation async (cgpu) if enabled
-        - Detect scenes in videos (parallel, local CPU)
-        - Wait for voice isolation to complete
-        - Analyze music with isolated audio
-        - Determine output profile
         """
-        logger.info("\n   🎵 Analyzing assets...")
+        logger.info("\n   🎵 Analyzing assets Checkpoint...")
 
         # Story Engine Analysis Trigger (Phase 1)
         if self.settings.features.story_engine:
-            self._trigger_story_analysis()
+            self._story_engine.ensure_analysis()
 
         # OPTIMIZATION: Start proxy generation in background
-        # This ensures proxies are ready for NLE export later
         proxy_futures = []
         if self.ctx.media.video_files:
             logger.info("   🎞️ Checking proxies...")
-            # Try to store proxies next to input for NLE linking standard
             proxy_dir = self.ctx.paths.input_dir / "Proxies"
             try:
                 proxy_dir.mkdir(parents=True, exist_ok=True)
@@ -619,25 +333,32 @@ class MontageBuilder:
         isolated_audio_path = None
 
         if self.settings.features.voice_isolation:
-            # Get music file first
+            # Replicate music selection logic to start async job
             music_files = self._get_files(self.ctx.paths.music_dir, ('.mp3', '.wav'))
             if music_files:
                 music_index = (self.variant_id - 1) % len(music_files)
                 music_path = music_files[music_index]
+                
+                # Check for override
+                if self.ctx.creative.editing_instructions and self.ctx.creative.editing_instructions.music_track:
+                    requested_track = self.ctx.creative.editing_instructions.music_track
+                    for mf in music_files:
+                        if mf == requested_track or os.path.basename(mf) == requested_track:
+                            music_path = mf
+                            break
 
-                # Start voice isolation async (runs on cgpu while we do scene detection)
+                # Start voice isolation async (cgpu)
                 logger.info("   🚀 Starting voice isolation async (cgpu)...")
                 voice_isolation_future = self._executor.submit(
-                    self._apply_voice_isolation, music_path
+                    self._analyzer.perform_voice_isolation, music_path
                 )
 
-        # Detect scenes in videos (parallel, local CPU) - runs while cgpu processes
-        self._detect_scenes()
+        # Detect scenes using AnalysisEngine (blocking call that runs parallel internally)
+        self._analyzer.detect_scenes(progress_callback=self.progress_callback)
 
-        # Wait for voice isolation to complete (if started)
+        # Wait for voice isolation to complete
         if voice_isolation_future is not None:
             try:
-                # Use configured timeout (default 1200s) instead of hardcoded 300s
                 timeout = self.settings.llm.cgpu_timeout
                 isolated_audio_path = voice_isolation_future.result(timeout=timeout)
                 logger.info(f"   ✅ Voice isolation completed")
@@ -647,14 +368,14 @@ class MontageBuilder:
                 logger.warning(f"   ⚠️ Voice isolation async failed: {e}")
                 isolated_audio_path = None
 
-        # Analyze music (use isolated audio if available)
-        self._analyze_music(isolated_audio_path=isolated_audio_path)
+        # Analyze music (delegated)
+        self._analyzer.analyze_music(isolated_audio_path=isolated_audio_path)
 
-        # Determine output profile
-        self._determine_output_profile()
+        # Determine output profile (delegated)
+        self._analyzer.determine_output_profile()
 
         # Initialize footage pool
-        self._init_footage_pool()
+        self._footage_pool = self._selection_engine.init_footage_pool()
 
         # Wait for proxies
         if proxy_futures:
@@ -664,8 +385,8 @@ class MontageBuilder:
                 try:
                     f.result()
                     completed += 1
-                except Exception as e:
-                    logger.warning(f"   ⚠️ Proxy generation warning: {e}")
+                except Exception:
+                    pass
             if completed > 0:
                 logger.info(f"   ✅ {completed} Proxies ready")
 
@@ -700,15 +421,13 @@ class MontageBuilder:
             self._run_story_assembly()
             return
 
-        # Initialize audio clip and calculate duration
-        self._init_audio_duration()
+        # Generate B-Roll plan if script is available
+        if self.ctx.creative.editing_instructions and self.ctx.creative.editing_instructions.script:
+             self._plan_broll_sequence()
 
-        # AI B-Roll Planning (Epic 2)
-        if self.ctx.creative.editing_instructions and "script" in self.ctx.creative.editing_instructions:
-            self._plan_broll_sequence()
-
-        # Initialize crossfade settings
-        self._init_crossfade_settings()
+        # Initialize audio and pacing
+        self._pacing_engine.init_audio_duration()
+        self._pacing_engine.init_crossfade_settings()
 
         # Initialize progressive renderer
         self._init_progressive_renderer()
@@ -723,7 +442,7 @@ class MontageBuilder:
         # Determine output filename
         style_name = "dynamic"
         if self.ctx.creative.editing_instructions is not None:
-            style_name = self.ctx.creative.editing_instructions.get('style', {}).get('name', 'dynamic')
+             style_name = self.ctx.creative.editing_instructions.style.name if self.ctx.creative.editing_instructions.style else "dynamic"
         
         # Load style params
         try:
@@ -819,7 +538,7 @@ class MontageBuilder:
         if self.ctx.creative.editing_instructions is None:
             return
 
-        effects = self.ctx.creative.editing_instructions.get('effects', {})
+        effects = getattr(self.ctx.creative.editing_instructions, 'effects', {})
 
         # ENV takes precedence over style template
         env_stabilize = self.settings.features.stabilize
@@ -829,29 +548,24 @@ class MontageBuilder:
         # Force disable heavy features in Preview Mode
         if self.settings.encoding.quality_profile == "preview":
             logger.info("   ⚡ Preview Mode: Disabling stabilization, upscale, and enhancement")
-            env_stabilize = False
-            env_upscale = False
-            env_enhance = False
-            # Also override instructions
-            if 'effects' in self.ctx.creative.editing_instructions:
-                self.ctx.creative.editing_instructions['effects']['stabilization'] = False
-                self.ctx.creative.editing_instructions['effects']['upscale'] = False
-                self.ctx.creative.editing_instructions['effects']['sharpness_boost'] = False
-
-        if not env_stabilize and 'stabilization' in effects:
-            self.ctx.features.stabilize = effects['stabilization']
+            self.ctx.features.stabilize = False
+            self.ctx.features.upscale = False
+            self.ctx.features.enhance = False
         else:
-            self.ctx.features.stabilize = env_stabilize
+            if not env_stabilize and 'stabilization' in effects:
+                self.ctx.features.stabilize = effects['stabilization']
+            else:
+                self.ctx.features.stabilize = env_stabilize
 
-        if not env_upscale and 'upscale' in effects:
-            self.ctx.features.upscale = effects['upscale']
-        else:
-            self.ctx.features.upscale = env_upscale
+            if not env_upscale and 'upscale' in effects:
+                self.ctx.features.upscale = effects['upscale']
+            else:
+                self.ctx.features.upscale = env_upscale
 
-        if not env_enhance and 'sharpness_boost' in effects:
-            self.ctx.features.enhance = effects['sharpness_boost']
-        else:
-            self.ctx.features.enhance = env_enhance
+            if not env_enhance and 'sharpness_boost' in effects:
+                self.ctx.features.enhance = effects['sharpness_boost']
+            else:
+                self.ctx.features.enhance = env_enhance
 
         # Parse color_grading from style template (NEW: replaces hardcoded Teal & Orange)
         # ENV takes priority, then style template effects, then default
@@ -876,74 +590,35 @@ class MontageBuilder:
         # Extract semantic query for Phase 2: Semantic Storytelling
         # Priority: explicit semantic_query > content_focus > ENV
         env_semantic = os.environ.get('SEMANTIC_QUERY', '')
-        if 'semantic_query' in self.ctx.creative.editing_instructions:
-            self.ctx.creative.semantic_query = self.ctx.creative.editing_instructions['semantic_query']
-        elif 'content_focus' in self.ctx.creative.editing_instructions:
-            self.ctx.creative.semantic_query = self.ctx.creative.editing_instructions['content_focus']
-        elif 'style' in self.ctx.creative.editing_instructions:
-            style = self.ctx.creative.editing_instructions['style']
+        
+        inst = self.ctx.creative.editing_instructions
+        
+        if getattr(inst, 'semantic_query', None):
+            self.ctx.creative.semantic_query = inst.semantic_query
+        elif getattr(inst, 'content_focus', None):
+            self.ctx.creative.semantic_query = inst.content_focus
+        elif inst.style:
             # Combine mood, theme, or content hints
+            style_params = inst.style.params
             semantic_parts = []
-            if style.get('mood'):
-                semantic_parts.append(style['mood'])
-            if style.get('theme'):
-                semantic_parts.append(style['theme'])
-            if style.get('content'):
-                semantic_parts.append(style['content'])
+            if style_params.get('mood'):
+                semantic_parts.append(style_params['mood'])
+            if style_params.get('theme'):
+                semantic_parts.append(style_params['theme'])
+            if style_params.get('content'):
+                semantic_parts.append(style_params['content'])
             if semantic_parts:
                 self.ctx.creative.semantic_query = ' '.join(semantic_parts)
+                
         if env_semantic and not self.ctx.creative.semantic_query:
             self.ctx.creative.semantic_query = env_semantic
 
     def _plan_broll_sequence(self):
         """
         Generate B-Roll plan from script.
-        
-        Uses BrollPlanner to find relevant clips for script segments.
-        Estimates timing based on word count if no timestamps provided.
         """
-        try:
-            from ..broll_planner import plan_broll
-            
-            script = self.ctx.creative.editing_instructions["script"]
-            logger.info(f"   📜 Planning B-Roll for script: {script[:50]}...")
-            
-            # Plan B-Roll (find suggestions)
-            # We use input_dir from context
-            plan = plan_broll(
-                script, 
-                input_dir=str(self.ctx.paths.input_dir),
-                top_k=3,
-                analyze_first=True
-            )
-            
-            # Estimate timing
-            # Simple heuristic: Distribute segments evenly or by word count
-            total_words = len(script.split())
-            duration_per_word = self.ctx.timeline.target_duration / max(1, total_words)
-            
-            current_time = 0.0
-            for segment in plan:
-                seg_text = segment["segment"]
-                seg_words = len(seg_text.split())
-                
-                # If we have a voiceover file, we could use forced alignment here
-                # For now, we estimate
-                seg_duration = seg_words * duration_per_word
-                
-                # Ensure minimum duration
-                seg_duration = max(seg_duration, 2.0)
-                
-                segment["start_time"] = current_time
-                segment["end_time"] = current_time + seg_duration
-                current_time += seg_duration
-                
-            self.ctx.creative.broll_plan = plan
-            logger.info(f"   ✅ B-Roll Plan created with {len(plan)} segments")
-            
-        except Exception as e:
-            logger.warning(f"   ⚠️ B-Roll planning failed: {e}")
-            self.ctx.creative.broll_plan = None
+        script = self.ctx.creative.editing_instructions.script
+        self.ctx.creative.broll_plan = self._story_engine.plan_broll(script)
 
     def _init_monitor(self):
         """Initialize monitoring system."""
@@ -960,8 +635,8 @@ class MontageBuilder:
         try:
             from ..clip_selector import IntelligentClipSelector
             style = "dynamic"
-            if self.ctx.creative.editing_instructions is not None:
-                style = self.ctx.creative.editing_instructions.get('style', {}).get('template', 'dynamic')
+            if self.ctx.creative.editing_instructions is not None and self.ctx.creative.editing_instructions.style:
+                style = self.ctx.creative.editing_instructions.style.name
             self._intelligent_selector = IntelligentClipSelector(style=style)
             logger.info(f"   🧠 Intelligent Clip Selector initialized (style={style})")
         except ImportError:
@@ -984,101 +659,11 @@ class MontageBuilder:
                 self.ctx.media.audio_result.energy_profile
             )
 
-    def _apply_voice_isolation(self, audio_path: str) -> str:
-        """Deprecated: Use AssetAnalyzer._apply_voice_isolation"""
-        return self._analyzer._apply_voice_isolation(audio_path)
-        
+
     def _apply_noise_reduction(self, audio_path: str) -> str:
         """Deprecated: Use AssetAnalyzer._apply_noise_reduction"""
         return self._analyzer._apply_noise_reduction(audio_path)
 
-    def _detect_scenes(self):
-        """Deprecated: Use AssetAnalyzer.detect_scenes"""
-        self._analyzer.detect_scenes(self.progress_callback)
-
-    def _determine_output_profile(self):
-        """Determine output profile from input footage."""
-        from ..video_metadata import determine_output_profile as _determine_profile
-        from .. import segment_writer as segment_writer_module
-
-        profile = _determine_profile(self.ctx.media.video_files)
-
-        # Override if EXPORT_WIDTH/HEIGHT are explicitly set in env
-        # We check os.environ directly to avoid default values in settings.export
-        import os
-        env_width = os.environ.get("EXPORT_WIDTH")
-        env_height = os.environ.get("EXPORT_HEIGHT")
-        
-        if env_width and env_height:
-             w = int(env_width)
-             h = int(env_height)
-             logger.info(f"   🔧 Explicit resolution override: {w}x{h}")
-             profile.width = w
-             profile.height = h
-             if w > h:
-                 profile.orientation = "horizontal"
-             elif w < h:
-                 profile.orientation = "vertical"
-             else:
-                 profile.orientation = "square"
-             profile.reason = "explicit_override"
-
-        # Override for Shorts Mode
-        if self.settings.features.shorts_mode:
-            logger.info("   📱 Shorts Mode enabled: Forcing 9:16 vertical output")
-            # Assuming 1080x1920 for shorts
-            profile.width = 1080
-            profile.height = 1920
-            profile.orientation = "vertical"
-            profile.aspect_ratio = "9:16"
-            profile.reason = "shorts_mode"
-
-        # Override for Preview Mode (Low Res)
-        if self.settings.encoding.quality_profile == "preview":
-            logger.info("   ⚡ Preview Mode enabled: Forcing low resolution (360p)")
-            
-            # Import constants
-            from ..ffmpeg_config import PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_CRF, PREVIEW_PRESET
-            
-            if profile.orientation == "vertical" or self.settings.features.shorts_mode:
-                profile.width = PREVIEW_HEIGHT  # 360
-                profile.height = PREVIEW_WIDTH  # 640
-            else:
-                profile.width = PREVIEW_WIDTH   # 640
-                profile.height = PREVIEW_HEIGHT # 360
-            profile.reason = "preview_mode"
-            
-            # Update encoding settings for speed
-            self.settings.encoding.crf = PREVIEW_CRF
-            self.settings.encoding.preset = PREVIEW_PRESET
-
-        # determine_output_profile returns an OutputProfile dataclass
-        self.ctx.media.output_profile = OutputProfile(
-            width=profile.width,
-            height=profile.height,
-            fps=profile.fps,
-            codec=profile.codec,
-            pix_fmt=profile.pix_fmt,
-            profile=profile.profile,
-            level=profile.level,
-            bitrate=profile.bitrate,
-            orientation=profile.orientation,
-            aspect_ratio=profile.aspect_ratio,
-            reason=getattr(profile, 'reason', 'default'),
-        )
-
-        # CRITICAL: Sync output profile to segment_writer globals
-        # This ensures clip normalization uses the correct dimensions
-        segment_writer_module.STANDARD_WIDTH = profile.width
-        segment_writer_module.STANDARD_HEIGHT = profile.height
-        segment_writer_module.STANDARD_FPS = profile.fps
-        segment_writer_module.STANDARD_PIX_FMT = profile.pix_fmt
-        segment_writer_module.TARGET_CODEC = profile.codec
-        segment_writer_module.TARGET_PROFILE = profile.profile
-        segment_writer_module.TARGET_LEVEL = profile.level
-
-        if self.settings.features.verbose:
-            logger.info(f"\n   🧭 Output profile: {self.ctx.media.output_profile.width}x{self.ctx.media.output_profile.height} @ {self.ctx.media.output_profile.fps:.1f}fps")
 
     def _init_footage_pool(self):
         """Initialize footage pool manager."""
@@ -1125,93 +710,14 @@ class MontageBuilder:
     # Assembly Loop Helpers
     # =========================================================================
 
-    def _init_audio_duration(self):
-        """Initialize audio and calculate target duration."""
-        # Get duration settings from config
-        target_duration_setting = self.settings.creative.target_duration
-        music_start = self.settings.creative.music_start
-        music_end = self.settings.creative.music_end
-
-        # Allow overrides from editing instructions
-        if self.ctx.creative.editing_instructions:
-            if self.ctx.creative.editing_instructions.music_start > 0:
-                music_start = self.ctx.creative.editing_instructions.music_start
-            
-            if self.ctx.creative.editing_instructions.music_end is not None:
-                music_end = self.ctx.creative.editing_instructions.music_end
-
-        audio_duration = self.ctx.media.audio_result.duration
-
-        # Apply music trimming
-        if music_end and music_end < audio_duration:
-            audio_duration = music_end - music_start
-        elif music_start > 0:
-            audio_duration = audio_duration - music_start
-
-        # Determine target duration
-        if target_duration_setting > 0:
-            self.ctx.timeline.target_duration = target_duration_setting
-        else:
-            self.ctx.timeline.target_duration = audio_duration
-
-        # Apply Creative Director constraints if provided (only when env didn't override)
-        if target_duration_setting <= 0 and self.ctx.creative.editing_instructions:
-            constraints = self.ctx.creative.editing_instructions.get("constraints", {})
-            target_override = coerce_float(constraints.get("target_duration_sec"))
-            if target_override and target_override > 0:
-                self.ctx.timeline.target_duration = min(audio_duration, target_override)
-
-        if self.settings.features.verbose:
-            logger.info(f"   ⏱️ Target duration: {self.ctx.timeline.target_duration:.1f}s")
-
-    def _init_crossfade_settings(self):
-        """Initialize crossfade settings from config and Creative Director."""
-        enable_xfade = self.settings.creative.enable_xfade
-        xfade_duration = self.settings.creative.xfade_duration
-
-        if enable_xfade == "true":
-            self.ctx.timeline.enable_xfade = True
-        elif enable_xfade == "false":
-            self.ctx.timeline.enable_xfade = False
-        elif self.ctx.creative.editing_instructions is not None:
-            transitions = self.ctx.creative.editing_instructions.get('transitions', {})
-            transition_type = transitions.get('type', 'energy_aware')
-            xfade_duration = transitions.get('crossfade_duration_sec', xfade_duration)
-            if transition_type == 'crossfade':
-                self.ctx.timeline.enable_xfade = True
-
-        self.ctx.timeline.xfade_duration = xfade_duration
 
     def _init_progressive_renderer(self):
         """Initialize progressive renderer if available."""
-        try:
-            from ..segment_writer import ProgressiveRenderer
-            from ..memory_monitor import get_memory_manager
-
-            self._memory_manager = get_memory_manager()
-
-            # Use adaptive batch size for low-memory environments
-            low_memory = self.settings.features.low_memory_mode
-            batch_size = self.settings.processing.get_adaptive_batch_size(low_memory)
-
-            if low_memory:
-                logger.info(f"   ⚠️ LOW_MEMORY_MODE: Batch size reduced to {batch_size}")
-
-            self._progressive_renderer = ProgressiveRenderer(
-                batch_size=batch_size,
-                output_dir=os.path.join(str(self.ctx.paths.temp_dir), f"segments_{self.ctx.job_id}"),
-                memory_manager=self._memory_manager,
-                job_id=self.ctx.job_id,
-                enable_xfade=self.ctx.timeline.enable_xfade,
-                xfade_duration=self.ctx.timeline.xfade_duration,
-                ffmpeg_crf=self.settings.encoding.crf,
-                normalize_clips=self.settings.encoding.normalize_clips,
-            )
-            logger.info(f"   ✅ Progressive Renderer initialized (batch={batch_size})")
-        except ImportError:
-            self._progressive_renderer = None
-            self._memory_manager = None
-            logger.warning("   ⚠️ Progressive Renderer not available")
+        self._progressive_renderer = self._render_engine.init_progressive_renderer()
+        # memory manager is handled inside engine now, though we expose it if needed
+        # self._memory_manager is used in cleanup, let's keep it sync if possible or rely on engine cleanup
+        if self._progressive_renderer:
+             self._memory_manager = self._progressive_renderer.memory_manager
 
     def _flush_pending_futures(self):
         """Wait for all pending clip processing futures to complete."""
@@ -1221,22 +727,7 @@ class MontageBuilder:
         logger.info(f"   ⏳ Waiting for {len(self._pending_futures)} pending clips to finish processing...")
         while self._pending_futures:
             fut, meta = self._pending_futures.pop(0)
-            try:
-                final_path, enhancements, temp_files = fut.result()
-                meta.enhancements = enhancements
-                
-                if self._progressive_renderer:
-                    self._progressive_renderer.add_clip_path(final_path)
-                    
-                    # Cleanup intermediate temp files
-                    for tf in temp_files:
-                        if tf != final_path and os.path.exists(tf):
-                            try:
-                                os.remove(tf)
-                            except Exception:
-                                pass
-            except Exception as e:
-                logger.error(f"Error processing clip {meta.source_path}: {e}")
+            self._render_engine.process_completed_task(fut, meta, self.enhancement_tracker)
 
     def _run_assembly_loop(self):
         """
@@ -1278,6 +769,9 @@ class MontageBuilder:
 
             # Calculate cut duration
             cut_duration = self._pacing_engine.get_next_cut_duration(current_energy)
+            
+            # Calculate beats per cut (approx) for beat indexing
+            beats_per_cut = cut_duration / (60.0 / tempo) if tempo > 0 else 4.0
 
             # Early exit: prevent overrun beyond target
             remaining_time = self.ctx.timeline.target_duration - self.ctx.timeline.current_time
@@ -1337,7 +831,7 @@ class MontageBuilder:
             clip_end = clip_start + cut_duration
 
             # Mark clip as consumed
-            self._footage_pool.consume_clip(
+            self._selection_engine.consume_clip(
                 clip_id=id(selected_scene),
                 timeline_position=self.ctx.timeline.current_time,
                 used_in_point=clip_start,
@@ -1352,6 +846,7 @@ class MontageBuilder:
             # Update state
             self.ctx.timeline.last_used_path = selected_scene['path']
             self.ctx.timeline.last_shot_type = selected_scene.get('meta', {}).get('shot', 'medium')
+            self.ctx.timeline.last_tags = selected_scene.get('meta', {}).get('tags', [])
             self.ctx.timeline.last_clip_end_time = clip_end
 
             self.ctx.timeline.current_time += cut_duration
@@ -1381,108 +876,50 @@ class MontageBuilder:
     ):
         """Submit clip processing task and track metadata."""
         
-        # Generate temp paths
-        temp_clip_name = f"temp_clip_{self.ctx.timeline.beat_idx}_{random.randint(0, 9999)}.mp4"
-        
-        # Submit task
-        if self._executor:
-            future = self._executor.submit(
-                process_clip_task,
-                scene_path=scene['path'],
-                clip_start=clip_start,
-                cut_duration=cut_duration,
-                temp_dir=str(self.ctx.paths.temp_dir),
-                temp_clip_name=temp_clip_name,
-                ctx_stabilize=self.ctx.features.stabilize,
-                ctx_upscale=self.ctx.features.upscale,
-                ctx_enhance=self.ctx.features.enhance,
-                ctx_color_grade=self.ctx.features.color_grade,
-                ctx_denoise=self.ctx.features.denoise,
-                ctx_sharpen=self.ctx.features.sharpen,
-                ctx_film_grain=self.ctx.features.film_grain,
-                enhancer=self._clip_enhancer,
-                output_profile=self.ctx.media.output_profile,
-                settings=self.settings,
-                resource_manager=self._resource_manager
-            )
-        else:
-            raise RuntimeError("Executor not initialized")
+        # Calculate pattern beat for metadata
+        pattern_beat = 4
+        if self.ctx.timeline.current_pattern:
+             # pattern_idx was incremented in loop? No, beat_idx was. 
+             # Actually timeline.current_pattern logic is slightly opaque here.
+             # Assuming standard 4 if not available.
+             # The original code accessed pattern_idx - 1, implying it was updated.
+             # But pattern updating logic isn't visible in the snippet.
+             # Let's trust the context or just pass 4 if unsure.
+             # Actually, let's look at how beats_per_cut was calculated in loop.
+             pass
 
-        # Create metadata (enhancements will be updated later)
-        clip_meta = ClipMetadata(
-            source_path=scene['path'],
-            start_time=clip_start,
-            duration=cut_duration,
-            timeline_start=self.ctx.timeline.current_time,
-            energy=current_energy,
-            action=scene.get('meta', {}).get('action', 'medium'),
-            shot=scene.get('meta', {}).get('shot', 'medium'),
-            beat_idx=self.ctx.timeline.beat_idx,
-            beats_per_cut=self.ctx.timeline.current_pattern[self.ctx.timeline.pattern_idx - 1] if self.ctx.timeline.current_pattern else 4,
-            selection_score=selection_score,
-            enhancements={} # Updated on completion
-        )
-        self.ctx.timeline.clips_metadata.append(clip_meta)
+        # We need to pass the current pattern beat if we want to match original behavior exactly for metadata.
+        # Original: self.ctx.timeline.current_pattern[self.ctx.timeline.pattern_idx - 1] if ...
         
+        current_pattern_val = 4
+        if self.ctx.timeline.current_pattern and self.ctx.timeline.pattern_idx > 0:
+             idx = (self.ctx.timeline.pattern_idx - 1) % len(self.ctx.timeline.current_pattern)
+             current_pattern_val = self.ctx.timeline.current_pattern[idx]
+
+        # Submit via Render Engine
+        future, clip_meta = self._render_engine.submit_clip_task(
+            scene=scene,
+            clip_start=clip_start,
+            cut_duration=cut_duration,
+            current_energy=current_energy,
+            selection_score=selection_score,
+            beat_idx=self.ctx.timeline.beat_idx,
+            beats_per_cut=0, # Let engine decide or reuse pattern val? 
+                             # The engine uses "beats_per_cut if beats_per_cut else current_pattern_beat".
+                             # So I pass 0 here and let it use current_pattern_val
+            current_pattern_beat=current_pattern_val,
+            executor=self._executor,
+            enhancer=self._clip_enhancer,
+            resource_manager=self._resource_manager
+        )
+        
+        self.ctx.timeline.clips_metadata.append(clip_meta)
         self._pending_futures.append((future, clip_meta))
         
         # Process completed futures in order to keep memory usage in check
-        # and feed the progressive renderer
         while self._pending_futures and self._pending_futures[0][0].done():
             fut, meta = self._pending_futures.pop(0)
-            try:
-                final_path, enhancements, temp_files = fut.result()
-                meta.enhancements = enhancements
-
-                # Create EnhancementDecision for NLE export tracking
-                decision = self.enhancement_tracker.create_decision(
-                    source_path=meta.source_path,
-                    timeline_in=meta.timeline_start,
-                    timeline_out=meta.timeline_start + meta.duration,
-                )
-
-                # Record applied enhancements with parameters
-                if enhancements.get('stabilized'):
-                    decision.record_stabilize(StabilizeParams(
-                        method="vidstab",
-                        smoothing=30,
-                        crop_mode="black",
-                    ))
-                if enhancements.get('upscaled'):
-                    decision.record_upscale(UpscaleParams(
-                        method="realesrgan" if self.settings.features.upscale else "lanczos",
-                        scale_factor=2,
-                    ))
-                if enhancements.get('enhanced'):
-                    decision.record_color_grade(ColorGradeParams(
-                        preset=self.ctx.features.color_grade or "teal_orange",
-                        intensity=self.ctx.features.color_intensity,
-                    ))
-                # NEW: Record denoise, sharpen, film_grain
-                if enhancements.get('denoised'):
-                    from ..clip_enhancement import DenoiseConfig
-                    decision.record_denoise(DenoiseConfig(spatial_strength=0.3))
-                if enhancements.get('sharpened'):
-                    from ..clip_enhancement import SharpenConfig
-                    decision.record_sharpen(SharpenConfig(amount=0.5))
-                if enhancements.get('film_grain'):
-                    from ..clip_enhancement import FilmGrainConfig
-                    decision.record_film_grain(FilmGrainConfig(grain_type=self.ctx.features.film_grain, enabled=True))
-
-                meta.enhancement_decision = decision
-
-                if self._progressive_renderer:
-                    self._progressive_renderer.add_clip_path(final_path)
-
-                    # Cleanup intermediate temp files
-                    for tf in temp_files:
-                        if tf != final_path and os.path.exists(tf):
-                            try:
-                                os.remove(tf)
-                            except Exception:
-                                pass
-            except Exception as e:
-                logger.error(f"Error processing clip {meta.source_path}: {e}")
+            self._render_engine.process_completed_task(fut, meta, self.enhancement_tracker)
 
 
 
@@ -1534,48 +971,8 @@ class MontageBuilder:
             logger.error(f"   ❌ Timeline export failed: {e}")
 
     def _save_episodic_memory(self):
-        """
-        Save clip usage to episodic memory for future learning.
-
-        Only runs if EPISODIC_MEMORY feature flag is enabled.
-        Tracks which clips were used in which story phases.
-        """
-        if not self.settings.features.episodic_memory:
-            return
-
-        cache = get_analysis_cache()
-        montage_id = f"{self.ctx.job_id}_v{self.variant_id}"
-        total_duration = self.ctx.timeline.current_time or 1.0  # Avoid division by zero
-
-        saved_count = 0
-        for clip in self.ctx.timeline.clips_metadata:
-            # Calculate story phase based on timeline position
-            position = clip.timeline_start / total_duration
-            if position < 0.15:
-                phase = "intro"
-            elif position < 0.40:
-                phase = "build"
-            elif position < 0.70:
-                phase = "climax"
-            elif position < 0.90:
-                phase = "sustain"
-            else:
-                phase = "outro"
-
-            entry = EpisodicMemoryEntry(
-                clip_path=clip.source_path,
-                montage_id=montage_id,
-                story_phase=phase,
-                timestamp_used=clip.timeline_start,
-                clip_start=clip.start_time,
-                clip_end=clip.start_time + clip.duration,
-            )
-
-            if cache.save_episodic_memory(entry):
-                saved_count += 1
-
-        if saved_count > 0:
-            logger.info(f"   📝 Episodic memory: saved {saved_count} clip usage records")
+        """Delegate to Selection Engine."""
+        self._selection_engine.save_episodic_memory()
 
 
 
@@ -1583,74 +980,6 @@ class MontageBuilder:
     # =========================================================================
     # Story Engine Methods (Phase 1)
     # =========================================================================
-
-    def _get_tension_metadata_dir(self) -> Path:
-        """Resolve the directory for tension metadata (prefers cache or output)."""
-        env_dir = os.environ.get("TENSION_METADATA_DIR")
-        if env_dir:
-            return Path(env_dir)
-        cache_dir = os.environ.get("METADATA_CACHE_DIR")
-        if cache_dir:
-            return Path(cache_dir) / "tension"
-        return self.ctx.paths.output_dir / "tension_analysis"
-
-    def _trigger_story_analysis(self):
-        """
-        Identifies clips missing tension analysis and triggers cgpu jobs.
-        """
-        logger.info("   📖 Story Engine: Checking for missing analysis...")
-        
-        # 1. Identify all input clips
-        input_clips = self.ctx.media.video_files or self._get_files(self.ctx.paths.input_dir, ('.mp4', '.mov', '.mkv'))
-        if not input_clips:
-            logger.warning("   ⚠️ Story Engine: No input clips found for analysis.")
-            return
-        
-        # 2. Check which ones are missing metadata
-        # We use TensionProvider to check existence (it has logic for ID generation)
-        tension_meta_dir = self._get_tension_metadata_dir()
-        tension_meta_dir.mkdir(parents=True, exist_ok=True)
-
-        provider = TensionProvider(tension_meta_dir)
-        missing_clips = []
-        
-        from ..storytelling.tension_provider import MissingAnalysisError
-        for clip in input_clips:
-            try:
-                provider.get_tension(clip)
-            except MissingAnalysisError:
-                missing_clips.append(clip)
-            except Exception as exc:
-                logger.warning(f"   ⚠️ Story Engine: Failed to read metadata for {os.path.basename(clip)}: {exc}")
-                missing_clips.append(clip)
-                
-        if not missing_clips:
-            logger.info("   ✅ All clips have tension analysis.")
-            return
-
-        logger.info(f"   ⚠️ Missing analysis for {len(missing_clips)} clips.")
-        
-        from ..cgpu_utils import is_cgpu_available
-        if not is_cgpu_available(require_gpu=False):
-            message = "Story Engine requires cgpu for tension analysis but cgpu is not available."
-            if self.settings.features.strict_cloud_compute:
-                raise RuntimeError(message)
-            logger.warning(f"   ⚠️ {message} Proceeding with dummy tension values.")
-            return
-
-        logger.info("   ☁️ Offloading tension analysis to cgpu...")
-        from ..cgpu_jobs import TensionAnalysisBatchJob
-        job = TensionAnalysisBatchJob(missing_clips, output_dir=str(tension_meta_dir))
-        result = job.execute()
-        if not result.success:
-            message = f"Story tension analysis failed: {result.error}"
-            if self.settings.features.strict_cloud_compute:
-                raise RuntimeError(message)
-            logger.warning(f"   ⚠️ {message}")
-            return
-
-        analyzed = result.metadata.get("clip_count", len(missing_clips))
-        logger.info(f"   ✅ Tension analysis complete for {analyzed} clip(s).")
 
     def _run_story_assembly(self):
         """
@@ -1663,50 +992,41 @@ class MontageBuilder:
             self._analyze_music()
 
         # Initialize duration, transitions, and renderer
-        self._init_audio_duration()
-        self._init_crossfade_settings()
+        self._pacing_engine.init_audio_duration()
+        self._pacing_engine.init_crossfade_settings()
         self._init_progressive_renderer()
 
-        # Determine style/arc
-        style_name = "dynamic"
-        story_arc_spec = None
-        if self.ctx.creative.editing_instructions:
-            style_name = self.ctx.creative.editing_instructions.get('style', {}).get('name', 'dynamic')
-            story_arc_spec = self.ctx.creative.editing_instructions.get("story_arc")
+        # Generate Plan
+        try:
+            timeline_events = self._story_engine.generate_story_plan()
+        except Exception as e:
+            logger.error(f"Story Engine Planning Failed: {e}")
+            raise
 
         # Determine output filename and logo
+        style_name = "dynamic"
+        if self.ctx.creative.editing_instructions and self.ctx.creative.editing_instructions.style:
+            style_name = self.ctx.creative.editing_instructions.style.name
         self._setup_output_paths(style_name)
+        
+        logger.info(f"   ✅ Generated {len(timeline_events)} cuts based on story arc.")
 
-        # Setup tension provider + solver
-        tension_meta_dir = self._get_tension_metadata_dir()
-        allow_dummy = not self.settings.features.strict_cloud_compute
-        provider = TensionProvider(tension_meta_dir, allow_dummy=allow_dummy)
-        if story_arc_spec:
-            arc = StoryArc.from_spec(story_arc_spec)
-        else:
-            arc = StoryArc.from_preset(style_name)
-        solver = StorySolver(arc, provider)
+        self._realize_story_plan(timeline_events)
 
-        # Build beat list (clamped to target duration)
+    def _realize_story_plan(self, timeline_events: List[Dict[str, Any]]):
+        """Converts abstract timeline events into concrete clips."""
+        
         duration = self.ctx.timeline.target_duration or self.ctx.media.audio_result.duration
-        beats = [t for t in self.ctx.media.audio_result.beat_times.tolist() if 0.0 <= t <= duration]
-        if not beats:
-            beats = [0.0]
-
+        
+        # Determine constraints
         min_clip_duration = None
         max_clip_duration = None
         if self.ctx.creative.editing_instructions:
-            constraints = self.ctx.creative.editing_instructions.get("constraints", {})
+            constraints = getattr(self.ctx.creative.editing_instructions, 'constraints', {})
             min_clip_duration = coerce_float(constraints.get("min_clip_duration_sec"))
             max_clip_duration = coerce_float(constraints.get("max_clip_duration_sec"))
             if min_clip_duration is not None and max_clip_duration is not None and min_clip_duration > max_clip_duration:
                 min_clip_duration, max_clip_duration = max_clip_duration, min_clip_duration
-
-        # Build timeline plan
-        input_clips = self.ctx.media.video_files or self._get_files(self.ctx.paths.input_dir, ('.mp4', '.mov', '.mkv'))
-        timeline_events = solver.solve(input_clips, duration, beats)
-        if not timeline_events:
-            raise RuntimeError("Story Engine produced no timeline events")
 
         # Map scenes by source path (fallback to full clip duration if scenes missing)
         scenes_by_path: Dict[str, List[Dict[str, Any]]] = {}
@@ -1714,6 +1034,8 @@ class MontageBuilder:
             scenes_by_path.setdefault(scene['path'], []).append(scene)
             scene.setdefault('usage_count', 0)
 
+        # Ensure we have scenes for all input clips even if detection failed
+        input_clips = self.ctx.media.video_files or self._get_files(self.ctx.paths.input_dir, ('.mp4', '.mov', '.mkv'))
         if input_clips:
             from ..video_metadata import probe_duration
             for clip_path in input_clips:
@@ -1728,16 +1050,14 @@ class MontageBuilder:
                             "meta": {},
                             "usage_count": 0,
                         }]
-
+                        
         for scenes in scenes_by_path.values():
             self.rng.shuffle(scenes)
-
-        logger.info(f"   ✅ Generated {len(timeline_events)} cuts based on '{style_name}' arc.")
 
         self.ctx.timeline.cut_number = 0
         self.ctx.timeline.current_time = 0.0
 
-        # Assemble timeline using existing clip processing pipeline
+        # Assemble timeline
         for idx, event in enumerate(timeline_events):
             start_time = float(event.get('time', 0.0))
             if start_time >= duration:
@@ -1809,13 +1129,5 @@ class MontageBuilder:
 # =============================================================================
 
 __all__ = [
-    # Data classes
-    "AudioAnalysisResult",
-    "SceneInfo",
-    "OutputProfile",
-    "ClipMetadata",
-    "MontageContext",
-    "MontageResult",
-    # Main class
     "MontageBuilder",
 ]

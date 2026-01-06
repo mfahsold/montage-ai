@@ -156,6 +156,7 @@ class MontageTimeline:
     pattern_idx: int = 0
     last_used_path: Optional[str] = None
     last_shot_type: Optional[str] = None
+    last_tags: List[str] = field(default_factory=list)
     last_clip_end_time: Optional[float] = None
     enable_xfade: bool = False
     xfade_duration: float = 0.3

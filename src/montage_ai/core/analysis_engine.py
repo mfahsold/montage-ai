@@ -28,6 +28,95 @@ class AssetAnalyzer:
         # Dependencies that are usually lazy loaded in methods
         self._resource_manager = None 
 
+    def determine_output_profile(self) -> None:
+        """Determine output profile from input footage."""
+        from ..video_metadata import determine_output_profile as _determine_profile, OutputProfile
+        from .. import segment_writer as segment_writer_module
+
+        if not self.ctx.media.video_files:
+             logger.warning("   ⚠️ No video files to determine profile from")
+             return
+
+        profile = _determine_profile(self.ctx.media.video_files)
+        
+        # Override if EXPORT_WIDTH/HEIGHT are explicitly set in env
+        env_width = os.environ.get("EXPORT_WIDTH")
+        env_height = os.environ.get("EXPORT_HEIGHT")
+        
+        if env_width and env_height:
+             try:
+                 w = int(env_width)
+                 h = int(env_height)
+                 logger.info(f"   🔧 Explicit resolution override: {w}x{h}")
+                 profile.width = w
+                 profile.height = h
+                 if w > h:
+                     profile.orientation = "horizontal"
+                 elif w < h:
+                     profile.orientation = "vertical"
+                 else:
+                     profile.orientation = "square"
+                 profile.reason = "explicit_override"
+             except ValueError:
+                 pass
+
+        # Override for Shorts Mode
+        if self.settings.features.shorts_mode:
+            logger.info("   📱 Shorts Mode enabled: Forcing 9:16 vertical output")
+            # Assuming 1080x1920 for shorts
+            profile.width = 1080
+            profile.height = 1920
+            profile.orientation = "vertical"
+            profile.aspect_ratio = "9:16"
+            profile.reason = "shorts_mode"
+
+        # Override for Preview Mode (Low Res)
+        if self.settings.encoding.quality_profile == "preview":
+            logger.info("   ⚡ Preview Mode enabled: Forcing low resolution (360p)")
+            
+            # Import constants
+            from ..ffmpeg_config import PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_CRF, PREVIEW_PRESET
+            
+            if profile.orientation == "vertical" or self.settings.features.shorts_mode:
+                profile.width = PREVIEW_HEIGHT  # 360
+                profile.height = PREVIEW_WIDTH  # 640
+            else:
+                profile.width = PREVIEW_WIDTH   # 640
+                profile.height = PREVIEW_HEIGHT # 360
+            profile.reason = "preview_mode"
+            
+            # Update encoding settings for speed
+            self.settings.encoding.crf = PREVIEW_CRF
+            self.settings.encoding.preset = PREVIEW_PRESET
+
+        # determine_output_profile returns an OutputProfile dataclass
+        # We need to ensure we are creating the correct object for context
+        self.ctx.media.output_profile = OutputProfile(
+            width=profile.width,
+            height=profile.height,
+            fps=profile.fps,
+            codec=profile.codec,
+            pix_fmt=profile.pix_fmt,
+            profile=profile.profile,
+            level=profile.level,
+            bitrate=profile.bitrate,
+            orientation=profile.orientation,
+            aspect_ratio=profile.aspect_ratio,
+            reason=getattr(profile, 'reason', 'default'),
+        )
+
+        # CRITICAL: Sync output profile to segment_writer globals
+        segment_writer_module.STANDARD_WIDTH = profile.width
+        segment_writer_module.STANDARD_HEIGHT = profile.height
+        segment_writer_module.STANDARD_FPS = profile.fps
+        segment_writer_module.STANDARD_PIX_FMT = profile.pix_fmt
+        segment_writer_module.TARGET_CODEC = profile.codec
+        segment_writer_module.TARGET_PROFILE = profile.profile
+        segment_writer_module.TARGET_LEVEL = profile.level
+        
+        if self.settings.features.verbose:
+            logger.info(f"\n   🧭 Output profile: {self.ctx.media.output_profile.width}x{self.ctx.media.output_profile.height} @ {self.ctx.media.output_profile.fps:.1f}fps")
+
     def analyze_music(self, isolated_audio_path: Optional[str] = None) -> None:
         """
         Load and analyze music file with caching support.
@@ -65,7 +154,7 @@ class AssetAnalyzer:
         if isolated_audio_path:
             music_path = isolated_audio_path
         elif self.settings.features.voice_isolation:
-            music_path = self._apply_voice_isolation(music_path)
+            music_path = self.perform_voice_isolation(music_path)
 
         # Apply noise reduction if enabled (can stack with voice_isolation or run standalone)
         if self.settings.features.noise_reduction:
@@ -117,7 +206,7 @@ class AssetAnalyzer:
             # Save to cache
             cache.save_audio(music_path, beat_info, energy_profile)
             
-    def _apply_voice_isolation(self, audio_path: str) -> str:
+    def perform_voice_isolation(self, audio_path: str) -> str:
         """
         Apply voice isolation to audio before analysis.
         Uses cgpu/demucs to separate vocals from music.
@@ -282,6 +371,8 @@ class AssetAnalyzer:
         self.ctx.media.all_scenes_dicts = [s.to_dict() for s in self.ctx.media.all_scenes]
 
         logger.info(f"   📹 Found {len(self.ctx.media.all_scenes)} scenes in {len(video_files)} videos")
+
+    def _get_files(self, directory: str, extensions: Tuple[str, ...]) -> List[str]:
         """Get valid files from directory."""
         if not os.path.exists(directory):
             return []

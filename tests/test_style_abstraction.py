@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from montage_ai.core.montage_builder import MontageBuilder
+from montage_ai.core.selection_engine import SelectionEngine
 
 @patch("montage_ai.core.montage_builder.get_settings")
 def test_apply_style_scoring(mock_get_settings):
@@ -9,6 +10,7 @@ def test_apply_style_scoring(mock_get_settings):
     mock_get_settings.return_value = mock_settings
     
     builder = MontageBuilder()
+    engine = builder._selection_engine
     
     # Test Case 1: Vlog Style (Face Count + Close Shot)
     vlog_params = {
@@ -17,7 +19,7 @@ def test_apply_style_scoring(mock_get_settings):
     }
     
     meta_face = {"face_count": 1, "shot": "close"}
-    score = builder._apply_style_scoring(meta_face, vlog_params)
+    score = engine._apply_style_scoring(meta_face, vlog_params)
     
     # Expected: 
     # Face: 1 * 10.0 * 2.0 = 20.0
@@ -32,7 +34,7 @@ def test_apply_style_scoring(mock_get_settings):
     }
     
     meta_action = {"action": "high", "shot": "wide"}
-    score = builder._apply_style_scoring(meta_action, sport_params)
+    score = engine._apply_style_scoring(meta_action, sport_params)
     
     # Expected:
     # Action High: 15.0 * 2.5 = 37.5
@@ -45,7 +47,7 @@ def test_apply_style_scoring(mock_get_settings):
         "weights": {"energy": 1.5}
     }
     meta_energy = {"energy": 0.8}
-    score = builder._apply_style_scoring(meta_energy, generic_params)
+    score = builder._selection_engine._apply_style_scoring(meta_energy, generic_params)
     
     # Expected:
     # Energy: 0.8 * 10.0 * 1.5 = 12.0
