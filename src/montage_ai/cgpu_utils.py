@@ -28,6 +28,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from .logger import logger
+from .utils import file_size_mb
 
 
 # ============================================================================
@@ -372,7 +373,7 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
     """
     try:
         # Get file size for logging
-        file_size_mb = os.path.getsize(local_path) / (1024 * 1024)
+        size_mb = file_size_mb(local_path)
         remote_dir = os.path.dirname(remote_path)
         if remote_dir:
             # Increased timeout for mkdir as cgpu connection setup can take time
@@ -390,7 +391,7 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
             )
 
         if result.returncode != 0:
-            logger.error(f"   ❌ cgpu copy failed (file: {os.path.basename(local_path)}, size: {file_size_mb:.1f}MB)")
+            logger.error(f"   ❌ cgpu copy failed (file: {os.path.basename(local_path)}, size: {size_mb:.1f}MB)")
             if result.stderr:
                 # Show first line of error
                 error_line = result.stderr.strip().split('\n')[0]
@@ -401,7 +402,7 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
 
     except subprocess.TimeoutExpired:
         logger.error(f"   ❌ Upload timeout after {timeout}s (file: {os.path.basename(local_path)})")
-        logger.error(f"      → File may be too large ({file_size_mb:.1f}MB), consider increasing timeout")
+        logger.error(f"      → File may be too large ({size_mb:.1f}MB), consider increasing timeout")
         return False
     except Exception as e:
         logger.error(f"   ❌ Copy to remote failed: {e}")

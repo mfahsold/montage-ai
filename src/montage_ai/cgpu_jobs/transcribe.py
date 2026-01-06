@@ -20,6 +20,7 @@ from typing import List, Optional
 from ..logger import logger
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
+from ..utils import file_size_mb
 
 
 class TranscribeJob(CGPUJob):
@@ -77,7 +78,7 @@ class TranscribeJob(CGPUJob):
             return False
 
         # Check file size (warn if large)
-        size_mb = self.audio_path.stat().st_size / (1024 * 1024)
+        size_mb = file_size_mb(self.audio_path)
         if size_mb > 500:
             logger.warning(f"Large file ({size_mb:.1f} MB) - transcription may take a while")
 

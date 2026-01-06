@@ -21,6 +21,7 @@ from typing import List, Optional
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
 from ..logger import logger
+from ..utils import clamp, file_size_mb
 
 
 class StabilizeJob(CGPUJob):
@@ -77,12 +78,12 @@ class StabilizeJob(CGPUJob):
             self.output_path = self.video_path.parent / f"{stem}_stabilized.mp4"
 
         # Clamp parameters to valid ranges
-        self.smoothing = max(1, min(smoothing, 30))
-        self.shakiness = max(1, min(shakiness, 10))
-        self.accuracy = max(1, min(accuracy, 15))
-        self.stepsize = max(1, min(stepsize, 32))
-        self.zoom = max(-100.0, min(zoom, 100.0))
-        self.optzoom = max(0, min(optzoom, 2))
+        self.smoothing = int(clamp(smoothing, 1, 30))
+        self.shakiness = int(clamp(shakiness, 1, 10))
+        self.accuracy = int(clamp(accuracy, 1, 15))
+        self.stepsize = int(clamp(stepsize, 1, 32))
+        self.zoom = clamp(zoom, -100.0, 100.0)
+        self.optzoom = int(clamp(optzoom, 0, 2))
         self.crop = crop if crop in ["black", "keep"] else "black"
 
     def prepare_local(self) -> bool:
@@ -107,7 +108,7 @@ class StabilizeJob(CGPUJob):
         """Upload video to remote."""
         remote_path = f"{self.remote_work_dir}/{self.video_path.name}"
 
-        size_mb = self.video_path.stat().st_size / (1024 * 1024)
+        size_mb = file_size_mb(self.video_path)
         logger.info(f"Uploading {self.video_path.name} ({size_mb:.1f} MB)...")
 
         if not copy_to_remote(str(self.video_path), remote_path):
@@ -181,8 +182,8 @@ class StabilizeJob(CGPUJob):
 
         if download_via_base64(remote_output, str(self.output_path)):
             # Get output size
-            if self.output_path.exists():
-                size_mb = self.output_path.stat().st_size / (1024 * 1024)
+            size_mb = file_size_mb(self.output_path)
+            if size_mb > 0:
                 logger.info(f"Output: {size_mb:.1f} MB")
 
             return JobResult(

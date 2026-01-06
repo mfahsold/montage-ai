@@ -130,16 +130,22 @@
 
     <div class="container">
         <div class="mb-8">
-            <h1 class="voxel-title">PROJECT CREATOR</h1>
-            <p class="text-muted">Compose your montage. Configure AI editing. Source from /data/input.</p>
+            <h1 class="voxel-title glitch-text">PROJECT CREATOR</h1>
+            <p class="text-muted">// Compose your montage. Configure AI editing. Source from /data/input.</p>
+            <div class="cyber-progress" style="margin-top: 1rem;"></div>
         </div>
 
         <form action="/api/jobs" method="POST" id="montageForm">
             <!-- STEP 1: Select Style -->
             <div class="mb-8">
-                <div class="voxel-card">
-                    <h3 class="mb-3 text-primary">STEP 1: SELECT STYLE</h3>
-                    <p class="text-xs text-muted mb-4">Choose editing rhythm and visual language. Pacing, transitions, cut timing vary by style.</p>
+                <div class="voxel-card gradient-border">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="step-number">1</div>
+                        <div>
+                            <h3 class="text-primary mb-1">SELECT STYLE</h3>
+                            <p class="text-xs text-muted">Choose editing rhythm and visual language</p>
+                        </div>
+                    </div>
                     
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <!-- DYNAMIC -->
@@ -176,8 +182,13 @@
             <!-- STEP 2: Director's Prompt -->
             <div class="mb-8">
                 <div class="voxel-card">
-                    <h3 class="mb-3 text-primary">STEP 2: CREATIVE DIRECTION</h3>
-                    <p class="text-xs text-muted mb-4">Describe mood, pacing, and intent. AI interprets your creative vision naturally.</p>
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="step-number">2</div>
+                        <div>
+                            <h3 class="text-primary mb-1">CREATIVE DIRECTION</h3>
+                            <p class="text-xs text-muted">Describe mood, pacing, and intent</p>
+                        </div>
+                    </div>
                     
                     <label class="tech-label">CREATIVE PROMPT</label>
                     <textarea 

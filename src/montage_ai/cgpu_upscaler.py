@@ -19,6 +19,7 @@ from .cgpu_utils import is_cgpu_available, check_cgpu_gpu
 from .cgpu_jobs import UpscaleJob
 from .cgpu_jobs.upscale import reset_session_cache
 from .config import get_settings
+from .utils import file_size_mb
 
 __all__ = [
     "upscale_with_cgpu",
@@ -165,8 +166,7 @@ if __name__ == "__main__":
         result = upscale_with_cgpu(input_file, output_file, scale=scale)
 
         if result:
-            import os
-            size_mb = os.path.getsize(result) / (1024 * 1024)
+            size_mb = file_size_mb(result)
             print()
             print(f"✅ Success: {result} ({size_mb:.1f} MB)")
             sys.exit(0)

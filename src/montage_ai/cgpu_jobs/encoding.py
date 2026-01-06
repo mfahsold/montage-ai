@@ -31,7 +31,7 @@ from typing import List, Optional, Dict, Any
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
 from ..logger import logger
-from ..utils import file_size_mb
+from ..utils import file_size_mb, clamp
 
 
 class VideoEncodingJob(CGPUJob):
@@ -108,7 +108,7 @@ class VideoEncodingJob(CGPUJob):
         # Codec settings
         self.codec = "hevc" if "265" in codec or "hevc" in codec.lower() else "h264"
         self.encoder = f"{self.codec}_nvenc"
-        self.quality = max(0, min(quality, 51))
+        self.quality = int(clamp(quality, 0, 51))
         self.preset = self.QUALITY_PRESETS.get(preset, "p4")
 
         # Filters

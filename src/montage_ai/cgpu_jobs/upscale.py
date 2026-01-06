@@ -26,6 +26,7 @@ from typing import List, Optional
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
 from ..logger import logger
+from ..utils import clamp, file_size_mb
 
 
 # Session state - shared across all UpscaleJob instances
@@ -103,10 +104,10 @@ class UpscaleJob(CGPUJob):
         """
         super().__init__()
         self.input_path = Path(input_path).resolve()
-        self.scale = max(2, min(scale, 4))  # Clamp 2-4
-        self.denoise_strength = max(0.0, min(denoise_strength, 1.0))
+        self.scale = int(clamp(scale, 2, 4))  # Clamp 2-4
+        self.denoise_strength = clamp(denoise_strength, 0.0, 1.0)
         self.tile_size = tile_size
-        self.crf = max(0, min(int(crf), 51))
+        self.crf = int(clamp(crf, 0, 51))
         normalized_format = (frame_format or "jpg").strip().lower()
         self.frame_format = normalized_format if normalized_format in ("jpg", "png") else "jpg"
 

@@ -57,6 +57,44 @@
   --shd-md: 4px 4px 0px 0px var(--border);
   --shd-primary: 4px 4px 0px 0px var(--primary);
   --shd-secondary: 4px 4px 0px 0px var(--secondary);
+
+  /* --- GLOW EFFECTS (Funky Accents) --- */
+  --glow-primary: 0 0 20px var(--primary-glow), 0 0 40px var(--primary-glow);
+  --glow-secondary: 0 0 20px var(--secondary-glow), 0 0 40px var(--secondary-glow);
+  --glow-success: 0 0 15px rgba(0, 255, 136, 0.4);
+
+  /* --- GRADIENTS (Artsy) --- */
+  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, #0088ff 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--secondary) 0%, #ff8800 100%);
+  --gradient-cyber: linear-gradient(135deg, var(--primary) 0%, #ff00ff 50%, var(--secondary) 100%);
+}
+
+/* --- ANIMATIONS (Funky) --- */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: var(--glow-primary); }
+  50% { box-shadow: 0 0 30px var(--primary-glow), 0 0 60px var(--primary-glow); }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes glitch {
+  0%, 90%, 100% { transform: translate(0); }
+  91% { transform: translate(-2px, 1px); }
+  93% { transform: translate(2px, -1px); }
+  95% { transform: translate(-1px, 2px); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes border-dance {
+  0%, 100% { border-color: var(--primary); }
+  50% { border-color: var(--secondary); }
 }
 
 /* --- RESET & BASE --- */
@@ -1023,4 +1061,262 @@ body::after {
 .feature-highlight:hover {
   background: linear-gradient(135deg, rgba(0, 85, 255, 0.1), rgba(255, 85, 0, 0.1));
   border-color: var(--primary);
+}
+
+/* =============================================================================
+   FUNKY & ARTSY ENHANCEMENTS (2026)
+   ============================================================================= */
+
+/* Cyber Section Headers */
+.cyber-header {
+  position: relative;
+  padding: 1rem 0;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: 900;
+}
+
+.cyber-header::before {
+  content: '//';
+  color: var(--secondary);
+  margin-right: 0.5rem;
+}
+
+.cyber-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--gradient-cyber);
+}
+
+/* Glowing Card Variant */
+.voxel-card.glow {
+  border-color: var(--primary);
+  box-shadow: var(--shd-primary), var(--glow-primary);
+}
+
+.voxel-card.glow:hover {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Gradient Border Card */
+.voxel-card.gradient-border {
+  border: 2px solid transparent;
+  background: linear-gradient(var(--card-bg), var(--card-bg)) padding-box,
+              var(--gradient-cyber) border-box;
+}
+
+/* Floating Animation */
+.float-anim {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Glitch Text Effect */
+.glitch-text {
+  position: relative;
+}
+
+.glitch-text:hover {
+  animation: glitch 0.3s ease-in-out;
+}
+
+/* Neon Badge */
+.neon-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.neon-badge.primary {
+  color: var(--primary);
+  box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.neon-badge.secondary {
+  color: var(--secondary);
+  box-shadow: 0 0 10px var(--secondary-glow);
+}
+
+.neon-badge.success {
+  color: var(--success);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+/* Icon Glow */
+.icon-glow {
+  filter: drop-shadow(0 0 5px currentColor);
+}
+
+/* Step Counter (Funky numbered steps) */
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: var(--gradient-primary);
+  color: white;
+  font-weight: 900;
+  font-size: var(--fs-lg);
+  box-shadow: var(--shd-sm), var(--glow-primary);
+  flex-shrink: 0;
+}
+
+/* Decorative Corner */
+.corner-deco {
+  position: relative;
+}
+
+.corner-deco::before,
+.corner-deco::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--primary);
+}
+
+.corner-deco::before {
+  top: -5px;
+  left: -5px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.corner-deco::after {
+  bottom: -5px;
+  right: -5px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Scanline Overlay */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.1) 0px,
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* Feature Card with Icon */
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+  transition: all 0.2s;
+}
+
+.feature-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-4px);
+  box-shadow: var(--shd-primary), var(--glow-primary);
+}
+
+.feature-card .icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  filter: drop-shadow(0 0 10px var(--primary-glow));
+}
+
+.feature-card h4 {
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.feature-card p {
+  font-size: var(--fs-xs);
+  color: var(--muted-fg);
+}
+
+/* Category Pill */
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--muted);
+  border-left: 3px solid var(--primary);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.category-pill.video { border-color: var(--primary); }
+.category-pill.audio { border-color: var(--success); }
+.category-pill.color { border-color: var(--secondary); }
+.category-pill.story { border-color: #9b59b6; }
+.category-pill.output { border-color: var(--warning); }
+
+/* Animated Progress Bar */
+.cyber-progress {
+  height: 4px;
+  background: var(--muted);
+  overflow: hidden;
+  position: relative;
+}
+
+.cyber-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--gradient-cyber);
+  animation: progress-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes progress-shimmer {
+  0% { width: 0%; opacity: 1; }
+  50% { width: 100%; opacity: 0.5; }
+  100% { width: 0%; opacity: 1; }
+}
+
+/* Radio/Checkbox as Styled Cards */
+.choice-card {
+  cursor: pointer;
+  padding: 1rem;
+  border: 2px solid var(--border);
+  background: var(--card-bg);
+  transition: all 0.15s;
+}
+
+.choice-card:hover {
+  border-color: var(--primary);
+  background: rgba(0, 85, 255, 0.05);
+}
+
+.choice-card.selected,
+.choice-card:has(input:checked) {
+  border-color: var(--secondary);
+  background: rgba(255, 85, 0, 0.1);
+  box-shadow: var(--shd-secondary);
+}
+
+.choice-card input {
+  display: none;
 }

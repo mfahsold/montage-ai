@@ -17,6 +17,7 @@ from typing import List, Optional
 from .base import CGPUJob, JobResult
 from ..cgpu_utils import run_cgpu_command, copy_to_remote, download_via_base64
 from ..logger import logger
+from ..utils import clamp, file_size_mb
 
 
 class VoiceIsolationJob(CGPUJob):
@@ -86,7 +87,7 @@ class VoiceIsolationJob(CGPUJob):
             return False
 
         # Check file size
-        size_mb = self.audio_path.stat().st_size / (1024 * 1024)
+        size_mb = file_size_mb(self.audio_path)
         if size_mb > 500:
             logger.warning(f"Large file ({size_mb:.1f} MB) - processing may take a while")
 
@@ -259,7 +260,7 @@ class NoiseReductionJob(CGPUJob):
         super().__init__()
         self.audio_path = Path(audio_path).resolve()
         self.output_dir = Path(output_dir) if output_dir else self.audio_path.parent
-        self.attenuation_limit = max(0, min(100, attenuation_limit))
+        self.attenuation_limit = int(clamp(attenuation_limit, 0, 100))
 
         self._output_path: Optional[Path] = None
 

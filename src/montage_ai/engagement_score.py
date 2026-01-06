@@ -23,6 +23,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import math
 
 from .logger import logger
+from .utils import clamp
 
 
 @dataclass
@@ -204,7 +205,7 @@ def _calculate_hook_score(
     if base_score < 70:
         recommendations.append("Strengthen your opening - hooks make or break engagement")
 
-    return min(100, max(0, base_score)), recommendations
+    return clamp(base_score, 0, 100), recommendations
 
 
 def _calculate_energy_score(
@@ -278,7 +279,7 @@ def _calculate_energy_score(
     # Weighted average
     score = variance_score * 0.4 + peak_score * 0.3 + level_score * 0.3
 
-    return min(100, max(0, score)), recommendations
+    return clamp(score, 0, 100), recommendations
 
 
 def _calculate_pacing_score(
@@ -332,7 +333,7 @@ def _calculate_pacing_score(
 
     score = scene_score * 0.6 + duration_score * 0.4
 
-    return min(100, max(0, score)), recommendations
+    return clamp(score, 0, 100), recommendations
 
 
 def _calculate_variety_score(
@@ -376,7 +377,7 @@ def _calculate_variety_score(
     else:
         score = freq_score
 
-    return min(100, max(0, score)), recommendations
+    return clamp(score, 0, 100), recommendations
 
 
 def _calculate_audio_score(
@@ -416,7 +417,7 @@ def _calculate_audio_score(
     else:
         recommendations.append("Consider adding voiceover for context")
 
-    return min(100, max(0, score)), recommendations
+    return clamp(score, 0, 100), recommendations
 
 
 # =============================================================================
