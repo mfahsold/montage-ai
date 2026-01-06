@@ -611,3 +611,416 @@ body::after {
   pointer-events: none;
   opacity: 0.3;
 }
+
+/* ==========================================================================
+   ARTSY VOXEL ENHANCEMENTS
+   ========================================================================== */
+
+/* Glitch Text Effect */
+@keyframes glitch {
+  0% {
+    text-shadow: 3px 3px 0px var(--secondary), -1px -1px 0px var(--primary);
+  }
+  25% {
+    text-shadow: -3px 3px 0px var(--secondary), 1px -1px 0px var(--primary);
+  }
+  50% {
+    text-shadow: 3px -3px 0px var(--primary), -1px 1px 0px var(--secondary);
+  }
+  75% {
+    text-shadow: -3px -3px 0px var(--primary), 1px 1px 0px var(--secondary);
+  }
+  100% {
+    text-shadow: 3px 3px 0px var(--secondary), -1px -1px 0px var(--primary);
+  }
+}
+
+.voxel-title:hover {
+  animation: glitch 0.3s ease-in-out infinite;
+}
+
+/* Neon Glow Animation */
+@keyframes neonPulse {
+  0%, 100% {
+    box-shadow: var(--shd-md), 0 0 10px var(--primary-glow);
+  }
+  50% {
+    box-shadow: var(--shd-md), 0 0 25px var(--primary-glow), 0 0 50px var(--primary-glow);
+  }
+}
+
+.voxel-card.glow-effect {
+  animation: neonPulse 3s ease-in-out infinite;
+}
+
+/* Cyberpunk Corner Accents */
+.voxel-card::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 20px;
+  height: 20px;
+  border-top: 3px solid var(--primary);
+  border-left: 3px solid var(--primary);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.voxel-card::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 20px;
+  height: 20px;
+  border-bottom: 3px solid var(--secondary);
+  border-right: 3px solid var(--secondary);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.voxel-card {
+  position: relative;
+}
+
+.voxel-card:hover::before,
+.voxel-card:hover::after {
+  opacity: 1;
+}
+
+/* Matrix Rain Effect for Background (Optional Class) */
+@keyframes matrixRain {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 0% 100%;
+  }
+}
+
+.matrix-bg {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ctext x='0' y='30' fill='%230055ff' opacity='0.03' font-family='monospace' font-size='10'%3E01%3C/text%3E%3C/svg%3E");
+  animation: matrixRain 20s linear infinite;
+}
+
+/* Pixel Art Border Animation */
+@keyframes pixelBorder {
+  0%, 100% {
+    border-image: linear-gradient(90deg, var(--primary), var(--secondary), var(--primary)) 1;
+  }
+  50% {
+    border-image: linear-gradient(90deg, var(--secondary), var(--primary), var(--secondary)) 1;
+  }
+}
+
+.voxel-btn-primary:hover,
+.voxel-btn-secondary:hover {
+  animation: pixelBorder 1s steps(5) infinite;
+}
+
+/* Holographic Gradient */
+@keyframes holoShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.holo-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--secondary) 25%,
+    #9b59b6 50%,
+    var(--primary) 75%,
+    var(--secondary) 100%
+  );
+  background-size: 400% 400%;
+  animation: holoShift 8s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* VHS Tracking Lines */
+@keyframes vhsTracking {
+  0%, 90%, 100% {
+    opacity: 0;
+  }
+  92%, 98% {
+    opacity: 0.3;
+  }
+  95% {
+    transform: translateX(-5px);
+  }
+}
+
+.vhs-effect::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.03) 2px,
+    rgba(255, 255, 255, 0.03) 4px
+  );
+  pointer-events: none;
+  animation: vhsTracking 8s ease-in-out infinite;
+}
+
+/* Retro CRT Corner Vignette */
+.crt-vignette {
+  box-shadow:
+    inset 0 0 100px rgba(0, 0, 0, 0.5),
+    inset 0 0 50px rgba(0, 0, 0, 0.3);
+}
+
+/* Data Stream Animation */
+@keyframes dataStream {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  90% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+/* Typing Cursor Animation */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typing-cursor::after {
+  content: '█';
+  animation: blink 1s step-end infinite;
+  color: var(--primary);
+}
+
+/* Tech Label with Line */
+.tech-label-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-fg);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.tech-label-line::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+}
+
+/* Hexagon Badge */
+.hex-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  background: var(--primary);
+  color: white;
+  font-size: var(--fs-xs);
+  font-weight: 900;
+  text-transform: uppercase;
+  clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%);
+}
+
+/* Animated Progress Bar */
+@keyframes progressGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--primary);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--primary), 0 0 30px var(--primary-glow);
+  }
+}
+
+.progress-bar.animated {
+  animation: progressGlow 2s ease-in-out infinite;
+}
+
+/* Stacked Paper Effect */
+.stacked-card {
+  position: relative;
+}
+
+.stacked-card::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: -8px;
+  bottom: -8px;
+  background: var(--border);
+  z-index: -1;
+}
+
+/* Pixel Perfect Divider */
+.pixel-divider {
+  height: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--primary) 0px,
+    var(--primary) 8px,
+    transparent 8px,
+    transparent 16px,
+    var(--secondary) 16px,
+    var(--secondary) 24px,
+    transparent 24px,
+    transparent 32px
+  );
+  margin: 2rem 0;
+}
+
+/* Floating Action Button */
+.fab {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  border: 3px solid var(--primary);
+  box-shadow: var(--shd-primary), 0 0 20px var(--primary-glow);
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: white;
+  transition: all 0.2s;
+  z-index: 1000;
+}
+
+.fab:hover {
+  transform: translate(-4px, -4px);
+  box-shadow: 8px 8px 0px 0px var(--secondary), 0 0 40px var(--primary-glow);
+}
+
+/* Status Indicator Dots */
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  position: relative;
+}
+
+.status-dot.online {
+  background: var(--success);
+  border-color: var(--success);
+  animation: neonPulse 2s ease-in-out infinite;
+}
+
+.status-dot.processing {
+  background: var(--secondary);
+  border-color: var(--secondary);
+  animation: neonPulse 1s ease-in-out infinite;
+}
+
+.status-dot.offline {
+  background: var(--error);
+  border-color: var(--error);
+}
+
+/* Ribbon Label */
+.ribbon {
+  position: absolute;
+  top: 10px;
+  right: -30px;
+  background: var(--secondary);
+  color: white;
+  padding: 0.25rem 2rem;
+  font-size: var(--fs-xs);
+  font-weight: 900;
+  text-transform: uppercase;
+  transform: rotate(45deg);
+  box-shadow: 0 2px 10px rgba(255, 85, 0, 0.3);
+}
+
+/* Input Focus Glow */
+.voxel-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shd-sm), 0 0 10px var(--primary-glow);
+}
+
+/* Checkbox Glow on Check */
+.voxel-checkbox:checked {
+  box-shadow: 2px 2px 0px 0px var(--border), 0 0 10px var(--primary-glow);
+}
+
+/* Card Category Colors */
+.option-group {
+  position: relative;
+  overflow: hidden;
+}
+
+.option-group::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--primary);
+}
+
+/* Animated Underline Links */
+.animated-link {
+  position: relative;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.animated-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--secondary);
+  transition: width 0.3s;
+}
+
+.animated-link:hover::after {
+  width: 100%;
+}
+
+/* Feature Grid Hover */
+.feature-highlight {
+  transition: all 0.2s;
+}
+
+.feature-highlight:hover {
+  background: linear-gradient(135deg, rgba(0, 85, 255, 0.1), rgba(255, 85, 0, 0.1));
+  border-color: var(--primary);
+}

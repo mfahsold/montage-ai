@@ -119,7 +119,7 @@ run_script() {
     local SCRIPT="$1"
     shift
     echo -e "${GREEN}🚀 Running script: $SCRIPT${NC}"
-    docker compose run --rm \
+    docker compose run --rm --user "$(id -u):$(id -g)" \
         --entrypoint "" \
         -v "$(pwd)/scripts:/app/scripts" \
         -v "$(pwd)/src:/app/src" \
@@ -241,7 +241,7 @@ run_montage() {
         CGPU_ENABLED="true"  # Enable cgpu if any feature needs it
     fi
 
-    docker compose run --rm \
+    docker compose run --rm --user "$(id -u):$(id -g)" \
         -e CREATIVE_PROMPT="$STYLE" \
         -e FFMPEG_PRESET="$PRESET" \
         -e STABILIZE="$STABILIZE" \
@@ -262,6 +262,9 @@ run_montage() {
         -e MUSIC_START="${MUSIC_START:-0}" \
         -e MUSIC_END="${MUSIC_END:-0}" \
         -e QUALITY_PROFILE="${QUALITY_PROFILE:-standard}" \
+        -e COLOR_GRADING="${COLOR_GRADING:-}" \
+        -e COLOR_INTENSITY="${COLOR_INTENSITY:-0.7}" \
+        -e UPSCALE="${UPSCALE:-false}" \
         montage-ai \
         python3 -m montage_ai
 }
@@ -282,6 +285,9 @@ CAPTIONS_STYLE="youtube"
 VOICE_ISOLATION="false"
 STORY_ENGINE="false"
 SHORTS_MODE="false"
+UPSCALE="false"
+COLOR_GRADING=""
+COLOR_INTENSITY="0.7"
 
 case "${1:-run}" in
     run)
@@ -299,7 +305,7 @@ case "${1:-run}" in
         shift
         echo "📝 Starting Text-Based Editor..."
         # Override input volume to be writable for transcript generation
-        docker compose run --rm \
+        docker compose run --rm --user "$(id -u):$(id -g)" \
             -v "$(pwd)/data/input:/data/input" \
             -e PYTHONPATH=/app/src \
             montage-ai python3 -m montage_ai.text_editor "$@"
@@ -325,6 +331,7 @@ case "${1:-run}" in
         PRESET="slow"
         QUALITY_PROFILE="high"
         STABILIZE="true"
+        UPSCALE="true"
         shift
         [[ -n "$1" && "$1" != --* ]] && { STYLE="$1"; shift; }
         ;;
@@ -384,6 +391,14 @@ esac
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --stabilize) STABILIZE="true"; shift ;;
+        --upscale) UPSCALE="true"; shift ;;
+        --color-grade)
+            if [[ -n "$2" && "$2" != --* ]]; then
+                COLOR_GRADING="$2"; shift
+            else
+                COLOR_GRADING="cinematic"
+            fi
+            shift ;;
         --shorts) SHORTS_MODE="true"; shift ;;
         --export) EXPORT_TIMELINE="true"; shift ;;
         --no-enhance) ENHANCE="false"; shift ;;

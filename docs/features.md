@@ -8,6 +8,110 @@ Complete guide to Montage AI capabilities.
 
 ## 🆕 2026 Releases
 
+### v1.1 Enhancement Suite (January 2026)
+
+Professional video enhancement with full NLE compatibility.
+
+#### AI Denoising
+
+Reduce noise while preserving film grain texture.
+
+**Methods:**
+- **hqdn3d:** Fast temporal/spatial denoising (default)
+- **nlmeans:** High-quality non-local means (slower, better)
+
+**Parameters:**
+| Parameter | Range | Default | Description |
+|-----------|-------|---------|-------------|
+| `temporal_strength` | 0.0-1.0 | 0.5 | Cross-frame reduction |
+| `spatial_strength` | 0.0-1.0 | 0.3 | In-frame reduction |
+| `chroma_strength` | 0.0-1.0 | 0.5 | Color noise reduction |
+| `preserve_grain` | 0.0-1.0 | 0.2 | Keep film texture |
+
+**Usage:**
+```bash
+./montage-ai.sh run hitchcock --denoise
+# Or with custom settings
+DENOISE_SPATIAL=0.4 DENOISE_TEMPORAL=0.6 ./montage-ai.sh run
+```
+
+#### Film Grain Simulation
+
+Add authentic film grain for cinematic look.
+
+**Presets:**
+| Type | Character | Use Case |
+|------|-----------|----------|
+| `fine` | Subtle texture | Modern digital |
+| `medium` | Visible grain | Music videos |
+| `35mm` | Classic cinema | Feature films |
+| `16mm` | Documentary | Indie, documentary |
+| `8mm` | Vintage home movie | Retro aesthetics |
+
+**Usage:**
+```bash
+./montage-ai.sh run --film-grain 35mm
+```
+
+#### Dialogue Ducking
+
+Auto-detect speech and lower background music.
+
+**How it works:**
+1. VAD (Voice Activity Detection) finds speech segments
+2. Generates volume keyframes with attack/release curves
+3. Exports NLE-compatible automation
+
+**Detection Methods:**
+| Method | Quality | Speed | Requirements |
+|--------|---------|-------|--------------|
+| Silero | Excellent | Medium | torch |
+| WebRTC | Good | Fast | webrtcvad |
+| FFmpeg | Basic | Fast | Built-in |
+
+**Parameters:**
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `duck_level_db` | -12 | Volume reduction |
+| `attack_time` | 0.15s | Ramp down time |
+| `release_time` | 0.30s | Ramp up time |
+
+**Export:** CSV, DaVinci Resolve text, Premiere XML
+
+#### Enhancement Tracking & NLE Export
+
+Every AI decision is tracked and exportable.
+
+**What's tracked:**
+- Stabilization (method, smoothing, crop mode)
+- Upscaling (model, scale factor)
+- Denoising (spatial/temporal strength)
+- Sharpening (amount, radius)
+- Color grading (preset, intensity, LUT)
+- Color matching (reference clip, method)
+- Film grain (type, intensity)
+- Dialogue ducking (keyframes, segments)
+
+**Export formats:**
+- **OTIO metadata:** Full parameters in clip metadata
+- **EDL comments:** `* MONTAGE_AI DENOISE: spatial=0.3`
+- **Recipe cards:** Human-readable Markdown instructions
+
+**Recipe Card Example:**
+```markdown
+## Clip: DJI_0042.MP4
+### DaVinci Resolve Recreation:
+1. **Stabilizer** (Color Page > Tracker)
+   - Mode: Perspective
+   - Smoothing: 0.30
+2. **Noise Reduction** (Color Page > Spatial NR)
+   - Luma Threshold: 3.0
+3. **Color Wheels** (Color Page > Primary)
+   - Saturation: 115%
+```
+
+---
+
 ### Transcript Editor
 
 Edit video by removing text. AI handles the cuts.

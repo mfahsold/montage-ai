@@ -3,6 +3,7 @@
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm--NC-purple.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
+[![K3s](https://img.shields.io/badge/k3s-ready-green.svg)](https://k3s.io/)
 
 > **We do not generate pixels. We polish them.**
 
@@ -34,27 +35,65 @@ docker-compose up -d
 
 | Feature | What It Does |
 |---------|------------|
-| **Beat-Sync** | Cuts aligned to music rhythm |
+| **Beat-Sync** | Cuts aligned to music rhythm via librosa |
 | **Transcript Editor** | Text-based video editing |
 | **Shorts Studio** | Auto-reframe to 9:16 vertical |
-| **Pro Export** | OTIO/EDL for DaVinci, Premiere |
-| **Quality Profiles** | Preview → Standard → High |
+| **Pro Export** | OTIO/EDL for DaVinci, Premiere, FCP |
+| **Quality Profiles** | Preview → Standard → High → Master |
+
+### New in v1.1
+
+| Feature | Description |
+|---------|-------------|
+| **AI Denoising** | hqdn3d/nlmeans noise reduction with grain preservation |
+| **Color Matching** | Shot-to-shot color consistency across clips |
+| **Film Grain** | Authentic 35mm/16mm/8mm grain simulation |
+| **Dialogue Ducking** | Auto-detect speech, lower music, export keyframes |
+| **NLE Recipe Cards** | Human-readable enhancement instructions |
+| **Enhancement Tracking** | Every AI decision exportable to NLEs |
 
 ## Editing Styles
 
-`dynamic` · `hitchcock` · `mtv` · `action` · `documentary` · `minimalist` · `wes_anderson`
+`dynamic` · `hitchcock` · `mtv` · `action` · `documentary` · `minimalist` · `wes_anderson` · `viral` · `wedding` · `travel` · `gaming`
 
 Or natural language: `CREATIVE_PROMPT="90s skateboard" ./montage-ai.sh run`
 
+## Processing Options
+
+```bash
+# Full enhancement pipeline
+./montage-ai.sh run hitchcock \
+  --stabilize \
+  --upscale \
+  --color-grade cinematic \
+  --denoise \
+  --film-grain 35mm
+```
+
 ## How It Compares
 
-| | Montage AI | Descript | Frame | Adobe |
-|---|---|---|---|---|
-| **Cost** | Free | $12/mo | Free | $55+/mo |
-| **Local** | ✅ | ❌ | ✅ | ❌ |
-| **Beat-Sync** | ✅ | Limited | ❌ | No |
-| **Auto-Reframe** | ✅ | ❌ | ✅ | No |
-| **Export OTIO/EDL** | ✅ | No | No | Limited |
+| | Montage AI | Descript | Frame | AutoClip | Adobe |
+|---|---|---|---|---|---|
+| **Cost** | Free | $12/mo | Free | Free | $55+/mo |
+| **Local** | ✅ | ❌ | ✅ | ✅ | ❌ |
+| **Beat-Sync** | ✅ (librosa) | Limited | ❌ | Energy only | No |
+| **Story Arc** | ✅ | ❌ | ❌ | ❌ | No |
+| **Auto-Reframe** | ✅ | ❌ | ✅ | ❌ | Limited |
+| **OTIO/EDL** | ✅ | No | No | No | Limited |
+| **Enhancement Tracking** | ✅ | No | No | No | No |
+
+## Architecture
+
+```
+Input Footage → Analysis → Creative Direction → Editing → Enhancement → Export
+                  │              │                 │           │
+                  └──────────────┴─────────────────┴───────────┴──→ NLE (OTIO/EDL)
+```
+
+- **Three-Stage Pipeline**: Ingest → Edit → Finish
+- **Local-First**: All processing on your hardware
+- **Cloud GPU Optional**: cgpu for upscaling/transcription
+- **K3s Distributed**: Scale across ARM + AMD nodes
 
 ## Documentation
 
@@ -62,7 +101,16 @@ Or natural language: `CREATIVE_PROMPT="90s skateboard" ./montage-ai.sh run`
 - **[Features](docs/features.md)** — Complete capabilities guide
 - **[Configuration](docs/configuration.md)** — All settings & environment variables
 - **[Architecture](docs/architecture.md)** — How it works (for developers)
+- **[Parameter Reference](docs/PARAMETER_REFERENCE.md)** — All controllable parameters
 - **[Troubleshooting](docs/troubleshooting.md)** — Common issues & fixes
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. We welcome:
+- Bug fixes and feature PRs
+- Style template contributions
+- Documentation improvements
+- Translation help
 
 ## License
 
@@ -73,5 +121,6 @@ Or natural language: `CREATIVE_PROMPT="90s skateboard" ./montage-ai.sh run`
 <p align="center">
   <a href="https://mfahsold.github.io/montage-ai">Website</a> ·
   <a href="docs/COMPETITIVE_ANALYSIS.md">Why Us?</a> ·
+  <a href="docs/features.md">Features</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>

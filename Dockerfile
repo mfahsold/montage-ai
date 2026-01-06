@@ -33,15 +33,26 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then         echo "Downloading Real-ESRGAN f
 # Copy application code
 COPY . .
 
+# Create non-root user for security and correct file permissions
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g ${GID} montage && \
+    useradd -u ${UID} -g ${GID} -m -s /bin/bash montage && \
+    chown -R montage:montage /app
+
 # Expose port for web UI
 EXPOSE 5000
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=src/montage_ai/web_ui/app.py
+ENV NUMBA_CACHE_DIR=/tmp/numba_cache
 
 # Set PYTHONPATH to include the source directory
 ENV PYTHONPATH=/app/src
+
+# Switch to non-root user
+USER montage
 
 # Default command
 WORKDIR /app/src

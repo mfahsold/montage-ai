@@ -1337,6 +1337,65 @@ def remove_filler_words(transcript: dict, fillers: Optional[List[str]] = None) -
 
 
 # =============================================================================
+# Dialogue Detection Integration
+# =============================================================================
+
+# Re-export dialogue detection for convenience
+try:
+    from .dialogue_ducking import (
+        DialogueSegment,
+        DialogueDetector,
+        DuckingConfig,
+        detect_dialogue_segments,
+        generate_duck_keyframes,
+        apply_ducking_to_audio,
+    )
+    DIALOGUE_DETECTION_AVAILABLE = True
+except ImportError:
+    DIALOGUE_DETECTION_AVAILABLE = False
+
+
+def analyze_dialogue_for_ducking(
+    voice_path: str,
+    music_duration: float,
+    duck_level_db: float = -12.0,
+    method: str = "auto"
+) -> Optional[dict]:
+    """
+    Analyze dialogue/speech for auto-ducking.
+
+    This convenience function wraps DialogueDetector for simple usage.
+
+    Args:
+        voice_path: Path to voice/dialogue audio
+        music_duration: Duration of music track (for keyframe generation)
+        duck_level_db: Volume reduction in dB during speech
+        method: Detection method (auto, silero, webrtc, ffmpeg)
+
+    Returns:
+        Dict with 'segments', 'keyframes', and 'ffmpeg_filter' keys,
+        or None if dialogue detection is not available.
+    """
+    if not DIALOGUE_DETECTION_AVAILABLE:
+        logger.warning("Dialogue detection not available")
+        return None
+
+    config = DuckingConfig(duck_level_db=duck_level_db)
+    detector = DialogueDetector(config)
+
+    result = detector.analyze(voice_path, music_duration, method)
+
+    return {
+        "segments": [s.to_dict() for s in result.segments],
+        "keyframes": [k.to_dict() for k in result.keyframes],
+        "ffmpeg_filter": detector.generate_ffmpeg_filter(result),
+        "total_speech_duration": result.total_speech_duration,
+        "speech_percentage": result.speech_percentage,
+        "method": result.method,
+    }
+
+
+# =============================================================================
 # Module Exports
 # =============================================================================
 
@@ -1344,10 +1403,21 @@ __all__ = [
     # Data classes
     "BeatInfo",
     "EnergyProfile",
+    "MusicSection",
+    "AudioQuality",
     # Main functions
     "analyze_audio",
     "analyze_music_energy",
     "get_beat_times",
     "calculate_dynamic_cut_length",
+    "detect_music_sections",
+    "fit_story_arc_to_sections",
     "remove_filler_words",
+    # Audio quality
+    "estimate_audio_snr",
+    "estimate_audio_snr_lufs",
+    "compare_audio_quality",
+    # Dialogue detection (if available)
+    "analyze_dialogue_for_ducking",
+    "DIALOGUE_DETECTION_AVAILABLE",
 ]

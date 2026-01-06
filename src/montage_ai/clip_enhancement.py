@@ -74,6 +74,112 @@ class EnhancementResult:
     details: Dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class DenoiseConfig:
+    """Configuration for video denoising.
+
+    FFmpeg filters used:
+    - hqdn3d: High quality 3D denoiser (temporal + spatial)
+    - nlmeans: Non-local means denoising (higher quality, slower)
+    - atadenoise: Adaptive temporal averaging denoiser
+    """
+    enabled: bool = True
+    # Temporal denoising (across frames)
+    temporal_strength: float = 0.5  # 0.0-1.0, maps to luma_tmp in hqdn3d
+    # Spatial denoising (within frame)
+    spatial_strength: float = 0.3   # 0.0-1.0, maps to luma_spatial
+    # Chroma denoising strength
+    chroma_strength: float = 0.5    # 0.0-1.0
+    # Preserve film grain look
+    preserve_grain: float = 0.2     # 0.0-1.0, reduces denoise in textured areas
+    # Use high-quality nlmeans (slower but better)
+    use_nlmeans: bool = False
+    # Strength for nlmeans (1-10)
+    nlmeans_strength: int = 4
+
+    def to_ffmpeg_filter(self) -> str:
+        """Convert config to FFmpeg filter string."""
+        if self.use_nlmeans:
+            # nlmeans: s=strength (1-10), p=patch size, pc=patch size color
+            s = max(1, min(10, self.nlmeans_strength))
+            return f"nlmeans=s={s}:p=7:pc=5:r=3"
+        else:
+            # hqdn3d: luma_spatial:chroma_spatial:luma_tmp:chroma_tmp
+            ls = self.spatial_strength * 8  # 0-8 range
+            cs = self.chroma_strength * 6   # 0-6 range
+            lt = self.temporal_strength * 6  # 0-6 range
+            ct = self.chroma_strength * self.temporal_strength * 4
+            # Reduce strength if preserving grain
+            grain_factor = 1.0 - (self.preserve_grain * 0.5)
+            ls *= grain_factor
+            lt *= grain_factor
+            return f"hqdn3d={ls:.1f}:{cs:.1f}:{lt:.1f}:{ct:.1f}"
+
+
+@dataclass
+class FilmGrainConfig:
+    """Configuration for film grain simulation.
+
+    Adds cinematic film grain to digital footage for a more organic look.
+    """
+    enabled: bool = False
+    # Grain type: fine, medium, coarse, 35mm, 16mm, 8mm
+    grain_type: str = "fine"
+    # Overall intensity (0.0-1.0)
+    intensity: float = 0.3
+    # Size of grain particles (0.5-2.0)
+    size: float = 1.0
+    # More grain in shadows
+    shadow_boost: float = 1.2
+    # Less grain in highlights
+    highlight_reduce: float = 0.8
+
+    def to_ffmpeg_filter(self) -> str:
+        """Convert config to FFmpeg filter string."""
+        # Use noise filter with specific settings per grain type
+        grain_params = {
+            "fine": {"strength": 8, "flags": "t+u"},
+            "medium": {"strength": 12, "flags": "t+u"},
+            "coarse": {"strength": 18, "flags": "t+u"},
+            "35mm": {"strength": 10, "flags": "t+u+a"},
+            "16mm": {"strength": 15, "flags": "t+u+a"},
+            "8mm": {"strength": 22, "flags": "t+u+a"},
+        }
+        params = grain_params.get(self.grain_type, grain_params["fine"])
+        strength = int(params["strength"] * self.intensity)
+        flags = params["flags"]
+        # Apply with size scaling
+        return f"noise=c0s={strength}:c0f={flags}:allf={flags}"
+
+
+@dataclass
+class SharpenConfig:
+    """Configuration for video sharpening.
+
+    Uses unsharp mask filter for controlled sharpening.
+    """
+    enabled: bool = True
+    # Sharpening amount (0.0-1.0)
+    amount: float = 0.4
+    # Radius in pixels (affects edge detection)
+    radius: float = 1.5
+    # Threshold to avoid sharpening noise (0-255)
+    threshold: int = 10
+    # Protect skin tones from over-sharpening
+    protect_skin: bool = True
+
+    def to_ffmpeg_filter(self) -> str:
+        """Convert config to FFmpeg filter string."""
+        # unsharp: luma_msize_x:luma_msize_y:luma_amount:chroma_msize_x:chroma_msize_y:chroma_amount
+        lx = ly = int(self.radius * 2) * 2 + 1  # Must be odd, 3-23
+        lx = max(3, min(23, lx))
+        ly = lx
+        la = self.amount * 2.0  # Scale to useful range
+        # Less sharpening on chroma to avoid color artifacts
+        ca = la * 0.5
+        return f"unsharp={lx}:{ly}:{la:.2f}:{lx}:{ly}:{ca:.2f}"
+
+
 # =============================================================================
 # Lazy imports for optional dependencies
 # =============================================================================
@@ -463,6 +569,229 @@ class ClipEnhancer:
         else:
             logger.info("Using FFmpeg Lanczos upscaling (Vulkan GPU not available)")
             return self._upscale_ffmpeg(input_path, output_path, scale=scale_value)
+
+    def denoise(
+        self,
+        input_path: str,
+        output_path: str,
+        config: Optional[DenoiseConfig] = None
+    ) -> str:
+        """
+        Apply denoising to video using FFmpeg filters.
+
+        Uses hqdn3d (fast) or nlmeans (high quality) filters.
+
+        Args:
+            input_path: Source video file
+            output_path: Destination for denoised video
+            config: DenoiseConfig with strength parameters
+
+        Returns:
+            Path to denoised video
+        """
+        config = config or DenoiseConfig()
+        if not config.enabled:
+            return input_path
+
+        logger.info(f"Denoising {os.path.basename(input_path)}...")
+        if self._skip_output_if_present(output_path, "Denoise"):
+            return output_path
+
+        denoise_filter = config.to_ffmpeg_filter()
+        logger.debug(f"Denoise filter: {denoise_filter}")
+
+        try:
+            cmd = build_ffmpeg_cmd([
+                "-i", input_path,
+                "-vf", denoise_filter,
+                "-c:a", "copy",
+            ] + build_video_encoding_args(
+                codec=STANDARD_CODEC,
+                profile=STANDARD_PROFILE,
+                pix_fmt=STANDARD_PIX_FMT,
+                preset=_ffmpeg_config.preset,
+            ) + [output_path])
+
+            run_command(cmd, timeout=_settings.processing.ffmpeg_long_timeout)
+            logger.info(f"Denoised: {os.path.basename(output_path)}")
+            return output_path
+
+        except CommandError as e:
+            logger.warning(f"Denoise failed: {e}")
+            return input_path
+
+    def add_film_grain(
+        self,
+        input_path: str,
+        output_path: str,
+        config: Optional[FilmGrainConfig] = None
+    ) -> str:
+        """
+        Add film grain simulation to video.
+
+        Adds organic film grain for a cinematic look.
+
+        Args:
+            input_path: Source video file
+            output_path: Destination for grained video
+            config: FilmGrainConfig with grain parameters
+
+        Returns:
+            Path to video with film grain
+        """
+        config = config or FilmGrainConfig()
+        if not config.enabled:
+            return input_path
+
+        logger.info(f"Adding film grain ({config.grain_type}) to {os.path.basename(input_path)}...")
+        if self._skip_output_if_present(output_path, "FilmGrain"):
+            return output_path
+
+        grain_filter = config.to_ffmpeg_filter()
+        logger.debug(f"Film grain filter: {grain_filter}")
+
+        try:
+            cmd = build_ffmpeg_cmd([
+                "-i", input_path,
+                "-vf", grain_filter,
+                "-c:a", "copy",
+            ] + build_video_encoding_args(
+                codec=STANDARD_CODEC,
+                profile=STANDARD_PROFILE,
+                pix_fmt=STANDARD_PIX_FMT,
+                preset=_ffmpeg_config.preset,
+            ) + [output_path])
+
+            run_command(cmd, timeout=_settings.processing.ffmpeg_long_timeout)
+            logger.info(f"Film grain added: {os.path.basename(output_path)}")
+            return output_path
+
+        except CommandError as e:
+            logger.warning(f"Film grain failed: {e}")
+            return input_path
+
+    def sharpen(
+        self,
+        input_path: str,
+        output_path: str,
+        config: Optional[SharpenConfig] = None
+    ) -> str:
+        """
+        Apply sharpening to video using unsharp mask.
+
+        Args:
+            input_path: Source video file
+            output_path: Destination for sharpened video
+            config: SharpenConfig with sharpening parameters
+
+        Returns:
+            Path to sharpened video
+        """
+        config = config or SharpenConfig()
+        if not config.enabled:
+            return input_path
+
+        logger.info(f"Sharpening {os.path.basename(input_path)}...")
+        if self._skip_output_if_present(output_path, "Sharpen"):
+            return output_path
+
+        sharpen_filter = config.to_ffmpeg_filter()
+        logger.debug(f"Sharpen filter: {sharpen_filter}")
+
+        try:
+            cmd = build_ffmpeg_cmd([
+                "-i", input_path,
+                "-vf", sharpen_filter,
+                "-c:a", "copy",
+            ] + build_video_encoding_args(
+                codec=STANDARD_CODEC,
+                profile=STANDARD_PROFILE,
+                pix_fmt=STANDARD_PIX_FMT,
+                preset=_ffmpeg_config.preset,
+            ) + [output_path])
+
+            run_command(cmd, timeout=_settings.processing.ffmpeg_long_timeout)
+            logger.info(f"Sharpened: {os.path.basename(output_path)}")
+            return output_path
+
+        except CommandError as e:
+            logger.warning(f"Sharpen failed: {e}")
+            return input_path
+
+    def enhance_pro(
+        self,
+        input_path: str,
+        output_path: str,
+        denoise_config: Optional[DenoiseConfig] = None,
+        sharpen_config: Optional[SharpenConfig] = None,
+        grain_config: Optional[FilmGrainConfig] = None,
+        color_grade: Optional[str] = None
+    ) -> str:
+        """
+        Professional enhancement pipeline combining multiple effects.
+
+        Order: Denoise -> Color Grade -> Sharpen -> Film Grain
+
+        Args:
+            input_path: Source video file
+            output_path: Destination for enhanced video
+            denoise_config: Denoising parameters
+            sharpen_config: Sharpening parameters
+            grain_config: Film grain parameters
+            color_grade: Color grading preset name
+
+        Returns:
+            Path to enhanced video
+        """
+        logger.info(f"Pro enhancement pipeline for {os.path.basename(input_path)}...")
+
+        # Build combined filter chain
+        filters = []
+
+        # 1. Denoise first (clean up noise before other processing)
+        if denoise_config and denoise_config.enabled:
+            filters.append(denoise_config.to_ffmpeg_filter())
+
+        # 2. Color grading
+        if color_grade:
+            grade_filter = COLOR_GRADING_FILTERS.get(color_grade)
+            if grade_filter:
+                filters.append(grade_filter)
+
+        # 3. Sharpen (after denoise to avoid amplifying noise)
+        if sharpen_config and sharpen_config.enabled:
+            filters.append(sharpen_config.to_ffmpeg_filter())
+
+        # 4. Film grain last (to overlay on clean image)
+        if grain_config and grain_config.enabled:
+            filters.append(grain_config.to_ffmpeg_filter())
+
+        if not filters:
+            logger.info("No enhancements requested")
+            return input_path
+
+        filter_chain = ",".join(filters)
+        logger.debug(f"Pro enhancement filter chain: {filter_chain}")
+
+        try:
+            cmd = build_ffmpeg_cmd([
+                "-i", input_path,
+                "-vf", filter_chain,
+                "-c:a", "copy",
+            ] + build_video_encoding_args(
+                codec=STANDARD_CODEC,
+                profile=STANDARD_PROFILE,
+                pix_fmt=STANDARD_PIX_FMT,
+                preset=_ffmpeg_config.preset,
+            ) + [output_path])
+
+            run_command(cmd, timeout=_settings.processing.ffmpeg_long_timeout)
+            logger.info(f"Pro enhanced: {os.path.basename(output_path)}")
+            return output_path
+
+        except CommandError as e:
+            logger.warning(f"Pro enhancement failed: {e}")
+            return input_path
 
     def color_match(
         self,

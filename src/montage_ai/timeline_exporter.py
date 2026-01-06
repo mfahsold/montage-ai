@@ -23,6 +23,7 @@ import os
 import json
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
 
@@ -51,6 +52,7 @@ class Clip:
     timeline_start: float  # Where this clip starts in final timeline (seconds)
     proxy_path: Optional[str] = None  # Path to proxy file (if generated)
     metadata: Dict = None  # Additional metadata (energy, motion score, etc.)
+    enhancement_decision: Optional[Any] = None  # EnhancementDecision from enhancement_tracking.py
 
 
 @dataclass
@@ -120,7 +122,8 @@ class TimelineExporter:
         export_otio: bool = True,
         export_edl: bool = True,
         export_xml: bool = True,
-        export_csv: bool = True
+        export_csv: bool = True,
+        export_recipe_card: bool = True
     ) -> Dict[str, str]:
         """
         Export timeline to NLE-compatible formats.
@@ -134,6 +137,7 @@ class TimelineExporter:
             export_edl: Export CMX 3600 EDL file
             export_xml: Export FCP XML v7 file (Resolve/Premiere/Kdenlive)
             export_csv: Export CSV spreadsheet
+            export_recipe_card: Export human-readable recipe card for NLE recreation
 
         Returns:
             Dictionary of exported file paths
@@ -187,6 +191,13 @@ class TimelineExporter:
         metadata_path = self._export_metadata(timeline)
         exported_files['metadata'] = metadata_path
         logger.info(f"✅ Metadata exported: {metadata_path}")
+
+        # Export recipe card (human-readable NLE recreation guide)
+        if export_recipe_card:
+            recipe_path = self._export_recipe_card(timeline)
+            if recipe_path:
+                exported_files['recipe_card'] = recipe_path
+                logger.info(f"✅ Recipe card exported: {recipe_path}")
 
         # Create project package
         package_path = self._create_project_package(timeline, exported_files, link_to_source=link_to_source)
@@ -267,6 +278,28 @@ class TimelineExporter:
                 # Sanitize metadata (convert numpy types to python types)
                 sanitized_metadata = self._sanitize_metadata(clip_data.metadata)
                 otio_clip.metadata.update(sanitized_metadata)
+
+            # Add enhancement metadata (NLE-compatible tracking)
+            if clip_data.enhancement_decision:
+                ed = clip_data.enhancement_decision
+                otio_clip.metadata["montage_ai"] = {
+                    "version": "1.0",
+                    "enhancements": {
+                        "stabilized": getattr(ed, 'stabilized', False),
+                        "upscaled": getattr(ed, 'upscaled', False),
+                        "denoised": getattr(ed, 'denoised', False),
+                        "sharpened": getattr(ed, 'sharpened', False),
+                        "color_graded": getattr(ed, 'color_graded', False),
+                        "color_matched": getattr(ed, 'color_matched', False),
+                        "film_grain_added": getattr(ed, 'film_grain_added', False),
+                    },
+                    "ai_reasoning": getattr(ed, 'ai_reasoning', None),
+                }
+                # Include full params if available
+                if hasattr(ed, 'to_dict'):
+                    otio_clip.metadata["montage_ai"]["params"] = self._sanitize_metadata(
+                        ed.to_dict().get("params", {})
+                    )
 
             video_track.append(otio_clip)
 
@@ -350,7 +383,14 @@ class TimelineExporter:
 
                     # Source file comment
                     f.write(f"* FROM CLIP NAME: {os.path.basename(clip.source_path)}\n")
-                    f.write(f"* SOURCE FILE: {clip.source_path}\n\n")
+                    f.write(f"* SOURCE FILE: {clip.source_path}\n")
+
+                    # Enhancement tracking comments (NLE-compatible)
+                    if clip.enhancement_decision and hasattr(clip.enhancement_decision, 'to_edl_comments'):
+                        for comment in clip.enhancement_decision.to_edl_comments():
+                            f.write(f"{comment}\n")
+
+                    f.write("\n")
             
             # Atomic rename
             if os.path.exists(edl_path):
@@ -485,6 +525,31 @@ class TimelineExporter:
                         f.write(f'                  <mastercomment1>{clip.metadata.get("energy", "")}</mastercomment1>\n')
                         f.write(f'                  <mastercomment2>{clip.metadata.get("shot", "")}</mastercomment2>\n')
                         f.write('                </comments>\n')
+
+                    # Add enhancement metadata as comments
+                    if clip.enhancement_decision:
+                        ed = clip.enhancement_decision
+                        enhancements = []
+                        if getattr(ed, 'stabilized', False):
+                            enhancements.append("STAB")
+                        if getattr(ed, 'denoised', False):
+                            enhancements.append("DENOISE")
+                        if getattr(ed, 'sharpened', False):
+                            enhancements.append("SHARP")
+                        if getattr(ed, 'color_graded', False):
+                            enhancements.append("COLOR")
+                        if getattr(ed, 'upscaled', False):
+                            enhancements.append("UPSCALE")
+                        if enhancements:
+                            if not clip.metadata:
+                                f.write('                <comments>\n')
+                            enhancement_str = "+".join(enhancements)
+                            f.write(f'                  <mastercomment3>MONTAGE_AI: {enhancement_str}</mastercomment3>\n')
+                            if hasattr(ed, 'ai_reasoning') and ed.ai_reasoning:
+                                reason = ed.ai_reasoning[:80].replace("<", "&lt;").replace(">", "&gt;")
+                                f.write(f'                  <mastercomment4>AI: {reason}</mastercomment4>\n')
+                            if not clip.metadata:
+                                f.write('                </comments>\n')
 
                     f.write('              </clipitem>\n')
 
@@ -640,26 +705,32 @@ class TimelineExporter:
         Returns:
             Path to metadata JSON file
         """
+        # Build clip data with enhancement tracking
+        clips_data = []
+        for i, clip in enumerate(timeline.clips, start=1):
+            clip_dict = {
+                "index": i,
+                "source_file": clip.source_path,
+                "proxy_file": clip.proxy_path,
+                "source_in": clip.start_time,
+                "source_out": clip.start_time + clip.duration,
+                "timeline_in": clip.timeline_start,
+                "timeline_out": clip.timeline_start + clip.duration,
+                "duration": clip.duration,
+                "metadata": self._sanitize_metadata(clip.metadata or {})
+            }
+            # Include enhancement decisions if available
+            if clip.enhancement_decision and hasattr(clip.enhancement_decision, 'to_dict'):
+                clip_dict["enhancement"] = self._sanitize_metadata(clip.enhancement_decision.to_dict())
+            clips_data.append(clip_dict)
+
         metadata = {
             "project_name": timeline.project_name,
             "duration_sec": timeline.total_duration,
             "fps": timeline.fps,
             "resolution": timeline.resolution,
             "audio_file": timeline.audio_path,
-            "clips": [
-                {
-                    "index": i,
-                    "source_file": clip.source_path,
-                    "proxy_file": clip.proxy_path,
-                    "source_in": clip.start_time,
-                    "source_out": clip.start_time + clip.duration,
-                    "timeline_in": clip.timeline_start,
-                    "timeline_out": clip.timeline_start + clip.duration,
-                    "duration": clip.duration,
-                    "metadata": self._sanitize_metadata(clip.metadata or {})
-                }
-                for i, clip in enumerate(timeline.clips, start=1)
-            ],
+            "clips": clips_data,
             "exporter_version": VERSION
         }
 
@@ -827,6 +898,200 @@ class TimelineExporter:
         frames = int((seconds % 1) * fps)
 
         return f"{hours:02d}:{minutes:02d}:{secs:02d}:{frames:02d}"
+
+    def _export_recipe_card(self, timeline: Timeline) -> Optional[str]:
+        """
+        Export human-readable recipe card for manual NLE recreation.
+
+        This generates a Markdown file that professional editors can use to
+        understand and recreate AI decisions in their preferred NLE.
+
+        Args:
+            timeline: Timeline object with enhancement decisions
+
+        Returns:
+            Path to recipe card Markdown file
+        """
+        recipe_path = os.path.join(
+            self.output_dir,
+            f"{timeline.project_name}_RECIPE_CARD.md"
+        )
+        temp_path = f"{recipe_path}.tmp"
+
+        # Check if any clips have enhancement decisions
+        has_enhancements = any(
+            clip.enhancement_decision for clip in timeline.clips
+        )
+
+        if not has_enhancements:
+            logger.debug("No enhancement decisions to export in recipe card")
+            return None
+
+        try:
+            with open(temp_path, 'w') as f:
+                # Header
+                f.write(f"# Enhancement Recipe Card - {timeline.project_name}\n\n")
+                f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
+                f.write(f"**Total Clips:** {len(timeline.clips)}\n")
+
+                enhanced_count = sum(
+                    1 for clip in timeline.clips
+                    if clip.enhancement_decision and any([
+                        getattr(clip.enhancement_decision, 'stabilized', False),
+                        getattr(clip.enhancement_decision, 'denoised', False),
+                        getattr(clip.enhancement_decision, 'color_graded', False),
+                        getattr(clip.enhancement_decision, 'upscaled', False),
+                    ])
+                )
+                f.write(f"**Enhanced Clips:** {enhanced_count}\n\n")
+                f.write("---\n\n")
+
+                # Per-clip recipes
+                for i, clip in enumerate(timeline.clips, start=1):
+                    ed = clip.enhancement_decision
+                    if not ed:
+                        continue
+
+                    # Check if any enhancement was applied
+                    if not any([
+                        getattr(ed, 'stabilized', False),
+                        getattr(ed, 'denoised', False),
+                        getattr(ed, 'sharpened', False),
+                        getattr(ed, 'color_graded', False),
+                        getattr(ed, 'upscaled', False),
+                        getattr(ed, 'color_matched', False),
+                        getattr(ed, 'film_grain_added', False),
+                    ]):
+                        continue
+
+                    # Clip header
+                    f.write(f"## Clip {i}: {os.path.basename(clip.source_path)}\n\n")
+                    tc_in = self._seconds_to_timecode(clip.timeline_start, timeline.fps)
+                    tc_out = self._seconds_to_timecode(clip.timeline_start + clip.duration, timeline.fps)
+                    f.write(f"**Timeline:** {tc_in} - {tc_out}\n\n")
+
+                    # Enhancement checklist
+                    f.write("### Applied Enhancements:\n")
+                    checks = [
+                        ("Stabilization", getattr(ed, 'stabilized', False)),
+                        ("Upscaling", getattr(ed, 'upscaled', False)),
+                        ("Denoising", getattr(ed, 'denoised', False)),
+                        ("Sharpening", getattr(ed, 'sharpened', False)),
+                        ("Color Grading", getattr(ed, 'color_graded', False)),
+                        ("Color Matching", getattr(ed, 'color_matched', False)),
+                        ("Film Grain", getattr(ed, 'film_grain_added', False)),
+                    ]
+                    for name, applied in checks:
+                        mark = "x" if applied else " "
+                        f.write(f"- [{mark}] {name}\n")
+                    f.write("\n")
+
+                    # DaVinci Resolve instructions
+                    f.write("### DaVinci Resolve Recreation:\n")
+                    step = 1
+
+                    if getattr(ed, 'stabilized', False):
+                        f.write(f"{step}. **Stabilizer** (Color Page > Tracker)\n")
+                        params = getattr(ed, 'stabilize_params', None)
+                        if params and hasattr(params, 'to_resolve_params'):
+                            for k, v in params.to_resolve_params().items():
+                                if k != 'node':
+                                    f.write(f"   - {k}: {v}\n")
+                        else:
+                            f.write("   - Mode: Perspective\n")
+                            f.write("   - Smoothing: 0.30\n")
+                        step += 1
+
+                    if getattr(ed, 'denoised', False):
+                        f.write(f"{step}. **Noise Reduction** (Color Page > Spatial NR)\n")
+                        params = getattr(ed, 'denoise_params', None)
+                        if params:
+                            f.write(f"   - Luma Threshold: {getattr(params, 'spatial_strength', 0.3) * 10:.1f}\n")
+                            f.write(f"   - Chroma Threshold: {getattr(params, 'chroma_strength', 0.5) * 10:.1f}\n")
+                        step += 1
+
+                    if getattr(ed, 'sharpened', False):
+                        f.write(f"{step}. **Sharpening** (Color Page > Blur/Sharpen)\n")
+                        params = getattr(ed, 'sharpen_params', None)
+                        if params:
+                            f.write(f"   - Amount: {getattr(params, 'amount', 0.4):.2f}\n")
+                            f.write(f"   - Radius: {getattr(params, 'radius', 1.5):.1f}\n")
+                        step += 1
+
+                    if getattr(ed, 'color_graded', False):
+                        f.write(f"{step}. **Color Grading** (Color Page > Primary Wheels)\n")
+                        params = getattr(ed, 'color_grade_params', None)
+                        if params:
+                            f.write(f"   - Preset: {getattr(params, 'preset', 'custom')}\n")
+                            f.write(f"   - Intensity: {getattr(params, 'intensity', 0.7):.0%}\n")
+                            f.write(f"   - Saturation: {getattr(params, 'saturation', 1.0):.0%}\n")
+                        step += 1
+
+                    if getattr(ed, 'upscaled', False):
+                        f.write(f"{step}. **Super Scale** (Edit Page > Inspector > Transform)\n")
+                        params = getattr(ed, 'upscale_params', None)
+                        if params:
+                            f.write(f"   - Scale: {getattr(params, 'scale_factor', 2)}x\n")
+                            f.write(f"   - Model: {getattr(params, 'model', 'Enhanced')}\n")
+                        step += 1
+
+                    f.write("\n")
+
+                    # Premiere Pro instructions
+                    f.write("### Premiere Pro Recreation:\n")
+                    step = 1
+
+                    if getattr(ed, 'stabilized', False):
+                        f.write(f"{step}. **Warp Stabilizer** (Effects Panel)\n")
+                        params = getattr(ed, 'stabilize_params', None)
+                        if params and hasattr(params, 'to_premiere_params'):
+                            for k, v in params.to_premiere_params().items():
+                                if k != 'effect':
+                                    f.write(f"   - {k}: {v}\n")
+                        else:
+                            f.write("   - Result: Smooth Motion\n")
+                            f.write("   - Smoothness: 30%\n")
+                        step += 1
+
+                    if getattr(ed, 'color_graded', False):
+                        f.write(f"{step}. **Lumetri Color** (Color Panel)\n")
+                        params = getattr(ed, 'color_grade_params', None)
+                        if params:
+                            f.write(f"   - Creative Look: {getattr(params, 'preset', 'None')}\n")
+                            f.write(f"   - Intensity: {getattr(params, 'intensity', 0.7) * 100:.0f}%\n")
+                        step += 1
+
+                    f.write("\n")
+
+                    # AI Reasoning
+                    if hasattr(ed, 'ai_reasoning') and ed.ai_reasoning:
+                        f.write("### AI Reasoning:\n")
+                        f.write(f"> {ed.ai_reasoning}\n\n")
+
+                    f.write("---\n\n")
+
+                # Footer
+                f.write("## About This Export\n\n")
+                f.write("This recipe card was generated by **Montage AI** to help you recreate\n")
+                f.write("or adjust AI-driven enhancements in your professional NLE.\n\n")
+                f.write("The parameters above can be applied manually in:\n")
+                f.write("- **DaVinci Resolve**: Color Page nodes, Tracker, Super Scale\n")
+                f.write("- **Premiere Pro**: Lumetri Color, Warp Stabilizer, Effects\n")
+                f.write("- **Final Cut Pro**: Color Board, Stabilization, Effects\n\n")
+                f.write(f"*Exporter Version: {VERSION}*\n")
+
+            # Atomic rename
+            if os.path.exists(recipe_path):
+                os.remove(recipe_path)
+            os.rename(temp_path, recipe_path)
+
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            logger.warning(f"Failed to export recipe card: {e}")
+            return None
+
+        return recipe_path
 
 
 from .config import get_settings

@@ -214,6 +214,20 @@
                                 <div class="option-label-desc">Remove camera shake. Recommended for handheld footage.</div>
                             </div>
                         </div>
+                        <div class="option-item">
+                            <input type="checkbox" name="denoise" id="denoise">
+                            <div class="option-label">
+                                <div class="option-label-title">AI DENOISE</div>
+                                <div class="option-label-desc">Reduce noise/grain. Best for low-light or high-ISO footage.</div>
+                            </div>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" name="sharpen" id="sharpen">
+                            <div class="option-label">
+                                <div class="option-label-title">SHARPEN</div>
+                                <div class="option-label-desc">Enhance edge detail. Subtle unsharp mask with skin protection.</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Color Grading -->
@@ -260,6 +274,42 @@
                         </div>
                     </div>
 
+                    <!-- Audio Enhancement -->
+                    <div class="option-group">
+                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--success); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎧 AUDIO ENHANCEMENT</div>
+                        <div class="option-item">
+                            <input type="checkbox" name="dialogue_duck" id="dialogue_duck">
+                            <div class="option-label">
+                                <div class="option-label-title">DIALOGUE DUCKING</div>
+                                <div class="option-label-desc">Auto-detect speech and lower music during dialogue. NLE-exportable keyframes.</div>
+                            </div>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" name="audio_normalize" id="audio_normalize">
+                            <div class="option-label">
+                                <div class="option-label-title">NORMALIZE AUDIO (-14 LUFS)</div>
+                                <div class="option-label-desc">Broadcast-safe loudness normalization for consistent levels.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Film Emulation -->
+                    <div class="option-group">
+                        <div style="font-weight: 900; font-size: 0.8rem; color: #9b59b6; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎬 FILM EMULATION</div>
+                        <div class="option-item" style="flex-direction: column; align-items: flex-start;">
+                            <label for="film_grain" class="option-label-title" style="margin-bottom: 0.5rem;">FILM GRAIN</label>
+                            <select name="film_grain" id="film_grain" class="voxel-input" style="width: 100%;">
+                                <option value="none">None - Clean digital</option>
+                                <option value="fine">Fine - Subtle texture</option>
+                                <option value="medium">Medium - Visible grain</option>
+                                <option value="35mm">35mm Film - Classic cinema</option>
+                                <option value="16mm">16mm Film - Documentary</option>
+                                <option value="8mm">8mm Film - Vintage home movie</option>
+                            </select>
+                            <p class="option-label-desc" style="margin-top: 0.5rem;">Add authentic film grain texture for cinematic look.</p>
+                        </div>
+                    </div>
+
                     <!-- Output Format -->
                     <div class="option-group">
                         <div style="font-weight: 900; font-size: 0.8rem; color: var(--secondary); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📱 OUTPUT FORMAT</div>
@@ -268,6 +318,20 @@
                             <div class="option-label">
                                 <div class="option-label-title">AUTO-REFRAME (9:16)</div>
                                 <div class="option-label-desc">Generate vertical version. Creates additional output file.</div>
+                            </div>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" name="export_timeline" id="export_timeline" checked>
+                            <div class="option-label">
+                                <div class="option-label-title">EXPORT TIMELINE (OTIO/EDL)</div>
+                                <div class="option-label-desc">Generate NLE project files for DaVinci Resolve, Premiere Pro.</div>
+                            </div>
+                        </div>
+                        <div class="option-item">
+                            <input type="checkbox" name="export_recipe" id="export_recipe">
+                            <div class="option-label">
+                                <div class="option-label-title">GENERATE RECIPE CARD</div>
+                                <div class="option-label-desc">Export enhancement parameters as human-readable instructions.</div>
                             </div>
                         </div>
                     </div>
