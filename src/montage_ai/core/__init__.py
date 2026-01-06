@@ -35,6 +35,14 @@ from .embedding_search import (
     reset_embedding_search,
 )
 
+from .encoder_router import (
+    EncoderRouter,
+    EncoderConfig,
+    EncoderTier,
+    get_encoder_router,
+    smart_encode,
+)
+
 __all__ = [
     # Builder
     "MontageBuilder",
@@ -57,4 +65,10 @@ __all__ = [
     "SearchResult",
     "get_embedding_search",
     "reset_embedding_search",
+    # Encoder Router
+    "EncoderRouter",
+    "EncoderConfig",
+    "EncoderTier",
+    "get_encoder_router",
+    "smart_encode",
 ]

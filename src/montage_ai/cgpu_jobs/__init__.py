@@ -18,6 +18,10 @@ __all__ = [
     "FFmpegRenderJob",
     "VoiceIsolationJob",
     "NoiseReductionJob",
+    "VideoEncodingJob",
+    # Helper functions
+    "should_use_cgpu_encoding",
+    "encode_with_cgpu_fallback",
     # Future jobs (skeleton implementations)
     "InterpolationJob",
     "LUTGeneratorJob",
@@ -61,4 +65,14 @@ def __getattr__(name):
     elif name == "LUTGeneratorJob":
         from .lut_generator import LUTGeneratorJob
         return LUTGeneratorJob
+    # Video Encoding Job
+    elif name == "VideoEncodingJob":
+        from .encoding import VideoEncodingJob
+        return VideoEncodingJob
+    elif name == "should_use_cgpu_encoding":
+        from .encoding import should_use_cgpu_encoding
+        return should_use_cgpu_encoding
+    elif name == "encode_with_cgpu_fallback":
+        from .encoding import encode_with_cgpu_fallback
+        return encode_with_cgpu_fallback
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

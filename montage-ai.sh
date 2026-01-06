@@ -262,7 +262,8 @@ run_montage() {
         -e MUSIC_START="${MUSIC_START:-0}" \
         -e MUSIC_END="${MUSIC_END:-0}" \
         -e QUALITY_PROFILE="${QUALITY_PROFILE:-standard}" \
-        montage-ai
+        montage-ai \
+        python3 -m montage_ai.editor
 }
 
 # Parse arguments

@@ -132,6 +132,16 @@ def map_options_to_env(
     env["CREATIVE_LOOP"] = bool_to_env(expanded.get("creative_loop"))
     env["ENABLE_STORY_ENGINE"] = bool_to_env(expanded.get("story_engine"))
     env["CAPTIONS"] = bool_to_env(expanded.get("captions"))
+
+    # Color Grading (from style template or explicit override)
+    color_grading = expanded.get("color_grading", "")
+    if color_grading and color_grading != "auto":
+        env["COLOR_GRADING"] = str(color_grading)
+
+    # Color Intensity (0.0-1.0, defaults to 1.0 = 100%)
+    color_intensity = expanded.get("color_intensity")
+    if color_intensity is not None and color_intensity != 1.0:
+        env["COLOR_INTENSITY"] = str(color_intensity)
     
     # Audio Polish (Clean Audio = Voice Isolation + Denoise)
     env["VOICE_ISOLATION"] = bool_to_env(expanded.get("clean_audio") or expanded.get("voice_isolation"))

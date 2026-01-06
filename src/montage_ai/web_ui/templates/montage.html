@@ -216,6 +216,50 @@
                         </div>
                     </div>
 
+                    <!-- Color Grading -->
+                    <div class="option-group">
+                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--accent, #e67e22); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎨 COLOR GRADING</div>
+                        <div class="option-item" style="flex-direction: column; align-items: flex-start;">
+                            <label for="color_grading" class="option-label-title" style="margin-bottom: 0.5rem;">COLOR PRESET</label>
+                            <select name="color_grading" id="color_grading" class="voxel-input" style="width: 100%;">
+                                <option value="auto">Auto (from style)</option>
+                                <optgroup label="Basic">
+                                    <option value="none">None - No color grading</option>
+                                    <option value="neutral">Neutral - Broadcast safe</option>
+                                    <option value="natural">Natural - True to source</option>
+                                </optgroup>
+                                <optgroup label="Temperature">
+                                    <option value="warm">Warm - Golden warmth</option>
+                                    <option value="cool">Cool - Blue/teal</option>
+                                    <option value="golden_hour">Golden Hour - Sunset</option>
+                                    <option value="blue_hour">Blue Hour - Dawn/dusk</option>
+                                </optgroup>
+                                <optgroup label="Cinematic">
+                                    <option value="teal_orange">Teal & Orange - Hollywood</option>
+                                    <option value="cinematic">Cinematic - S-curve contrast</option>
+                                    <option value="blockbuster">Blockbuster - Action movie</option>
+                                </optgroup>
+                                <optgroup label="Stylized">
+                                    <option value="vibrant">Vibrant - Punchy colors</option>
+                                    <option value="desaturated">Desaturated - Muted filmic</option>
+                                    <option value="high_contrast">High Contrast - Strong B&W</option>
+                                    <option value="vintage">Vintage - Faded film</option>
+                                    <option value="filmic_warm">Filmic Warm - Classic</option>
+                                    <option value="noir">Noir - Desaturated contrast</option>
+                                </optgroup>
+                                <optgroup label="Documentary">
+                                    <option value="documentary">Documentary - Natural sharp</option>
+                                </optgroup>
+                            </select>
+                            <p class="option-label-desc" style="margin-top: 0.5rem;">Override style's default color grade. "Auto" uses the style's built-in look.</p>
+                        </div>
+                        <div class="option-item" style="flex-direction: column; align-items: flex-start; margin-top: 0.75rem;">
+                            <label for="color_intensity" class="option-label-title" style="margin-bottom: 0.5rem;">INTENSITY: <span id="intensity_value">100</span>%</label>
+                            <input type="range" name="color_intensity" id="color_intensity" min="0" max="100" value="100" class="voxel-input" style="width: 100%;">
+                            <p class="option-label-desc" style="margin-top: 0.5rem;">Blend strength. 70% often looks more natural than 100%.</p>
+                        </div>
+                    </div>
+
                     <!-- Output Format -->
                     <div class="option-group">
                         <div style="font-weight: 900; font-size: 0.8rem; color: var(--secondary); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📱 OUTPUT FORMAT</div>
@@ -277,13 +321,25 @@
         function selectStyle(styleName) {
             // Update radio button
             document.querySelector(`input[name="style"][value="${styleName}"]`).checked = true;
-            
+
             // Update visual state
             document.querySelectorAll('.style-card').forEach(card => {
                 card.classList.remove('active');
             });
             event.currentTarget.classList.add('active');
         }
+
+        // Color grading intensity slider
+        document.addEventListener('DOMContentLoaded', function() {
+            const intensitySlider = document.getElementById('color_intensity');
+            const intensityValue = document.getElementById('intensity_value');
+
+            if (intensitySlider && intensityValue) {
+                intensitySlider.addEventListener('input', function() {
+                    intensityValue.textContent = this.value;
+                });
+            }
+        });
     </script>
 </body>
 </html>

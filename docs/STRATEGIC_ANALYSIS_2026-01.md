@@ -239,7 +239,7 @@ From [self-hosted video platform analysis](https://blog.altegon.com/the-rise-of-
 | **Story Engine** | ⏸️ Defer | Scaffolded but not integrated, complex |
 | **Video Agent Memory** | ⏸️ Defer | SQL storage, embeddings — overkill |
 | **Frame Interpolation** | ⏸️ Defer | Edge case, not core workflow |
-| **AI LUT Generation** | ❌ Remove | Out of scope ("polish" not "grade") |
+| **AI LUT Generation** | ⏸️ Defer | Skeleton exists, implement when demand proven (see STRATEGY_COLOR_GRADING_2026-01.md) |
 | **Generative B-roll** | ❌ Never | Violates "don't generate" philosophy |
 | **Multi-Track Compositing** | ❌ Never | NLE job, not rough-cut tool |
 
@@ -267,12 +267,14 @@ From [self-hosted video platform analysis](https://blog.altegon.com/the-rise-of-
 - `clip_selector.py` → Merge into footage_manager
 - `semantic_matcher.py` → Optional addon for B-roll
 
-#### C. Remove Dead Code
+#### C. Connect Color Grading to Pipeline ✅ COMPLETED
 
-**Action:**
-- Remove `AI_LUT_GENERATION` flag and scaffolding
-- Remove `FRAME_INTERPOLATION` flag (not implemented)
-- Clean unused imports in `montage_builder.py`
+**Action:** (Completed 2026-01-06)
+- Added `COLOR_GRADING_FILTERS` dictionary with 14 presets (none, neutral, warm, cool, teal_orange, vibrant, etc.)
+- Modified `enhance()` to accept `color_grade` parameter
+- Wired `color_grading` from style templates to enhancement pipeline
+- Each of 16 styles now gets appropriate color look
+- See `STRATEGY_COLOR_GRADING_2026-01.md` for full details
 
 ### 5.2 Short-Term Actions (Month 1)
 

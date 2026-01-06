@@ -133,15 +133,52 @@ Fine-tune the length and timing of your montage.
 
 ## Visual Enhancement
 
-| Variable          | Default | Description                                   |
-| ----------------- | ------- | --------------------------------------------- |
-| `STABILIZE`       | `false` | Enable video stabilization                    |
-| `UPSCALE`         | `false` | Enable AI upscaling (Real-ESRGAN)             |
-| `ENHANCE`         | `true`  | Enable color/sharpness enhancement            |
-| `PRESERVE_ASPECT` | `false` | Letterbox instead of crop when aspect differs |
-| `DEEP_ANALYSIS`   | `false` | Enable deep footage analysis (experimental)   |
-| `COLORLEVELS`     | `true`  | Apply broadcast-safe levels (16-235)          |
-| `LUMA_NORMALIZE`  | `true`  | Normalize luma for consistency across clips   |
+| Variable          | Default       | Description                                   |
+| ----------------- | ------------- | --------------------------------------------- |
+| `STABILIZE`       | `false`       | Enable video stabilization                    |
+| `UPSCALE`         | `false`       | Enable AI upscaling (Real-ESRGAN)             |
+| `ENHANCE`         | `true`        | Enable color/sharpness enhancement            |
+| `PRESERVE_ASPECT` | `false`       | Letterbox instead of crop when aspect differs |
+| `DEEP_ANALYSIS`   | `false`       | Enable deep footage analysis (experimental)   |
+| `COLORLEVELS`     | `true`        | Apply broadcast-safe levels (16-235)          |
+| `LUMA_NORMALIZE`  | `true`        | Normalize luma for consistency across clips   |
+
+### Color Grading
+
+| Variable          | Default       | Description                                                             |
+| ----------------- | ------------- | ----------------------------------------------------------------------- |
+| `COLOR_GRADING`   | `auto`        | Color grading preset (overrides style default)                          |
+| `COLOR_INTENSITY` | `1.0`         | Color grading strength (0.0-1.0). Values of 0.5-0.7 often look natural. |
+
+**Available Color Grading Presets:**
+
+| Preset          | Description                                          |
+| --------------- | ---------------------------------------------------- |
+| `auto`          | Use style template's default color grade             |
+| `none`          | No color grading applied                             |
+| `neutral`       | Broadcast-safe levels (Rec.709 compliant)            |
+| `natural`       | True-to-source with minimal adjustment               |
+| `warm`          | Golden warmth (highlight red/yellow)                 |
+| `cool`          | Blue/teal tone (shadows/midtones)                    |
+| `golden_hour`   | Sunset/sunrise warmth                                |
+| `blue_hour`     | Dawn/dusk cool tones                                 |
+| `teal_orange`   | Hollywood blockbuster look (orange skin, teal bg)    |
+| `cinematic`     | S-curve contrast with slight desaturation            |
+| `blockbuster`   | Action movie: strong teal/orange + high contrast     |
+| `vibrant`       | Punchy, saturated colors                             |
+| `desaturated`   | Muted, filmic look                                   |
+| `high_contrast` | Strong black & white with midtone emphasis           |
+| `vintage`       | Faded film with lifted blacks                        |
+| `filmic_warm`   | Classic warm film stock                              |
+| `noir`          | High contrast with desaturation                      |
+| `documentary`   | Natural with sharpness emphasis                      |
+
+**Example:**
+```bash
+COLOR_GRADING=teal_orange \
+COLOR_INTENSITY=0.7 \
+./montage-ai.sh run hitchcock
+```
 
 ### Upscaling Controls
 

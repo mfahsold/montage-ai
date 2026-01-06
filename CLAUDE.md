@@ -95,6 +95,7 @@ make logs                         # View job logs
 | `ffmpeg_config.py` | GPU encoder detection (NVENC/VAAPI/QSV), auto-acceleration |
 | `cgpu_upscaler.py` | Cloud GPU offloading for AI upscaling via cgpu |
 | `timeline_exporter.py` | Export to OTIO/EDL for DaVinci Resolve, Premiere |
+| `color_grading.py` | Color grading presets, LUT support, intensity control |
 | `color_harmonizer.py` | Shot-to-shot color consistency, LUT application |
 
 ### LLM Backend Priority
@@ -125,6 +126,8 @@ CGPU_ENABLED=true              # Enable cloud GPU via cgpu
 FFMPEG_HWACCEL=auto            # GPU encoding: auto, nvenc, vaapi, qsv, none
 STABILIZE=true                 # Enable video stabilization
 UPSCALE=true                   # Enable AI upscaling
+COLOR_GRADING=teal_orange      # Color grading preset (17 presets available)
+COLOR_INTENSITY=0.7            # Color grading strength (0.0-1.0)
 ```
 
 ## Adding a New Style

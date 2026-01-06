@@ -114,6 +114,19 @@ def _get_cgpu_stabilizer():
 _VIDSTAB_AVAILABLE: Optional[bool] = None
 
 
+# =============================================================================
+# Color Grading Presets (imported from centralized module)
+# =============================================================================
+
+# Import from centralized color_grading module for DRY compliance
+from .color_grading import (
+    PRESET_FILTERS as COLOR_GRADING_FILTERS,
+    ColorGradeConfig,
+    build_color_grade_filter,
+    resolve_style_color_grade,
+)
+
+
 def _check_vidstab_available() -> bool:
     """Check if FFmpeg was compiled with libvidstab support."""
     global _VIDSTAB_AVAILABLE
@@ -244,20 +257,22 @@ class ClipEnhancer:
 
         return results
 
-    def enhance(self, input_path: str, output_path: str) -> str:
+    def enhance(self, input_path: str, output_path: str, color_grade: str = "teal_orange") -> str:
         """
-        Apply cinematic enhancements with content-aware adjustments.
+        Apply cinematic enhancements with style-appropriate color grading.
 
         Enhancement pipeline:
         1. Analyze clip brightness
-        2. Apply adaptive color grading (Teal & Orange)
-        3. Apply S-curve contrast
+        2. Apply style-specific color grading (from COLOR_GRADING_FILTERS)
+        3. Apply adaptive S-curve contrast
         4. CAS (Contrast Adaptive Sharpening)
         5. Subtle vignette
 
         Args:
             input_path: Source video file
             output_path: Destination for enhanced video
+            color_grade: Color grading preset name (default: "teal_orange")
+                         See COLOR_GRADING_FILTERS for available presets.
 
         Returns:
             Path to enhanced video (or original on failure)
@@ -284,21 +299,39 @@ class ClipEnhancer:
             contrast = 1.05
             shadow_lift = 0.20
 
+        # Get color grading filter for the requested style
+        grade_filter = COLOR_GRADING_FILTERS.get(color_grade, COLOR_GRADING_FILTERS.get("teal_orange", ""))
+
         # Build filter chain
-        filters = ",".join([
-            # Teal & Orange color grading (Hollywood look)
-            "colorbalance=rs=-0.1:gs=-0.05:bs=0.15:rm=0.05:gm=0:bm=-0.05:rh=0.1:gh=0.05:bh=-0.1",
-            # Adaptive S-curve contrast
-            f"curves=m='0/0 0.25/{shadow_lift} 0.5/0.5 0.75/0.80 1/1'",
-            # Contrast Adaptive Sharpening
-            "cas=0.5",
-            # Adaptive saturation, contrast, and brightness
-            f"eq=saturation={saturation}:contrast={contrast}:brightness={brightness_adj:.3f}",
-            # Subtle vignette
-            "vignette=PI/4:mode=forward:eval=frame",
-            # Fine detail sharpening
-            "unsharp=3:3:0.5:3:3:0.3"
-        ])
+        filter_parts = []
+
+        # 1. Style-specific color grading (if not "none")
+        if grade_filter:
+            filter_parts.append(grade_filter)
+            logger.debug(f"Applying '{color_grade}' color grading")
+
+        # 2. Adaptive S-curve contrast (unless style already has curves)
+        if "curves=" not in grade_filter:
+            filter_parts.append(f"curves=m='0/0 0.25/{shadow_lift} 0.5/0.5 0.75/0.80 1/1'")
+
+        # 3. Contrast Adaptive Sharpening
+        filter_parts.append("cas=0.5")
+
+        # 4. Adaptive saturation, contrast, and brightness (unless style already has eq)
+        if "eq=" not in grade_filter:
+            filter_parts.append(f"eq=saturation={saturation}:contrast={contrast}:brightness={brightness_adj:.3f}")
+        else:
+            # Just apply brightness adjustment
+            filter_parts.append(f"eq=brightness={brightness_adj:.3f}")
+
+        # 5. Subtle vignette
+        filter_parts.append("vignette=PI/4:mode=forward:eval=frame")
+
+        # 6. Fine detail sharpening (unless style already has unsharp)
+        if "unsharp=" not in grade_filter:
+            filter_parts.append("unsharp=3:3:0.5:3:3:0.3")
+
+        filters = ",".join(filter_parts)
 
         # Log if content needed adjustment
         if analysis.is_dark or analysis.is_bright:
@@ -999,6 +1032,8 @@ __all__ = [
     "EnhancementResult",
     # Main class
     "ClipEnhancer",
+    # Color grading presets
+    "COLOR_GRADING_FILTERS",
     # Legacy functions
     "stabilize_clip",
     "enhance_clip",

@@ -121,4 +121,7 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
         "story_arc": str(opts.get("story_arc", data.get("story_arc", ""))),
         "reframe_mode": str(opts.get("reframe_mode", data.get("reframe_mode", "auto"))),
         "caption_style": str(opts.get("caption_style", data.get("caption_style", "tiktok"))),
+        # Color Grading (NEW)
+        "color_grading": str(opts.get("color_grading", data.get("color_grading", "auto"))),
+        "color_intensity": float(opts.get("color_intensity", data.get("color_intensity", 100)) or 100) / 100.0,
     }

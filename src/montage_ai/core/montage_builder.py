@@ -145,6 +145,8 @@ class MontageFeatures:
     stabilize: bool = False
     upscale: bool = False
     enhance: bool = False
+    color_grade: str = "teal_orange"  # Color grading preset from style template
+    color_intensity: float = 1.0  # Color grading strength (0.0-1.0)
 
 
 @dataclass
@@ -203,6 +205,7 @@ _LEGACY_ATTR_MAP = {
     "stabilize": ("features", "stabilize"),
     "upscale": ("features", "upscale"),
     "enhance": ("features", "enhance"),
+    "color_grade": ("features", "color_grade"),
     "editing_instructions": ("creative", "editing_instructions"),
     "semantic_query": ("creative", "semantic_query"),
     "broll_plan": ("creative", "broll_plan"),
@@ -334,6 +337,7 @@ def process_clip_task(
     ctx_stabilize: bool,
     ctx_upscale: bool,
     ctx_enhance: bool,
+    ctx_color_grade: str,
     enhancer: Any,
     output_profile: Any,
     settings: Any,
@@ -435,7 +439,7 @@ def process_clip_task(
 
         if ctx_enhance:
             enhance_path = os.path.join(temp_dir, f"enhance_{temp_clip_name}")
-            result = enhancer.enhance(current_path, enhance_path)
+            result = enhancer.enhance(current_path, enhance_path, color_grade=ctx_color_grade)
             if result != current_path:
                 current_path = result
                 temp_files.append(enhance_path)
@@ -766,7 +770,7 @@ class MontageBuilder:
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         logger.info(f"   🚀 Initialized parallel processor with {max_workers} workers")
 
-        logger.info(f"   🎨 Effects: STABILIZE={self.ctx.stabilize}, UPSCALE={self.ctx.upscale}, ENHANCE={self.ctx.enhance}")
+        logger.info(f"   🎨 Effects: STABILIZE={self.ctx.stabilize}, UPSCALE={self.ctx.upscale}, ENHANCE={self.ctx.enhance}, COLOR_GRADE={self.ctx.color_grade}")
 
     def analyze_assets(self):
         """
@@ -1077,6 +1081,26 @@ class MontageBuilder:
             self.ctx.enhance = effects['sharpness_boost']
         else:
             self.ctx.enhance = env_enhance
+
+        # Parse color_grading from style template (NEW: replaces hardcoded Teal & Orange)
+        # ENV takes priority, then style template effects, then default
+        env_color_grade = os.environ.get('COLOR_GRADING', '')
+        if env_color_grade:
+            self.ctx.color_grade = env_color_grade
+        elif 'color_grading' in effects:
+            self.ctx.color_grade = effects['color_grading']
+        else:
+            self.ctx.color_grade = "teal_orange"  # Legacy default
+
+        # Parse color_intensity (0.0-1.0, defaults to 1.0)
+        env_color_intensity = os.environ.get('COLOR_INTENSITY', '')
+        if env_color_intensity:
+            try:
+                self.ctx.features.color_intensity = float(env_color_intensity)
+            except ValueError:
+                self.ctx.features.color_intensity = 1.0
+        else:
+            self.ctx.features.color_intensity = 1.0
 
         # Extract semantic query for Phase 2: Semantic Storytelling
         # Priority: explicit semantic_query > content_focus > ENV
@@ -2329,6 +2353,7 @@ class MontageBuilder:
                 ctx_stabilize=self.ctx.stabilize,
                 ctx_upscale=self.ctx.upscale,
                 ctx_enhance=self.ctx.enhance,
+                ctx_color_grade=self.ctx.color_grade,
                 enhancer=self._clip_enhancer,
                 output_profile=self.ctx.output_profile,
                 settings=self.settings,

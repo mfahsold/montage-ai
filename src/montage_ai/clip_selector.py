@@ -160,7 +160,8 @@ class IntelligentClipSelector:
         prompt = self._build_ranking_prompt(candidates, context)
 
         # Query LLM (using same backend as Creative Director)
-        response = self.llm._query_llm(prompt)
+        # Use CreativeDirector's system prompt for persona context
+        response = self.llm._query_llm(self.llm.system_prompt, prompt)
 
         if not response:
             return None

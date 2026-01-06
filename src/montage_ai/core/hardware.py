@@ -76,16 +76,19 @@ def _has_vaapi() -> bool:
     env = os.environ.copy()
     # Set driver hints for AMD and Intel
     if not env.get("LIBVA_DRIVER_NAME"):
-        # Try radeonsi for AMD, then iHD for Intel
-        for driver in ["radeonsi", "iHD", "i965"]:
+        # Try iHD for Intel first (more common), then radeonsi for AMD
+        for driver in ["iHD", "radeonsi", "i965"]:
             env["LIBVA_DRIVER_NAME"] = driver
             try:
+                # Note: VAAPI requires hwupload filter to transfer frames to GPU
                 result = subprocess.run(
                     build_ffmpeg_cmd(
                         [
                             "-init_hw_device", "vaapi=va:/dev/dri/renderD128",
+                            "-filter_hw_device", "va",
                             "-f", "lavfi",
                             "-i", "color=black:s=64x64:d=0.1",
+                            "-vf", "format=nv12,hwupload",
                             "-c:v", "h264_vaapi", "-f", "null", "-",
                         ],
                         overwrite=False,
@@ -219,13 +222,16 @@ def get_hwaccel_by_type(hwaccel: str, preferred_codec: str = "h264") -> Optional
         )
 
     if accel == "qsv":
+        # QSV requires Intel GPU
+        if not _is_intel_gpu():
+            return None
         encoder = _pick_encoder("h264_qsv", "hevc_qsv", codec_pref)
         if not encoder:
             return None
         return HWConfig(
             type="qsv",
             encoder=encoder,
-            decoder_args=["-hwaccel", "qsv"],
+            decoder_args=["-hwaccel", "qsv", "-hwaccel_output_format", "qsv"],
             encoder_args=["-c:v", encoder],
             is_gpu=True
         )
@@ -233,16 +239,128 @@ def get_hwaccel_by_type(hwaccel: str, preferred_codec: str = "h264") -> Optional
     return None
 
 
+def _is_jetson() -> bool:
+    """Detect if running on NVIDIA Jetson platform."""
+    jetson_indicators = [
+        "/etc/nv_tegra_release",
+        "/sys/bus/platform/drivers/tegra-fuse",
+        "/dev/nvhost-ctrl",
+        "/dev/nvhost-nvenc",
+    ]
+    return any(os.path.exists(p) for p in jetson_indicators)
+
+
+def _is_intel_gpu() -> bool:
+    """Detect if Intel GPU is present (required for QSV encoding)."""
+    # Must have DRI device
+    if not os.path.exists("/dev/dri/renderD128"):
+        return False
+
+    # Check vendor ID in sysfs (Intel = 0x8086)
+    vendor_paths = [
+        "/sys/class/drm/card0/device/vendor",
+        "/sys/class/drm/renderD128/device/vendor",
+    ]
+    for path in vendor_paths:
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    vendor = f.read().strip()
+                    if "0x8086" in vendor or "8086" in vendor:
+                        return True
+            except (IOError, PermissionError):
+                pass
+
+    # Fallback: check lspci for Intel VGA
+    try:
+        result = subprocess.run(
+            ["lspci", "-nn"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if "Intel" in result.stdout and ("VGA" in result.stdout or "Display" in result.stdout):
+            return True
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    return False
+
+
+def check_encoder_works(hw_config: HWConfig) -> bool:
+    """Test if an encoder actually works by doing a minimal encode."""
+    import subprocess
+    import tempfile
+    
+    # CPU always works
+    if hw_config.type == "cpu":
+        return True
+        
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = os.path.join(tmpdir, "test.mp4")
+            
+            cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+            cmd.extend(hw_config.decoder_args)
+            cmd.extend(["-f", "lavfi", "-i", "color=black:s=64x64:d=0.1"])
+            
+            if hw_config.hwupload_filter:
+                cmd.extend(["-vf", hw_config.hwupload_filter])
+                
+            cmd.extend(hw_config.encoder_args)
+            
+            # Simple quality args to satisfy encoder requirements
+            if hw_config.type in ("nvenc", "nvmpi"):
+                cmd.extend(["-cq", "35"])
+            elif hw_config.type == "vaapi":
+                cmd.extend(["-qp", "35"])
+            elif hw_config.type == "qsv":
+                cmd.extend(["-global_quality", "35"])
+            
+            cmd.append(output_path)
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0 and os.path.exists(output_path):
+                return True
+            else:
+                # logger might not be available or circular, use simple print in debug/dev
+                return False
+                
+    except Exception:
+        return False
+
+
 def get_best_hwaccel(preferred_codec: str = "h264") -> HWConfig:
     """
     Detect the best available hardware acceleration.
     Returns a HWConfig object with FFmpeg arguments.
-    """
-    for accel in ("nvenc", "nvmpi", "videotoolbox", "vaapi", "qsv"):
-        config = get_hwaccel_by_type(accel, preferred_codec=preferred_codec)
-        if config:
-            return config
 
+    Priority order (platform-aware):
+    - Jetson: NVMPI first (NVENC doesn't work on Jetson!)
+    - Desktop: NVENC → VideoToolbox → VAAPI → QSV
+    - Fallback: CPU
+    """
+    # Jetson-specific: NVMPI is the only working encoder
+    if _is_jetson():
+        config = get_hwaccel_by_type("nvmpi", preferred_codec=preferred_codec)
+        if config and check_encoder_works(config):
+            return config
+        # Fallback to CPU on Jetson if NVMPI unavailable
+        return get_hwaccel_by_type("cpu", preferred_codec=preferred_codec)
+
+    # Desktop/Server: Standard priority order
+    for accel in ("nvenc", "videotoolbox", "vaapi", "qsv"):
+        config = get_hwaccel_by_type(accel, preferred_codec=preferred_codec)
+        if config and check_encoder_works(config):
+            return config
+            
+    # Fallback to CPU
     return get_hwaccel_by_type("cpu", preferred_codec=preferred_codec)
 
 def get_ffmpeg_hw_args(mode: str = "encode", preferred_codec: str = "h264") -> List[str]:
