@@ -71,7 +71,13 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
     opts = data.get("options", {})
 
     target_duration = float(opts.get("target_duration", data.get("target_duration", 0)) or 0)
-    music_start = float(opts.get("music_start", data.get("music_start", 0)) or 0)
+    
+    # Handle music start (supports both API 'music_start' and HTML 'music_start_time')
+    music_start_val = opts.get("music_start", data.get("music_start"))
+    if music_start_val is None:
+        music_start_val = opts.get("music_start_time", data.get("music_start_time", 0))
+    music_start = float(music_start_val or 0)
+
     music_end_raw = opts.get("music_end", data.get("music_end", None))
 
     music_end = float(music_end_raw) if music_end_raw is not None else None
@@ -82,6 +88,11 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
     music_start = max(0, music_start)
     if music_end is not None:
         music_end = max(music_start + 1, music_end)
+        
+    # Handle Music Track Selection
+    music_track = str(opts.get("music_track", data.get("music_track", "")))
+    if music_track.lower() == "auto":
+        music_track = ""  # Let AI Auto-Select
 
     def get_bool(key: str) -> bool:
         val = opts.get(key, data.get(key))
@@ -111,6 +122,7 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
         "target_duration": target_duration,
         "music_start": music_start,
         "music_end": music_end,
+        "music_track": music_track,
         "preview": data.get("preset") == "fast",
         "quality_profile": quality_profile,
         "cloud_acceleration": cloud_acceleration,

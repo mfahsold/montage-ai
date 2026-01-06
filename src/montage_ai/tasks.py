@@ -62,7 +62,20 @@ def run_montage(job_id: str, style: str, options: dict):
                     "style": style,
                     "variant_id": options.get('variant_id', 1),
                     "editing_instructions": editing_instructions,
-                    "beat_sync": options.get('beat_sync', True)
+                    "beat_sync": options.get('beat_sync', True),
+                    # Audio
+                    "music_track": options.get('music_track'),
+                    "music_start": options.get('music_start', 0),
+                    "music_end": options.get('music_end'),
+                    # Color Grading
+                    "color_grading": options.get('color_grading'),
+                    "color_intensity": options.get('color_intensity'),
+                    # Enhancements
+                    "denoise": options.get('denoise', False),
+                    "sharpen": options.get('sharpen', False),
+                    "film_grain": options.get('film_grain'),
+                    # Misc
+                    "target_duration": options.get('target_duration')
                 }
             )
 

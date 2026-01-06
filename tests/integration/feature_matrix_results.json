@@ -1,0 +1,437 @@
+{
+  "test_name": "full_feature_matrix",
+  "status": "TestStatus.PASS",
+  "duration_ms": 4162.55521774292,
+  "features_tested": 17,
+  "features_passed": 17,
+  "parameters_tested": 35,
+  "parameters_valid": 35,
+  "notes": "Tested 17 features, 35 parameters",
+  "feature_results": [
+    {
+      "name": "video_enhancement",
+      "category": "Per-clip video quality improvements",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.015020370483398438,
+      "details": "6/6 parameters valid",
+      "sub_tests": [
+        {
+          "name": "STABILIZE",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "UPSCALE",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "ENHANCE",
+          "value": true,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "DENOISE",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "SHARPEN",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "FILM_GRAIN",
+          "value": "none",
+          "expected_type": "str",
+          "actual_type": "str",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "audio_processing",
+      "category": "Audio enhancement and manipulation",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.011682510375976562,
+      "details": "6/6 parameters valid",
+      "sub_tests": [
+        {
+          "name": "VOICE_ISOLATION",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "CLEAN_AUDIO",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "NOISE_REDUCTION",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "NOISE_REDUCTION_STRENGTH",
+          "value": 100,
+          "expected_type": "int",
+          "actual_type": "int",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "DIALOGUE_DUCK",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "DIALOGUE_DUCK_LEVEL",
+          "value": -12.0,
+          "expected_type": "float",
+          "actual_type": "float",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "creative_ai",
+      "category": "LLM and AI-powered creative features",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.008821487426757812,
+      "details": "6/6 parameters valid",
+      "sub_tests": [
+        {
+          "name": "LLM_CLIP_SELECTION",
+          "value": true,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "CREATIVE_LOOP",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "CREATIVE_LOOP_MAX_ITERATIONS",
+          "value": 3,
+          "expected_type": "int",
+          "actual_type": "int",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "STORY_ENGINE",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "DEEP_ANALYSIS",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "CREATIVE_PROMPT",
+          "value": "",
+          "expected_type": "str",
+          "actual_type": "str",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "output_formats",
+      "category": "Export and output configuration",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.008344650268554688,
+      "details": "6/6 parameters valid",
+      "sub_tests": [
+        {
+          "name": "EXPORT_TIMELINE",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "GENERATE_PROXIES",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "SHORTS_MODE",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "REFRAME_MODE",
+          "value": "auto",
+          "expected_type": "str",
+          "actual_type": "str",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "CAPTIONS",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "CAPTIONS_STYLE",
+          "value": "tiktok",
+          "expected_type": "str",
+          "actual_type": "str",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "quality_profiles",
+      "category": "Output quality and encoding settings",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.0050067901611328125,
+      "details": "3/3 parameters valid",
+      "sub_tests": [
+        {
+          "name": "QUALITY_PROFILE",
+          "value": "standard",
+          "expected_type": "str",
+          "actual_type": "str",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "TARGET_DURATION",
+          "value": 30.0,
+          "expected_type": "float",
+          "actual_type": "float",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "PRESERVE_ASPECT",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "cut_styles",
+      "category": "Editing rhythm and visual language presets",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.002384185791015625,
+      "details": "1/1 parameters valid",
+      "sub_tests": [
+        {
+          "name": "CUT_STYLE",
+          "value": "dynamic",
+          "expected_type": "str",
+          "actual_type": "str",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "color_grading",
+      "category": "Color correction and grading",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.0035762786865234375,
+      "details": "2/2 parameters valid",
+      "sub_tests": [
+        {
+          "name": "COLOR_GRADING",
+          "value": "auto",
+          "expected_type": "str",
+          "actual_type": "str",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "COLOR_INTENSITY",
+          "value": 1.0,
+          "expected_type": "float",
+          "actual_type": "float",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "performance",
+      "category": "Performance and resource management",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.0045299530029296875,
+      "details": "3/3 parameters valid",
+      "sub_tests": [
+        {
+          "name": "LOW_MEMORY_MODE",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "COLORLEVELS",
+          "value": true,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "LUMA_NORMALIZE",
+          "value": true,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "cloud_gpu",
+      "category": "Cloud GPU acceleration (cgpu)",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.003337860107421875,
+      "details": "2/2 parameters valid",
+      "sub_tests": [
+        {
+          "name": "CGPU_ENABLED",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        },
+        {
+          "name": "STRICT_CLOUD_COMPUTE",
+          "value": false,
+          "expected_type": "bool",
+          "actual_type": "bool",
+          "valid": true,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "name": "montage_builder_integration",
+      "category": "Core Pipeline",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.0972747802734375,
+      "details": "All 8 context attributes present",
+      "sub_tests": []
+    },
+    {
+      "name": "enhancement_tracking",
+      "category": "Pro Handoff",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.09322166442871094,
+      "details": "All 6 enhancement types tracked, export OK",
+      "sub_tests": []
+    },
+    {
+      "name": "clip_enhancer_methods",
+      "category": "Video Processing",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.006198883056640625,
+      "details": "All 6 methods present",
+      "sub_tests": []
+    },
+    {
+      "name": "dialogue_ducking",
+      "category": "Audio Processing",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.041961669921875,
+      "details": "Generated 8 keyframes for 2 segments",
+      "sub_tests": []
+    },
+    {
+      "name": "color_grading_presets",
+      "category": "Color Grading",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.003814697265625,
+      "details": "All 13 presets available",
+      "sub_tests": []
+    },
+    {
+      "name": "cut_style_templates",
+      "category": "Style Templates",
+      "status": "TestStatus.PASS",
+      "duration_ms": 52.79684066772461,
+      "details": "Loaded 6 style templates",
+      "sub_tests": []
+    },
+    {
+      "name": "timeline_exporter",
+      "category": "Pro Handoff",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.2791881561279297,
+      "details": "All 6 export formats available",
+      "sub_tests": []
+    },
+    {
+      "name": "story_engine",
+      "category": "Creative AI",
+      "status": "TestStatus.PASS",
+      "duration_ms": 0.2810955047607422,
+      "details": "5/5 story arcs, tension@0.5=0.64",
+      "sub_tests": []
+    }
+  ]
+}

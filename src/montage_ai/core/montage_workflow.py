@@ -47,8 +47,16 @@ class MontageWorkflow(VideoWorkflow):
         """Initialize montage builder."""
         # Extract variant_id from options.extras or default to 1
         variant_id = self.options.extras.get('variant_id', 1)
-        editing_instructions = self.options.extras.get('editing_instructions', {})
+        editing_instructions = self.options.extras.get('editing_instructions', {}) or {}
         
+        # Inject Music preferences into instructions (so Builder can find them)
+        if self.options.extras.get('music_track'):
+            editing_instructions['music_track'] = self.options.extras.get('music_track')
+        if self.options.extras.get('music_start'):
+            editing_instructions['music_start'] = self.options.extras.get('music_start')
+        if self.options.extras.get('music_end'):
+            editing_instructions['music_end'] = self.options.extras.get('music_end')
+            
         # Define progress callback wrapper
         def builder_progress_callback(percent: int, message: str):
             # Map builder progress (0-100 of a specific phase) to global workflow progress
@@ -79,6 +87,23 @@ class MontageWorkflow(VideoWorkflow):
         self.builder.ctx.upscale = self.options.upscale
         self.builder.ctx.enhance = self.options.enhance
         
+        # Apply advanced features from extras
+        feats = self.builder.ctx.features
+        extras = self.options.extras
+        
+        if 'color_grading' in extras:
+            feats.color_grade = extras['color_grading']
+        if 'color_intensity' in extras:
+            feats.color_intensity = float(extras['color_intensity'])
+        if 'denoise' in extras:
+            feats.denoise = extras['denoise']
+        if 'sharpen' in extras:
+            feats.sharpen = extras['sharpen']
+        if 'film_grain' in extras:
+            feats.film_grain = extras['film_grain']
+        if 'dialogue_duck' in extras:
+            feats.dialogue_duck = extras['dialogue_duck']
+            
         # Phase 1: Setup
         self.builder.setup_workspace()
     

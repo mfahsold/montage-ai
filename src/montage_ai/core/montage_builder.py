@@ -1315,6 +1315,22 @@ class MontageBuilder:
         music_index = (self.variant_id - 1) % len(music_files)
         music_path = music_files[music_index]
 
+        # Allow specific track override from editing instructions
+        if self.ctx.editing_instructions and 'music_track' in self.ctx.editing_instructions:
+            requested_track = self.ctx.editing_instructions['music_track']
+            # Find exact match or filename match
+            match = None
+            for mf in music_files:
+                if mf == requested_track or os.path.basename(mf) == requested_track:
+                    match = mf
+                    break
+            
+            if match:
+                logger.info(f"   🎵 Using requested track: {os.path.basename(match)}")
+                music_path = match
+            else:
+                logger.warning(f"   ⚠️ Requested track '{requested_track}' not found, falling back to variant default")
+
         # Use pre-isolated audio if provided (from async processing)
         # Otherwise apply voice isolation synchronously if enabled
         if isolated_audio_path:
@@ -1743,6 +1759,24 @@ class MontageBuilder:
         target_duration_setting = self.settings.creative.target_duration
         music_start = self.settings.creative.music_start
         music_end = self.settings.creative.music_end
+
+        # Allow overrides from editing instructions
+        if self.ctx.editing_instructions:
+            if 'music_start' in self.ctx.editing_instructions:
+                try:
+                    override_start = float(self.ctx.editing_instructions['music_start'])
+                    if override_start >= 0:
+                        music_start = override_start
+                except (ValueError, TypeError):
+                    pass
+            
+            if 'music_end' in self.ctx.editing_instructions:
+                try:
+                    override_end = float(self.ctx.editing_instructions['music_end'])
+                    if override_end > 0:
+                        music_end = override_end
+                except (ValueError, TypeError):
+                    pass
 
         audio_duration = self.ctx.audio_result.duration
 

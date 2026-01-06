@@ -275,13 +275,25 @@ h3 { font-size: var(--fs-base); }
 
 .nav-brand {
   font-weight: 900;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-xl);
   color: var(--fg);
   text-decoration: none;
   text-transform: uppercase;
+  letter-spacing: -0.05em;
+  word-spacing: -0.2em;
+  position: relative;
+  transition: all 0.3s ease;
 }
 
-.nav-brand span { color: var(--primary); }
+.nav-brand:hover {
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+.nav-brand span { 
+  color: var(--primary);
+  text-shadow: var(--glow-primary);
+  display: inline-block;
+}
 
 .nav-links {
   display: flex;
@@ -1319,4 +1331,202 @@ body::after {
 
 .choice-card input {
   display: none;
+}
+
+/* --- ANIMATED ICONS & HEADER STATUS (Re-applying) --- */
+
+.anim-icon {
+  width: 42px;
+  height: 42px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.workflow-card:hover .anim-icon {
+  transform: translateY(-5px) scale(1.1);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 10px currentColor);
+}
+
+/* Specific Animations based on context */
+.workflow-card:hover .icon-camera {
+  transform: rotate(-10deg) scale(1.1);
+}
+.workflow-card:hover .icon-mobile {
+  transform: rotate(10deg) scale(1.1);
+}
+
+.system-status-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.5rem 1.5rem;
+  align-items: center;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--fs-xs);
+  color: var(--muted-fg);
+}
+
+.status-val {
+  font-weight: bold;
+  color: var(--fg);
+}
+
+.status-mini-bar {
+  width: 60px;
+  height: 4px;
+  background: var(--muted);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.status-mini-fill {
+  height: 100%;
+  background: var(--primary);
+}
+
+/* --- RECENT JOBS THUMBNAIL & PREVIEW --- */
+.job-preview-container {
+    width: 120px;
+    height: 68px; /* 16:9 approx */
+    background: #000;
+    position: relative;
+    overflow: hidden;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.job-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.3s;
+}
+
+.job-video-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.job-preview-container:hover .job-thumbnail {
+    opacity: 0;
+}
+
+.job-preview-container:hover .job-video-preview {
+    opacity: 1;
+}
+
+/* --- AUDIO SCRUBBER --- */
+.audio-scrubber-container {
+    background: var(--muted);
+    border: 1px solid var(--border);
+    padding: 1rem;
+    position: relative;
+}
+
+.waveform-visual {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 0.5rem;
+    opacity: 0.7;
+}
+
+.wave-bar {
+    flex: 1;
+    background: var(--primary);
+    border-radius: 1px;
+    transition: height 0.2s;
+}
+
+input[type=range].scrubber {
+    width: 100%;
+    -webkit-appearance: none;
+    background: transparent;
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+    width: calc(100% - 2rem);
+    height: 40px;
+    cursor: pointer;
+}
+
+input[type=range].scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 40px;
+    width: 4px;
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+/* --- FOOTER SLOGAN --- */
+.footer-slogan {
+    font-family: var(--font-main);
+    font-weight: 700;
+    font-size: var(--fs-lg);
+    color: var(--muted-fg);
+    letter-spacing: -0.05em;
+    opacity: 0.5;
+}
+
+/* --- NAV DROPDOWN --- */
+.nav-group {
+    position: relative;
+    display: inline-block;
+}
+
+.nav-dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: var(--card-bg);
+    min-width: 160px;
+    box-shadow: var(--shd-md);
+    border: 1px solid var(--border);
+    z-index: 1001;
+    top: 100%;
+    left: 0;
+    padding: 0.5rem 0;
+}
+
+.nav-group:hover .nav-dropdown-content {
+    display: block;
+}
+
+.nav-dropdown-content .nav-link {
+    display: block;
+    padding: 0.5rem 1rem;
+    border-bottom: none;
+}
+
+.nav-dropdown-content .nav-link:hover {
+    background-color: var(--muted);
+    color: var(--primary);
 }

@@ -223,7 +223,13 @@ def index():
 @app.route('/montage')
 def montage_creator():
     """Montage Creator - advanced editing interface."""
-    return render_template('montage.html', version=VERSION)
+    # List music tracks
+    music_dir = _settings.paths.music_dir
+    music_tracks = []
+    if os.path.exists(music_dir):
+        music_tracks = [f for f in os.listdir(music_dir) if f.lower().endswith(('.mp3', '.wav', '.m4a'))]
+    
+    return render_template('montage.html', version=VERSION, music_tracks=sorted(music_tracks))
 
 
 @app.route('/shorts')
@@ -248,6 +254,12 @@ def gallery():
 def settings():
     """Settings - system configuration."""
     return render_template('settings.html', version=VERSION)
+
+
+@app.route('/features')
+def features():
+    """Features - system capabilities overview."""
+    return render_template('features.html', version=VERSION)
 
 
 @app.route('/api/status')
@@ -589,7 +601,13 @@ def api_upload():
 @app.route('/api/jobs', methods=['POST'])
 def api_create_job():
     """Create new montage job with queue management."""
-    data = request.json
+    # Support both JSON (API) and Form Data (Browser)
+    if request.is_json:
+        data = request.json
+    else:
+        # Convert ImmutableMultiDict to dict, handling defaults for checkboxes
+        data = request.form.to_dict()
+        # Handle specific checkbox/numeric conversions if necessary (done in normalize_options)
 
     # Validate required fields
     if 'style' not in data:

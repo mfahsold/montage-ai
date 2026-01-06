@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Features - Montage AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <span>MONTAGE</span> AI
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">DASHBOARD</a>
+            <a href="/montage" class="nav-link">CREATOR</a>
+            <a href="/gallery" class="nav-link">GALLERY</a>
+            <a href="/settings" class="nav-link">SETTINGS</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="mb-8 pt-4">
+            <h1 class="voxel-title">FEATURES</h1>
+            <p class="text-xs text-muted">Core capabilities and workflow tools.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="voxel-card">
+                <h3 class="text-primary mb-2">Beat-Sync Montages</h3>
+                <p class="text-sm text-muted">Advanced audio analysis aligns cuts precisely with musical beats. Supports multiple editing styles (Dynamic, Hitchcock, MTV) to match the rhythm of your soundtrack.</p>
+            </div>
+
+            <div class="voxel-card">
+                <h3 class="text-secondary mb-2">Vertical Shorts Generator</h3>
+                <p class="text-sm text-muted">Intelligent auto-reframing for social media. Detected faces and subjects are kept in focus within the 9:16 aspect ratio automatically.</p>
+            </div>
+
+            <div class="voxel-card">
+                <h3 class="text-primary mb-2">Text-Based Editing</h3>
+                <p class="text-sm text-muted">Edit video by editing the transcript. Remove filler words, rearrange sentences, and create cuts just by manipulating text.</p>
+            </div>
+
+            <div class="voxel-card">
+                <h3 class="text-secondary mb-2">Professional Export</h3>
+                <p class="text-sm text-muted">Export to standard video formats (MP4, MKV) or generate OTIO/EDL timelines for further refinement in DaVinci Resolve or Premiere Pro.</p>
+            </div>
+            
+            <div class="voxel-card">
+                <h3 class="text-primary mb-2">Hardware Acceleration</h3>
+                <p class="text-sm text-muted">Optimized for diverse hardware. Utilizes NVIDIA NVENC, Intel QSV, Jetson NVMPI, and Cloud GPU offloading for efficient rendering.</p>
+            </div>
+
+             <div class="voxel-card">
+                <h3 class="text-secondary mb-2">Polished Color Grading</h3>
+                <p class="text-sm text-muted">Apply cinematic LUTs and color grading presets. From Blockbuster Action to Wes Anderson styles, enhance the visual tone of your footage automatically.</p>
+            </div>
+        </div>
+        
+        <div class="mt-8 text-center">
+            <a href="/" class="voxel-btn voxel-btn-primary">Back to Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>

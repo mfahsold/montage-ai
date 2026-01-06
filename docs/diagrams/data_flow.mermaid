@@ -1,0 +1,44 @@
+sequenceDiagram
+    participant User
+    participant WebUI as Flask App (app.py)
+    participant Redis as Redis Queue
+    participant Worker as RQ Worker (tasks.py)
+    participant Workflow as MontageWorkflow
+    participant Builder as MontageBuilder
+    participant FS as FileSystem / Data
+    participant Ext as External Tools (FFmpeg/ML)
+
+    User->>WebUI: POST /api/jobs (FormData)
+    Note over WebUI: job_options.normalize_options()
+    
+    WebUI->>Redis: Queue Job (run_montage)
+    WebUI-->>User: 202 Accepted (Job ID)
+
+    Redis->>Worker: Dequeue Job
+    Worker->>Worker: Parse Options -> WorkflowOptions
+    
+    Worker->>Workflow: initialize(options)
+    Workflow->>Builder: __init__(instruction, settings)
+    
+    loop Analysis Phase
+        Workflow->>Builder: analyze_assets()
+        Builder->>Ext: Scene Detection (PySceneDetect)
+        Builder->>Ext: Audio Analysis (Librosa/CGPU)
+        Builder->>FS: Cache Analysis Results (Redis/Pickle)
+    end
+    
+    loop Planning Phase
+        Workflow->>Builder: plan_montage()
+        Builder->>Builder: Select Clips (Beat Sync)
+        Builder->>Builder: Apply Style Template
+    end
+    
+    loop Rendering Phase
+        Workflow->>Builder: render_output()
+        Builder->>Ext: FFmpeg (Concat/Filter/Encode)
+        Ext->>FS: Write MP4 Output
+    end
+    
+    Worker->>Redis: Publish "job_complete"
+    Redis-->>WebUI: SSE Update
+    WebUI-->>User: Update Status (Completed)
