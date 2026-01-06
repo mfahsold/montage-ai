@@ -11,10 +11,12 @@ resources:
   - web-service.yaml
   - cgpu-server.yaml
   - registry.yaml
+  - ingress.yaml
   - network-policies/networkpolicy-default-deny.yaml
   - network-policies/allow-registry-ingress.yaml
   - network-policies/allow-renderer-egress.yaml
   - network-policies/allow-cgpu-egress.yaml
+  - network-policies/allow-web-ingress.yaml
 
 labels:
   - pairs:

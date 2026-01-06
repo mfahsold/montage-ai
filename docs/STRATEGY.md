@@ -1,7 +1,7 @@
 # Montage AI – Strategic Product Document
 
-**Version:** 2.6 (Post-Phase 2 Consolidation)
-**Date:** January 5, 2026
+**Version:** 2.7 (Feature Complete)
+**Date:** January 6, 2026
 **Classification:** Public
 **Status:** Active
 
@@ -60,14 +60,17 @@ Three focused workflows:
 | **Audio Polish** | ✅ 100% | SNR measurement, before/after reporting |
 | **Caption Burn-In** | ✅ 100% | 5 styles (Karaoke, Bold, Minimal, TikTok, Cinematic) |
 
-### 🔴 Not Yet Implemented
+### ✅ Recently Implemented (January 6, 2026)
 
-| Component | Priority | Notes |
-|-----------|----------|-------|
-| **Telemetry/Metrics** | Medium | Engineering time needed |
-| **Import Smoke Tests** | Low | NLE-specific testing |
-| **Subject Tracking v2** | Medium | ML model selection |
-| **Audio Fallback Strategy** | Low | Edge case handling |
+| Component | Status | Notes |
+|-----------|--------|-------|
+| **Telemetry/Metrics** | ✅ Live | `telemetry.py` - Time-to-preview, success rates |
+| **NLE Import Smoke Tests** | ✅ Live | `tests/integration/test_nle_export.py` - OTIO/EDL validation |
+| **Subject Tracking v2** | ✅ Live | Kalman filter smoothing in `auto_reframe.py` |
+| **Audio Fallback Strategy** | ✅ Live | `audio_fallback.py` - Artifact detection + blending |
+| **VideoAnalysisEngine** | ✅ Live | `video_analysis_engine.py` - Single-pass pluggable analyzers |
+| **Audio-Aware Shorts** | ✅ Live | Energy-based highlight detection in `shorts_workflow.py` |
+| **Enhancement Options (Shorts)** | ✅ Live | Stabilize/Upscale toggles in UI |
 
 ---
 

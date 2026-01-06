@@ -1,0 +1,45 @@
+{
+  "id": "wedding",
+  "name": "Wedding Film",
+  "description": "Romantic, cinematic style for wedding highlight films",
+  "params": {
+    "style": {"name": "wedding", "mood": "romantic"},
+    "pacing": {
+      "speed": "slow",
+      "variation": "moderate",
+      "intro_duration_beats": 8,
+      "climax_intensity": 0.7,
+      "min_cut_beats": 4,
+      "max_cut_beats": 12
+    },
+    "cinematography": {
+      "prefer_wide_shots": true,
+      "prefer_high_action": false,
+      "match_cuts_enabled": true,
+      "invisible_cuts_enabled": true,
+      "shot_variation_priority": "balanced",
+      "prefer_faces": true
+    },
+    "transitions": {
+      "type": "crossfade",
+      "crossfade_duration_sec": 1.0,
+      "whip_pan_probability": 0.0
+    },
+    "effects": {
+      "color_grading": "filmic_warm",
+      "stabilization": true,
+      "sharpness_boost": false,
+      "vignette": true,
+      "film_grain": 0.1
+    },
+    "energy_mapping": {
+      "sync_to_beats": true,
+      "energy_amplification": 0.6,
+      "beat_reactivity": "gentle"
+    },
+    "story_arc": {
+      "preset": "hero_journey",
+      "emotional_peaks": ["ceremony", "first_dance", "speeches"]
+    }
+  }
+}

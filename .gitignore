@@ -35,13 +35,12 @@ logs/
 # Note: docs/BACKLOG.md IS tracked (public backlog)
 /BACKLOG.md
 docs/internal/
+docs/archive/internal/
 docs/market_analysis.md
-# docs/roadmap/  <-- Unignored for next_steps.md
 docs/stability_report.md
 docs/integration_status_report.md
 docs/offloading_analysis.md
 docs/LEGAL_IMPLEMENTATION.md
-docs/archive/
 docs/marketing/monetization_strategy.md
 docs/marketing/social_media_strategy.md
 private/
@@ -62,6 +61,13 @@ downloads/
 local_downloads/
 reproduce_*.py
 verify_*.py
+
+# Redis
+dump.rdb
+*.rdb
+
+# Telemetry data
+data/output/telemetry/
 
 # Test fixtures (generated via make test-fixtures)
 tests/fixtures/

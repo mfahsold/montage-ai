@@ -1,0 +1,41 @@
+{
+  "id": "gaming",
+  "name": "Gaming Montage",
+  "description": "Fast-paced action cuts for gaming highlight reels",
+  "params": {
+    "style": {"name": "gaming", "mood": "intense"},
+    "pacing": {
+      "speed": "fast",
+      "variation": "high",
+      "intro_duration_beats": 2,
+      "climax_intensity": 0.95,
+      "min_cut_beats": 1,
+      "max_cut_beats": 4
+    },
+    "cinematography": {
+      "prefer_wide_shots": false,
+      "prefer_high_action": true,
+      "match_cuts_enabled": true,
+      "invisible_cuts_enabled": true,
+      "shot_variation_priority": "high"
+    },
+    "transitions": {
+      "type": "mixed",
+      "crossfade_duration_sec": 0.1,
+      "whip_pan_probability": 0.15,
+      "flash_transition_probability": 0.1
+    },
+    "effects": {
+      "color_grading": "high_contrast",
+      "stabilization": false,
+      "sharpness_boost": true,
+      "vignette": true,
+      "speed_ramps": true
+    },
+    "energy_mapping": {
+      "sync_to_beats": true,
+      "energy_amplification": 1.5,
+      "beat_reactivity": "aggressive"
+    }
+  }
+}

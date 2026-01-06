@@ -1,0 +1,39 @@
+{
+  "id": "tutorial",
+  "name": "Tutorial/How-To",
+  "description": "Clear, educational style with longer cuts and focus on clarity",
+  "params": {
+    "style": {"name": "tutorial", "mood": "instructive"},
+    "pacing": {
+      "speed": "slow",
+      "variation": "minimal",
+      "intro_duration_beats": 8,
+      "climax_intensity": 0.4,
+      "min_cut_beats": 4,
+      "max_cut_beats": 16
+    },
+    "cinematography": {
+      "prefer_wide_shots": false,
+      "prefer_high_action": false,
+      "match_cuts_enabled": false,
+      "invisible_cuts_enabled": false,
+      "shot_variation_priority": "minimal"
+    },
+    "transitions": {
+      "type": "crossfade",
+      "crossfade_duration_sec": 0.5,
+      "whip_pan_probability": 0.0
+    },
+    "effects": {
+      "color_grading": "neutral",
+      "stabilization": true,
+      "sharpness_boost": false,
+      "vignette": false
+    },
+    "energy_mapping": {
+      "sync_to_beats": false,
+      "energy_amplification": 0.5,
+      "beat_reactivity": "none"
+    }
+  }
+}

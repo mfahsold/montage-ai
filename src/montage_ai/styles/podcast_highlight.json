@@ -1,0 +1,44 @@
+{
+  "id": "podcast_highlight",
+  "name": "Podcast Highlight",
+  "description": "Focus on speakers with natural pacing for podcast clips",
+  "params": {
+    "style": {"name": "podcast_highlight", "mood": "conversational"},
+    "pacing": {
+      "speed": "medium",
+      "variation": "minimal",
+      "intro_duration_beats": 4,
+      "climax_intensity": 0.6,
+      "min_cut_beats": 4,
+      "max_cut_beats": 12
+    },
+    "cinematography": {
+      "prefer_wide_shots": false,
+      "prefer_high_action": false,
+      "match_cuts_enabled": true,
+      "invisible_cuts_enabled": true,
+      "shot_variation_priority": "low",
+      "prefer_faces": true
+    },
+    "transitions": {
+      "type": "crossfade",
+      "crossfade_duration_sec": 0.3,
+      "whip_pan_probability": 0.0
+    },
+    "effects": {
+      "color_grading": "warm",
+      "stabilization": true,
+      "sharpness_boost": false,
+      "vignette": false
+    },
+    "energy_mapping": {
+      "sync_to_beats": false,
+      "energy_amplification": 0.7,
+      "beat_reactivity": "subtle"
+    },
+    "audio": {
+      "voice_priority": true,
+      "music_ducking": 0.3
+    }
+  }
+}

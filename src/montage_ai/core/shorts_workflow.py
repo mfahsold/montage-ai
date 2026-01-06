@@ -2,9 +2,15 @@
 Shorts Studio Workflow - Concrete Implementation
 
 Converts horizontal video to vertical (9:16) with smart reframing and captions.
+
+Features:
+- Smart subject tracking (face detection + Kalman smoothing)
+- Audio-aware highlight detection
+- Caption burning with multiple styles
+- Voice isolation & noise reduction (Clean Audio)
 """
 
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 from pathlib import Path
 
 from .workflow import VideoWorkflow, WorkflowOptions, WorkflowPhase
@@ -17,21 +23,22 @@ from ..logger import logger
 class ShortsWorkflow(VideoWorkflow):
     """
     Shorts Studio workflow implementation.
-    
+
     Pipeline:
     1. Initialize: Setup reframer
     2. Validate: Check video exists and is suitable
-    3. Analyze: Face detection + subject tracking
-    4. Process: Calculate crop windows
+    3. Analyze: Face detection + subject tracking + audio analysis
+    4. Process: Calculate crop windows + detect highlights
     5. Render: Apply reframing
     6. Export: Add captions (if requested)
     """
-    
+
     def __init__(self, options: WorkflowOptions):
         super().__init__(options)
         self.reframer: Optional[AutoReframeEngine] = None
         self.crop_data: Optional[list] = None
         self.reframed_path: Optional[Path] = None
+        self.audio_highlights: List[Dict[str, Any]] = []
     
     @property
     def workflow_name(self) -> str:
@@ -64,20 +71,79 @@ class ShortsWorkflow(VideoWorkflow):
         logger.debug(f"Input validated: {size_mb:.1f} MB")
     
     def analyze(self) -> Optional[list]:
-        """Analyze video for smart reframing."""
+        """Analyze video for smart reframing + audio highlights."""
         reframe_mode = self.options.extras.get('reframe_mode', 'auto')
-        
+        audio_aware = self.options.extras.get('audio_aware', False)
+
+        # 1. Video Analysis (Reframing)
         if reframe_mode == 'center':
-            logger.info("Center crop mode - skipping analysis")
-            return None
-        
-        logger.info("Analyzing video for subject tracking...")
-        self._update_progress(20, "Detecting faces...")
-        
-        self.crop_data = self.reframer.analyze(self.options.input_path)
-        
-        logger.info(f"Analysis complete: {len(self.crop_data)} frames")
+            logger.info("Center crop mode - skipping video analysis")
+        else:
+            logger.info("Analyzing video for subject tracking...")
+            self._update_progress(20, "Detecting faces...")
+            self.crop_data = self.reframer.analyze(self.options.input_path)
+            logger.info(f"Video analysis complete: {len(self.crop_data)} frames")
+
+        # 2. Audio Analysis (Highlights)
+        if audio_aware:
+            self._update_progress(30, "Analyzing audio for highlights...")
+            self.audio_highlights = self._analyze_audio_highlights()
+            logger.info(f"Audio analysis complete: {len(self.audio_highlights)} highlights")
+
         return self.crop_data
+
+    def _analyze_audio_highlights(self) -> List[Dict[str, Any]]:
+        """Detect audio-based highlight moments."""
+        try:
+            import numpy as np
+            from ..audio_analysis import AudioAnalyzer
+
+            analyzer = AudioAnalyzer(self.options.input_path)
+            analyzer.analyze()
+
+            highlights = []
+            energy = analyzer.energy_curve if hasattr(analyzer, 'energy_curve') else []
+            beats = analyzer.beat_times if hasattr(analyzer, 'beat_times') else []
+
+            if len(energy) == 0:
+                return []
+
+            # Find high-energy regions
+            threshold = np.percentile(energy, 85)
+            hop_time = getattr(analyzer, 'hop_length', 512) / getattr(analyzer, 'sr', 22050)
+
+            in_highlight = False
+            start_time = 0.0
+            peak_energy = 0.0
+
+            for i, e in enumerate(energy):
+                time = i * hop_time
+                if e > threshold and not in_highlight:
+                    in_highlight = True
+                    start_time = max(0, time - 0.5)
+                    peak_energy = e
+                elif in_highlight:
+                    peak_energy = max(peak_energy, e)
+                    if e <= threshold * 0.8:
+                        in_highlight = False
+                        duration = time - start_time
+                        if 2.0 <= duration <= 60.0:
+                            score = min(1.0, peak_energy / (np.max(energy) + 0.001))
+                            highlights.append({
+                                "start": start_time,
+                                "end": time,
+                                "duration": duration,
+                                "score": score,
+                                "type": "energy"
+                            })
+
+            # Sort by score and return top highlights
+            highlights.sort(key=lambda x: x['score'], reverse=True)
+            return highlights[:10]
+
+        except Exception as e:
+            logger.warning(f"Audio highlight detection failed: {e}")
+            return []
     
     def process(self, analysis_result: Any) -> str:
         """Process = Apply reframing."""

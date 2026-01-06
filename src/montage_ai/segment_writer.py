@@ -145,12 +145,36 @@ class StreamParams:
         )
 
 
-def ffprobe_stream_params(video_path: str) -> Optional[StreamParams]:
+# Module-level stream params cache (uses file path + mtime as key)
+_stream_params_cache: Dict[str, Tuple[float, StreamParams]] = {}
+
+
+def ffprobe_stream_params(video_path: str, use_cache: bool = True) -> Optional[StreamParams]:
     """
-    Get video stream parameters using ffprobe.
-    
+    Get video stream parameters using ffprobe with caching.
+
     Returns StreamParams for validation before concat.
+
+    Args:
+        video_path: Path to video file
+        use_cache: Whether to use cached results (default: True)
+
+    Performance:
+        Caches results using file mtime for validation.
+        Repeated calls to the same file are instant.
     """
+    global _stream_params_cache
+
+    # Check cache first
+    if use_cache and video_path in _stream_params_cache:
+        try:
+            cached_mtime, cached_params = _stream_params_cache[video_path]
+            current_mtime = os.path.getmtime(video_path)
+            if cached_mtime == current_mtime:
+                return cached_params
+        except OSError:
+            pass  # File may have been deleted, continue with fresh probe
+
     try:
         cmd = build_ffprobe_cmd([
             "-v", "quiet",
@@ -164,22 +188,22 @@ def ffprobe_stream_params(video_path: str) -> Optional[StreamParams]:
             cmd,
             capture_output=True,
             timeout=_settings.processing.ffprobe_timeout,
-            check=False, # We handle returncode manually
-            log_output=False # Keep logs clean
+            check=False,  # We handle returncode manually
+            log_output=False  # Keep logs clean
         )
-        
+
         if result.returncode != 0:
             return None
-            
+
         data = json.loads(result.stdout)
         streams = data.get("streams", [])
-        
+
         if not streams:
             return None
-            
+
         stream = streams[0]
         format_info = data.get("format", {})
-        
+
         # Parse frame rate (can be "30/1" or "29.97")
         fps_str = stream.get("r_frame_rate", "30/1")
         if "/" in fps_str:
@@ -187,11 +211,11 @@ def ffprobe_stream_params(video_path: str) -> Optional[StreamParams]:
             fps = float(num) / float(den)
         else:
             fps = float(fps_str)
-        
+
         # Get duration from format section
         duration = float(format_info.get("duration", 0))
-        
-        return StreamParams(
+
+        params = StreamParams(
             fps=fps,
             pix_fmt=stream.get("pix_fmt", "unknown"),
             width=int(stream.get("width", 0)),
@@ -200,6 +224,22 @@ def ffprobe_stream_params(video_path: str) -> Optional[StreamParams]:
             profile=stream.get("profile"),
             duration=duration
         )
+
+        # Cache the result
+        if use_cache:
+            try:
+                mtime = os.path.getmtime(video_path)
+                _stream_params_cache[video_path] = (mtime, params)
+                # Evict old entries if cache grows too large
+                if len(_stream_params_cache) > 500:
+                    # Remove oldest 100 entries
+                    keys_to_remove = list(_stream_params_cache.keys())[:100]
+                    for key in keys_to_remove:
+                        del _stream_params_cache[key]
+            except OSError:
+                pass  # File may have been deleted
+
+        return params
     except Exception as e:
         logger.warning(f"   ⚠️ ffprobe failed for {video_path}: {e}")
         return None

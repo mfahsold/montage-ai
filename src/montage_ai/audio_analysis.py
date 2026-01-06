@@ -496,6 +496,128 @@ def estimate_audio_snr(audio_path: str) -> AudioQuality:
     )
 
 
+def estimate_audio_snr_lufs(audio_path: str) -> AudioQuality:
+    """
+    Estimate SNR using LUFS (EBU R128) for more accurate measurement.
+
+    LUFS provides perceptually accurate loudness measurements that are
+    better correlated with human perception than simple dB measurements.
+
+    Returns:
+        AudioQuality with LUFS-based SNR estimate
+    """
+    # Get integrated loudness and loudness range
+    cmd = build_ffmpeg_cmd(
+        ["-i", audio_path, "-af", "ebur128=framelog=verbose:peak=true", "-f", "null", "-"],
+        overwrite=False
+    )
+
+    try:
+        result = run_command(cmd, capture_output=True, timeout=60, check=False)
+        stderr = result.stderr
+
+        # Parse summary stats
+        integrated_lufs = -24.0  # Default
+        loudness_range = 12.0  # Default
+        true_peak = -1.0  # Default
+
+        for line in stderr.split('\n'):
+            if 'I:' in line and 'LUFS' in line:
+                try:
+                    i_part = line.split('I:')[1].split('LUFS')[0].strip()
+                    integrated_lufs = float(i_part)
+                except (ValueError, IndexError):
+                    pass
+            elif 'LRA:' in line and 'LU' in line:
+                try:
+                    lra_part = line.split('LRA:')[1].split('LU')[0].strip()
+                    loudness_range = float(lra_part)
+                except (ValueError, IndexError):
+                    pass
+            elif 'True peak:' in line or 'Peak:' in line:
+                try:
+                    peak_part = line.split(':')[-1].split('dB')[0].strip()
+                    true_peak = float(peak_part)
+                except (ValueError, IndexError):
+                    pass
+
+        # Estimate SNR from loudness range and integrated loudness
+        # Higher LRA = more dynamic range = potentially cleaner audio
+        # Lower integrated loudness with high LRA = good SNR
+        snr_estimate = 30 + (loudness_range * 1.5) + (integrated_lufs + 24) * 0.5
+        snr_estimate = max(0, min(60, snr_estimate))
+
+        # Quality classification
+        if snr_estimate >= 40:
+            tier = "excellent"
+        elif snr_estimate >= 25:
+            tier = "good"
+        elif snr_estimate >= 15:
+            tier = "acceptable"
+        elif snr_estimate >= 8:
+            tier = "poor"
+        else:
+            tier = "unusable"
+
+        return AudioQuality(
+            snr_db=snr_estimate,
+            mean_volume_db=integrated_lufs,
+            max_volume_db=true_peak,
+            is_usable=snr_estimate >= 8,
+            quality_tier=tier
+        )
+
+    except Exception as e:
+        logger.warning(f"LUFS-based SNR estimation failed: {e}, falling back to volume-based")
+        return estimate_audio_snr(audio_path)
+
+
+@dataclass
+class AudioComparisonResult:
+    """Result of comparing audio quality before and after processing."""
+    before: AudioQuality
+    after: AudioQuality
+    snr_improvement_db: float
+    quality_improved: bool
+    summary: str
+
+
+def compare_audio_quality(original_path: str, processed_path: str) -> AudioComparisonResult:
+    """
+    Compare audio quality before and after processing.
+
+    Useful for validating Audio Polish (voice isolation, noise reduction).
+
+    Returns:
+        AudioComparisonResult with before/after metrics and improvement summary
+    """
+    before = estimate_audio_snr_lufs(original_path)
+    after = estimate_audio_snr_lufs(processed_path)
+
+    snr_improvement = after.snr_db - before.snr_db
+    quality_improved = snr_improvement > 0
+
+    # Generate summary
+    if snr_improvement > 6:
+        summary = f"Significant improvement: +{snr_improvement:.1f}dB SNR"
+    elif snr_improvement > 3:
+        summary = f"Moderate improvement: +{snr_improvement:.1f}dB SNR"
+    elif snr_improvement > 0:
+        summary = f"Slight improvement: +{snr_improvement:.1f}dB SNR"
+    elif snr_improvement > -3:
+        summary = f"No significant change: {snr_improvement:+.1f}dB SNR"
+    else:
+        summary = f"Quality degraded: {snr_improvement:.1f}dB SNR (consider rollback)"
+
+    return AudioComparisonResult(
+        before=before,
+        after=after,
+        snr_improvement_db=snr_improvement,
+        quality_improved=quality_improved,
+        summary=summary
+    )
+
+
 # =============================================================================
 # FFmpeg Fallback (bare-metal, no Python dependencies)
 # =============================================================================

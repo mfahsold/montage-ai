@@ -317,6 +317,30 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0; }
         }
+
+        /* Engagement Score Styles */
+        .engagement-grade {
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 900;
+            background: var(--bg);
+            border: 3px solid var(--border);
+            box-shadow: var(--shd-md);
+        }
+
+        .engagement-grade[data-grade="S"] { border-color: #f1c40f; color: #f1c40f; }
+        .engagement-grade[data-grade="A"] { border-color: #2ecc71; color: #2ecc71; }
+        .engagement-grade[data-grade="B"] { border-color: #3498db; color: #3498db; }
+        .engagement-grade[data-grade="C"] { border-color: #9b59b6; color: #9b59b6; }
+        .engagement-grade[data-grade="D"] { border-color: #e67e22; color: #e67e22; }
+        .engagement-grade[data-grade="F"] { border-color: #e74c3c; color: #e74c3c; }
+
+        .space-y-2 > * + * { margin-top: 0.5rem; }
+        .space-y-3 > * + * { margin-top: 0.75rem; }
     </style>
 </head>
 <body>
@@ -427,6 +451,26 @@
                             <button class="voxel-btn text-xs">MINIMAL</button>
                             <button class="voxel-btn text-xs voxel-btn-secondary">BOLD NEON</button>
                         </div>
+
+                        <label class="tech-label mt-4">ENHANCEMENT OPTIONS</label>
+                        <div class="voxel-card bg-muted p-3">
+                            <div class="flex items-center mb-2">
+                                <input type="checkbox" id="stabilize" class="mr-2">
+                                <label for="stabilize" class="text-xs">STABILIZATION (reduce shake)</label>
+                            </div>
+                            <div class="flex items-center mb-2">
+                                <input type="checkbox" id="upscale" class="mr-2">
+                                <label for="upscale" class="text-xs">AI UPSCALE (4K enhancement)</label>
+                            </div>
+                            <div class="flex items-center mb-2">
+                                <input type="checkbox" id="cleanAudio" class="mr-2">
+                                <label for="cleanAudio" class="text-xs">CLEAN AUDIO (voice isolation)</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="audioAware" class="mr-2">
+                                <label for="audioAware" class="text-xs">AUDIO-AWARE CUTS (beat sync)</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -503,6 +547,94 @@
                 </div>
             </div>
         </div>
+
+        <!-- STEP 5: Engagement Score (shown after generation) -->
+        <div id="engagementSection" style="display: none;" class="mt-6">
+            <div class="voxel-card">
+                <h3 class="mb-3 text-primary">STEP 5: Engagement Analysis</h3>
+                <p class="text-xs text-muted mb-4">AI-predicted engagement score based on hook strength, energy, pacing, and platform optimization.</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Left: Score Overview -->
+                    <div>
+                        <div class="flex items-center gap-4 mb-4">
+                            <div id="engagementGrade" class="engagement-grade">-</div>
+                            <div>
+                                <div class="text-2xl font-bold"><span id="engagementScore">--</span>/100</div>
+                                <div class="text-xs text-muted">Overall Score</div>
+                            </div>
+                        </div>
+
+                        <!-- Score Bars -->
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span>HOOK STRENGTH</span>
+                                    <span id="hookScoreVal">--</span>
+                                </div>
+                                <div class="progress-bar"><div id="hookScoreBar" class="progress-fill" style="width:0%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span>ENERGY LEVEL</span>
+                                    <span id="energyScoreVal">--</span>
+                                </div>
+                                <div class="progress-bar"><div id="energyScoreBar" class="progress-fill" style="width:0%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span>PACING</span>
+                                    <span id="pacingScoreVal">--</span>
+                                </div>
+                                <div class="progress-bar"><div id="pacingScoreBar" class="progress-fill" style="width:0%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span>VARIETY</span>
+                                    <span id="varietyScoreVal">--</span>
+                                </div>
+                                <div class="progress-bar"><div id="varietyScoreBar" class="progress-fill" style="width:0%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span>AUDIO</span>
+                                    <span id="audioScoreVal">--</span>
+                                </div>
+                                <div class="progress-bar"><div id="audioScoreBar" class="progress-fill" style="width:0%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Recommendations -->
+                    <div>
+                        <label class="tech-label">PLATFORM SCORES</label>
+                        <div class="grid grid-cols-2 gap-2 mb-4" id="platformScores">
+                            <div class="voxel-card p-2 text-center">
+                                <div class="text-xs text-muted">TikTok</div>
+                                <div class="font-bold" id="platformTiktok">--</div>
+                            </div>
+                            <div class="voxel-card p-2 text-center">
+                                <div class="text-xs text-muted">YT Shorts</div>
+                                <div class="font-bold" id="platformYoutube">--</div>
+                            </div>
+                            <div class="voxel-card p-2 text-center">
+                                <div class="text-xs text-muted">IG Reels</div>
+                                <div class="font-bold" id="platformInstagram">--</div>
+                            </div>
+                            <div class="voxel-card p-2 text-center">
+                                <div class="text-xs text-muted">YT Long</div>
+                                <div class="font-bold" id="platformYoutubeLong">--</div>
+                            </div>
+                        </div>
+
+                        <label class="tech-label">AI RECOMMENDATIONS</label>
+                        <ul id="engagementRecommendations" class="space-y-2 text-xs">
+                            <li class="text-muted">Generate a video to see recommendations...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -539,14 +671,20 @@
             const captionStyle = document.getElementById('captionStyle')?.value || 'tiktok';
             const autoCaptions = document.getElementById('autoCaptions')?.checked !== false;
             const cleanAudio = document.getElementById('cleanAudio')?.checked === true;
+            const audioAware = document.getElementById('audioAware')?.checked === true;
+            const stabilize = document.getElementById('stabilize')?.checked === true;
+            const upscale = document.getElementById('upscale')?.checked === true;
             const platform = document.getElementById('platformPreset').value || 'tiktok';
-            
+
             // Build payload
             const payload = {
                 video_path: videoPath,
                 workflow_type: workflowType,
                 style: montageStyle,
                 reframeMode: reframeMode,
+                stabilize: stabilize,
+                upscale: upscale,
+                audioAware: audioAware,
                 captionStyle: captionStyle,
                 autoCaptions: autoCaptions,
                 cleanAudio: cleanAudio,
@@ -653,19 +791,24 @@
             const progressSection = document.getElementById('progressSection');
             const successMessage = document.getElementById('successMessage');
             const errorMessage = document.getElementById('errorMessage');
-            
+
             if (job.status === 'completed') {
                 // Success
                 progressSection.style.display = 'none';
                 successMessage.style.display = 'block';
-                
+
                 const downloadLink = document.getElementById('downloadLink');
-                downloadLink.href = `/api/download/${job.output_file || job.path}`;
-                downloadLink.download = job.output_file || 'short.mp4';
-                
+                const outputFile = job.output_file || job.path;
+                downloadLink.href = `/api/download/${outputFile}`;
+                downloadLink.download = outputFile || 'short.mp4';
+
                 btn.disabled = false;
                 btn.textContent = 'Generate Another';
-                
+
+                // Fetch engagement score for the generated video
+                const platform = document.getElementById('platformPreset').value || 'tiktok';
+                fetchEngagementScore(outputFile, platform);
+
             } else if (job.status === 'failed') {
                 // Failed
                 progressSection.style.display = 'none';
@@ -708,9 +851,102 @@
         }
         
         // =====================================================================
+        // Engagement Score System
+        // =====================================================================
+
+        async function fetchEngagementScore(videoPath, platform = 'tiktok') {
+            const engagementSection = document.getElementById('engagementSection');
+
+            try {
+                engagementSection.style.display = 'block';
+                document.getElementById('engagementGrade').textContent = '...';
+
+                const response = await fetch('/api/engagement', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        video_path: videoPath,
+                        platform: platform
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to fetch engagement score');
+                }
+
+                const data = await response.json();
+                displayEngagementScore(data);
+
+            } catch (error) {
+                console.error('Engagement score error:', error);
+                document.getElementById('engagementGrade').textContent = '?';
+                document.getElementById('engagementScore').textContent = '--';
+            }
+        }
+
+        function displayEngagementScore(data) {
+            const gradeEl = document.getElementById('engagementGrade');
+            gradeEl.textContent = data.grade || '-';
+            gradeEl.setAttribute('data-grade', data.grade || '');
+
+            document.getElementById('engagementScore').textContent = Math.round(data.overall_score || 0);
+
+            // Individual scores
+            const scores = [
+                ['hook', data.hook_score],
+                ['energy', data.energy_score],
+                ['pacing', data.pacing_score],
+                ['variety', data.variety_score],
+                ['audio', data.audio_score]
+            ];
+
+            scores.forEach(([name, score]) => {
+                const val = Math.round(score || 0);
+                document.getElementById(`${name}ScoreVal`).textContent = val;
+                document.getElementById(`${name}ScoreBar`).style.width = `${val}%`;
+            });
+
+            // Platform scores
+            const platformMap = {
+                'tiktok': 'platformTiktok',
+                'youtube_shorts': 'platformYoutube',
+                'instagram_reels': 'platformInstagram',
+                'youtube_long': 'platformYoutubeLong'
+            };
+
+            if (data.platform_scores) {
+                Object.entries(data.platform_scores).forEach(([platform, score]) => {
+                    const elId = platformMap[platform];
+                    if (elId) {
+                        document.getElementById(elId).textContent = Math.round(score);
+                    }
+                });
+            }
+
+            // Recommendations
+            const recList = document.getElementById('engagementRecommendations');
+            recList.innerHTML = '';
+
+            if (data.recommendations && data.recommendations.length > 0) {
+                data.recommendations.forEach(rec => {
+                    const li = document.createElement('li');
+                    li.className = 'p-2 bg-muted border-l-2 border-primary';
+                    li.textContent = rec;
+                    recList.appendChild(li);
+                });
+            } else {
+                const li = document.createElement('li');
+                li.className = 'text-muted';
+                li.textContent = 'Great job! No major improvements needed.';
+                recList.appendChild(li);
+            }
+        }
+
+        // =====================================================================
         // Safe Zone Management System
         // =====================================================================
-        
+
         let safeZones = [];
         let isDrawingMode = false;
         let isDrawing = false;

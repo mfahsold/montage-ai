@@ -622,7 +622,8 @@ class MontageBuilder:
         self._clip_enhancer = None
         self._intelligent_selector = None
         self._resource_manager: Optional[ResourceManager] = None
-        
+        self._scene_provider = None  # Unified scene analysis provider
+
         # Parallel processing
         self._executor: Optional[ThreadPoolExecutor] = None
         self._pending_futures: List[Future] = []
@@ -649,6 +650,18 @@ class MontageBuilder:
                 editing_instructions=self.editing_instructions,
             ),
         )
+
+    # =========================================================================
+    # Lazy-Initialized Providers
+    # =========================================================================
+
+    @property
+    def scene_provider(self):
+        """Get the unified scene provider (lazy initialized)."""
+        if self._scene_provider is None:
+            from .scene_provider import get_scene_provider
+            self._scene_provider = get_scene_provider()
+        return self._scene_provider
 
     # =========================================================================
     # Public API
@@ -1714,11 +1727,7 @@ class MontageBuilder:
         This is the heart of the montage creation process.
         """
         from ..audio_analysis import calculate_dynamic_cut_length
-        from ..scene_analysis import (
-            calculate_visual_similarity,
-            detect_motion_blur,
-            find_best_start_point,
-        )
+        from ..scene_analysis import find_best_start_point
 
         # Cut patterns for dynamic pacing
         default_patterns = [
@@ -2248,7 +2257,8 @@ class MontageBuilder:
         unique_videos: int
     ) -> Tuple[Optional[Dict[str, Any]], float]:
         """Score and select the best clip for this cut."""
-        from ..scene_analysis import calculate_visual_similarity
+        # Use unified SceneProvider for visual similarity calculation
+        similarity_fn = self.scene_provider.calculate_similarity
 
         valid_scenes = self._get_candidate_scenes(available_footage)
         if not valid_scenes:
@@ -2282,7 +2292,7 @@ class MontageBuilder:
                 scoring_rules["shot_variation_bonus"],
                 scoring_rules["shot_repetition_penalty"],
             )
-            score += self._score_match_cut(scene, calculate_visual_similarity)
+            score += self._score_match_cut(scene, similarity_fn)
             score += self._score_semantic_match(meta)
             score += self._score_broll_match(scene, meta)
 

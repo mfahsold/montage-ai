@@ -31,8 +31,9 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple
 
 from .ffmpeg_config import get_config
-from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
+from .ffmpeg_utils import build_ffmpeg_cmd
 from .logger import logger
+from .video_metadata import probe_metadata
 
 # Import Timeline Exporter for Pro Handoff
 try:
@@ -130,17 +131,10 @@ class TextEditor:
 
     @property
     def video_duration(self) -> float:
-        """Get video duration via ffprobe."""
+        """Get video duration using cached metadata probe."""
         if self._video_duration is None:
-            cmd = build_ffprobe_cmd([
-                "-v", "quiet",
-                "-show_entries", "format=duration",
-                "-of", "json",
-                str(self.video_path)
-            ])
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            data = json.loads(result.stdout)
-            self._video_duration = float(data["format"]["duration"])
+            metadata = probe_metadata(str(self.video_path))
+            self._video_duration = metadata.duration if metadata else 0.0
         return self._video_duration
 
     def load_transcript(self, transcript_path: str) -> int:

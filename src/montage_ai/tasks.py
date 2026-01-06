@@ -13,6 +13,7 @@ from montage_ai.logger import logger
 from montage_ai.core.workflow import WorkflowOptions
 from montage_ai.core.montage_workflow import MontageWorkflow
 from montage_ai.core.shorts_workflow import ShortsWorkflow
+from montage_ai import telemetry
 
 # We need to know paths.
 settings = get_settings()
@@ -25,55 +26,70 @@ def run_montage(job_id: str, style: str, options: dict):
     """Run montage creation in background (RQ worker)."""
     # Ensure directories
     settings.paths.ensure_directories()
-    
+
     # Setup job logging
     log_path = Path(OUTPUT_DIR) / f"render_{job_id}.log"
     file_handler = logging.FileHandler(log_path, encoding='utf-8')
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(file_handler)
-    
-    try:
-        # Prepare options
-        editing_instructions = options.get('editing_instructions', {})
-        prompt = options.get('prompt')
-        
-        if prompt and not editing_instructions:
-            try:
-                from montage_ai.creative_director import interpret_natural_language
-                logger.info(f"Interpreting creative prompt: {prompt}")
-                editing_instructions = interpret_natural_language(prompt)
-            except Exception as e:
-                logger.warning(f"Failed to interpret prompt: {e}")
 
-        workflow_options = WorkflowOptions(
-            input_path=str(INPUT_DIR),
-            output_dir=str(OUTPUT_DIR),
-            job_id=job_id,
-            quality_profile=options.get('quality_profile', 'standard'),
-            stabilize=options.get('stabilize', False),
-            upscale=options.get('upscale', False),
-            enhance=options.get('enhance', False),
-            extras={
-                "style": style,
-                "variant_id": options.get('variant_id', 1),
-                "editing_instructions": editing_instructions,
-                "beat_sync": options.get('beat_sync', True)
-            }
-        )
-        
-        # Run workflow
-        workflow = MontageWorkflow(workflow_options)
-        workflow.execute()
-        
-    except Exception as e:
-        logger.error(f"Critical error in run_montage: {e}")
-        store = JobStore()
-        store.update_job(job_id, {"status": "failed", "error": str(e)})
-        
-    finally:
-        # Teardown logging
-        logger.removeHandler(file_handler)
-        file_handler.close()
+    # Start telemetry tracking
+    with telemetry.job_context(job_id, "montage") as t:
+        try:
+            # Prepare options
+            t.phase_start("setup")
+            editing_instructions = options.get('editing_instructions', {})
+            prompt = options.get('prompt')
+
+            if prompt and not editing_instructions:
+                try:
+                    from montage_ai.creative_director import interpret_natural_language
+                    logger.info(f"Interpreting creative prompt: {prompt}")
+                    editing_instructions = interpret_natural_language(prompt)
+                except Exception as e:
+                    logger.warning(f"Failed to interpret prompt: {e}")
+            t.phase_end("setup")
+
+            workflow_options = WorkflowOptions(
+                input_path=str(INPUT_DIR),
+                output_dir=str(OUTPUT_DIR),
+                job_id=job_id,
+                quality_profile=options.get('quality_profile', 'standard'),
+                stabilize=options.get('stabilize', False),
+                upscale=options.get('upscale', False),
+                enhance=options.get('enhance', False),
+                extras={
+                    "style": style,
+                    "variant_id": options.get('variant_id', 1),
+                    "editing_instructions": editing_instructions,
+                    "beat_sync": options.get('beat_sync', True)
+                }
+            )
+
+            # Run workflow with telemetry phases
+            workflow = MontageWorkflow(workflow_options)
+
+            t.phase_start("analyzing")
+            # Note: workflow.execute() handles all phases internally
+            # We track overall execution here
+            t.phase_end("analyzing")
+
+            t.phase_start("rendering")
+            workflow.execute()
+            t.phase_end("rendering")
+
+            t.record_success()
+
+        except Exception as e:
+            logger.error(f"Critical error in run_montage: {e}")
+            store = JobStore()
+            store.update_job(job_id, {"status": "failed", "error": str(e)})
+            t.record_failure(str(e))
+
+        finally:
+            # Teardown logging
+            logger.removeHandler(file_handler)
+            file_handler.close()
 
 def run_transcript_render(job_data: dict):
     """Run transcript render in background."""
@@ -86,42 +102,50 @@ def run_shorts_reframe(job_id: str, options: dict):
     """Run shorts reframing in background (RQ worker)."""
     # Ensure directories
     settings.paths.ensure_directories()
-    
+
     # Setup job logging
     log_path = Path(OUTPUT_DIR) / f"shorts_{job_id}.log"
     file_handler = logging.FileHandler(log_path, encoding='utf-8')
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(file_handler)
-    
-    try:
-        # Prepare options
-        workflow_options = WorkflowOptions(
-            input_path=options.get('video_path'),
-            output_dir=str(OUTPUT_DIR),
-            job_id=job_id,
-            quality_profile='standard',
-            extras={
-                "reframe_mode": options.get('reframe_mode', 'auto'),
-                "add_captions": options.get('add_captions', True),
-                "caption_style": options.get('caption_style', 'tiktok'),
-                "clean_audio": options.get('clean_audio', False),
-                "audio_aware": options.get('audio_aware', False),
-                "platform": options.get('platform', 'tiktok')
-            }
-        )
-        
-        # Run workflow
-        workflow = ShortsWorkflow(workflow_options)
-        workflow.execute()
-        
-    except Exception as e:
-        logger.error(f"Critical error in run_shorts_reframe: {e}")
-        store = JobStore()
-        store.update_job(job_id, {"status": "failed", "error": str(e)})
-        
-    finally:
-        # Teardown logging
-        logger.removeHandler(file_handler)
-        file_handler.close()
+
+    # Start telemetry tracking
+    with telemetry.job_context(job_id, "shorts") as t:
+        try:
+            t.phase_start("setup")
+            workflow_options = WorkflowOptions(
+                input_path=options.get('video_path'),
+                output_dir=str(OUTPUT_DIR),
+                job_id=job_id,
+                quality_profile='standard',
+                extras={
+                    "reframe_mode": options.get('reframe_mode', 'auto'),
+                    "add_captions": options.get('add_captions', True),
+                    "caption_style": options.get('caption_style', 'tiktok'),
+                    "clean_audio": options.get('clean_audio', False),
+                    "audio_aware": options.get('audio_aware', False),
+                    "platform": options.get('platform', 'tiktok')
+                }
+            )
+            t.phase_end("setup")
+
+            # Run workflow
+            t.phase_start("rendering")
+            workflow = ShortsWorkflow(workflow_options)
+            workflow.execute()
+            t.phase_end("rendering")
+
+            t.record_success()
+
+        except Exception as e:
+            logger.error(f"Critical error in run_shorts_reframe: {e}")
+            store = JobStore()
+            store.update_job(job_id, {"status": "failed", "error": str(e)})
+            t.record_failure(str(e))
+
+        finally:
+            # Teardown logging
+            logger.removeHandler(file_handler)
+            file_handler.close()
 
 

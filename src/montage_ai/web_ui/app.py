@@ -2406,11 +2406,75 @@ def api_audio_analyze():
                 # Don't fail the whole request, just skip timeline data
         
         return jsonify(response_data)
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/engagement', methods=['POST'])
+@api_endpoint
+def api_engagement_score():
+    """
+    Calculate engagement score for a video.
+
+    Request JSON:
+        video_path: str - Path to video file
+        platform: str - Target platform (tiktok, youtube_shorts, instagram_reels, youtube_long)
+
+    Returns:
+        overall_score: float (0-100)
+        grade: str (S/A/B/C/D/F)
+        hook_score, energy_score, pacing_score, variety_score, audio_score: float
+        recommendations: list of improvement suggestions
+        platform_scores: dict of scores per platform
+    """
+    from ..engagement_score import get_engagement_summary, PLATFORM_PARAMS
+
+    data = request.json or {}
+    video_path = data.get('video_path')
+    platform = data.get('platform', 'tiktok')
+
+    if not video_path:
+        return jsonify({"success": False, "error": "video_path required"}), 400
+
+    video_file = Path(video_path)
+    if not video_file.exists():
+        # Try relative to output dir
+        video_file = Path(settings.paths.output_dir) / video_path
+        if not video_file.exists():
+            return jsonify({"success": False, "error": f"Video not found: {video_path}"}), 404
+
+    if platform not in PLATFORM_PARAMS:
+        return jsonify({
+            "success": False,
+            "error": f"Unknown platform: {platform}. Valid: {list(PLATFORM_PARAMS.keys())}"
+        }), 400
+
+    summary = get_engagement_summary(str(video_file), platform=platform)
+    return jsonify({"success": True, **summary})
+
+
+@app.route('/api/engagement/platforms', methods=['GET'])
+def api_engagement_platforms():
+    """Return available platforms and their parameters."""
+    from ..engagement_score import PLATFORM_PARAMS
+
+    platforms = {}
+    for name, params in PLATFORM_PARAMS.items():
+        platforms[name] = {
+            "optimal_duration": params["optimal_duration"],
+            "hook_window": params["hook_window"],
+            "description": {
+                "tiktok": "Short-form viral content, fast hooks",
+                "youtube_shorts": "YouTube's short format, slightly longer",
+                "instagram_reels": "Instagram's short-form, visual focus",
+                "youtube_long": "Standard YouTube videos, deeper engagement"
+            }.get(name, name)
+        }
+
+    return jsonify({"success": True, "platforms": platforms})
 
 
 @app.route('/api/shorts/create', methods=['POST'])
