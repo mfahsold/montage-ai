@@ -32,7 +32,7 @@ from .config import get_settings
 from .core.cmd_runner import run_command
 from .video_metadata import probe_metadata
 from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
-from .ffmpeg_config import COLOR_PRESETS, LUT_FILES
+from .ffmpeg_config import COLOR_PRESETS, LUT_FILES, AUDIO_FILTERS
 import shutil
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Callable, Union
@@ -553,7 +553,7 @@ class FFmpegToolkit:
             # Duck video audio when new audio is present
             filter_complex = (
                 f"[1:a]asplit=2[sc][mix];"
-                f"[0:a][sc]sidechaincompress=threshold=0.03:ratio=4:attack=200:release=1000[ducked];"
+                f"[0:a][sc]{AUDIO_FILTERS['ducking_soft']}[ducked];"
                 f"[ducked]volume={video_vol}[va];"
                 f"[mix]volume={audio_vol}[aa];"
                 f"[va][aa]amix=inputs=2:duration=first[aout]"

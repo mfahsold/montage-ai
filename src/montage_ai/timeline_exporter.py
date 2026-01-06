@@ -153,11 +153,20 @@ class TimelineExporter:
         # Generate proxies first (if requested)
         if generate_proxies:
             logger.info(f"\n🎞️ Generating proxies ({proxy_format})...")
+            from .proxy_generator import ProxyGenerator
+            pg = ProxyGenerator(self.proxy_dir)
+            
             for clip in timeline.clips:
-                proxy_path = self._generate_proxy(clip.source_path, format=proxy_format)
-                if proxy_path:
-                    clip.proxy_path = proxy_path
-                    logger.info(f"   ✅ {os.path.basename(clip.source_path)}")
+                try:
+                    proxy_path = pg.get_proxy_path(clip.source_path, format=proxy_format)
+                    if not proxy_path.exists():
+                        pg.generate(clip.source_path, proxy_path, format=proxy_format)
+                    
+                    if proxy_path.exists():
+                        clip.proxy_path = str(proxy_path)
+                        logger.info(f"   ✅ {os.path.basename(clip.source_path)}")
+                except Exception as e:
+                    logger.error(f"   ❌ Proxy failed for {os.path.basename(clip.source_path)}: {e}")
 
         # Export OpenTimelineIO
         if export_otio and OTIO_AVAILABLE:

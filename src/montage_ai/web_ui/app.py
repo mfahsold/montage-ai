@@ -25,6 +25,7 @@ from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
 from ..core.hardware import get_best_hwaccel
 from ..auto_reframe import AutoReframeEngine
 from ..ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
+from ..ffmpeg_config import AUDIO_FILTERS
 from ..audio_analysis import remove_filler_words
 from ..transcriber import Transcriber
 
@@ -2029,12 +2030,7 @@ def _apply_ffmpeg_noise_reduction(video_path: str) -> str:
         output_path = OUTPUT_DIR / f"shorts_denoised_{timestamp}.mp4"
 
         # Adaptive FFT-based denoiser + EQ + light compression
-        noise_filter = (
-            "afftdn=nf=-25:nr=10:nt=w"
-            ",highpass=f=80"
-            ",lowpass=f=14000"
-            ",compand=attacks=0.3:decays=0.8:points=-80/-900|-45/-15|-27/-9|0/-7:soft-knee=6:gain=3"
-        )
+        noise_filter = AUDIO_FILTERS["noise_reduction_fast"]
 
         cmd = build_ffmpeg_cmd([
             "-i", video_path,
@@ -2251,12 +2247,7 @@ def api_audio_clean():
         if reduce_noise or not voice_isolated:
             # FFmpeg noise reduction using afftdn (adaptive FFT-based denoiser)
             # This is a solid local fallback when CGPU isn't available
-            noise_reduction_filter = (
-                "afftdn=nf=-25:nr=10:nt=w"  # Adaptive denoiser
-                ",highpass=f=80"  # Remove low rumble
-                ",lowpass=f=14000"  # Remove high hiss
-                ",compand=attacks=0.3:decays=0.8:points=-80/-900|-45/-15|-27/-9|0/-7:soft-knee=6:gain=3"  # Light compression
-            )
+            noise_reduction_filter = AUDIO_FILTERS["noise_reduction_fast"]
             
             cmd = build_ffmpeg_cmd(
                 [

@@ -106,6 +106,36 @@ COLOR_PRESETS = {
     "punch": "eq=saturation=1.25:contrast=1.1,unsharp=3:3:0.8,curves=m='0/0 0.2/0.15 0.8/0.85 1/1'"
 }
 
+# =============================================================================
+# Audio Processing Chains (DRY Definition)
+# =============================================================================
+
+AUDIO_FILTERS = {
+    # Voice Polish: Rumble removal -> Denoise -> Compress -> EQ -> Limit
+    "voice_polish": (
+        "highpass=f=80,"
+        "afftdn=nf=-25,"
+        "acompressor=threshold=-12dB:ratio=4:attack=20:release=250,"
+        "equalizer=f=3000:t=q:w=1:g=2,"
+        "alimiter=limit=-1dB"
+    ),
+
+    # Fast noise reduction for web previews (lighter CPU/latency)
+    "noise_reduction_fast": (
+        "afftdn=nf=-25:nr=10:nt=w,"
+        "highpass=f=80,"
+        "lowpass=f=14000,"
+        "compand=attacks=0.3:decays=0.8:points=-80/-900|-45/-15|-27/-9|0/-7:soft-knee=6:gain=3"
+    ),
+    
+    # Auto-Ducking: Duck [1] based on [0]
+    # Note: Requires complex filter graph construction in code, this is the core effect params
+    "ducking_core": "sidechaincompress=threshold=0.1:ratio=5:attack=50:release=300:link=average",
+
+    # Softer ducking for general B-roll/music mixing
+    "ducking_soft": "sidechaincompress=threshold=0.03:ratio=4:attack=200:release=1000"
+}
+
 LUT_FILES = {
     "cinematic_lut": "cinematic.cube",
     "teal_orange_lut": "teal_orange.cube",

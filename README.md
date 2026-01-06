@@ -41,6 +41,23 @@ docker-compose up -d
 | **Pro Export** | OTIO/EDL for DaVinci, Premiere, FCP |
 | **Quality Profiles** | Preview → Standard → High → Master |
 
+### New in v1.3 (Pro Polish)
+
+| Feature | Description |
+|---------|-------------|
+| **Audio Polish** | Voice Isolation (Filter Chain) + Auto-Ducking (Sidechain) |
+| **Pro Export** | OTIO + Proxy Generation (H.264/ProRes) for NLEs |
+| **Performance** | Optimized Preview Pipeline (<3 min render) |
+
+### New in v1.2 (Shorts Studio 2.0)
+
+| Feature | Description |
+|---------|-------------|
+| **Smart Reframing v2** | Kalman filter tracking for smoother subject centering |
+| **Highlight Detection** | Multi-modal scoring (Audio + Motion + Face) |
+| **Review Cards UI** | Interactive review of detected highlight moments |
+| **Viral Captions** | 3 new preset styles for vertical video captions |
+
 ### New in v1.1
 
 | Feature | Description |

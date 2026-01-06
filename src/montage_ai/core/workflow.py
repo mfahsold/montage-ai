@@ -177,6 +177,16 @@ class VideoWorkflow(ABC):
                 duration_seconds=duration
             )
             
+            # Persist result to JobStore
+            self.job_store.update_job(
+                self.options.job_id, 
+                {
+                    "result": self._result.to_dict(),
+                    "output_file": os.path.basename(output_path),
+                    "metadata": self.get_metadata() # Explicitly at top level for ease of access
+                }
+            )
+            
             logger.info(f"[{self.workflow_name}] Completed in {duration:.1f}s: {output_path}")
             return self._result
             

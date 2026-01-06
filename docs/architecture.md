@@ -38,6 +38,18 @@ System design and component overview.
 │                               │                                          │
 │                               ▼                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                       Shorts Studio (v1.2+)                       │   │
+│  │                                                                   │   │
+│  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
+│  │   │ Smart    │  │ Caption  │  │ Audio    │  │ Highlight│        │   │
+│  │   │ Reframe  │  │ Burn     │  │ Polish   │  │ Detect   │        │   │
+│  │   │(MediaPipe)│ │ (Styles) │  │(Sidechain)│ │ (Multi)  │        │   │
+│  │   └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
+│  │                                                                   │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                               │                                          │
+│                               ▼                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
 │  │                    Enhancement Pipeline                           │   │
 │  │                                                                   │   │
 │  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
@@ -88,6 +100,8 @@ The central orchestrator that executes the editing pipeline in phases:
 | `auto_reframe.py` | **Auto Reframe Engine**. 9:16 conversion using Convex Optimization (L2) for cinematic camera paths |
 | `video_metadata.py` | Technical metadata extraction (ffprobe wrapper) |
 | `clip_enhancement.py` | Stabilization, upscaling, color matching (Local/Cloud hybrid) |
+| `audio_enhancer.py` | **Audio Polish**. Voice isolation, auto-ducking, loudness normalization (Pro Polish) |
+| `shorts_workflow.py` | **Shorts Studio**. Dedicated pipeline for vertical content generation |
 | `ffmpeg_config.py` | GPU encoder detection (NVENC/VAAPI/QSV), encoding parameters |
 
 ### Performance Optimizations

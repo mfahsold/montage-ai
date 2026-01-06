@@ -253,6 +253,79 @@
             box-shadow: 0 0 8px rgba(255, 85, 0, 0.6);
         }
 
+        /* --- CAPTION PREVIEW STYLES --- */
+        .caption-preview {
+            position: absolute;
+            width: 80%;
+            left: 10%;
+            bottom: 25%;
+            text-align: center;
+            pointer-events: none;
+            z-index: 20;
+            font-family: 'Segoe UI', sans-serif;
+            transition: all 0.3s ease;
+            display: none;
+            line-height: 1.4;
+        }
+
+        /* Style: TikTok (Classic) */
+        .caption-preview.tiktok {
+            font-weight: 800;
+            color: white;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            font-size: 1.1rem;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 8px;
+            border-radius: 4px;
+            box-decoration-break: clone;
+        }
+
+        /* Style: Cinematic */
+        .caption-preview.cinematic {
+            font-family: Georgia, serif;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #f0f0f0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            bottom: 15%;
+            font-size: 0.8rem;
+        }
+
+        /* Style: Minimal */
+        .caption-preview.minimal {
+            background: rgba(255,255,255,0.95);
+            color: #111;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            bottom: 30%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Style: Bold (MrBeast style) */
+        .caption-preview.bold {
+            font-family: Impact, sans-serif;
+            font-weight: 900;
+            color: #FFD700;
+            text-shadow: 2px 2px 0px #000;
+            font-size: 1.4rem;
+            transform: rotate(-1deg);
+            bottom: 40%;
+        }
+
+        /* Style: Karaoke (Gradient) */
+        .caption-preview.karaoke {
+            font-weight: 900;
+            background: linear-gradient(to right, #00fff2, #ff004c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.3);
+            font-size: 1.2rem;
+            bottom: 25%;
+        }
+
+
         #safeZone.drawing {
             pointer-events: auto;
         }
@@ -396,6 +469,9 @@
                                 <div class="safe-zone-overlay" id="safeZone">
                                     <!-- Custom rectangles drawn here -->
                                 </div>
+                                <div id="captionPreview" class="caption-preview">
+                                    This is a preview caption<br>to test the style
+                                </div>
                             </div>
                         </div>
 
@@ -447,10 +523,14 @@
                         </div>
 
                         <label class="tech-label">CAPTION STYLE</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button class="voxel-btn text-xs">MINIMAL</button>
-                            <button class="voxel-btn text-xs voxel-btn-secondary">BOLD NEON</button>
-                        </div>
+                        <select id="captionStyle" class="voxel-input mb-4" onchange="updateCaptionPreview()">
+                             <option value="none">None (No Captions)</option>
+                             <option value="tiktok" selected>TikTok (Classic)</option>
+                             <option value="bold">Bold (Yellow)</option>
+                             <option value="minimal">Minimal (Clean)</option>
+                             <option value="cinematic">Cinematic (Serif)</option>
+                             <option value="karaoke">Karaoke (Gradient)</option>
+                        </select>
 
                         <label class="tech-label mt-4">ENHANCEMENT OPTIONS</label>
                         <div class="voxel-card bg-muted p-3">
@@ -472,6 +552,18 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HIGHIGHTS REVIEW -->
+        <div id="highlightReview" class="mb-6 hidden" style="display: none;">
+            <div class="voxel-card">
+                <h3 class="mb-3 text-primary">HIGHLIGHT MOMENTS</h3>
+                <p class="text-xs text-muted mb-4">AI detected these top moments. Click to view.</p>
+                
+                <div id="highlightCards" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <!-- Cards will be injected here -->
                 </div>
             </div>
         </div>
@@ -639,10 +731,75 @@
 
     <script>
         // =====================================================================
+        // State Management
+        // =====================================================================
+        let selectedVideoPath = null;
+        let currentJobId = null;
+
+        // =====================================================================
+        // Initialization & File Loading
+        // =====================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFiles();
+            toggleWorkflowOptions();
+            updateCaptionPreview();
+        });
+
+        async function loadFiles() {
+            try {
+                const res = await fetch('/api/files');
+                const data = await res.json();
+                const container = document.getElementById('clipList');
+                container.innerHTML = ''; // Clear hardcoded items
+
+                if (data.videos.length === 0) {
+                    container.innerHTML = '<div class="text-xs text-muted p-2">No videos found in /data/input</div>';
+                    return;
+                }
+
+                data.videos.forEach(filename => {
+                    const div = document.createElement('div');
+                    div.className = 'voxel-card clip-item p-2';
+                    div.innerHTML = `
+                        <div class="text-xs font-bold">${filename}</div>
+                        <!-- <div class="text-xs text-muted">Unknown Duration</div> -->
+                    `;
+                    div.onclick = () => selectClip(filename, div);
+                    container.appendChild(div);
+                });
+
+                // Auto-select first video if available
+                if (data.videos.length > 0) {
+                    selectClip(data.videos[0], container.firstChild);
+                }
+
+            } catch (e) {
+                console.error('Failed to load files', e);
+                document.getElementById('clipList').innerHTML = '<div class="text-xs text-danger">Error loading files</div>';
+            }
+        }
+
+        function selectClip(filename, element) {
+            // Update UI
+            document.querySelectorAll('.clip-item').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+
+            // Set state
+            selectedVideoPath = `/data/input/${filename}`;
+            
+            // Update Preview
+            const previewVideo = document.getElementById('previewVideo');
+            previewVideo.src = `/api/video/${filename}`;
+            document.getElementById('previewHint').style.display = 'none';
+
+            // Reset job results
+            document.getElementById('successMessage').style.display = 'none';
+        }
+
+        // =====================================================================
         // Job Management (Async Processing with Progress Tracking)
         // =====================================================================
         
-        let currentJobId = null;
         let pollInterval = null;
         
         function toggleWorkflowOptions() {
@@ -652,6 +809,22 @@
                 styleSec.style.display = (type === 'montage') ? 'block' : 'none';
             }
         }
+
+        function updateCaptionPreview() {
+            const style = document.getElementById('captionStyle').value;
+            const preview = document.getElementById('captionPreview');
+            
+            // Remove all specific classes
+            preview.classList.remove('tiktok', 'bold', 'minimal', 'cinematic', 'karaoke');
+            
+            if (style === 'none') {
+                preview.style.display = 'none';
+            } else {
+                preview.style.display = 'block';
+                preview.classList.add(style);
+            }
+        }
+
         
         async function generateShort() {
             const btn = document.getElementById('generateBtn');
@@ -664,7 +837,14 @@
             errorMessage.style.display = 'none';
             
             // Get options
-            const videoPath = '/data/input/test.mp4'; // TODO: Get from file upload
+            // const videoPath = '/data/input/test.mp4'; // OLD HARDCODED
+
+            if (!selectedVideoPath) {
+                alert("Please select a video clip first.");
+                return;
+            }
+
+            const videoPath = selectedVideoPath;
             const workflowType = document.getElementById('workflowType').value;
             const montageStyle = document.getElementById('montageStyle').value;
             const reframeMode = document.getElementById('reframeMode').value;
@@ -802,8 +982,18 @@
                 downloadLink.href = `/api/download/${outputFile}`;
                 downloadLink.download = outputFile || 'short.mp4';
 
+                // Update Preview Video
+                const videoEl = document.querySelector('#phoneScreen video');
+                if (videoEl) {
+                    videoEl.src = `/api/download/${outputFile}`;
+                    videoEl.load();
+                }
+
                 btn.disabled = false;
                 btn.textContent = 'Generate Another';
+
+                // Render Highlights
+                renderHighlights(job);
 
                 // Fetch engagement score for the generated video
                 const platform = document.getElementById('platformPreset').value || 'tiktok';
@@ -827,6 +1017,70 @@
             
             currentJobId = null;
         }
+
+        function renderHighlights(job) {
+            const container = document.getElementById('highlightCards');
+            const section = document.getElementById('highlightReview');
+            
+            // Extract highlights from metadata
+            const metadata = job.metadata || (job.result && job.result.metadata) || {};
+            const highlights = metadata.highlights || [];
+            
+            if (!highlights || highlights.length === 0) {
+                if (section) section.style.display = 'none';
+                return;
+            }
+            
+            if (section) section.style.display = 'block';
+            if (container) {
+                container.innerHTML = highlights.map((h, index) => {
+                    const score = Math.round(h.score * 100);
+                    // Color code score for visual impact
+                    const colorClass = score > 80 ? 'text-success' : (score > 60 ? 'text-primary' : 'text-muted');
+                    
+                    return `
+                    <div class="voxel-card p-2 cursor-pointer hover:border-primary transition-all" onclick="seekVideo(${h.start})">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-primary">#${index + 1}</span>
+                            <span class="text-xs font-mono">${h.duration.toFixed(1)}s</span>
+                        </div>
+                        
+                        <div class="flex items-center gap-2 mb-1">
+                            <div class="text-lg font-bold ${colorClass}">${score}</div>
+                            <div class="text-xs text-muted flex-1 text-right">
+                               <span title="Action" class="mr-1">⚡${h.signals?.action?.toFixed(1) || '-'}</span> 
+                               <span title="Face">👤${h.signals?.face?.toFixed(1) || '-'}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-bar mb-1">
+                            <div class="progress-fill" style="width: ${score}%"></div>
+                        </div>
+                        
+                        <div class="text-xs text-muted truncate">${h.description || 'Highlight'}</div>
+                    </div>
+                    `;
+                }).join('');
+            }
+        }
+        
+        function seekVideo(time) {
+            const videoEl = document.querySelector('#phoneScreen video');
+            if (videoEl) {
+                // Ensure video is playable
+                if (videoEl.readyState >= 1) {
+                    videoEl.currentTime = Math.max(0, time);
+                    videoEl.play().catch(e => console.log('Autoplay prevented', e));
+                    
+                    // Smooth scroll to preview
+                    const preview = document.getElementById('phoneScreen');
+                    preview.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    console.warn('Video not ready to seek');
+                }
+            }
+        }
+
         
         async function cancelJob() {
             if (!currentJobId) return;

@@ -40,3 +40,4 @@ rq>=1.16.0
 # Audio Analysis
 librosa>=0.10.2
 numba>=0.60.0
+opentimelineio>=0.15.0

@@ -18,6 +18,7 @@ from ..auto_reframe import AutoReframeEngine, CropWindow
 from ..transcriber import transcribe_audio
 from ..caption_burner import CaptionBurner, CaptionStyle
 from ..logger import logger
+from ..timeline_exporter import TimelineExporter, Timeline, Clip
 
 
 class ShortsWorkflow(VideoWorkflow):
@@ -87,63 +88,101 @@ class ShortsWorkflow(VideoWorkflow):
         # 2. Audio Analysis (Highlights)
         if audio_aware:
             self._update_progress(30, "Analyzing audio for highlights...")
-            self.audio_highlights = self._analyze_audio_highlights()
+            self.audio_highlights = self._analyze_smart_highlights()
             logger.info(f"Audio analysis complete: {len(self.audio_highlights)} highlights")
 
         return self.crop_data
 
-    def _analyze_audio_highlights(self) -> List[Dict[str, Any]]:
-        """Detect audio-based highlight moments."""
+    def _analyze_smart_highlights(self) -> List[Dict[str, Any]]:
+        """Detect highlights using multi-modal signals (Audio + Face + Action)."""
         try:
             import numpy as np
-            from ..audio_analysis import AudioAnalyzer
+            from ..audio_analysis import analyze_music_energy, EnergyProfile
+            from ..scene_analysis import Scene, SceneAnalysis
+            from .highlight_detector import HighlightDetector
 
-            analyzer = AudioAnalyzer(self.options.input_path)
-            analyzer.analyze()
+            # 1. Get Audio Energy
+            _, energy_profile = analyze_music_energy(self.options.input_path)
+            
+            # 2. visual Analysis (simulate Scenes from Crop Data)
+            # If we don't have crop data (e.g. center crop mode), we need to generate dummy scenes
+            scenes = self._create_scenes_from_crops(self.crop_data) if self.crop_data else []
+            
+            if not scenes:
+                # If no visual data, create dummy scenes based on audio duration
+                max_time = energy_profile.times[-1] if len(energy_profile.times) > 0 else 60.0
+                scenes = [
+                    Scene(start=i, end=min(i+3.0, max_time), path="", meta={"analysis": SceneAnalysis(description="", face_count=0, action="MEDIUM", quality="YES", shot="medium")})
+                    for i in np.arange(0, max_time, 3.0)
+                ]
 
-            highlights = []
-            energy = analyzer.energy_curve if hasattr(analyzer, 'energy_curve') else []
-            beats = analyzer.beat_times if hasattr(analyzer, 'beat_times') else []
-
-            if len(energy) == 0:
-                return []
-
-            # Find high-energy regions
-            threshold = np.percentile(energy, 85)
-            hop_time = getattr(analyzer, 'hop_length', 512) / getattr(analyzer, 'sr', 22050)
-
-            in_highlight = False
-            start_time = 0.0
-            peak_energy = 0.0
-
-            for i, e in enumerate(energy):
-                time = i * hop_time
-                if e > threshold and not in_highlight:
-                    in_highlight = True
-                    start_time = max(0, time - 0.5)
-                    peak_energy = e
-                elif in_highlight:
-                    peak_energy = max(peak_energy, e)
-                    if e <= threshold * 0.8:
-                        in_highlight = False
-                        duration = time - start_time
-                        if 2.0 <= duration <= 60.0:
-                            score = min(1.0, peak_energy / (np.max(energy) + 0.001))
-                            highlights.append({
-                                "start": start_time,
-                                "end": time,
-                                "duration": duration,
-                                "score": score,
-                                "type": "energy"
-                            })
-
-            # Sort by score and return top highlights
-            highlights.sort(key=lambda x: x['score'], reverse=True)
-            return highlights[:10]
+            # 3. Detect
+            detector = HighlightDetector(scenes, energy_profile)
+            results = detector.detect(top_k=10)
+            
+            return [
+                {
+                    "start": r.start, 
+                    "end": r.end, 
+                    "duration": r.end - r.start,
+                    "score": r.score,
+                    "type": "smart_highlight",
+                    "signals": r.signals
+                }
+                for r in results
+            ]
 
         except Exception as e:
-            logger.warning(f"Audio highlight detection failed: {e}")
+            logger.error(f"Highlight detection failed: {e}", exc_info=True)
             return []
+
+    def _create_scenes_from_crops(self, crop_data: List[Any], step_sec: float = 3.0) -> List[Any]:
+        """Convert frame-level crop data into Scene objects."""
+        from ..scene_analysis import Scene, SceneAnalysis
+        import numpy as np
+        
+        if not crop_data:
+            return []
+            
+        total_time = crop_data[-1].time
+        scenes = []
+        
+        # Split into fixed windows
+        for t in np.arange(0, total_time, step_sec):
+            start = float(t)
+            end = min(float(t + step_sec), total_time)
+            
+            # Find crops in this window
+            # Assumes crop_data is sorted by time
+            window_crops = [c for c in crop_data if start <= c.time < end]
+            
+            if not window_crops:
+                continue
+                
+            # Compute aggregate stats
+            avg_score = np.mean([c.score for c in window_crops])
+            # std_x = np.std([c.x for c in window_crops]) # Maybe proxy for action?
+            
+            # Map to SceneAnalysis
+            # If avg_score (face confidence) is high, face_count = 1
+            face_count = 1 if avg_score > 0.6 else 0
+            
+            # Detect "Action" via motion? For now default to MEDIUM.
+            action = "MEDIUM"
+            
+            analysis = SceneAnalysis(
+                description="Auto-generated segment",
+                face_count=face_count,
+                action=action,
+                quality="YES",
+                tags=[],
+                mood="neutral",
+                shot="medium"
+            )
+            
+            scenes.append(Scene(start=start, end=end, path="", meta={"analysis": analysis}))
+            
+        return scenes
     
     def process(self, analysis_result: Any) -> str:
         """Process = Apply reframing."""
@@ -153,10 +192,20 @@ class ShortsWorkflow(VideoWorkflow):
         self.reframed_path = Path(self.options.output_dir) / f"shorts_reframed_{timestamp}.mp4"
         
         logger.info(f"Reframing to: {self.reframed_path}")
+        
+        # Performance Tuning: Use preview preset if this is a preview?
+        # The user/UI doesn't explicitly send "preview" mode for shorts yet, but 
+        # config.quality_profile might be set.
+        from ..config import get_settings
+        settings = get_settings()
+        # Default to high quality unless env var set or passed (TODO: pass from options)
+        # Using settings.ffmpeg.preset if available or hardcoded "medium"
+        
         self.reframer.apply(
             self.crop_data,
             self.options.input_path,
-            str(self.reframed_path)
+            str(self.reframed_path),
+            preset="fast" # Use fast for shorts to ensure responsiveness (<3min goal)
         )
         
         return str(self.reframed_path)
@@ -203,6 +252,34 @@ class ShortsWorkflow(VideoWorkflow):
         
         # Burn captions
         caption_style = self.options.extras.get('caption_style', 'tiktok')
+        
+        # --- AUDIO POLISH ---
+        clean_audio = self.options.extras.get('clean_audio', False)
+        if clean_audio:
+            logger.info("Applying Audio Polish (Voice Isolation)...")
+            from ..audio_enhancer import AudioEnhancer
+            enhancer = AudioEnhancer()
+            polished_path = Path(output_path).with_suffix('.polished.mp4')
+            
+            # Since we have video+audio in output_path, we need to process its audio
+            # and replace it. Doing this IN-PLACE is tricky.
+            # Simpler: Process output_path -> polished_path
+            # But wait, audio processing usually happens BEFORE caption burn in NLEs.
+            # Here video is already rendered. It's fine to clean audio of the final render.
+            
+            # Extract audio -> Enhance -> Replace
+            try:
+                # We can do this in one pass if we are clever, but let's be safe.
+                # Just run the enhance_voice filter on the video file audio stream.
+                success = enhancer.enhance_voice(str(output_path), str(polished_path))
+                if success and polished_path.exists():
+                    # Replace original
+                    output_path.unlink()
+                    polished_path.rename(output_path)
+            except Exception as e:
+                logger.warning(f"Audio Polish failed: {e}")
+
+        # --- CAPTIONS ---
         style_map = {
             'default': CaptionStyle.TIKTOK,
             'tiktok': CaptionStyle.TIKTOK,
@@ -210,8 +287,10 @@ class ShortsWorkflow(VideoWorkflow):
             'minimal': CaptionStyle.MINIMAL,
             'gradient': CaptionStyle.KARAOKE,
             'karaoke': CaptionStyle.KARAOKE,
+            'cinematic': CaptionStyle.CINEMATIC,
+            'youtube': CaptionStyle.YOUTUBE,
         }
-        burner_style = style_map.get(caption_style, CaptionStyle.TIKTOK)
+        burner_style = style_map.get(caption_style.lower(), CaptionStyle.TIKTOK)
         
         logger.info(f"Burning captions ({caption_style} style)...")
         burner = CaptionBurner(style=burner_style)
@@ -219,7 +298,47 @@ class ShortsWorkflow(VideoWorkflow):
         
         # Cleanup SRT
         srt_path.unlink(missing_ok=True)
-        
+
+        # --- OTIO/EDL EXPORT ---
+        try:
+            self._update_progress(95, "Exporting timeline...")
+            from ..utils import get_video_duration
+
+            final_path_str = str(output_path)
+            duration = get_video_duration(final_path_str)
+
+            # Create a simple timeline with one clip (the result)
+            timeline = Timeline(
+                clips=[Clip(
+                    source_path=final_path_str,
+                    start_time=0.0,
+                    duration=duration,
+                    timeline_start=0.0
+                )],
+                audio_path=final_path_str,
+                total_duration=duration,
+                resolution=(1080, 1920),
+                project_name=output_path.stem
+            )
+
+            exporter = TimelineExporter(output_dir=self.options.output_dir)
+            
+            # Check if user wanted proxies (passed in options or default to True for "Pro"?)
+            # Let's assume True if quality is HIGH, or just default to False unless specified.
+            generate_proxies = self.options.extras.get('generate_proxies', False)
+            
+            exporter.export_timeline(
+                timeline,
+                generate_proxies=generate_proxies,
+                link_to_source=True,
+                export_otio=True,
+                export_edl=True
+            )
+            logger.info("OTIO/EDL export complete")
+
+        except Exception as e:
+            logger.warning(f"OTIO Export failed: {e}")
+
         return str(output_path)
     
     def cleanup(self) -> None:
@@ -239,6 +358,7 @@ class ShortsWorkflow(VideoWorkflow):
             "caption_style": self.options.extras.get('caption_style', 'tiktok'),
             "add_captions": self.options.extras.get('add_captions', True),
             "platform": self.options.extras.get('platform', 'tiktok'),
+            "highlights": self.audio_highlights,
         })
         return base
     

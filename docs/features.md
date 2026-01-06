@@ -97,6 +97,78 @@ Every AI decision is tracked and exportable.
 - **EDL comments:** `* MONTAGE_AI DENOISE: spatial=0.3`
 - **Recipe cards:** Human-readable Markdown instructions
 
+### v1.2 Shorts Studio 2.0 (February 2026)
+
+End-to-end vertical video automation with smart reframing and highlight detection.
+
+#### Smart Reframing v2
+
+Intelligent 16:9 to 9:16 conversion keeping the subject in frame.
+
+**New capabilities:**
+- **Subject Tracking**: Kalman Filter smoothing prevents jerky camera movements
+- **Motion Optimization**: `CameraMotionOptimizer` balances subject centering vs. stability
+- **Fallback Modes**: Auto-switches to Action Tracking or Center Crop if face detection fails
+
+#### Styles & Captions
+
+Apply trending visual styles instantly.
+
+**Caption Presets:**
+| Style | Description |
+|-------|-------------|
+| `TikTok` | Classic white text with black outline |
+| `Bold` | Heavy font, neon colors, high contrast |
+| `Minimal` | Clean sans-serif, lower third placement |
+| `Cinematic` | Letterboxed, serif font, yellow subtitles |
+
+#### Highlight Detection
+
+AI-powered identification of "viral moments" in long-form content.
+
+**Signals:**
+- **Audio Energy**: Loudness, laughter, excitement spikes
+- **Visual Action**: High motion content (Optical Flow)
+- **Face Presence**: Close-ups and reaction shots
+
+### v1.3 Pro Polish (March 2026)
+
+Professional finishing tools for audio and workflow integration.
+
+#### Audio Polish Suite
+
+Studio-quality audio enhancement pipeline.
+
+- **Voice Isolation:** EQ + Compression + Limiting + Noise Gate to clean up dialogue.
+- **Auto-Ducking:** Automatically lowers background music volume during speech segments (Sidechain Compression).
+- **SNR Check:** (Beta) Analyzes Signal-to-Noise Ratio to flag poor audio.
+
+#### Professional Export
+
+Workflow tools for NLE integration.
+
+- **OTIO Export:** Generate OpenTimelineIO files for DaVinci Resolve / Premiere Pro.
+- **Proxy Generation:** Auto-creates lightweight H.264/ProRes proxies linked to the timeline.
+- **Timeline Integrity:** Relink guides ensure proxies and source files match perfectly.
+
+#### Performance Tuning
+
+- **Fast Preview:** "Time-to-First-Preview" optimized to < 3 minutes via `ultrafast` preset and parallel processing.
+- **Visual Action**: High motion scenes
+- **Face Presence**: Clear, expressive faces
+- **Score Fusion**: `(Audio * 0.4) + (Action * 0.3) + (Face * 0.3)`
+
+**Review UI:**
+- **Interactive Cards**: Click to jump to highlight
+- **Score Breakdown**: See why a moment was picked (Action/Face/Audio)
+- **Visual Cues**: Color-coded confidence scores
+
+**Usage:**
+Select "Shorts Studio" workflow in the Web UI, or:
+```bash
+./montage-ai.sh run --workflow shorts --audio-aware
+```
+
 **Recipe Card Example:**
 ```markdown
 ## Clip: DJI_0042.MP4
@@ -438,7 +510,8 @@ See [configuration.md](configuration.md#creative-loop-agentic-refinement) for al
 
 - **Smart Reframing**: Automatically crops horizontal footage to 9:16 vertical aspect ratio using face detection and segmented tracking.
 - **Segmented Tracking**: Stabilizes camera movement by keeping the crop window static until the subject moves significantly, preventing jitter.
-- **Auto-Captions**: Generates and burns in subtitles (requires `whisper`).
+- **Auto-Captions**: Generates and burns in subtitles (requires `whisper`).  
+  **Styles:** `tiktok` (Bold/Shadowed), `minimal` (Clean), `cinematic` (Serif/Boxed), `bold` (Impact).
 - **Web UI Integration**: Toggle "Shorts Mode" in the Web UI for easy creation.
 
 **CLI usage:**

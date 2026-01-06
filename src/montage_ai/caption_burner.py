@@ -74,7 +74,7 @@ STYLE_CONFIGS: Dict[CaptionStyle, StyleConfig] = {
         shadowy=0,
         box=False,
         x_expr="(w-text_w)/2",
-        y_expr="(h-text_h)/2",  # centered vertically
+        y_expr="(h-text_h)*0.75",  # Lower middle (above TikTok UI)
     ),
     CaptionStyle.YOUTUBE: StyleConfig(
         fontsize=42,
@@ -120,7 +120,7 @@ STYLE_CONFIGS: Dict[CaptionStyle, StyleConfig] = {
         shadowy=3,
         box=False,
         x_expr="(w-text_w)/2",
-        y_expr="(h-text_h)/2",
+        y_expr="(h-text_h)*0.6",  # Just below center
     ),
     CaptionStyle.CINEMATIC: StyleConfig(
         fontsize=38,

@@ -48,6 +48,38 @@ class ProxyGenerator:
         # We use a simple strategy: proxy_{stem}.mp4
         return self.proxy_dir / f"proxy_{source.stem}{ext}"
 
+    def generate(self, source_path: Union[str, Path], output_path: Union[str, Path], format: str = "h264") -> bool:
+        """Generate a proxy file using ffmpeg."""
+        from .ffmpeg_utils import build_ffmpeg_cmd
+        from .core.cmd_runner import run_command
+        
+        # Determine codec settings
+        if format == "prores":
+            v_codec = ["-c:v", "prores_ks", "-profile:v", "proxy"]
+            a_codec = ["-c:a", "pcm_s16le"]
+        elif format == "dnxhr":
+            v_codec = ["-c:v", "dnxhd", "-profile:v", "dnxhr_lb"]
+            a_codec = ["-c:a", "pcm_s16le"]
+        else:
+            # H.264 (Default)
+            # Use 720p or 540p for proxies
+            v_codec = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-vf", "scale=-2:720"]
+            a_codec = ["-c:a", "aac", "-b:a", "128k"]
+            
+        cmd = build_ffmpeg_cmd([
+            "-i", str(source_path),
+            *v_codec,
+            *a_codec,
+            str(output_path)
+        ])
+        
+        try:
+            run_command(cmd)
+            return True
+        except Exception as e:
+            logger.error(f"Proxy generation failed: {e}")
+            raise
+
     def ensure_proxy(self, source_path: Union[str, Path], format: str = "h264", force: bool = False) -> Optional[Path]:
         """
         Ensure a proxy exists for the given source file.
