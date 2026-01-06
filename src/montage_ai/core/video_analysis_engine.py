@@ -1,22 +1,29 @@
 """
 Video Analysis Engine - Unified Single-Pass Video Analysis
 
+.. deprecated:: 2026.1
+    This module is deprecated. Use `scene_analysis.py` for scene detection
+    and `scene_provider.py` for unified analysis access.
+
+    Migration:
+        # Old way (deprecated)
+        from montage_ai.core.video_analysis_engine import VideoAnalysisEngine
+        engine = VideoAnalysisEngine(video_path)
+        results = engine.analyze()
+
+        # New way (preferred)
+        from montage_ai.core.scene_provider import get_scene_provider
+        provider = get_scene_provider()
+        scenes = provider.detect_scenes(video_path)
+
 Provides a pluggable architecture for video analysis:
 - Single video decode pass (efficient I/O)
 - Pluggable analyzers (scene detection, face tracking, motion, etc.)
 - Shared frame buffering and caching
 - Unified result aggregation
-
-Usage:
-    from montage_ai.core.video_analysis_engine import VideoAnalysisEngine, AnalyzerPlugin
-
-    engine = VideoAnalysisEngine(video_path)
-    engine.add_analyzer(SceneDetectionAnalyzer())
-    engine.add_analyzer(FaceTrackingAnalyzer())
-
-    results = engine.analyze()
-    # results = {"scene_detection": [...], "face_tracking": [...]}
 """
+
+import warnings
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -359,7 +366,15 @@ class VideoAnalysisEngine:
 
         Args:
             video_path: Path to video file
+
+        .. deprecated:: 2026.1
+            Use scene_provider.get_scene_provider() instead.
         """
+        warnings.warn(
+            "VideoAnalysisEngine is deprecated. Use scene_provider.get_scene_provider() instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.video_path = video_path
         self._metadata: Optional[VideoMetadata] = None
         self._analyzers: List[AnalyzerPlugin] = []

@@ -133,9 +133,7 @@ class FeatureConfig:
     creative_loop: bool = field(default_factory=lambda: os.environ.get("CREATIVE_LOOP", "false").lower() == "true")
     creative_loop_max_iterations: int = field(default_factory=lambda: int(os.environ.get("CREATIVE_LOOP_MAX_ITERATIONS", "3")))
 
-    # 2025 Tech Vision: Future features (infrastructure ready, not yet implemented)
-    frame_interpolation: bool = field(default_factory=lambda: os.environ.get("FRAME_INTERPOLATION", "false").lower() == "true")
-    ai_lut_generation: bool = field(default_factory=lambda: os.environ.get("AI_LUT_GENERATION", "false").lower() == "true")
+    # Episodic memory for analysis caching (experimental)
     episodic_memory: bool = field(default_factory=lambda: os.environ.get("EPISODIC_MEMORY", "false").lower() == "true")
 
     # Storytelling Engine (Phase 1 scaffolding)

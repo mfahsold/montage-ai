@@ -32,6 +32,16 @@ Timeline Export:
 __version__ = "0.4.0"
 
 from .editor import create_montage
+from .exceptions import (
+    MontageError,
+    VideoAnalysisError,
+    RenderError,
+    FFmpegError,
+    LLMError,
+    CGPUError,
+    TimelineError,
+    ConfigurationError,
+)
 from .style_templates import (
     get_style_template,
     list_available_styles,
@@ -91,6 +101,15 @@ except ImportError:
 __all__ = [
     # Core
     "create_montage",
+    # Exceptions
+    "MontageError",
+    "VideoAnalysisError",
+    "RenderError",
+    "FFmpegError",
+    "LLMError",
+    "CGPUError",
+    "TimelineError",
+    "ConfigurationError",
     # Styles
     "get_style_template",
     "list_available_styles",
