@@ -1,54 +1,54 @@
 # Descript Alternative (Offline) with OTIO Export
 
-**TL;DR:** Montage AI = lokale, deterministische Rough-Cuts mit Beat-Sync, Story-Arcs und OTIO/EDL-Handoff. Kein Upload, keine Credits, volle Kontrolle.
+**TL;DR:** Montage AI = local, deterministic rough-cuts with beat-sync, story arcs, and OTIO/EDL handoff. No upload, no credits, full control.
 
-## Warum offline?
-- **Privacy:** Kundendaten und Rohmaterial verlassen die Maschine nicht.
-- **Speed:** Keine Upload-Wartezeiten, große Files direkt von SSD/NAS.
-- **Kosten:** Keine Minuten-Credits, keine Paywalls pro Export.
-- **Deterministisch:** Gleiche Eingabe → gleiche Timeline, reproduzierbar für Revisionen.
+## Why Offline?
+- **Privacy:** Client data and raw footage never leave your machine.
+- **Speed:** No upload wait times, large files directly from SSD/NAS.
+- **Cost:** No per-minute credits, no paywalls per export.
+- **Deterministic:** Same input = same timeline, reproducible for revisions.
 
-## Was unterscheidet uns von Descript & Co?
-- **OTIO/EDL Export:** Direkt in DaVinci/Premiere weiterarbeiten (Pro Handoff).
-- **Beat-Sync + Story Arcs:** Automatische Musik-Synchronisation und 5-Phasen-Narrativ.
-- **Local-First:** FFmpeg/Whisper/Auto-Editor laufen lokal; optional cgpu-Cloud nur wenn explizit gewünscht.
-- **Batch/CLI:** `make dev-test` lokal, `make cluster` für Multi-Arch/Cluster. Skriptbar für CI.
-- **Longform-tauglich:** Podcasts, Lectures, Streams ohne Upload-Limits.
+## What Sets Us Apart from Descript & Co?
+- **OTIO/EDL Export:** Continue editing directly in DaVinci/Premiere (Pro handoff).
+- **Beat-Sync + Story Arcs:** Automatic music synchronization and 5-phase narrative.
+- **Local-First:** FFmpeg/Whisper/Auto-Editor run locally; optional cgpu cloud only when explicitly requested.
+- **Batch/CLI:** `make dev-test` locally, `make cluster` for multi-arch/cluster. Scriptable for CI.
+- **Longform-ready:** Podcasts, lectures, streams without upload limits.
 
 ## Quick Start
 ```bash
-# Lokal: 5 Sekunden Feedback
-make dev       # einmalig build
-make dev-test  # edit → test (volume mounts)
+# Local: 5-second feedback
+make dev       # one-time build
+make dev-test  # edit -> test (volume mounts)
 
 # Cluster (multi-arch, shared cache)
 make cluster   # build + push + deploy
 ```
 
-## Workflow: Podcast → Shorts (offline)
-1) Audio/Video in `data/input/` ablegen
-2) `make dev-test` starten (nutzt lokalen Cache)
-3) Montage AI erzeugt Rough Cut + optional 9:16 Clips
-4) Export als `montage.otio` → Import in DaVinci/Premiere für Finishing
+## Workflow: Podcast to Shorts (Offline)
+1) Place audio/video in `data/input/`
+2) Run `make dev-test` (uses local cache)
+3) Montage AI generates rough cut + optional 9:16 clips
+4) Export as `montage.otio` -> Import into DaVinci/Premiere for finishing
 
-## SEO / Suchbegriffe
-- „descript alternative offline“
-- „ai video editor local“
-- „beat sync video editor“
-- „otio export video editor“
-- „podcast to shorts offline“
+## SEO / Search Terms
+- "descript alternative offline"
+- "ai video editor local"
+- "beat sync video editor"
+- "otio export video editor"
+- "podcast to shorts offline"
 
-## Warum OTIO?
-OTIO ist ein offener Timeline-Standard. Damit:
-- Sauberer Handoff zu NLEs (Premiere/Resolve/Avid via EDL/XML)
-- Keine Black-Box-XML-Skripte
-- Stabil für Round-Trips mit Audio/Video-Sync
+## Why OTIO?
+OTIO is an open timeline standard. This enables:
+- Clean handoff to NLEs (Premiere/Resolve/Avid via EDL/XML)
+- No black-box XML scripts
+- Stable round-trips with audio/video sync
 
-## Roadmap (relevant für Offline-User)
-- Verbesserte Caption-Styling-Presets (lokal)
-- Batching von Hooks/Highlights für Shorts
-- Weitere Audio-Cleanup-Presets (LUFS, DeReverb, Auto-Duck)
+## Roadmap (Relevant for Offline Users)
+- Improved caption styling presets (local)
+- Batching of hooks/highlights for Shorts
+- Additional audio cleanup presets (LUFS, DeReverb, Auto-Duck)
 
 ---
 
-**Jetzt ausprobieren:** [GitHub Repo](https://github.com/mfahsold/montage-ai)
+**Try it now:** [GitHub Repo](https://github.com/mfahsold/montage-ai)

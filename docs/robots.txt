@@ -1,0 +1,5 @@
+# Montage AI - https://mfahsold.github.io/montage-ai/
+User-agent: *
+Allow: /
+
+Sitemap: https://mfahsold.github.io/montage-ai/sitemap.xml

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://mfahsold.github.io/montage-ai/
+    about: Check the docs first - your answer might be there!
+  - name: Discussions
+    url: https://github.com/mfahsold/montage-ai/discussions
+    about: Ask questions and share ideas
