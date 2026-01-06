@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-REGISTRY="${REGISTRY:-192.168.1.12:5000}"
+REGISTRY="${REGISTRY:-registry.fluxibri.lan:30500}"
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
 TAG="${TAG:-latest}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"

@@ -1,4 +1,4 @@
 debug = true
-
-[registry."192.168.1.12:5000"]
+[registry."localhost:5000"]
+  http = true
   insecure = true

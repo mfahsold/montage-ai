@@ -22,8 +22,8 @@ labels:
       app.kubernetes.io/version: "1.0.0"
       app.kubernetes.io/managed-by: kustomize
 
-# Image configuration - use local cluster registry
-images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newName: 192.168.1.12:5000/montage-ai
-    newTag: latest
+# Image configuration
+# images:
+#   - name: ghcr.io/mfahsold/montage-ai
+#     newName: montage-ai-registry.montage-ai.svc.cluster.local:5000/montage-ai
+#     newTag: latest

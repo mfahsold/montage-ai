@@ -33,6 +33,8 @@ spec:
       labels:
         app.kubernetes.io/name: montage-ai-web
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
       - name: web-ui
         image: ghcr.io/mfahsold/montage-ai:latest
@@ -44,6 +46,8 @@ spec:
         env:
         - name: FLASK_ENV
           value: "production"
+        - name: PORT
+          value: "5000"
         - name: INPUT_DIR
           value: "/data/input"
         - name: MUSIC_DIR
@@ -87,6 +91,18 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 2
+      - name: redis
+        image: redis:alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: 500m
+          requests:
+            memory: 64Mi
+            cpu: 100m
       volumes:
       - name: input
         persistentVolumeClaim:

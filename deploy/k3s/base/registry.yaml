@@ -18,19 +18,18 @@ spec:
       # Pin to fluxibriserver for reliable access
       nodeSelector:
         kubernetes.io/hostname: codeai-fluxibriserver
-      # Use host network to expose registry directly on node
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
       containers:
         - name: registry
           image: registry:2
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 30500
+            - containerPort: 5000
               protocol: TCP
           env:
-            # Listen on port 30500 directly (hostNetwork exposes this)
             - name: REGISTRY_HTTP_ADDR
-              value: "0.0.0.0:30500"
+              value: :5000
           volumeMounts:
             - name: registry-data
               mountPath: /var/lib/registry
@@ -38,7 +37,6 @@ spec:
         - name: registry-data
           emptyDir: {}
 ---
-# Service points to port 30500 now
 apiVersion: v1
 kind: Service
 metadata:
@@ -50,5 +48,5 @@ spec:
     app: montage-ai-registry
   ports:
     - name: registry
-      port: 30500
-      targetPort: 30500
+      port: 5000
+      targetPort: 5000
