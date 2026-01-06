@@ -6,7 +6,7 @@
 # Configuration
 IMAGE_NAME ?= ghcr.io/mfahsold/montage-ai
 IMAGE_TAG ?= latest
-REGISTRY ?= 10.43.17.166:5000
+REGISTRY ?= 192.168.1.12:5000
 CLUSTER_REGISTRY ?= $(REGISTRY)
 NAMESPACE ?= montage-ai
 PLATFORM ?= linux/amd64
