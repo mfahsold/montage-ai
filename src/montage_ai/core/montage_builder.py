@@ -155,6 +155,11 @@ class MontageFeatures:
     enhance: bool = False
     color_grade: str = "teal_orange"  # Color grading preset from style template
     color_intensity: float = 1.0  # Color grading strength (0.0-1.0)
+    # New features
+    denoise: bool = False  # FFmpeg hqdn3d/nlmeans noise reduction
+    sharpen: bool = False  # Unsharp mask sharpening
+    film_grain: str = "none"  # Film grain preset: none, 35mm, 16mm, 8mm, digital
+    dialogue_duck: bool = False  # Auto-duck music during speech
 
 
 @dataclass
@@ -214,6 +219,10 @@ _LEGACY_ATTR_MAP = {
     "upscale": ("features", "upscale"),
     "enhance": ("features", "enhance"),
     "color_grade": ("features", "color_grade"),
+    "denoise": ("features", "denoise"),
+    "sharpen": ("features", "sharpen"),
+    "film_grain": ("features", "film_grain"),
+    "dialogue_duck": ("features", "dialogue_duck"),
     "editing_instructions": ("creative", "editing_instructions"),
     "semantic_query": ("creative", "semantic_query"),
     "broll_plan": ("creative", "broll_plan"),
@@ -346,6 +355,9 @@ def process_clip_task(
     ctx_upscale: bool,
     ctx_enhance: bool,
     ctx_color_grade: str,
+    ctx_denoise: bool,
+    ctx_sharpen: bool,
+    ctx_film_grain: str,
     enhancer: Any,
     output_profile: Any,
     settings: Any,
@@ -427,7 +439,10 @@ def process_clip_task(
     stabilize_applied = False
     upscale_applied = False
     enhance_applied = False
-    
+    denoise_applied = False
+    sharpen_applied = False
+    film_grain_applied = False
+
     if enhancer:
         if ctx_stabilize:
             stab_path = os.path.join(temp_dir, f"stab_{temp_clip_name}")
@@ -452,6 +467,33 @@ def process_clip_task(
                 current_path = result
                 temp_files.append(enhance_path)
                 enhance_applied = True
+
+        # 2b. Denoise (NEW)
+        if ctx_denoise:
+            denoise_path = os.path.join(temp_dir, f"denoise_{temp_clip_name}")
+            result = enhancer.denoise(current_path, denoise_path)
+            if result != current_path:
+                current_path = result
+                temp_files.append(denoise_path)
+                denoise_applied = True
+
+        # 2c. Sharpen (NEW)
+        if ctx_sharpen:
+            sharpen_path = os.path.join(temp_dir, f"sharpen_{temp_clip_name}")
+            result = enhancer.sharpen(current_path, sharpen_path)
+            if result != current_path:
+                current_path = result
+                temp_files.append(sharpen_path)
+                sharpen_applied = True
+
+        # 2d. Film Grain (NEW)
+        if ctx_film_grain and ctx_film_grain != "none":
+            grain_path = os.path.join(temp_dir, f"grain_{temp_clip_name}")
+            result = enhancer.add_film_grain(current_path, grain_path, preset=ctx_film_grain)
+            if result != current_path:
+                current_path = result
+                temp_files.append(grain_path)
+                film_grain_applied = True
 
     # 3. Normalize (optional)
     final_clip_path = current_path
@@ -573,8 +615,11 @@ def process_clip_task(
         'stabilized': stabilize_applied,
         'upscaled': upscale_applied,
         'enhanced': enhance_applied,
+        'denoised': denoise_applied,
+        'sharpened': sharpen_applied,
+        'film_grain': film_grain_applied,
     }
-    
+
     return final_clip_path, enhancements, temp_files
 
 
@@ -658,6 +703,10 @@ class MontageBuilder:
                 stabilize=self.settings.features.stabilize,
                 upscale=self.settings.features.upscale,
                 enhance=self.settings.features.enhance,
+                denoise=self.settings.features.denoise,
+                sharpen=self.settings.features.sharpen,
+                film_grain=self.settings.features.film_grain,
+                dialogue_duck=self.settings.features.dialogue_duck,
             ),
             creative=MontageCreative(
                 editing_instructions=self.editing_instructions,
@@ -786,7 +835,17 @@ class MontageBuilder:
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         logger.info(f"   🚀 Initialized parallel processor with {max_workers} workers")
 
-        logger.info(f"   🎨 Effects: STABILIZE={self.ctx.stabilize}, UPSCALE={self.ctx.upscale}, ENHANCE={self.ctx.enhance}, COLOR_GRADE={self.ctx.color_grade}")
+        # Log enabled effects
+        effects_list = []
+        if self.ctx.stabilize: effects_list.append("STAB")
+        if self.ctx.upscale: effects_list.append("UPSCALE")
+        if self.ctx.enhance: effects_list.append("ENHANCE")
+        if self.ctx.denoise: effects_list.append("DENOISE")
+        if self.ctx.sharpen: effects_list.append("SHARPEN")
+        if self.ctx.film_grain and self.ctx.film_grain != "none": effects_list.append(f"GRAIN:{self.ctx.film_grain}")
+        if self.ctx.dialogue_duck: effects_list.append("DUCK")
+        effects_str = ", ".join(effects_list) if effects_list else "none"
+        logger.info(f"   🎨 Effects: [{effects_str}] COLOR_GRADE={self.ctx.color_grade}")
 
     def analyze_assets(self):
         """
@@ -992,9 +1051,32 @@ class MontageBuilder:
             logger.info(f"   🔗 Finalizing with Progressive Renderer ({self._progressive_renderer.get_segment_count()} segments)...")
 
             audio_duration = self.ctx.target_duration
+            audio_path = self.ctx.audio_result.music_path
+
+            # Apply dialogue ducking if enabled
+            if self.ctx.dialogue_duck and audio_path:
+                try:
+                    from ..dialogue_ducking import apply_ducking_to_audio
+                    # Use voice track if available (from voice isolation), else try original audio
+                    voice_path = getattr(self.ctx.audio_result, 'voice_path', None) or audio_path
+                    ducked_audio_path = os.path.join(str(self.ctx.temp_dir), "ducked_audio.m4a")
+                    duck_level = self.settings.features.dialogue_duck_level
+                    logger.info(f"   🔇 Applying dialogue ducking ({duck_level}dB)...")
+                    result = apply_ducking_to_audio(
+                        music_path=audio_path,
+                        voice_path=voice_path,
+                        output_path=ducked_audio_path,
+                        duck_level_db=duck_level
+                    )
+                    if result and os.path.exists(result):
+                        audio_path = result
+                        logger.info("   ✅ Dialogue ducking applied")
+                except Exception as e:
+                    logger.warning(f"   ⚠️ Dialogue ducking failed: {e}")
+
             success = self._progressive_renderer.finalize(
                 output_path=self.ctx.output_filename,
-                audio_path=self.ctx.audio_result.music_path,
+                audio_path=audio_path,
                 audio_duration=audio_duration,
                 logo_path=self.ctx.logo_path
             )
@@ -2370,6 +2452,9 @@ class MontageBuilder:
                 ctx_upscale=self.ctx.upscale,
                 ctx_enhance=self.ctx.enhance,
                 ctx_color_grade=self.ctx.color_grade,
+                ctx_denoise=self.ctx.denoise,
+                ctx_sharpen=self.ctx.sharpen,
+                ctx_film_grain=self.ctx.film_grain,
                 enhancer=self._clip_enhancer,
                 output_profile=self.ctx.output_profile,
                 settings=self.settings,
@@ -2428,6 +2513,16 @@ class MontageBuilder:
                         preset=self.ctx.color_grade or "teal_orange",
                         intensity=self.ctx.features.color_intensity,
                     ))
+                # NEW: Record denoise, sharpen, film_grain
+                if enhancements.get('denoised'):
+                    from ..enhancement_tracking import DenoiseParams
+                    decision.record_denoise(DenoiseParams(method="hqdn3d", strength=5))
+                if enhancements.get('sharpened'):
+                    from ..enhancement_tracking import SharpenParams
+                    decision.record_sharpen(SharpenParams(method="unsharp", strength=0.5))
+                if enhancements.get('film_grain'):
+                    from ..clip_enhancement import FilmGrainConfig
+                    decision.record_film_grain(FilmGrainConfig(preset=self.ctx.film_grain))
 
                 meta.enhancement_decision = decision
 

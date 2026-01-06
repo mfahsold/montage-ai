@@ -162,6 +162,17 @@ class FeatureConfig:
     noise_reduction: bool = field(default_factory=lambda: os.environ.get("NOISE_REDUCTION", "false").lower() == "true")
     noise_reduction_strength: int = field(default_factory=lambda: int(os.environ.get("NOISE_REDUCTION_STRENGTH", "100")))
 
+    # Video Enhancement (per-clip)
+    denoise: bool = field(default_factory=lambda: os.environ.get("DENOISE", "false").lower() == "true")
+    sharpen: bool = field(default_factory=lambda: os.environ.get("SHARPEN", "false").lower() == "true")
+
+    # Film Grain Simulation: none, 35mm, 16mm, 8mm, digital
+    film_grain: str = field(default_factory=lambda: os.environ.get("FILM_GRAIN", "none"))
+
+    # Dialogue Ducking: Auto-duck music during speech
+    dialogue_duck: bool = field(default_factory=lambda: os.environ.get("DIALOGUE_DUCK", "false").lower() == "true")
+    dialogue_duck_level: float = field(default_factory=lambda: float(os.environ.get("DIALOGUE_DUCK_LEVEL", "-12")))
+
     # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)
     low_memory_mode: bool = field(default_factory=lambda: os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true")
 
