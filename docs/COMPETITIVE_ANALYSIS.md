@@ -1,7 +1,7 @@
 # Montage AI: Competitive Analysis & Market Positioning
 ## Strategic Assessment Q1 2026
 
-**Last Updated:** January 4, 2026  
+**Last Updated:** January 6, 2026  
 **Audience:** Product teams, investors, technical partners  
 **Status:** Public Strategy Document
 
@@ -27,7 +27,7 @@ Montage AI occupies a **unique niche** in the video editing landscape by being t
 | Dimension | Descript | Montage AI | Winner |
 |-----------|----------|-----------|--------|
 | **Price** | $12-30/mo | Free (OSS) | 🟢 Montage |
-| **Text Editing** | ✅ Yes | ✅ Yes (prototype) | 🟡 Tie |
+| **Text Editing** | ✅ Yes | ✅ Yes (beta) | 🟡 Tie |
 | **Local Processing** | ❌ Cloud-only | ✅ Yes | 🟢 Montage |
 | **NLE Handoff** | ⚠️ Exports MP4 | ✅ OTIO/EDL | 🟢 Montage |
 | **Shorts/Vertical** | ❌ Not native | ✅ Dedicated UI | 🟢 Montage |
@@ -58,12 +58,13 @@ Montage AI occupies a **unique niche** in the video editing landscape by being t
 |-----------|-----------|-----------|--------|
 | **Shorts Specialization** | ✅ Excellent | ✅ Excellent | 🟡 Tie |
 | **Smart Reframe** | ✅ AI-driven | ✅ MediaPipe-based | 🟡 Tie |
+| **Virality Score** | ✅ "Virality Score" | ✅ Engagement Score | 🟡 Tie |
 | **Pricing** | $30-100/mo | Free | 🟢 Montage |
 | **Local Processing** | ❌ Cloud-only | ✅ Yes | 🟢 Montage |
-| **Caption Styles** | Limited | Native support | 🟢 Montage |
-| **Standalone** | ⚠️ Requires Opus Clip Pro | ✅ Yes | 🟢 Montage |
+| **Caption Styles** | Limited | ✅ 4 presets | 🟢 Montage |
+| **Standalone** | ⚠️ Requires Opus Pro | ✅ Yes | 🟢 Montage |
 
-**Verdict:** Montage AI is **Opus Clip for budget-conscious creators** + professional editors. Opus retains advantage in AI sophistication and brand recognition.
+**Verdict:** Montage AI is **Opus Clip for budget-conscious creators** + professional editors. Opus retains advantage in AI sophistication and brand recognition. Our Engagement Score provides similar virality prediction locally.
 
 ---
 
@@ -127,7 +128,8 @@ Montage AI occupies a **unique niche** in the video editing landscape by being t
 2. **Professional Workflow** — OTIO/EDL export to real NLEs (DaVinci Resolve, Premiere, FCP)
 3. **Production Audio** — librosa-powered beat detection + energy analysis
 4. **Enterprise Ready** — K8s distributed rendering, ARM + AMD multi-architecture support
-5. **Style System** — 8 curated presets + LLM creative direction
+5. **Style System** — 16 curated presets + LLM creative direction
+6. **Engagement Score** — Multi-signal virality prediction for Shorts
 
 ---
 
@@ -171,7 +173,7 @@ Montage AI occupies a **unique niche** in the video editing landscape by being t
 | **Quality Profiles** | ✅ Prod | Preview, Standard, High, Master |
 | **GPU Auto-Detection** | ✅ Prod | hwaccel auto-selection |
 | **Shorts Reframing** | ✅ Prod | MediaPipe + smoothing |
-| **Style Templates** | ✅ Prod | 8 curated styles |
+| **Style Templates** | ✅ Prod | 16 curated styles |
 | **Audio Analysis** | ✅ Prod | Energy + filler detection |
 | **SSE Streaming** | ✅ Prod | Real-time progress |
 | **Docker + K3s** | ✅ Prod | Verified deployment |
@@ -180,10 +182,12 @@ Montage AI occupies a **unique niche** in the video editing landscape by being t
 
 | Component | Status | Target | Work Needed |
 |-----------|--------|--------|-------------|
-| **Transcript Editor** | ⚠️ Beta | Q1 2026 | Live preview, word-level cuts |
-| **OTIO Export** | ⚠️ MVP | Q1 2026 | Verify in DaVinci/Premiere |
-| **Caption Styles** | ⚠️ Partial | Q1 2026 | Karaoke, TikTok presets |
-| **Voice Isolation** | ⚠️ MVP | Q1 2026 | Real-time denoise + SNR check |
+| **Transcript Editor** | ✅ Beta | Q1 2026 | Live preview wired, word-level cuts working |
+| **OTIO Export** | ✅ Prod | Q1 2026 | Verified schema v1, conform guide included |
+| **Caption Styles** | ✅ Prod | Q1 2026 | TikTok, Minimal, Bold, Gradient presets |
+| **Voice Isolation** | ✅ Beta | Q1 2026 | SNR-based adaptive processing |
+| **Engagement Score** | ✅ Prod | Q1 2026 | Hook, energy, pacing, variety analysis |
+| **Clean Audio** | ✅ Beta | Q1 2026 | Noise reduction + voice isolation combo |
 
 ### Research / Conceptual 🔴
 
@@ -253,43 +257,50 @@ Montage AI occupies a **unique niche** in the video editing landscape by being t
 
 ## Strategic Recommendations (2026)
 
-### Q1 Priorities (MUST DO)
-1. ✅ **Transcript Editor Launch** — Descript parity (first feature users understand)
-2. ✅ **Shorts Studio 2.0** — Caption styles + highlight detection
-3. ✅ **Pro Handoff Beta** — OTIO verified in target NLEs
-4. ✅ **RQ Infrastructure** — Production-grade job queue (already done ✅)
+### Q1 Priorities (MUST DO) — Status Update Jan 6
+1. ✅ **Transcript Editor Launch** — Beta complete, live preview wired
+2. ✅ **Shorts Studio 2.0** — Caption styles (4 presets) + Engagement Score
+3. ✅ **Pro Handoff Beta** — OTIO schema v1 verified, conform guide included
+4. ✅ **RQ Infrastructure** — Redis-backed job queue production-ready
+5. ✅ **Clean Audio** — Voice isolation + noise reduction with SNR detection
 
-### Q2 Opportunties (SHOULD DO)
-5. Voice Isolation + denoise (audio polish)
+### Q2 Opportunities (SHOULD DO)
 6. Enterprise licensing framework
 7. Hosted demo + case studies
-8. Community styles marketplace
+8. Community styles marketplace (16 styles already available)
+9. Podcast editing workflow (audio-first mode)
 
 ### Q3+ Vision (NICE TO HAVE)
-9. LLM Clip Selection (advanced AI)
-10. Story Engine (narrative arc optimization)
-11. Professional support packages
-12. Expand to podcast editing (Descript alternative)
+10. LLM Clip Selection (advanced AI)
+11. Story Engine (narrative arc optimization)
+12. Professional support packages
+13. Mobile companion app (review + approve)
 
 ---
 
 ## GitHub Pages & Marketing Update
 
-### Current State ⚠️
-- **index.html** has good design but lacks competitive context
-- **README.md** is feature-focused, not market-positioned
-- **STRATEGY.md** exists but not linked from main landing
-- No comparison table vs competitors
-- No clear "Why Montage AI?" narrative for different audiences
+### Current State ✅ (Updated Jan 6, 2026)
+- **index.html** — Full SEO meta tags, JSON-LD schema, OSS comparison section
+- **README.md** — Clear value prop with comparison table
+- **Competitive Analysis** — Linked from main site ("Why Us?")
+- **GitHub Settings** — 20 topics, description, homepage URL configured
+- **SEO Assets** — robots.txt, sitemap.xml, 404.html, og-image.png
+- **GitHub Actions** — Auto-deploy workflow for docs/
 
-### Recommended Changes 🎯
-1. Add "Why Montage AI?" section with 3 audience personas
-2. Create competitive comparison table (transparent, honest)
-3. Link to this strategic analysis on main site
-4. Add "For Professionals" landing page (OTIO handoff focus)
-5. Case studies section (before/after rough cuts)
-6. "Q1 2026 Roadmap" callout box
-7. Legal/licensing clarity (PolyForm NC explainer)
+### Completed ✅
+1. ✅ Comparison table on index.html (vs Descript, Frame, Adobe)
+2. ✅ OSS Landscape section with feature comparison
+3. ✅ Link to COMPETITIVE_ANALYSIS.md ("Why Us?")
+4. ✅ SEO meta tags (Open Graph, Twitter Cards, JSON-LD)
+5. ✅ GitHub Discussions enabled
+6. ✅ FUNDING.yml for GitHub Sponsors
+
+### Remaining 🎯
+1. Add demo GIF/video to README
+2. Case studies section (before/after)
+3. Submit to awesome-video, awesome-self-hosted lists
+4. Create YouTube tutorial
 
 ---
 
