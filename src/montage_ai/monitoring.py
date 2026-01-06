@@ -75,7 +75,7 @@ class Monitor:
         self._log_file = None
         self._tee_enabled = False
         self._mem_thread = None
-        self._mem_interval = float(os.environ.get("MONITOR_MEM_INTERVAL", "5.0"))
+        self._mem_interval = float(os.environ.get("MONITOR_MEM_INTERVAL", "30.0"))
         self._stop_event = threading.Event()
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
@@ -121,7 +121,7 @@ class Monitor:
                     if cgpu_stats:
                         msg += f" | {cgpu_stats}"
                         
-                    logger.info(msg)
+                    logger.debug(msg)
                 except Exception:
                     pass
                 if self._stop_event.wait(self._mem_interval):

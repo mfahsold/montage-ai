@@ -258,6 +258,41 @@ CRITICAL: Respond with JSON only, no markdown, no explanations."""
                 f"energy={energy:.2f}, faces={face_count}, duration={candidate.duration:.1f}s "
                 f"(heuristic_score={candidate.heuristic_score})")
 
+    def _fix_llm_json(self, text: str) -> str:
+        """
+        Fix common LLM JSON issues:
+        - Single quotes → double quotes
+        - Trailing commas
+        - Unquoted property names
+        - Comments
+        """
+        import re
+        # Remove JS-style comments
+        text = re.sub(r'//[^\n]*', '', text)
+        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+        # Replace single quotes with double quotes (careful with apostrophes)
+        text = re.sub(r"'(\w+)':", r'"\1":', text)  # property names
+        text = re.sub(r":\s*'([^']*)'", r': "\1"', text)  # string values
+        # Remove trailing commas before } or ]
+        text = re.sub(r',\s*([}\]])', r'\1', text)
+        return text
+
+    def _extract_json_object(self, text: str) -> Optional[str]:
+        """Extract first complete JSON object from text."""
+        # Find first { and match to closing }
+        start = text.find('{')
+        if start == -1:
+            return None
+        depth = 0
+        for i, c in enumerate(text[start:], start):
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    return text[start:i + 1]
+        return None
+
     def _parse_llm_ranking(
         self,
         llm_response: str,
@@ -284,8 +319,26 @@ CRITICAL: Respond with JSON only, no markdown, no explanations."""
                 response = response[:-3]
             response = response.strip()
 
-            # Parse JSON
-            data = json.loads(response)
+            # Try parsing as-is first
+            data = None
+            try:
+                data = json.loads(response)
+            except json.JSONDecodeError:
+                # Apply fixes for common LLM JSON issues
+                fixed = self._fix_llm_json(response)
+                try:
+                    data = json.loads(fixed)
+                except json.JSONDecodeError:
+                    # Try extracting just the JSON object
+                    extracted = self._extract_json_object(response)
+                    if extracted:
+                        try:
+                            data = json.loads(self._fix_llm_json(extracted))
+                        except json.JSONDecodeError:
+                            pass
+
+            if data is None:
+                raise json.JSONDecodeError("Could not parse JSON after fixes", response, 0)
             rankings_data = data.get('rankings', [])
 
             if not rankings_data:
@@ -314,11 +367,10 @@ CRITICAL: Respond with JSON only, no markdown, no explanations."""
             return rankings
 
         except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse LLM ranking JSON: {e}")
-            logger.debug(f"Response: {llm_response[:200]}...")
+            logger.debug(f"LLM ranking JSON parse failed: {e}")
             return None
         except Exception as e:
-            logger.warning(f"Error parsing LLM ranking: {e}")
+            logger.debug(f"LLM ranking parse error: {e}")
             return None
 
     def get_statistics(self) -> Dict[str, Any]:

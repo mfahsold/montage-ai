@@ -234,7 +234,7 @@ class CreativeDirector:
                 logger.info(f"Generated editing instructions (style: {instructions['style']['name']})")
                 return instructions
             else:
-                logger.warning("LLM response failed validation")
+                logger.info("LLM response incomplete, using defaults")
                 return None
 
         except Exception as e:
@@ -314,7 +314,7 @@ class CreativeDirector:
             response = self._query_google_ai(system_prompt, formatted_prompt)
             if response:
                 return response
-            logger.warning("Google AI failed, attempting fallback...")
+            logger.debug("Google AI unavailable, trying fallback")
 
         # 4. Ollama (Local Fallback)
         return self._query_ollama(system_prompt, formatted_prompt)
@@ -448,7 +448,7 @@ class CreativeDirector:
                         if text.endswith("```"):
                             text = text[:-3]
                         return text.strip()
-                logger.warning("Google AI returned empty response")
+                logger.debug("Google AI returned empty response")
                 return None
             else:
                 error_msg = response.json().get("error", {}).get("message", response.text)
@@ -526,7 +526,7 @@ class CreativeDirector:
                 result = response.json()
                 return result.get("response", "")
             else:
-                logger.warning(f"Ollama API error: {response.status_code}")
+                logger.debug(f"Ollama API error: {response.status_code}")
                 return None
 
         except requests.exceptions.Timeout:
@@ -539,6 +539,55 @@ class CreativeDirector:
         except Exception as e:
             logger.error(f"LLM query error: {e}")
             return None
+
+    def _repair_json(self, text: str) -> str:
+        """
+        Attempt to repair truncated or malformed JSON from LLM responses.
+
+        Handles:
+        - Truncated JSON (missing closing braces/brackets)
+        - Unclosed strings
+        - Single quotes instead of double quotes
+        - Trailing commas
+        - JS-style comments
+        """
+        import re
+
+        # Remove JS-style comments
+        text = re.sub(r'//[^\n]*', '', text)
+        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+
+        # Replace single quotes with double quotes for property names and values
+        text = re.sub(r"'(\w+)':", r'"\1":', text)
+        text = re.sub(r":\s*'([^']*)'", r': "\1"', text)
+
+        # Remove trailing commas before } or ]
+        text = re.sub(r',\s*([}\]])', r'\1', text)
+
+        # Check for unclosed strings by counting non-escaped quotes
+        # Simple approach: count quotes outside of escaped sequences
+        in_string = False
+        last_char = ''
+        for c in text:
+            if c == '"' and last_char != '\\':
+                in_string = not in_string
+            last_char = c
+
+        if in_string:
+            # String is unclosed - close it
+            text = text.rstrip() + '"'
+
+        # Try to fix truncated JSON by closing open structures
+        open_braces = text.count('{') - text.count('}')
+        open_brackets = text.count('[') - text.count(']')
+
+        if open_braces > 0 or open_brackets > 0:
+            # Strip trailing incomplete content
+            text = text.rstrip(',\n\t ')
+            # Close brackets/braces in correct order
+            text += ']' * open_brackets + '}' * open_braces
+
+        return text
 
     def _parse_and_validate(self, llm_response: str) -> Optional[Dict[str, Any]]:
         """
@@ -559,7 +608,11 @@ class CreativeDirector:
                 cleaned_response = cleaned_response[3:]
             if cleaned_response.endswith("```"):
                 cleaned_response = cleaned_response[:-3]
-            
+            cleaned_response = cleaned_response.strip()
+
+            # Try to repair truncated/malformed JSON
+            cleaned_response = self._repair_json(cleaned_response)
+
             # Validate with Pydantic
             output = DirectorOutput.model_validate_json(cleaned_response)
             
@@ -571,14 +624,13 @@ class CreativeDirector:
             return self._merge_defaults(defaults, instructions)
 
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON from LLM: {e}")
-            logger.debug(f"Response: {llm_response[:200]}...")
+            logger.debug(f"LLM returned invalid JSON: {e}")
             return None
         except ValidationError as e:
-            logger.warning(f"LLM response failed schema validation: {e}")
+            logger.debug(f"LLM response failed schema validation: {e}")
             return None
         except Exception as e:
-            logger.error(f"Validation error: {e}")
+            logger.debug(f"LLM validation error: {e}")
             return None
 
     def _merge_defaults(self, defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:

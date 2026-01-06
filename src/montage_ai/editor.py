@@ -529,8 +529,9 @@ def interpret_creative_prompt():
                 effects = EDITING_INSTRUCTIONS.get('effects', {})
                 transitions = EDITING_INSTRUCTIONS.get('transitions', {})
 
-                logger.info(f"   Style Name:       {style.get('name', 'unknown')}")
-                logger.info(f"   Description:      {style.get('description', 'N/A')[:60]}...")
+                logger.info(f"   Style Name:       {style.get('name') or 'unknown'}")
+                desc = style.get('description') or 'N/A'
+                logger.info(f"   Description:      {desc[:60]}...")
                 logger.info(f"   Pacing Speed:     {pacing.get('speed', 'N/A')}")
                 logger.info(f"   Cut Duration:     {pacing.get('min_cut_duration', 'N/A')}-{pacing.get('max_cut_duration', 'N/A')}s")
                 logger.info(f"   Beat Sync:        {pacing.get('beat_sync', 'N/A')}")
@@ -866,16 +867,17 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
         return None
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for python -m montage_ai or python -m montage_ai.editor"""
     # Initialize monitoring
     monitor = None
     if MONITORING_AVAILABLE:
         monitor = init_monitor(JOB_ID, VERBOSE)
         monitor.start_phase("initialization")
-    
+
     # Interpret creative prompt (if provided)
     interpret_creative_prompt()
-    
+
     if monitor:
         monitor.end_phase({"style": EDITING_INSTRUCTIONS.get('style', {}).get('name', CUT_STYLE) if EDITING_INSTRUCTIONS else CUT_STYLE})
 
@@ -898,10 +900,14 @@ if __name__ == "__main__":
         create_montage(i)
         if monitor:
             monitor.end_phase()
-    
+
     # Print final summary
     if monitor:
         monitor.log_resources()
         monitor.print_summary()
         # Export monitoring data as JSON
         monitor.export_json(os.path.join(OUTPUT_DIR, f"monitoring_{JOB_ID}.json"))
+
+
+if __name__ == "__main__":
+    main()
