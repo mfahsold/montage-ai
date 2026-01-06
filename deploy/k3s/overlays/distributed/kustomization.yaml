@@ -20,11 +20,6 @@ resources:
   - ../../base
   - nfs-pvc.yaml
 
-configMapGenerator:
-  - name: montage-builder-patch
-    files:
-      - montage_builder.py
-
 patches:
   # Use JSON 6902 patch to REPLACE volumes (not add)
   - target:
@@ -79,15 +74,6 @@ patches:
             hostPath:
               path: /dev/dri
               type: DirectoryOrCreate
-          - name: code-patch
-            configMap:
-              name: montage-builder-patch
-      - op: add
-        path: /spec/template/spec/containers/0/volumeMounts/-
-        value:
-          name: code-patch
-          mountPath: /app/src/montage_ai/core/montage_builder.py
-          subPath: montage_builder.py
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:

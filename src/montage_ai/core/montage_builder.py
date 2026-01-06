@@ -39,310 +39,22 @@ from ..enhancement_tracking import (
     UpscaleParams,
     ColorGradeParams,
 )
-
-
-# =============================================================================
-# Data Classes
-# =============================================================================
-
-@dataclass
-class AudioAnalysisResult:
-    """Results from audio analysis phase."""
-    music_path: str
-    beat_times: np.ndarray
-    tempo: float
-    energy_times: np.ndarray
-    energy_values: np.ndarray
-    duration: float
-    sections: List[Any] = field(default_factory=list)
-
-    @property
-    def beat_count(self) -> int:
-        """Number of detected beats."""
-        return len(self.beat_times)
-
-    @property
-    def avg_energy(self) -> float:
-        """Average energy level (0-1)."""
-        if len(self.energy_values) > 0:
-            return float(np.mean(self.energy_values))
-        return 0.5
-
-    @property
-    def energy_profile(self) -> str:
-        """Categorize energy as high/mixed/low."""
-        settings = get_settings()
-        avg = self.avg_energy
-        if avg > settings.audio.energy_high_threshold:
-            return "high"
-        elif avg < settings.audio.energy_low_threshold:
-            return "low"
-        return "mixed"
-
-
-@dataclass
-class SceneInfo:
-    """Information about a detected scene."""
-    path: str
-    start: float
-    end: float
-    duration: float
-    meta: Dict[str, Any] = field(default_factory=dict)
-    deep_analysis: Optional[Dict[str, Any]] = None
-
-    @property
-    def midpoint(self) -> float:
-        """Middle point of the scene."""
-        return self.start + (self.duration / 2)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to legacy dictionary format."""
-        return {
-            'path': self.path,
-            'start': self.start,
-            'end': self.end,
-            'duration': self.duration,
-            'meta': self.meta,
-        }
-
-
-@dataclass
-class OutputProfile:
-    """Video output profile configuration."""
-    width: int
-    height: int
-    fps: float
-    codec: str
-    pix_fmt: str
-    profile: Optional[str] = None
-    level: Optional[str] = None
-    bitrate: int = 0
-    orientation: str = "vertical"
-    aspect_ratio: str = "9:16"
-    reason: str = "default"
-
-
-@dataclass
-class ClipMetadata:
-    """Metadata for a placed clip in the timeline."""
-    source_path: str
-    start_time: float
-    duration: float
-    timeline_start: float
-    energy: float
-    action: str
-    shot: str
-    beat_idx: int
-    beats_per_cut: float
-    selection_score: float
-    enhancements: Dict[str, bool] = field(default_factory=dict)
-    enhancement_decision: Optional[Any] = None  # EnhancementDecision for NLE export
-
-
-@dataclass
-class MontagePaths:
-    input_dir: Path
-    music_dir: Path
-    assets_dir: Path
-    output_dir: Path
-    temp_dir: Path
-
-
-@dataclass
-class MontageFeatures:
-    stabilize: bool = False
-    upscale: bool = False
-    enhance: bool = False
-    color_grade: str = "teal_orange"  # Color grading preset from style template
-    color_intensity: float = 1.0  # Color grading strength (0.0-1.0)
-    # New features
-    denoise: bool = False  # FFmpeg hqdn3d/nlmeans noise reduction
-    sharpen: bool = False  # Unsharp mask sharpening
-    film_grain: str = "none"  # Film grain preset: none, 35mm, 16mm, 8mm, digital
-    dialogue_duck: bool = False  # Auto-duck music during speech
-
-
-@dataclass
-class MontageCreative:
-    editing_instructions: Optional[Dict[str, Any]] = None
-    semantic_query: Optional[str] = None
-    broll_plan: Optional[List[Dict[str, Any]]] = None
-    style_params: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class MontageMedia:
-    audio_result: Optional[AudioAnalysisResult] = None
-    all_scenes: List[SceneInfo] = field(default_factory=list)
-    all_scenes_dicts: List[Dict[str, Any]] = field(default_factory=list)
-    video_files: List[str] = field(default_factory=list)
-    output_profile: Optional[OutputProfile] = None
-
-
-@dataclass
-class MontageTimeline:
-    target_duration: float = 0.0
-    current_time: float = 0.0
-    beat_idx: int = 0
-    cut_number: int = 0
-    estimated_total_cuts: int = 0
-    clips_metadata: List[ClipMetadata] = field(default_factory=list)
-    current_pattern: Optional[List[float]] = None
-    pattern_idx: int = 0
-    last_used_path: Optional[str] = None
-    last_shot_type: Optional[str] = None
-    last_clip_end_time: Optional[float] = None
-    enable_xfade: bool = False
-    xfade_duration: float = 0.3
-
-
-@dataclass
-class MontageRender:
-    output_filename: Optional[str] = None
-    render_duration: float = 0.0
-    logo_path: Optional[str] = None
-    exported_files: Optional[Dict[str, str]] = None
-
-
-@dataclass
-class MontageTiming:
-    start_time: float = field(default_factory=time.time)
-
-
-_LEGACY_ATTR_MAP = {
-    "input_dir": ("paths", "input_dir"),
-    "music_dir": ("paths", "music_dir"),
-    "assets_dir": ("paths", "assets_dir"),
-    "output_dir": ("paths", "output_dir"),
-    "temp_dir": ("paths", "temp_dir"),
-    "stabilize": ("features", "stabilize"),
-    "upscale": ("features", "upscale"),
-    "enhance": ("features", "enhance"),
-    "color_grade": ("features", "color_grade"),
-    "denoise": ("features", "denoise"),
-    "sharpen": ("features", "sharpen"),
-    "film_grain": ("features", "film_grain"),
-    "dialogue_duck": ("features", "dialogue_duck"),
-    "editing_instructions": ("creative", "editing_instructions"),
-    "semantic_query": ("creative", "semantic_query"),
-    "broll_plan": ("creative", "broll_plan"),
-    "style_params": ("creative", "style_params"),
-    "audio_result": ("media", "audio_result"),
-    "all_scenes": ("media", "all_scenes"),
-    "all_scenes_dicts": ("media", "all_scenes_dicts"),
-    "video_files": ("media", "video_files"),
-    "output_profile": ("media", "output_profile"),
-    "target_duration": ("timeline", "target_duration"),
-    "current_time": ("timeline", "current_time"),
-    "beat_idx": ("timeline", "beat_idx"),
-    "cut_number": ("timeline", "cut_number"),
-    "estimated_total_cuts": ("timeline", "estimated_total_cuts"),
-    "clips_metadata": ("timeline", "clips_metadata"),
-    "current_pattern": ("timeline", "current_pattern"),
-    "pattern_idx": ("timeline", "pattern_idx"),
-    "last_used_path": ("timeline", "last_used_path"),
-    "last_shot_type": ("timeline", "last_shot_type"),
-    "last_clip_end_time": ("timeline", "last_clip_end_time"),
-    "enable_xfade": ("timeline", "enable_xfade"),
-    "xfade_duration": ("timeline", "xfade_duration"),
-    "output_filename": ("render", "output_filename"),
-    "render_duration": ("render", "render_duration"),
-    "logo_path": ("render", "logo_path"),
-    "exported_files": ("render", "exported_files"),
-    "start_time": ("timing", "start_time"),
-}
-
-
-@dataclass
-class MontageContext:
-    """
-    Encapsulates all state for a montage job.
-
-    Groups related state into cohesive sub-objects, while preserving legacy
-    attribute access for a gradual migration.
-    """
-    job_id: str
-    variant_id: int
-    settings: Settings
-    paths: MontagePaths
-    features: MontageFeatures = field(default_factory=MontageFeatures)
-    creative: MontageCreative = field(default_factory=MontageCreative)
-    media: MontageMedia = field(default_factory=MontageMedia)
-    timeline: MontageTimeline = field(default_factory=MontageTimeline)
-    render: MontageRender = field(default_factory=MontageRender)
-    timing: MontageTiming = field(default_factory=MontageTiming)
-
-    def __getattr__(self, name: str):
-        mapping = _LEGACY_ATTR_MAP.get(name)
-        if mapping:
-            group, field_name = mapping
-            return getattr(getattr(self, group), field_name)
-        raise AttributeError(f"{type(self).__name__} has no attribute {name!r}")
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        mapping = _LEGACY_ATTR_MAP.get(name)
-        if mapping:
-            group, field_name = mapping
-            if group in self.__dict__:
-                setattr(getattr(self, group), field_name, value)
-                if name in self.__dict__:
-                    object.__delattr__(self, name)
-                return
-        object.__setattr__(self, name, value)
-
-    def reset_timeline_state(self):
-        """Reset timeline state for a fresh pass."""
-        self.timeline.current_time = 0.0
-        self.timeline.beat_idx = 0
-        self.timeline.cut_number = 0
-        self.timeline.clips_metadata = []
-        self.timeline.current_pattern = None
-        self.timeline.pattern_idx = 0
-        self.timeline.last_used_path = None
-        self.timeline.last_shot_type = None
-        self.timeline.last_clip_end_time = None
-
-    def get_story_position(self) -> float:
-        """Get current position in story arc (0-1)."""
-        if self.timeline.target_duration > 0:
-            return self.timeline.current_time / self.timeline.target_duration
-        return 0.0
-
-    def get_story_phase(self) -> str:
-        """Get current story phase based on position."""
-        return self.map_position_to_phase(self.get_story_position())
-
-    @staticmethod
-    def map_position_to_phase(position: float) -> str:
-        """Map normalized timeline position (0.0-1.0) to story phase."""
-        if position < 0.15:
-            return "intro"
-        elif position < 0.40:
-            return "build"
-        elif position < 0.70:
-            return "climax"
-        elif position < 0.90:
-            return "sustain"
-        return "outro"
-
-    def elapsed_time(self) -> float:
-        """Time since job started."""
-        return time.time() - self.timing.start_time
-
-
-@dataclass
-class MontageResult:
-    """Result of a montage build operation."""
-    success: bool
-    output_path: Optional[str]
-    duration: float
-    cut_count: int
-    render_time: float
-    file_size_mb: float = 0.0
-    error: Optional[str] = None
-    stats: Dict[str, Any] = field(default_factory=dict)
-    project_package_path: Optional[str] = None
-
+from .models import EditingInstructions
+from .context import (
+    AudioAnalysisResult,
+    SceneInfo,
+    OutputProfile,
+    ClipMetadata,
+    MontagePaths,
+    MontageFeatures,
+    MontageCreative,
+    MontageMedia,
+    MontageTimeline,
+    MontageRender,
+    MontageTiming,
+    MontageContext,
+    MontageResult,
+)
 
 
 def process_clip_task(
@@ -663,11 +375,19 @@ class MontageBuilder:
         self.settings = settings or get_settings()
         self.variant_id = variant_id
         self.rng = random.Random(42 + variant_id)  # Seeded RNG for determinism
-        self.editing_instructions = editing_instructions
+        
+        # Convert dict to strongly-typed model if necessary
+        if isinstance(editing_instructions, dict):
+            self.editing_instructions = EditingInstructions(**editing_instructions)
+        else:
+            self.editing_instructions = editing_instructions
+            
         self.progress_callback = progress_callback
 
         # Initialize context
         self.ctx = self._create_context()
+        if self.editing_instructions:
+            self.ctx.creative.editing_instructions = self.editing_instructions
         if job_id:
             self.ctx.job_id = job_id
 
@@ -685,6 +405,16 @@ class MontageBuilder:
         # Parallel processing
         self._executor: Optional[ThreadPoolExecutor] = None
         self._pending_futures: List[Future] = []
+        
+        # New Engines
+        from .analysis_engine import AssetAnalyzer
+        from .render_engine import RenderEngine
+        from .pacing_engine import PacingEngine
+        from .selection_engine import SelectionEngine
+        self._analyzer = AssetAnalyzer(self.ctx)
+        self._render_engine = RenderEngine(self.ctx)
+        self._pacing_engine = PacingEngine(self.ctx)
+        self._selection_engine = SelectionEngine(self.ctx)
 
     def _create_context(self) -> MontageContext:
         """Create a fresh MontageContext from settings."""
@@ -756,7 +486,7 @@ class MontageBuilder:
             self.plan_montage()
 
             # Phase 4: Enhance (if enabled)
-            if self.ctx.stabilize or self.ctx.upscale or self.ctx.enhance:
+            if self.ctx.features.stabilize or self.ctx.features.upscale or self.ctx.features.enhance:
                 self.enhance_assets()
 
             # Phase 5: Render
@@ -774,13 +504,13 @@ class MontageBuilder:
             # Build result
             return MontageResult(
                 success=True,
-                output_path=self.ctx.output_filename,
-                duration=self.ctx.current_time,
-                cut_count=self.ctx.cut_number,
-                render_time=self.ctx.render_duration,
+                output_path=self.ctx.render.output_filename,
+                duration=self.ctx.timeline.current_time,
+                cut_count=self.ctx.timeline.cut_number,
+                render_time=self.ctx.render.render_duration,
                 file_size_mb=self._get_output_file_size(),
                 stats=self._collect_stats(),
-                project_package_path=self.ctx.exported_files.get('package') if self.ctx.exported_files else None,
+                project_package_path=self.ctx.render.exported_files.get('package') if self.ctx.render.exported_files else None,
             )
 
         except Exception as e:
@@ -812,7 +542,7 @@ class MontageBuilder:
         logger.info("   📁 Setting up workspace...")
 
         # Ensure temp directory exists
-        os.makedirs(str(self.ctx.temp_dir), exist_ok=True)
+        os.makedirs(str(self.ctx.paths.temp_dir), exist_ok=True)
 
         # Initialize resource manager and log status
         self._resource_manager = get_resource_manager(refresh=True)
@@ -837,15 +567,15 @@ class MontageBuilder:
 
         # Log enabled effects
         effects_list = []
-        if self.ctx.stabilize: effects_list.append("STAB")
-        if self.ctx.upscale: effects_list.append("UPSCALE")
-        if self.ctx.enhance: effects_list.append("ENHANCE")
-        if self.ctx.denoise: effects_list.append("DENOISE")
-        if self.ctx.sharpen: effects_list.append("SHARPEN")
-        if self.ctx.film_grain and self.ctx.film_grain != "none": effects_list.append(f"GRAIN:{self.ctx.film_grain}")
-        if self.ctx.dialogue_duck: effects_list.append("DUCK")
+        if self.ctx.features.stabilize: effects_list.append("STAB")
+        if self.ctx.features.upscale: effects_list.append("UPSCALE")
+        if self.ctx.features.enhance: effects_list.append("ENHANCE")
+        if self.ctx.features.denoise: effects_list.append("DENOISE")
+        if self.ctx.features.sharpen: effects_list.append("SHARPEN")
+        if self.ctx.features.film_grain and self.ctx.features.film_grain != "none": effects_list.append(f"GRAIN:{self.ctx.features.film_grain}")
+        if self.ctx.features.dialogue_duck: effects_list.append("DUCK")
         effects_str = ", ".join(effects_list) if effects_list else "none"
-        logger.info(f"   🎨 Effects: [{effects_str}] COLOR_GRADE={self.ctx.color_grade}")
+        logger.info(f"   🎨 Effects: [{effects_str}] COLOR_GRADE={self.ctx.features.color_grade}")
 
     def analyze_assets(self):
         """
@@ -869,17 +599,17 @@ class MontageBuilder:
         # OPTIMIZATION: Start proxy generation in background
         # This ensures proxies are ready for NLE export later
         proxy_futures = []
-        if self.ctx.video_files:
+        if self.ctx.media.video_files:
             logger.info("   🎞️ Checking proxies...")
             # Try to store proxies next to input for NLE linking standard
-            proxy_dir = self.ctx.input_dir / "Proxies"
+            proxy_dir = self.ctx.paths.input_dir / "Proxies"
             try:
                 proxy_dir.mkdir(parents=True, exist_ok=True)
             except (PermissionError, OSError):
-                proxy_dir = self.ctx.temp_dir / "proxies"
+                proxy_dir = self.ctx.paths.temp_dir / "proxies"
             
             generator = ProxyGenerator(proxy_dir)
-            for video_path in self.ctx.video_files:
+            for video_path in self.ctx.media.video_files:
                 proxy_futures.append(
                     self._executor.submit(generator.ensure_proxy, video_path)
                 )
@@ -890,7 +620,7 @@ class MontageBuilder:
 
         if self.settings.features.voice_isolation:
             # Get music file first
-            music_files = self._get_files(self.ctx.music_dir, ('.mp3', '.wav'))
+            music_files = self._get_files(self.ctx.paths.music_dir, ('.mp3', '.wav'))
             if music_files:
                 music_index = (self.variant_id - 1) % len(music_files)
                 music_path = music_files[music_index]
@@ -946,14 +676,14 @@ class MontageBuilder:
         if not style_label:
             style_label = "dynamic"
 
-        self.ctx.output_filename = os.path.join(
-            str(self.ctx.output_dir),
+        self.ctx.render.output_filename = os.path.join(
+            str(self.ctx.paths.output_dir),
             f"gallery_montage_{self.ctx.job_id}_v{self.variant_id}_{style_label}.mp4"
         )
 
         # Check for logo
-        logo_files = self._get_files(self.ctx.assets_dir, ('.png', '.jpg'))
-        self.ctx.logo_path = logo_files[0] if logo_files else None
+        logo_files = self._get_files(self.ctx.paths.assets_dir, ('.png', '.jpg'))
+        self.ctx.render.logo_path = logo_files[0] if logo_files else None
 
     def plan_montage(self):
         """
@@ -974,7 +704,7 @@ class MontageBuilder:
         self._init_audio_duration()
 
         # AI B-Roll Planning (Epic 2)
-        if self.ctx.editing_instructions and "script" in self.ctx.editing_instructions:
+        if self.ctx.creative.editing_instructions and "script" in self.ctx.creative.editing_instructions:
             self._plan_broll_sequence()
 
         # Initialize crossfade settings
@@ -984,25 +714,25 @@ class MontageBuilder:
         self._init_progressive_renderer()
 
         # Estimate total cuts for progress tracking
-        tempo = self.ctx.audio_result.tempo
+        tempo = self.ctx.media.audio_result.tempo
         avg_beats_per_cut = 4.0
-        self.ctx.estimated_total_cuts = int(
-            (self.ctx.target_duration * tempo / 60) / avg_beats_per_cut
+        self.ctx.timeline.estimated_total_cuts = int(
+            (self.ctx.timeline.target_duration * tempo / 60) / avg_beats_per_cut
         )
 
         # Determine output filename
         style_name = "dynamic"
-        if self.ctx.editing_instructions is not None:
-            style_name = self.ctx.editing_instructions.get('style', {}).get('name', 'dynamic')
+        if self.ctx.creative.editing_instructions is not None:
+            style_name = self.ctx.creative.editing_instructions.get('style', {}).get('name', 'dynamic')
         
         # Load style params
         try:
             template = get_style_template(style_name)
-            self.ctx.style_params = template.get("params", {})
+            self.ctx.creative.style_params = template.get("params", {})
             logger.info(f"   🎨 Loaded style '{style_name}' params")
         except Exception as e:
             logger.warning(f"   ⚠️ Failed to load style '{style_name}': {e}")
-            self.ctx.style_params = {}
+            self.ctx.creative.style_params = {}
 
         self._setup_output_paths(style_name)
 
@@ -1032,66 +762,10 @@ class MontageBuilder:
     def render_output(self):
         """
         Phase 5: Render final output.
-
-        - Finalize progressive renderer (or legacy path)
-        - Add audio
-        - Add logo overlay (if present)
         """
-        logger.info("\n   🎬 Rendering output...")
-
-        if self.settings.processing.should_skip_output(self.ctx.output_filename):
-            logger.info(f"   ♻️ Output exists, skipping render: {os.path.basename(self.ctx.output_filename)}")
-            self.ctx.render_duration = 0.0
-            return
-
-        render_start_time = time.time()
-
-        if self._progressive_renderer:
-            # Progressive path: finalize with FFmpeg
-            logger.info(f"   🔗 Finalizing with Progressive Renderer ({self._progressive_renderer.get_segment_count()} segments)...")
-
-            audio_duration = self.ctx.target_duration
-            audio_path = self.ctx.audio_result.music_path
-
-            # Apply dialogue ducking if enabled
-            if self.ctx.dialogue_duck and audio_path:
-                try:
-                    from ..dialogue_ducking import apply_ducking_to_audio
-                    # Use voice track if available (from voice isolation), else try original audio
-                    voice_path = getattr(self.ctx.audio_result, 'voice_path', None) or audio_path
-                    ducked_audio_path = os.path.join(str(self.ctx.temp_dir), "ducked_audio.m4a")
-                    duck_level = self.settings.features.dialogue_duck_level
-                    logger.info(f"   🔇 Applying dialogue ducking ({duck_level}dB)...")
-                    result = apply_ducking_to_audio(
-                        music_path=audio_path,
-                        voice_path=voice_path,
-                        output_path=ducked_audio_path,
-                        duck_level_db=duck_level
-                    )
-                    if result and os.path.exists(result):
-                        audio_path = result
-                        logger.info("   ✅ Dialogue ducking applied")
-                except Exception as e:
-                    logger.warning(f"   ⚠️ Dialogue ducking failed: {e}")
-
-            success = self._progressive_renderer.finalize(
-                output_path=self.ctx.output_filename,
-                audio_path=audio_path,
-                audio_duration=audio_duration,
-                logo_path=self.ctx.logo_path
-            )
-
-            if success:
-                method_str = "xfade" if self.ctx.enable_xfade else "-c copy"
-                self.ctx.render_duration = time.time() - render_start_time
-                logger.info(f"   ✅ Final video rendered via FFmpeg ({method_str}) in {self.ctx.render_duration:.1f}s")
-                if self.ctx.logo_path:
-                    logger.info(f"   🏷️ Logo overlay: {os.path.basename(self.ctx.logo_path)}")
-            else:
-                raise RuntimeError("Progressive render failed")
-        else:
-            # Legacy path would go here
-            raise NotImplementedError("Legacy MoviePy rendering not implemented in MontageBuilder")
+        # Pass renderer to engine (if not already managed there in future)
+        self._render_engine.set_renderer(self._progressive_renderer)
+        self._render_engine.render_output()
 
     def cleanup(self):
         """
@@ -1111,15 +785,14 @@ class MontageBuilder:
         if self._executor:
             self._executor.shutdown(wait=False)
 
-        # Cleanup progressive renderer resources
+        # Cleanup via engine
+        self._render_engine.cleanup()
         if self._progressive_renderer:
-            try:
-                self._progressive_renderer.cleanup()
-            except Exception as e:
-                logger.warning(f"   ⚠️ Progressive renderer cleanup failed: {e}")
+             # Just in case engine didn't catch it
+             pass
 
         # Cleanup temp directory
-        temp_dir = str(self.ctx.temp_dir)
+        temp_dir = str(self.ctx.paths.temp_dir)
         if os.path.isdir(temp_dir):
             for f in os.listdir(temp_dir):
                 if f.startswith(f"clip_{self.ctx.job_id}") or f.startswith("temp_clip_"):
@@ -1143,10 +816,10 @@ class MontageBuilder:
 
     def _apply_creative_director_effects(self):
         """Apply Creative Director effect overrides."""
-        if self.ctx.editing_instructions is None:
+        if self.ctx.creative.editing_instructions is None:
             return
 
-        effects = self.ctx.editing_instructions.get('effects', {})
+        effects = self.ctx.creative.editing_instructions.get('effects', {})
 
         # ENV takes precedence over style template
         env_stabilize = self.settings.features.stabilize
@@ -1160,35 +833,35 @@ class MontageBuilder:
             env_upscale = False
             env_enhance = False
             # Also override instructions
-            if 'effects' in self.ctx.editing_instructions:
-                self.ctx.editing_instructions['effects']['stabilization'] = False
-                self.ctx.editing_instructions['effects']['upscale'] = False
-                self.ctx.editing_instructions['effects']['sharpness_boost'] = False
+            if 'effects' in self.ctx.creative.editing_instructions:
+                self.ctx.creative.editing_instructions['effects']['stabilization'] = False
+                self.ctx.creative.editing_instructions['effects']['upscale'] = False
+                self.ctx.creative.editing_instructions['effects']['sharpness_boost'] = False
 
         if not env_stabilize and 'stabilization' in effects:
-            self.ctx.stabilize = effects['stabilization']
+            self.ctx.features.stabilize = effects['stabilization']
         else:
-            self.ctx.stabilize = env_stabilize
+            self.ctx.features.stabilize = env_stabilize
 
         if not env_upscale and 'upscale' in effects:
-            self.ctx.upscale = effects['upscale']
+            self.ctx.features.upscale = effects['upscale']
         else:
-            self.ctx.upscale = env_upscale
+            self.ctx.features.upscale = env_upscale
 
         if not env_enhance and 'sharpness_boost' in effects:
-            self.ctx.enhance = effects['sharpness_boost']
+            self.ctx.features.enhance = effects['sharpness_boost']
         else:
-            self.ctx.enhance = env_enhance
+            self.ctx.features.enhance = env_enhance
 
         # Parse color_grading from style template (NEW: replaces hardcoded Teal & Orange)
         # ENV takes priority, then style template effects, then default
         env_color_grade = os.environ.get('COLOR_GRADING', '')
         if env_color_grade:
-            self.ctx.color_grade = env_color_grade
+            self.ctx.features.color_grade = env_color_grade
         elif 'color_grading' in effects:
-            self.ctx.color_grade = effects['color_grading']
+            self.ctx.features.color_grade = effects['color_grading']
         else:
-            self.ctx.color_grade = "teal_orange"  # Legacy default
+            self.ctx.features.color_grade = "teal_orange"  # Legacy default
 
         # Parse color_intensity (0.0-1.0, defaults to 1.0)
         env_color_intensity = os.environ.get('COLOR_INTENSITY', '')
@@ -1203,12 +876,12 @@ class MontageBuilder:
         # Extract semantic query for Phase 2: Semantic Storytelling
         # Priority: explicit semantic_query > content_focus > ENV
         env_semantic = os.environ.get('SEMANTIC_QUERY', '')
-        if 'semantic_query' in self.ctx.editing_instructions:
-            self.ctx.semantic_query = self.ctx.editing_instructions['semantic_query']
-        elif 'content_focus' in self.ctx.editing_instructions:
-            self.ctx.semantic_query = self.ctx.editing_instructions['content_focus']
-        elif 'style' in self.ctx.editing_instructions:
-            style = self.ctx.editing_instructions['style']
+        if 'semantic_query' in self.ctx.creative.editing_instructions:
+            self.ctx.creative.semantic_query = self.ctx.creative.editing_instructions['semantic_query']
+        elif 'content_focus' in self.ctx.creative.editing_instructions:
+            self.ctx.creative.semantic_query = self.ctx.creative.editing_instructions['content_focus']
+        elif 'style' in self.ctx.creative.editing_instructions:
+            style = self.ctx.creative.editing_instructions['style']
             # Combine mood, theme, or content hints
             semantic_parts = []
             if style.get('mood'):
@@ -1218,9 +891,9 @@ class MontageBuilder:
             if style.get('content'):
                 semantic_parts.append(style['content'])
             if semantic_parts:
-                self.ctx.semantic_query = ' '.join(semantic_parts)
-        if env_semantic and not self.ctx.semantic_query:
-            self.ctx.semantic_query = env_semantic
+                self.ctx.creative.semantic_query = ' '.join(semantic_parts)
+        if env_semantic and not self.ctx.creative.semantic_query:
+            self.ctx.creative.semantic_query = env_semantic
 
     def _plan_broll_sequence(self):
         """
@@ -1232,14 +905,14 @@ class MontageBuilder:
         try:
             from ..broll_planner import plan_broll
             
-            script = self.ctx.editing_instructions["script"]
+            script = self.ctx.creative.editing_instructions["script"]
             logger.info(f"   📜 Planning B-Roll for script: {script[:50]}...")
             
             # Plan B-Roll (find suggestions)
             # We use input_dir from context
             plan = plan_broll(
                 script, 
-                input_dir=str(self.ctx.input_dir),
+                input_dir=str(self.ctx.paths.input_dir),
                 top_k=3,
                 analyze_first=True
             )
@@ -1247,7 +920,7 @@ class MontageBuilder:
             # Estimate timing
             # Simple heuristic: Distribute segments evenly or by word count
             total_words = len(script.split())
-            duration_per_word = self.ctx.target_duration / max(1, total_words)
+            duration_per_word = self.ctx.timeline.target_duration / max(1, total_words)
             
             current_time = 0.0
             for segment in plan:
@@ -1265,12 +938,12 @@ class MontageBuilder:
                 segment["end_time"] = current_time + seg_duration
                 current_time += seg_duration
                 
-            self.ctx.broll_plan = plan
+            self.ctx.creative.broll_plan = plan
             logger.info(f"   ✅ B-Roll Plan created with {len(plan)} segments")
             
         except Exception as e:
             logger.warning(f"   ⚠️ B-Roll planning failed: {e}")
-            self.ctx.broll_plan = None
+            self.ctx.creative.broll_plan = None
 
     def _init_monitor(self):
         """Initialize monitoring system."""
@@ -1287,8 +960,8 @@ class MontageBuilder:
         try:
             from ..clip_selector import IntelligentClipSelector
             style = "dynamic"
-            if self.ctx.editing_instructions is not None:
-                style = self.ctx.editing_instructions.get('style', {}).get('template', 'dynamic')
+            if self.ctx.creative.editing_instructions is not None:
+                style = self.ctx.creative.editing_instructions.get('style', {}).get('template', 'dynamic')
             self._intelligent_selector = IntelligentClipSelector(style=style)
             logger.info(f"   🧠 Intelligent Clip Selector initialized (style={style})")
         except ImportError:
@@ -1298,237 +971,37 @@ class MontageBuilder:
             self._intelligent_selector = None
 
     def _analyze_music(self, isolated_audio_path: Optional[str] = None):
-        """Load and analyze music file with caching support.
-
-        Args:
-            isolated_audio_path: Pre-isolated audio path from async processing.
-                                 If provided, skips voice isolation step.
-        """
-        from ..audio_analysis import get_beat_times, analyze_music_energy, detect_music_sections
-
-        # Get music files
-        music_files = self._get_files(self.ctx.music_dir, ('.mp3', '.wav'))
-        if not music_files:
-            raise ValueError("No music found in music directory")
-
-        # Select music file (rotate through variants)
-        music_index = (self.variant_id - 1) % len(music_files)
-        music_path = music_files[music_index]
-
-        # Allow specific track override from editing instructions
-        if self.ctx.editing_instructions and 'music_track' in self.ctx.editing_instructions:
-            requested_track = self.ctx.editing_instructions['music_track']
-            # Find exact match or filename match
-            match = None
-            for mf in music_files:
-                if mf == requested_track or os.path.basename(mf) == requested_track:
-                    match = mf
-                    break
-            
-            if match:
-                logger.info(f"   🎵 Using requested track: {os.path.basename(match)}")
-                music_path = match
-            else:
-                logger.warning(f"   ⚠️ Requested track '{requested_track}' not found, falling back to variant default")
-
-        # Use pre-isolated audio if provided (from async processing)
-        # Otherwise apply voice isolation synchronously if enabled
-        if isolated_audio_path:
-            music_path = isolated_audio_path
-        elif self.settings.features.voice_isolation:
-            music_path = self._apply_voice_isolation(music_path)
-
-        # Apply noise reduction if enabled (can stack with voice_isolation or run standalone)
-        if self.settings.features.noise_reduction:
-            music_path = self._apply_noise_reduction(music_path)
-
-        # Try cache first
-        cache = get_analysis_cache()
-        cached = cache.load_audio(music_path)
-
-        if cached:
-            # Cache hit - use cached analysis
-            logger.info("   ⚡ Using cached audio analysis")
-            # Note: Cached object might not have sections if it's old, so we might need to re-detect
-            # For now, we'll just re-detect sections from energy profile if missing
-            
-            energy_profile = analyze_music_energy(music_path, verbose=False) # Lightweight if cached? No, analyze_music_energy does work.
-            # Actually, we can reconstruct EnergyProfile from cached data
-            from ..audio_analysis import EnergyProfile
-            ep = EnergyProfile(
-                times=np.array(cached.energy_times),
-                rms=np.array(cached.energy_values),
-                sample_rate=22050, # Assumption
-                hop_length=512 # Assumption
-            )
-            sections = detect_music_sections(ep)
-
-            self.ctx.audio_result = AudioAnalysisResult(
-                music_path=music_path,
-                beat_times=np.array(cached.beat_times),
-                tempo=cached.tempo,
-                energy_times=np.array(cached.energy_times),
-                energy_values=np.array(cached.energy_values),
-                duration=cached.duration,
-                sections=sections
-            )
-        else:
-            # Cache miss - analyze and cache
-            beat_info = get_beat_times(music_path, verbose=self.settings.features.verbose)
-            energy_profile = analyze_music_energy(music_path, verbose=self.settings.features.verbose)
-            sections = detect_music_sections(energy_profile)
-
-            # Store in context
-            self.ctx.audio_result = AudioAnalysisResult(
-                music_path=music_path,
-                beat_times=beat_info.beat_times,
-                tempo=beat_info.tempo,
-                energy_times=energy_profile.times,
-                energy_values=energy_profile.rms,
-                duration=beat_info.duration,
-                sections=sections
-            )
-
-            # Save to cache
-            cache.save_audio(music_path, beat_info, energy_profile)
-
-        if self._monitor:
+        """Load and analyze music file with caching support."""
+        # Delegate to new Analyzer engine
+        self._analyzer.analyze_music(isolated_audio_path)
+        
+        # Monitor logging (kept here for now, could move to engine later)
+        if self._monitor and self.ctx.media.audio_result:
             self._monitor.log_beat_analysis(
-                music_path,
-                self.ctx.audio_result.tempo,
-                len(self.ctx.audio_result.beat_times),
-                self.ctx.audio_result.energy_profile
+                self.ctx.media.audio_result.music_path,
+                self.ctx.media.audio_result.tempo,
+                len(self.ctx.media.audio_result.beat_times),
+                self.ctx.media.audio_result.energy_profile
             )
+
+    def _apply_voice_isolation(self, audio_path: str) -> str:
+        """Deprecated: Use AssetAnalyzer._apply_voice_isolation"""
+        return self._analyzer._apply_voice_isolation(audio_path)
+        
+    def _apply_noise_reduction(self, audio_path: str) -> str:
+        """Deprecated: Use AssetAnalyzer._apply_noise_reduction"""
+        return self._analyzer._apply_noise_reduction(audio_path)
 
     def _detect_scenes(self):
-        """Detect scenes in all video files with caching and parallel processing."""
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        from ..scene_analysis import detect_scenes, analyze_scene_content, clear_histogram_cache
-        from .analysis_cache import get_analysis_cache
-
-        # Clear histogram cache from previous runs
-        clear_histogram_cache()
-
-        # Get video files
-        video_files = self._get_files(self.ctx.input_dir, ('.mp4', '.mov'))
-        if not video_files:
-            raise ValueError("No videos found in input directory")
-
-        self.ctx.video_files = video_files
-        self.ctx.all_scenes = []
-        self.ctx.all_scenes_dicts = []
-
-        # Scene detection threshold (from scenedetect defaults)
-        threshold = 30.0
-        cache = get_analysis_cache()
-        cache_hits = 0
-        uncached_videos = []
-
-        # First pass: check cache and collect uncached videos
-        cached_scenes = {}  # path -> scenes list
-        for v_path in video_files:
-            cached = cache.load_scenes(v_path, threshold)
-            if cached:
-                cache_hits += 1
-                cached_scenes[v_path] = [(s["start"], s["end"]) for s in cached.scenes]
-            else:
-                uncached_videos.append(v_path)
-
-        # Parallel scene detection for uncached videos
-        detected_scenes = {}  # path -> scenes list
-
-        def detect_video_scenes(v_path: str):
-            """Detect scenes in a single video (thread-safe)."""
-            try:
-                scenes = detect_scenes(v_path, threshold=threshold)
-                return v_path, scenes
-            except Exception as e:
-                logger.warning(f"   ⚠️ Scene detection failed for {v_path}: {e}")
-                return v_path, []
-
-        if uncached_videos:
-            # Use ThreadPoolExecutor for parallel I/O
-            # Use more workers based on available CPU cores for better cluster utilization
-            optimal_workers = self._resource_manager.get_optimal_threads()
-            adaptive_workers = self.settings.processing.get_adaptive_parallel_jobs(self.settings.features.low_memory_mode)
-            max_workers = min(optimal_workers, adaptive_workers, len(uncached_videos))
-            logger.info(f"   🚀 Parallel scene detection ({len(uncached_videos)} videos, {max_workers} workers)")
-            
-            # Progress tracking setup
-            total_tasks = len(uncached_videos)
-            completed_tasks = 0
-
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {executor.submit(detect_video_scenes, v): v for v in uncached_videos}
-
-                for future in as_completed(futures):
-                    v_path, scenes = future.result()
-                    detected_scenes[v_path] = scenes
-                    # Save to cache
-                    cache.save_scenes(v_path, threshold, scenes)
-                    
-                    # Update progress
-                    completed_tasks += 1
-                    if self.progress_callback:
-                        # Map 0-100% of this phase to 10-40% of overall job
-                        local_pct = int((completed_tasks / total_tasks) * 100)
-                        # We arbitrarily map "Scene Detection" to the 20-50% range of the whole job
-                        # But simpler is just to report "Analyzing X/Y"
-                        msg = f"Detecting scenes in {os.path.basename(v_path)} ({completed_tasks}/{total_tasks})"
-                        self.progress_callback(local_pct, msg)
-
-        # Combine cached and detected scenes
-        all_video_scenes = {**cached_scenes, **detected_scenes}
-
-        # Build scene list
-        for v_path in video_files:
-            scenes = all_video_scenes.get(v_path, [])
-            for start, end in scenes:
-                duration = end - start
-                if duration > 1.0:  # Ignore tiny clips
-                    scene_info = SceneInfo(
-                        path=v_path,
-                        start=start,
-                        end=end,
-                        duration=duration,
-                    )
-                    self.ctx.all_scenes.append(scene_info)
-
-        if cache_hits > 0:
-            logger.info(f"   ⚡ Used cached scene detection for {cache_hits}/{len(video_files)} videos")
-
-        # Parallel AI scene analysis (limit to first 20 for speed)
-        logger.info("   🤖 AI Director is watching footage...")
-        scenes_to_analyze = self.ctx.all_scenes[:20]
-
-        def analyze_scene(scene):
-            """Analyze a single scene (thread-safe)."""
-            try:
-                meta = analyze_scene_content(scene.path, scene.midpoint)
-                return scene, meta
-            except Exception:
-                return scene, {}
-
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(analyze_scene, s) for s in scenes_to_analyze]
-            for future in as_completed(futures):
-                scene, meta = future.result()
-                scene.meta = meta
-
-        # Shuffle for variety
-        random.shuffle(self.ctx.all_scenes)
-
-        # Create legacy dict format (needed for footage_manager compatibility)
-        self.ctx.all_scenes_dicts = [s.to_dict() for s in self.ctx.all_scenes]
-
-        logger.info(f"   📹 Found {len(self.ctx.all_scenes)} scenes in {len(video_files)} videos")
+        """Deprecated: Use AssetAnalyzer.detect_scenes"""
+        self._analyzer.detect_scenes(self.progress_callback)
 
     def _determine_output_profile(self):
         """Determine output profile from input footage."""
         from ..video_metadata import determine_output_profile as _determine_profile
         from .. import segment_writer as segment_writer_module
 
-        profile = _determine_profile(self.ctx.video_files)
+        profile = _determine_profile(self.ctx.media.video_files)
 
         # Override if EXPORT_WIDTH/HEIGHT are explicitly set in env
         # We check os.environ directly to avoid default values in settings.export
@@ -1580,7 +1053,7 @@ class MontageBuilder:
             self.settings.encoding.preset = PREVIEW_PRESET
 
         # determine_output_profile returns an OutputProfile dataclass
-        self.ctx.output_profile = OutputProfile(
+        self.ctx.media.output_profile = OutputProfile(
             width=profile.width,
             height=profile.height,
             fps=profile.fps,
@@ -1605,7 +1078,7 @@ class MontageBuilder:
         segment_writer_module.TARGET_LEVEL = profile.level
 
         if self.settings.features.verbose:
-            logger.info(f"\n   🧭 Output profile: {self.ctx.output_profile.width}x{self.ctx.output_profile.height} @ {self.ctx.output_profile.fps:.1f}fps")
+            logger.info(f"\n   🧭 Output profile: {self.ctx.media.output_profile.width}x{self.ctx.media.output_profile.height} @ {self.ctx.media.output_profile.fps:.1f}fps")
 
     def _init_footage_pool(self):
         """Initialize footage pool manager."""
@@ -1614,111 +1087,10 @@ class MontageBuilder:
         # Use the same dict objects that are stored in context
         # (important: id() matching requires same objects)
         self._footage_pool = integrate_footage_manager(
-            self.ctx.all_scenes_dicts,
+            self.ctx.media.all_scenes_dicts,
             strict_once=False,
         )
 
-    def _apply_voice_isolation(self, audio_path: str) -> str:
-        """
-        Apply voice isolation to audio before analysis.
-
-        Uses cgpu/demucs to separate vocals from music, resulting in
-        cleaner beat detection and energy analysis.
-
-        Args:
-            audio_path: Path to original audio file
-
-        Returns:
-            Path to isolated vocals (or original if isolation fails)
-        """
-        model = self.settings.features.voice_isolation_model
-        logger.info(f"\n🎤 Isolating voice ({model} model)...")
-
-        try:
-            from ..cgpu_utils import is_cgpu_available
-            if not is_cgpu_available():
-                if self.settings.features.strict_cloud_compute:
-                    raise RuntimeError("Strict cloud compute enabled: cgpu voice isolation not available.")
-                logger.warning("   Voice isolation requires cgpu - using original audio")
-                return audio_path
-
-            from ..cgpu_jobs import VoiceIsolationJob
-            job = VoiceIsolationJob(
-                audio_path=audio_path,
-                model=model,
-                two_stems=True,  # Fast mode: vocals + accompaniment
-                keep_all_stems=True, # We need no_vocals for better beat detection
-            )
-            result = job.execute()
-
-            if result.success:
-                # Prefer no_vocals (accompaniment) for beat detection as it has clearer drums/bass
-                # without vocal interference
-                stems = result.metadata.get("stems", {})
-                if stems.get("no_vocals"):
-                    logger.info(f"   ✅ Voice isolated: Using accompaniment for analysis: {stems['no_vocals']}")
-                    return stems["no_vocals"]
-                
-                if result.output_path:
-                    logger.info(f"   ✅ Voice isolated: {result.output_path}")
-                    return result.output_path
-            else:
-                if self.settings.features.strict_cloud_compute:
-                    raise RuntimeError(f"Strict cloud compute enabled: Voice isolation failed: {result.error}")
-                logger.warning(f"   Voice isolation failed: {result.error}")
-                return audio_path
-
-        except Exception as e:
-            if self.settings.features.strict_cloud_compute:
-                raise RuntimeError(f"Strict cloud compute enabled: Voice isolation error: {e}")
-            logger.warning(f"   Voice isolation error: {e}")
-            return audio_path
-
-    def _apply_noise_reduction(self, audio_path: str) -> str:
-        """
-        Apply noise reduction to audio using DeepFilterNet via cgpu.
-
-        Lighter/faster than voice_isolation - good for podcasts, interviews,
-        vlogs with background noise.
-
-        Args:
-            audio_path: Path to original audio file
-
-        Returns:
-            Path to cleaned audio (or original if reduction fails)
-        """
-        strength = self.settings.features.noise_reduction_strength
-        logger.info(f"\n🔇 Applying noise reduction (strength: {strength})...")
-
-        try:
-            from ..cgpu_utils import is_cgpu_available
-            if not is_cgpu_available():
-                if self.settings.features.strict_cloud_compute:
-                    raise RuntimeError("Strict cloud compute enabled: cgpu noise reduction not available.")
-                logger.warning("   Noise reduction requires cgpu - using original audio")
-                return audio_path
-
-            from ..cgpu_jobs import NoiseReductionJob
-            job = NoiseReductionJob(
-                audio_path=audio_path,
-                attenuation_limit=strength,
-            )
-            result = job.execute()
-
-            if result.success and result.output_path:
-                logger.info(f"   ✅ Noise reduced: {result.output_path}")
-                return result.output_path
-            else:
-                if self.settings.features.strict_cloud_compute:
-                    raise RuntimeError(f"Strict cloud compute enabled: Noise reduction failed: {result.error}")
-                logger.warning(f"   Noise reduction failed: {result.error}")
-                return audio_path
-
-        except Exception as e:
-            if self.settings.features.strict_cloud_compute:
-                raise RuntimeError(f"Strict cloud compute enabled: Noise reduction error: {e}")
-            logger.warning(f"   Noise reduction error: {e}")
-            return audio_path
 
     def _get_files(self, directory: Path, extensions: Tuple[str, ...]) -> List[str]:
         """Get files with given extensions from directory."""
@@ -1732,8 +1104,8 @@ class MontageBuilder:
 
     def _get_output_file_size(self) -> float:
         """Get output file size in MB."""
-        if self.ctx.output_filename and os.path.exists(self.ctx.output_filename):
-            return os.path.getsize(self.ctx.output_filename) / (1024 * 1024)
+        if self.ctx.render.output_filename and os.path.exists(self.ctx.render.output_filename):
+            return os.path.getsize(self.ctx.render.output_filename) / (1024 * 1024)
         return 0.0
 
     def _collect_stats(self) -> Dict[str, Any]:
@@ -1741,10 +1113,10 @@ class MontageBuilder:
         return {
             "job_id": self.ctx.job_id,
             "variant_id": self.variant_id,
-            "cut_count": self.ctx.cut_number,
-            "duration": self.ctx.current_time,
-            "tempo": self.ctx.audio_result.tempo if self.ctx.audio_result else 0,
-            "scene_count": len(self.ctx.all_scenes),
+            "cut_count": self.ctx.timeline.cut_number,
+            "duration": self.ctx.timeline.current_time,
+            "tempo": self.ctx.media.audio_result.tempo if self.ctx.media.audio_result else 0,
+            "scene_count": len(self.ctx.media.all_scenes),
             "elapsed_time": self.ctx.elapsed_time(),
             "story_engine": self.settings.features.story_engine,
         }
@@ -1761,24 +1133,14 @@ class MontageBuilder:
         music_end = self.settings.creative.music_end
 
         # Allow overrides from editing instructions
-        if self.ctx.editing_instructions:
-            if 'music_start' in self.ctx.editing_instructions:
-                try:
-                    override_start = float(self.ctx.editing_instructions['music_start'])
-                    if override_start >= 0:
-                        music_start = override_start
-                except (ValueError, TypeError):
-                    pass
+        if self.ctx.creative.editing_instructions:
+            if self.ctx.creative.editing_instructions.music_start > 0:
+                music_start = self.ctx.creative.editing_instructions.music_start
             
-            if 'music_end' in self.ctx.editing_instructions:
-                try:
-                    override_end = float(self.ctx.editing_instructions['music_end'])
-                    if override_end > 0:
-                        music_end = override_end
-                except (ValueError, TypeError):
-                    pass
+            if self.ctx.creative.editing_instructions.music_end is not None:
+                music_end = self.ctx.creative.editing_instructions.music_end
 
-        audio_duration = self.ctx.audio_result.duration
+        audio_duration = self.ctx.media.audio_result.duration
 
         # Apply music trimming
         if music_end and music_end < audio_duration:
@@ -1788,19 +1150,19 @@ class MontageBuilder:
 
         # Determine target duration
         if target_duration_setting > 0:
-            self.ctx.target_duration = target_duration_setting
+            self.ctx.timeline.target_duration = target_duration_setting
         else:
-            self.ctx.target_duration = audio_duration
+            self.ctx.timeline.target_duration = audio_duration
 
         # Apply Creative Director constraints if provided (only when env didn't override)
-        if target_duration_setting <= 0 and self.ctx.editing_instructions:
-            constraints = self.ctx.editing_instructions.get("constraints", {})
+        if target_duration_setting <= 0 and self.ctx.creative.editing_instructions:
+            constraints = self.ctx.creative.editing_instructions.get("constraints", {})
             target_override = coerce_float(constraints.get("target_duration_sec"))
             if target_override and target_override > 0:
-                self.ctx.target_duration = min(audio_duration, target_override)
+                self.ctx.timeline.target_duration = min(audio_duration, target_override)
 
         if self.settings.features.verbose:
-            logger.info(f"   ⏱️ Target duration: {self.ctx.target_duration:.1f}s")
+            logger.info(f"   ⏱️ Target duration: {self.ctx.timeline.target_duration:.1f}s")
 
     def _init_crossfade_settings(self):
         """Initialize crossfade settings from config and Creative Director."""
@@ -1808,17 +1170,17 @@ class MontageBuilder:
         xfade_duration = self.settings.creative.xfade_duration
 
         if enable_xfade == "true":
-            self.ctx.enable_xfade = True
+            self.ctx.timeline.enable_xfade = True
         elif enable_xfade == "false":
-            self.ctx.enable_xfade = False
-        elif self.ctx.editing_instructions is not None:
-            transitions = self.ctx.editing_instructions.get('transitions', {})
+            self.ctx.timeline.enable_xfade = False
+        elif self.ctx.creative.editing_instructions is not None:
+            transitions = self.ctx.creative.editing_instructions.get('transitions', {})
             transition_type = transitions.get('type', 'energy_aware')
             xfade_duration = transitions.get('crossfade_duration_sec', xfade_duration)
             if transition_type == 'crossfade':
-                self.ctx.enable_xfade = True
+                self.ctx.timeline.enable_xfade = True
 
-        self.ctx.xfade_duration = xfade_duration
+        self.ctx.timeline.xfade_duration = xfade_duration
 
     def _init_progressive_renderer(self):
         """Initialize progressive renderer if available."""
@@ -1837,11 +1199,11 @@ class MontageBuilder:
 
             self._progressive_renderer = ProgressiveRenderer(
                 batch_size=batch_size,
-                output_dir=os.path.join(str(self.ctx.temp_dir), f"segments_{self.ctx.job_id}"),
+                output_dir=os.path.join(str(self.ctx.paths.temp_dir), f"segments_{self.ctx.job_id}"),
                 memory_manager=self._memory_manager,
                 job_id=self.ctx.job_id,
-                enable_xfade=self.ctx.enable_xfade,
-                xfade_duration=self.ctx.xfade_duration,
+                enable_xfade=self.ctx.timeline.enable_xfade,
+                xfade_duration=self.ctx.timeline.xfade_duration,
                 ffmpeg_crf=self.settings.encoding.crf,
                 normalize_clips=self.settings.encoding.normalize_clips,
             )
@@ -1896,41 +1258,32 @@ class MontageBuilder:
         
         # Load patterns from style if available
         cut_patterns = default_patterns
-        if self.ctx.style_params and "cut_patterns" in self.ctx.style_params:
-            cut_patterns = self.ctx.style_params["cut_patterns"]
+        if self.ctx.creative.style_params and "cut_patterns" in self.ctx.creative.style_params:
+            cut_patterns = self.ctx.creative.style_params["cut_patterns"]
             logger.info(f"   🎨 Using {len(cut_patterns)} custom cut patterns from style")
 
         # Get audio data
-        beat_times = self.ctx.audio_result.beat_times
-        energy_times = self.ctx.audio_result.energy_times
-        energy_values = self.ctx.audio_result.energy_values
-        tempo = self.ctx.audio_result.tempo
+        beat_times = self.ctx.media.audio_result.beat_times
+        energy_times = self.ctx.media.audio_result.energy_times
+        energy_values = self.ctx.media.audio_result.energy_values
+        tempo = self.ctx.media.audio_result.tempo
 
         # Get unique video count for variety logic
-        unique_videos = len(set(s.path for s in self.ctx.all_scenes))
+        unique_videos = len(set(s.path for s in self.ctx.media.all_scenes))
 
         # Main loop
-        while self.ctx.current_time < self.ctx.target_duration and self.ctx.all_scenes:
+        while self.ctx.timeline.current_time < self.ctx.timeline.target_duration and self.ctx.media.all_scenes:
             # Get current energy
-            current_energy = self._get_energy_at_time(
-                self.ctx.current_time, energy_times, energy_values
-            )
-
-            # Calculate beats per cut
-            beats_per_cut = self._calculate_beats_per_cut(
-                current_energy, tempo, cut_patterns
-            )
+            current_energy = self._pacing_engine.get_energy_at_time(self.ctx.timeline.current_time)
 
             # Calculate cut duration
-            cut_duration = self._calculate_cut_duration(
-                beats_per_cut, beat_times
-            )
+            cut_duration = self._pacing_engine.get_next_cut_duration(current_energy)
 
             # Early exit: prevent overrun beyond target
-            remaining_time = self.ctx.target_duration - self.ctx.current_time
+            remaining_time = self.ctx.timeline.target_duration - self.ctx.timeline.current_time
             if remaining_time < cut_duration * 0.3:
                 # Less than 30% of a cut remaining - stop here
-                logger.info(f"   🛑 Target reached ({self.ctx.current_time:.1f}s / {self.ctx.target_duration:.1f}s)")
+                logger.info(f"   🛑 Target reached ({self.ctx.timeline.current_time:.1f}s / {self.ctx.timeline.target_duration:.1f}s)")
                 break
 
             # Trim last cut if it would significantly overshoot
@@ -1946,8 +1299,9 @@ class MontageBuilder:
                 break
 
             # Score and select clip
-            selected_scene, best_score = self._select_clip(
-                available_footage, current_energy, unique_videos
+            similarity_fn = self._scene_provider.calculate_similarity if self._scene_provider else None
+            selected_scene, best_score = self._selection_engine.select_clip(
+                available_footage, current_energy, unique_videos, similarity_fn=similarity_fn
             )
 
             if selected_scene is None:
@@ -1985,7 +1339,7 @@ class MontageBuilder:
             # Mark clip as consumed
             self._footage_pool.consume_clip(
                 clip_id=id(selected_scene),
-                timeline_position=self.ctx.current_time,
+                timeline_position=self.ctx.timeline.current_time,
                 used_in_point=clip_start,
                 used_out_point=clip_end
             )
@@ -1996,469 +1350,26 @@ class MontageBuilder:
             )
 
             # Update state
-            self.ctx.last_used_path = selected_scene['path']
-            self.ctx.last_shot_type = selected_scene.get('meta', {}).get('shot', 'medium')
-            self.ctx.last_clip_end_time = clip_end
+            self.ctx.timeline.last_used_path = selected_scene['path']
+            self.ctx.timeline.last_shot_type = selected_scene.get('meta', {}).get('shot', 'medium')
+            self.ctx.timeline.last_clip_end_time = clip_end
 
-            self.ctx.current_time += cut_duration
-            self.ctx.beat_idx += int(beats_per_cut)
-            self.ctx.cut_number += 1
+            self.ctx.timeline.current_time += cut_duration
+            self.ctx.timeline.beat_idx += int(beats_per_cut)
+            self.ctx.timeline.cut_number += 1
 
             # Progress logging
-            if self._monitor and self.ctx.cut_number % 5 == 0:
+            if self._monitor and self.ctx.timeline.cut_number % 5 == 0:
                 self._monitor.log_progress(
-                    self.ctx.cut_number,
-                    self.ctx.estimated_total_cuts,
+                    self.ctx.timeline.cut_number,
+                    self.ctx.timeline.estimated_total_cuts,
                     "cuts placed"
                 )
 
         # Flush remaining futures
         self._flush_pending_futures()
 
-        logger.info(f"   ✅ Assembly complete: {self.ctx.cut_number} cuts, {self.ctx.current_time:.1f}s")
-
-    def _get_energy_at_time(
-        self, time_sec: float, energy_times: np.ndarray, energy_values: np.ndarray
-    ) -> float:
-        """Get energy level at a specific time."""
-        if len(energy_times) == 0:
-            return 0.5
-        idx = np.searchsorted(energy_times, time_sec)
-        idx = min(idx, len(energy_values) - 1)
-        return float(energy_values[idx])
-
-    def _calculate_beats_per_cut(
-        self, current_energy: float, tempo: float, cut_patterns: List[List[float]]
-    ) -> float:
-        """Calculate beats per cut based on pacing settings."""
-        from ..audio_analysis import calculate_dynamic_cut_length
-
-        min_beats = None
-        max_beats = None
-        if self.ctx.editing_instructions and tempo > 0:
-            constraints = self.ctx.editing_instructions.get("constraints", {})
-            min_clip = coerce_float(constraints.get("min_clip_duration_sec"))
-            max_clip = coerce_float(constraints.get("max_clip_duration_sec"))
-            beat_duration = 60.0 / tempo
-            if min_clip:
-                min_beats = min_clip / beat_duration
-            if max_clip:
-                max_beats = max_clip / beat_duration
-            if min_beats is not None and max_beats is not None and min_beats > max_beats:
-                min_beats, max_beats = max_beats, min_beats
-
-        def clamp_beats(beats: float) -> float:
-            if min_beats is not None:
-                beats = max(beats, min_beats)
-            if max_beats is not None:
-                beats = min(beats, max_beats)
-            return beats
-
-        pacing_speed = "dynamic"
-        if self.ctx.editing_instructions is not None:
-            pacing_speed = self.ctx.editing_instructions.get('pacing', {}).get('speed', 'dynamic')
-
-        # Section-based pacing override (Pacing Curves)
-        # If we are in a high energy section, force faster cuts regardless of instantaneous drops
-        current_section = None
-        if self.ctx.audio_result and self.ctx.audio_result.sections:
-            for section in self.ctx.audio_result.sections:
-                if section.start_time <= self.ctx.current_time < section.end_time:
-                    current_section = section
-                    break
-        
-        if pacing_speed == "dynamic" and current_section:
-            if current_section.energy_level == "high":
-                # High energy section: 2 beats (fast) or 4 beats (medium-fast)
-                # We still allow some variation but cap the max length
-                return 2 if tempo < 130 else 4
-            elif current_section.energy_level == "low":
-                # Low energy section: 8 beats (slow) or 16 beats (very slow)
-                return 16 if tempo < 100 else 8
-
-        if pacing_speed == "very_fast":
-            return clamp_beats(1)
-        elif pacing_speed == "fast":
-            return clamp_beats(2 if tempo < 130 else 4)
-        elif pacing_speed == "medium":
-            return clamp_beats(4)
-        elif pacing_speed == "slow":
-            return clamp_beats(8)
-        elif pacing_speed == "very_slow":
-            return clamp_beats(16 if tempo < 100 else 8)
-        else:  # dynamic
-            if self.ctx.current_pattern is None or self.ctx.pattern_idx >= len(self.ctx.current_pattern):
-                self.ctx.current_pattern = calculate_dynamic_cut_length(
-                    current_energy, tempo, self.ctx.current_time,
-                    self.ctx.target_duration, cut_patterns
-                )
-                self.ctx.pattern_idx = 0
-
-            beats = self.ctx.current_pattern[self.ctx.pattern_idx]
-            self.ctx.pattern_idx += 1
-            return clamp_beats(beats)
-
-    def _calculate_cut_duration(
-        self, beats_per_cut: float, beat_times: np.ndarray
-    ) -> float:
-        """Calculate cut duration from beat times."""
-        target_beat_idx = self.ctx.beat_idx + beats_per_cut
-
-        if target_beat_idx >= len(beat_times):
-            return self.ctx.target_duration - self.ctx.current_time
-
-        # Interpolate for fractional beats
-        idx_int = int(self.ctx.beat_idx)
-        if idx_int >= len(beat_times) - 1:
-            t_start = beat_times[-1]
-        else:
-            frac = self.ctx.beat_idx - idx_int
-            t_start = beat_times[idx_int] + (beat_times[min(idx_int+1, len(beat_times)-1)] - beat_times[idx_int]) * frac
-
-        target_idx_int = int(target_beat_idx)
-        if target_idx_int >= len(beat_times) - 1:
-            t_end = beat_times[-1]
-        else:
-            frac = target_beat_idx - target_idx_int
-            t_end = beat_times[target_idx_int] + (beat_times[min(target_idx_int+1, len(beat_times)-1)] - beat_times[target_idx_int]) * frac
-
-        cut_duration = t_end - t_start
-
-        # Add micro-timing jitter for humanization
-        jitter = random.uniform(-0.05, 0.05)
-        if cut_duration + jitter > 0.5:
-            cut_duration += jitter
-
-        return max(cut_duration, 0.5)
-
-    def _apply_style_scoring(self, meta: Dict[str, Any], style_params: Dict[str, Any]) -> float:
-        """
-        Apply data-driven scoring based on style weights.
-        
-        Abstracts the logic so new styles can be defined purely in JSON
-        without code changes.
-        """
-        score = 0.0
-        weights = style_params.get('weights', {})
-        
-        # 1. Numeric Fields (Linear scaling)
-        # Automatically apply weights to any matching numeric field in meta
-        # e.g. "face_count": 2.0 -> +20 points per face
-        # e.g. "visual_quality": 1.5 -> +15 points per quality point (0-1)
-        for key, weight in weights.items():
-            if key == 'action': continue  # Handled specially below
-            
-            val = meta.get(key)
-            if isinstance(val, (int, float)) and val > 0:
-                # Normalize factor: 10 points per unit * weight
-                score += (val * 10.0) * weight
-
-        # 2. Action Level (Categorical -> Scalar)
-        if 'action' in weights:
-            action = meta.get('action', 'medium')
-            weight = weights['action']
-            if action == 'high':
-                score += 15.0 * weight
-            elif action == 'low':
-                score -= 5.0 * weight
-
-        # 3. Preferred Lists (Binary match)
-        # Automatically checks "preferred_X" against "X" in meta
-        # e.g. "preferred_shots" -> checks meta["shot"]
-        for param_key, param_val in style_params.items():
-            if param_key.startswith('preferred_') and isinstance(param_val, list):
-                # Extract field name: preferred_shots -> shot
-                field_name = param_key.replace('preferred_', '').rstrip('s')
-                
-                meta_val = meta.get(field_name)
-                if meta_val and meta_val in param_val:
-                    score += 20.0
-
-        return score
-
-    def _get_candidate_scenes(self, available_footage) -> List[Dict[str, Any]]:
-        clip_ids = {c.clip_id for c in available_footage}
-        return [
-            scene for scene in self.ctx.media.all_scenes_dicts
-            if id(scene) in clip_ids
-        ]
-
-    def _resolve_scoring_rules(self) -> Dict[str, float]:
-        scoring_rules = self.ctx.creative.style_params.get("scoring_rules", {})
-        return {
-            "fresh_clip_bonus": scoring_rules.get("fresh_clip_bonus", 50),
-            "jump_cut_penalty": scoring_rules.get("jump_cut_penalty", 50),
-            "shot_variation_bonus": scoring_rules.get("shot_variation_bonus", 10),
-            "shot_repetition_penalty": scoring_rules.get("shot_repetition_penalty", 10),
-        }
-
-    def _get_current_music_section(self):
-        audio = self.ctx.media.audio_result
-        if not audio or not audio.sections:
-            return None
-        current_time = self.ctx.timeline.current_time
-        for section in audio.sections:
-            if section.start_time <= current_time < section.end_time:
-                return section
-        return None
-
-    def _score_usage_and_story_phase(
-        self,
-        footage_clip: Any,
-        current_energy: float,
-        fresh_clip_bonus: float,
-    ) -> float:
-        score = 0.0
-        if not footage_clip:
-            return score
-
-        if footage_clip.usage_count == 0:
-            score += fresh_clip_bonus
-        elif footage_clip.usage_count == 1:
-            score += (fresh_clip_bonus * 0.4)
-        else:
-            score -= footage_clip.usage_count * 10
-
-        phase = self.ctx.get_story_phase()
-        if phase == "intro" and current_energy < 0.4:
-            score += 15
-        elif phase == "build" and 0.4 <= current_energy < 0.7:
-            score += 15
-        elif phase == "climax" and current_energy >= 0.7:
-            score += 15
-        elif phase == "outro" and current_energy < 0.5:
-            score += 15
-
-        return score
-
-    def _score_jump_cut(
-        self, scene_path: str, unique_videos: int, jump_cut_penalty: float
-    ) -> float:
-        if scene_path != self.ctx.timeline.last_used_path:
-            return 0.0
-        if unique_videos > 1:
-            return -jump_cut_penalty
-        return -(jump_cut_penalty * 0.1)
-
-    @staticmethod
-    def _score_action_energy(
-        meta: Dict[str, Any],
-        current_energy: float,
-        current_section: Any,
-    ) -> float:
-        score = 0.0
-        action = meta.get('action', 'medium')
-        if current_energy > 0.6 and action == 'high':
-            score += 20
-        if current_energy < 0.4 and action == 'low':
-            score += 20
-
-        if current_section:
-            if current_section.energy_level == "high" and action == "high":
-                score += 25
-            elif current_section.energy_level == "low" and action == "low":
-                score += 25
-
-        return score
-
-    def _score_style_preferences(self, meta: Dict[str, Any]) -> float:
-        style_params = self.ctx.creative.style_params
-        if not style_params:
-            return 0.0
-        return self._apply_style_scoring(meta, style_params)
-
-    def _score_shot_variation(
-        self,
-        shot: str,
-        shot_variation_bonus: float,
-        shot_repetition_penalty: float,
-    ) -> float:
-        if self.ctx.timeline.last_shot_type and shot == self.ctx.timeline.last_shot_type:
-            return -shot_repetition_penalty
-        return shot_variation_bonus
-
-    def _score_match_cut(self, scene: Dict[str, Any], similarity_fn) -> float:
-        if self.ctx.timeline.last_clip_end_time is None or not self.ctx.timeline.last_used_path:
-            return 0.0
-
-        try:
-            similarity = similarity_fn(
-                self.ctx.timeline.last_used_path,
-                self.ctx.timeline.last_clip_end_time,
-                scene['path'],
-                scene['start'],
-            )
-            if similarity > 0.7:
-                return 30.0
-        except Exception:
-            pass
-        return 0.0
-
-    def _score_semantic_match(self, meta: Dict[str, Any]) -> float:
-        if not self.ctx.creative.semantic_query:
-            return 0.0
-        if not (meta.get('tags') or meta.get('caption')):
-            return 0.0
-
-        try:
-            from ..semantic_matcher import get_semantic_matcher
-            matcher = get_semantic_matcher()
-            if matcher.is_available:
-                sem_result = matcher.match_query_to_clip(self.ctx.creative.semantic_query, meta)
-                return int(sem_result.overall_score * 40)
-        except Exception:
-            return 0.0
-        return 0.0
-
-    def _score_broll_match(self, scene: Dict[str, Any], meta: Dict[str, Any]) -> float:
-        if not self.ctx.creative.broll_plan:
-            return 0.0
-
-        active_segment = None
-        current_time = self.ctx.timeline.current_time
-        for seg in self.ctx.creative.broll_plan:
-            if seg.get("start_time", 0) <= current_time < seg.get("end_time", 99999):
-                active_segment = seg
-                break
-
-        if not active_segment:
-            return 0.0
-
-        for sug in active_segment.get("suggestions", []):
-            if sug.get("clip") == scene["path"]:
-                return 100.0
-
-        if not (meta.get('tags') or meta.get('caption')):
-            return 0.0
-
-        try:
-            from ..semantic_matcher import get_semantic_matcher
-            matcher = get_semantic_matcher()
-            if matcher.is_available:
-                sem_result = matcher.match_query_to_clip(active_segment["segment"], meta)
-                return int(sem_result.overall_score * 50)
-        except Exception:
-            return 0.0
-        return 0.0
-
-    def _select_with_intelligent_selector(
-        self,
-        candidates: List[Dict[str, Any]],
-        current_energy: float,
-    ) -> Tuple[Dict[str, Any], float]:
-        from ..clip_selector import ClipCandidate
-
-        clip_candidates = [
-            ClipCandidate(
-                path=scene['path'],
-                start_time=scene['start'],
-                duration=scene['duration'],
-                heuristic_score=int(scene.get('_heuristic_score', 0)),
-                metadata=scene.get('meta', {}),
-            )
-            for scene in candidates
-        ]
-
-        prev_clips = []
-        if self.ctx.timeline.last_used_path:
-            prev_meta = {'shot': self.ctx.timeline.last_shot_type}
-            prev_clips.append({'meta': prev_meta})
-
-        context = {
-            'current_energy': current_energy,
-            'position': self.ctx.get_story_phase(),
-            'previous_clips': prev_clips,
-            'beat_position': self.ctx.timeline.beat_idx,
-        }
-
-        best_candidate, reason = self._intelligent_selector.select_best_clip(
-            clip_candidates,
-            context,
-            top_n=5,
-        )
-
-        selected_scene = next(
-            (
-                scene for scene in candidates
-                if scene['path'] == best_candidate.path
-                and scene['start'] == best_candidate.start_time
-            ),
-            candidates[0],
-        )
-
-        if "LLM" in reason:
-            logger.info(f"   🧠 {reason}")
-
-        return selected_scene, best_candidate.heuristic_score
-
-    @staticmethod
-    def _select_probabilistic(
-        candidates: List[Dict[str, Any]],
-    ) -> Tuple[Optional[Dict[str, Any]], float]:
-        candidates.sort(key=lambda x: x.get('_heuristic_score', -1000), reverse=True)
-        top_n = min(3, len(candidates))
-        if top_n > 0:
-            top_candidates = candidates[:top_n]
-            min_score = min(c.get('_heuristic_score', 0) for c in top_candidates)
-            weights = [c.get('_heuristic_score', 0) - min_score + 10 for c in top_candidates]
-            selected_scene = random.choices(top_candidates, weights=weights, k=1)[0]
-            best_score = selected_scene.get('_heuristic_score', 0)
-            return selected_scene, best_score
-        return None, 0.0
-
-    def _select_clip(
-        self,
-        available_footage,
-        current_energy: float,
-        unique_videos: int
-    ) -> Tuple[Optional[Dict[str, Any]], float]:
-        """Score and select the best clip for this cut."""
-        # Use unified SceneProvider for visual similarity calculation
-        similarity_fn = self.scene_provider.calculate_similarity
-
-        valid_scenes = self._get_candidate_scenes(available_footage)
-        if not valid_scenes:
-            return None, 0
-
-        candidates = valid_scenes[:20]
-        scoring_rules = self._resolve_scoring_rules()
-        current_section = self._get_current_music_section()
-        clip_map = {c.clip_id: c for c in available_footage}
-
-        for scene in candidates:
-            meta = scene.get('meta', {})
-            shot = meta.get('shot', 'medium')
-
-            footage_clip = clip_map.get(id(scene))
-            score = 0.0
-            score += self._score_usage_and_story_phase(
-                footage_clip,
-                current_energy,
-                scoring_rules["fresh_clip_bonus"],
-            )
-            score += self._score_jump_cut(
-                scene['path'],
-                unique_videos,
-                scoring_rules["jump_cut_penalty"],
-            )
-            score += self._score_action_energy(meta, current_energy, current_section)
-            score += self._score_style_preferences(meta)
-            score += self._score_shot_variation(
-                shot,
-                scoring_rules["shot_variation_bonus"],
-                scoring_rules["shot_repetition_penalty"],
-            )
-            score += self._score_match_cut(scene, similarity_fn)
-            score += self._score_semantic_match(meta)
-            score += self._score_broll_match(scene, meta)
-
-            score += random.randint(-15, 15)
-            scene['_heuristic_score'] = score
-
-        if self._intelligent_selector:
-            return self._select_with_intelligent_selector(candidates, current_energy)
-
-        return self._select_probabilistic(candidates)
+        logger.info(f"   ✅ Assembly complete: {self.ctx.timeline.cut_number} cuts, {self.ctx.timeline.current_time:.1f}s")
 
     def _process_and_add_clip(
         self,
@@ -2471,7 +1382,7 @@ class MontageBuilder:
         """Submit clip processing task and track metadata."""
         
         # Generate temp paths
-        temp_clip_name = f"temp_clip_{self.ctx.beat_idx}_{random.randint(0, 9999)}.mp4"
+        temp_clip_name = f"temp_clip_{self.ctx.timeline.beat_idx}_{random.randint(0, 9999)}.mp4"
         
         # Submit task
         if self._executor:
@@ -2480,17 +1391,17 @@ class MontageBuilder:
                 scene_path=scene['path'],
                 clip_start=clip_start,
                 cut_duration=cut_duration,
-                temp_dir=str(self.ctx.temp_dir),
+                temp_dir=str(self.ctx.paths.temp_dir),
                 temp_clip_name=temp_clip_name,
-                ctx_stabilize=self.ctx.stabilize,
-                ctx_upscale=self.ctx.upscale,
-                ctx_enhance=self.ctx.enhance,
-                ctx_color_grade=self.ctx.color_grade,
-                ctx_denoise=self.ctx.denoise,
-                ctx_sharpen=self.ctx.sharpen,
-                ctx_film_grain=self.ctx.film_grain,
+                ctx_stabilize=self.ctx.features.stabilize,
+                ctx_upscale=self.ctx.features.upscale,
+                ctx_enhance=self.ctx.features.enhance,
+                ctx_color_grade=self.ctx.features.color_grade,
+                ctx_denoise=self.ctx.features.denoise,
+                ctx_sharpen=self.ctx.features.sharpen,
+                ctx_film_grain=self.ctx.features.film_grain,
                 enhancer=self._clip_enhancer,
-                output_profile=self.ctx.output_profile,
+                output_profile=self.ctx.media.output_profile,
                 settings=self.settings,
                 resource_manager=self._resource_manager
             )
@@ -2502,16 +1413,16 @@ class MontageBuilder:
             source_path=scene['path'],
             start_time=clip_start,
             duration=cut_duration,
-            timeline_start=self.ctx.current_time,
+            timeline_start=self.ctx.timeline.current_time,
             energy=current_energy,
             action=scene.get('meta', {}).get('action', 'medium'),
             shot=scene.get('meta', {}).get('shot', 'medium'),
-            beat_idx=self.ctx.beat_idx,
-            beats_per_cut=self.ctx.current_pattern[self.ctx.pattern_idx - 1] if self.ctx.current_pattern else 4,
+            beat_idx=self.ctx.timeline.beat_idx,
+            beats_per_cut=self.ctx.timeline.current_pattern[self.ctx.timeline.pattern_idx - 1] if self.ctx.timeline.current_pattern else 4,
             selection_score=selection_score,
             enhancements={} # Updated on completion
         )
-        self.ctx.clips_metadata.append(clip_meta)
+        self.ctx.timeline.clips_metadata.append(clip_meta)
         
         self._pending_futures.append((future, clip_meta))
         
@@ -2544,7 +1455,7 @@ class MontageBuilder:
                     ))
                 if enhancements.get('enhanced'):
                     decision.record_color_grade(ColorGradeParams(
-                        preset=self.ctx.color_grade or "teal_orange",
+                        preset=self.ctx.features.color_grade or "teal_orange",
                         intensity=self.ctx.features.color_intensity,
                     ))
                 # NEW: Record denoise, sharpen, film_grain
@@ -2556,7 +1467,7 @@ class MontageBuilder:
                     decision.record_sharpen(SharpenConfig(amount=0.5))
                 if enhancements.get('film_grain'):
                     from ..clip_enhancement import FilmGrainConfig
-                    decision.record_film_grain(FilmGrainConfig(grain_type=self.ctx.film_grain, enabled=True))
+                    decision.record_film_grain(FilmGrainConfig(grain_type=self.ctx.features.film_grain, enabled=True))
 
                 meta.enhancement_decision = decision
 
@@ -2586,7 +1497,7 @@ class MontageBuilder:
         
         # Convert ClipMetadata to format expected by exporter
         clips_data = []
-        for clip in self.ctx.clips_metadata:
+        for clip in self.ctx.timeline.clips_metadata:
             clips_data.append({
                 'source_path': clip.source_path,
                 'start_time': clip.start_time,
@@ -2603,21 +1514,21 @@ class MontageBuilder:
             })
 
         # Get audio path safely
-        audio_path = self.ctx.audio_result.music_path if self.ctx.audio_result else ""
+        audio_path = self.ctx.media.audio_result.music_path if self.ctx.media.audio_result else ""
         if not audio_path:
             logger.warning("   ⚠️ No audio path found for export, using placeholder")
             audio_path = "audio_track_missing.mp3"
 
         try:
-            self.ctx.exported_files = export_timeline_from_montage(
+            self.ctx.render.exported_files = export_timeline_from_montage(
                 clips_data=clips_data,
                 audio_path=audio_path,
-                total_duration=self.ctx.current_time,
-                output_dir=str(self.ctx.output_dir),
+                total_duration=self.ctx.timeline.current_time,
+                output_dir=str(self.ctx.paths.output_dir),
                 project_name=f"{self.ctx.job_id}_v{self.variant_id}",
                 generate_proxies=self.settings.features.generate_proxies,
-                resolution=(self.ctx.output_profile.width, self.ctx.output_profile.height),
-                fps=self.ctx.output_profile.fps
+                resolution=(self.ctx.media.output_profile.width, self.ctx.media.output_profile.height),
+                fps=self.ctx.media.output_profile.fps
             )
         except Exception as e:
             logger.error(f"   ❌ Timeline export failed: {e}")
@@ -2634,10 +1545,10 @@ class MontageBuilder:
 
         cache = get_analysis_cache()
         montage_id = f"{self.ctx.job_id}_v{self.variant_id}"
-        total_duration = self.ctx.current_time or 1.0  # Avoid division by zero
+        total_duration = self.ctx.timeline.current_time or 1.0  # Avoid division by zero
 
         saved_count = 0
-        for clip in self.ctx.clips_metadata:
+        for clip in self.ctx.timeline.clips_metadata:
             # Calculate story phase based on timeline position
             position = clip.timeline_start / total_duration
             if position < 0.15:
@@ -2681,7 +1592,7 @@ class MontageBuilder:
         cache_dir = os.environ.get("METADATA_CACHE_DIR")
         if cache_dir:
             return Path(cache_dir) / "tension"
-        return self.ctx.output_dir / "tension_analysis"
+        return self.ctx.paths.output_dir / "tension_analysis"
 
     def _trigger_story_analysis(self):
         """
@@ -2690,7 +1601,7 @@ class MontageBuilder:
         logger.info("   📖 Story Engine: Checking for missing analysis...")
         
         # 1. Identify all input clips
-        input_clips = self.ctx.video_files or self._get_files(self.ctx.input_dir, ('.mp4', '.mov', '.mkv'))
+        input_clips = self.ctx.media.video_files or self._get_files(self.ctx.paths.input_dir, ('.mp4', '.mov', '.mkv'))
         if not input_clips:
             logger.warning("   ⚠️ Story Engine: No input clips found for analysis.")
             return
@@ -2748,7 +1659,7 @@ class MontageBuilder:
         logger.info("   📖 Story Engine: Assembling narrative...")
         
         # Ensure audio analysis is done
-        if not hasattr(self.ctx, 'audio_result') or self.ctx.audio_result is None:
+        if not hasattr(self.ctx, 'audio_result') or self.ctx.media.audio_result is None:
             self._analyze_music()
 
         # Initialize duration, transitions, and renderer
@@ -2759,9 +1670,9 @@ class MontageBuilder:
         # Determine style/arc
         style_name = "dynamic"
         story_arc_spec = None
-        if self.ctx.editing_instructions:
-            style_name = self.ctx.editing_instructions.get('style', {}).get('name', 'dynamic')
-            story_arc_spec = self.ctx.editing_instructions.get("story_arc")
+        if self.ctx.creative.editing_instructions:
+            style_name = self.ctx.creative.editing_instructions.get('style', {}).get('name', 'dynamic')
+            story_arc_spec = self.ctx.creative.editing_instructions.get("story_arc")
 
         # Determine output filename and logo
         self._setup_output_paths(style_name)
@@ -2777,29 +1688,29 @@ class MontageBuilder:
         solver = StorySolver(arc, provider)
 
         # Build beat list (clamped to target duration)
-        duration = self.ctx.target_duration or self.ctx.audio_result.duration
-        beats = [t for t in self.ctx.audio_result.beat_times.tolist() if 0.0 <= t <= duration]
+        duration = self.ctx.timeline.target_duration or self.ctx.media.audio_result.duration
+        beats = [t for t in self.ctx.media.audio_result.beat_times.tolist() if 0.0 <= t <= duration]
         if not beats:
             beats = [0.0]
 
         min_clip_duration = None
         max_clip_duration = None
-        if self.ctx.editing_instructions:
-            constraints = self.ctx.editing_instructions.get("constraints", {})
+        if self.ctx.creative.editing_instructions:
+            constraints = self.ctx.creative.editing_instructions.get("constraints", {})
             min_clip_duration = coerce_float(constraints.get("min_clip_duration_sec"))
             max_clip_duration = coerce_float(constraints.get("max_clip_duration_sec"))
             if min_clip_duration is not None and max_clip_duration is not None and min_clip_duration > max_clip_duration:
                 min_clip_duration, max_clip_duration = max_clip_duration, min_clip_duration
 
         # Build timeline plan
-        input_clips = self.ctx.video_files or self._get_files(self.ctx.input_dir, ('.mp4', '.mov', '.mkv'))
+        input_clips = self.ctx.media.video_files or self._get_files(self.ctx.paths.input_dir, ('.mp4', '.mov', '.mkv'))
         timeline_events = solver.solve(input_clips, duration, beats)
         if not timeline_events:
             raise RuntimeError("Story Engine produced no timeline events")
 
         # Map scenes by source path (fallback to full clip duration if scenes missing)
         scenes_by_path: Dict[str, List[Dict[str, Any]]] = {}
-        for scene in self.ctx.all_scenes_dicts:
+        for scene in self.ctx.media.all_scenes_dicts:
             scenes_by_path.setdefault(scene['path'], []).append(scene)
             scene.setdefault('usage_count', 0)
 
@@ -2823,8 +1734,8 @@ class MontageBuilder:
 
         logger.info(f"   ✅ Generated {len(timeline_events)} cuts based on '{style_name}' arc.")
 
-        self.ctx.cut_number = 0
-        self.ctx.current_time = 0.0
+        self.ctx.timeline.cut_number = 0
+        self.ctx.timeline.current_time = 0.0
 
         # Assemble timeline using existing clip processing pipeline
         for idx, event in enumerate(timeline_events):
@@ -2872,8 +1783,8 @@ class MontageBuilder:
             else:
                 clip_start = self.rng.uniform(scene_start, max_start)
 
-            self.ctx.current_time = start_time
-            self.ctx.beat_idx = idx
+            self.ctx.timeline.current_time = start_time
+            self.ctx.timeline.beat_idx = idx
             current_energy = float(event.get('clip_tension') or event.get('target_tension') or 0.5)
             selection_score = float(event.get('score', 0.0))
 
@@ -2886,8 +1797,8 @@ class MontageBuilder:
             )
 
             scene['usage_count'] = scene.get('usage_count', 0) + 1
-            self.ctx.cut_number += 1
-            self.ctx.current_time = start_time + cut_duration
+            self.ctx.timeline.cut_number += 1
+            self.ctx.timeline.current_time = start_time + cut_duration
 
         # Flush remaining futures to finalize segments
         self._flush_pending_futures()

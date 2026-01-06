@@ -83,9 +83,9 @@ class MontageWorkflow(VideoWorkflow):
         )
         
         # Apply workflow options to builder context
-        self.builder.ctx.stabilize = self.options.stabilize
-        self.builder.ctx.upscale = self.options.upscale
-        self.builder.ctx.enhance = self.options.enhance
+        self.builder.ctx.features.stabilize = self.options.stabilize
+        self.builder.ctx.features.upscale = self.options.upscale
+        self.builder.ctx.features.enhance = self.options.enhance
         
         # Apply advanced features from extras
         feats = self.builder.ctx.features
@@ -133,7 +133,7 @@ class MontageWorkflow(VideoWorkflow):
         """Render output."""
         if self.builder:
             # Enhance if enabled (handled in builder based on ctx flags set in initialize)
-            if self.builder.ctx.stabilize or self.builder.ctx.upscale or self.builder.ctx.enhance:
+            if self.builder.ctx.features.stabilize or self.builder.ctx.features.upscale or self.builder.ctx.features.enhance:
                 self.builder.enhance_assets()
             
             self.builder.render_output()
@@ -146,7 +146,7 @@ class MontageWorkflow(VideoWorkflow):
             # Save episodic memory
             self.builder._save_episodic_memory()
             
-            return str(self.builder.ctx.output_filename)
+            return str(self.builder.ctx.render.output_filename)
         return ""
     
     def cleanup(self) -> None:
