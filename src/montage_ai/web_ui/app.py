@@ -45,6 +45,9 @@ from ..timeline_exporter import TimelineExporter, Timeline, Clip
 # SSE Helper (Refactored to separate module)
 from .sse import MessageAnnouncer, format_sse
 
+# DRY Decorators for consistent error handling
+from .decorators import api_endpoint, require_json, require_file, validate_range
+
 announcer = MessageAnnouncer()
 
 # B-Roll Planning (semantic clip search via video_agent)
@@ -285,53 +288,63 @@ def api_status():
     })
 
 
+@app.route('/api/telemetry')
+def api_telemetry():
+    """Get telemetry metrics (KPIs, success rates, timing averages)."""
+    try:
+        from .. import telemetry
+        kpis = telemetry.get_kpis()
+        aggregate = telemetry.get_aggregate().to_dict()
+        return jsonify({
+            "status": "ok",
+            "kpis": kpis,
+            "aggregate": aggregate
+        })
+    except Exception as e:
+        logger.warning(f"Failed to get telemetry: {e}")
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "kpis": {},
+            "aggregate": {}
+        })
+
+
 @app.route('/api/analyze-crops', methods=['POST'])
+@api_endpoint
+@require_json('filename')
 def analyze_crops():
     """Analyze a video for smart reframing crops."""
     data = request.json
     filename = data.get('filename')
     keyframes_data = data.get('keyframes', [])
-    
-    if not filename:
-        return jsonify({"error": "Filename required"}), 400
-        
+
     filepath = os.path.join(INPUT_DIR, filename)
     if not os.path.exists(filepath):
-        return jsonify({"error": "File not found"}), 404
-        
-    try:
-        # Use a smaller smoothing window for UI responsiveness if needed, 
-        # but default is fine.
-        reframer = AutoReframeEngine()
-        
-        # Convert keyframes dicts to Keyframe objects
-        from ..auto_reframe import Keyframe
-        keyframes = []
-        if keyframes_data:
-            for kf in keyframes_data:
-                keyframes.append(Keyframe(
-                    time=float(kf['time']),
-                    center_x_norm=float(kf['x'])
-                ))
-        
-        crops = reframer.analyze(filepath, keyframes=keyframes)
-        
-        # Convert dataclasses to dicts
-        result = [
-            {
-                "time": c.time,
-                "x": c.x,
-                "y": c.y,
-                "width": c.width,
-                "height": c.height,
-                "score": c.score
-            }
-            for c in crops
-        ]
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error analyzing crops: {e}")
-        return jsonify({"error": str(e)}), 500
+        raise FileNotFoundError(f"File not found: {filename}")
+
+    reframer = AutoReframeEngine()
+
+    # Convert keyframes dicts to Keyframe objects
+    from ..auto_reframe import Keyframe
+    keyframes = [
+        Keyframe(time=float(kf['time']), center_x_norm=float(kf['x']))
+        for kf in keyframes_data
+    ] if keyframes_data else []
+
+    crops = reframer.analyze(filepath, keyframes=keyframes)
+
+    return jsonify([
+        {
+            "time": c.time,
+            "x": c.x,
+            "y": c.y,
+            "width": c.width,
+            "height": c.height,
+            "score": c.score
+        }
+        for c in crops
+    ])
 
 
 @app.route('/api/transparency')
@@ -2030,6 +2043,9 @@ def api_shorts_render():
     add_captions = data.get('autoCaptions', data.get('add_captions', True))
     platform = data.get('platform', 'tiktok')
     clean_audio = data.get('cleanAudio', data.get('audioPolish', False))
+    audio_aware = data.get('audioAware', data.get('audio_aware', False))
+    stabilize = data.get('stabilize', False)
+    upscale = data.get('upscale', False)
 
     if not video_path or not Path(video_path).exists():
         return jsonify({"error": "Video file not found"}), 404
@@ -2071,7 +2087,10 @@ def api_shorts_render():
                 "caption_style": caption_style,
                 "add_captions": add_captions,
                 "platform": platform,
-                "clean_audio": clean_audio
+                "clean_audio": clean_audio,
+                "audio_aware": audio_aware,
+                "stabilize": stabilize,
+                "upscale": upscale
             },
             "phase": JobPhase.initial().to_dict(),
             "created_at": datetime.now().isoformat()
@@ -2088,166 +2107,38 @@ def api_shorts_render():
 
 
 @app.route('/api/shorts/highlights', methods=['POST'])
+@api_endpoint
 def api_shorts_highlights():
     """
     Detect highlight moments for clip extraction.
-    
+
     Multi-signal highlight detection:
     1. Audio Energy: High-energy regions (music drops, loud moments)
     2. Beat Alignment: Key beats in music
     3. Speech Phrases: Important speech segments (hooks)
+    4. Fallback: Evenly distributed beat-aligned moments
     """
+    from .highlights import detect_highlights
+
     data = request.json or {}
     video_path = data.get('video_path')
-    max_clips = int(data.get('max_clips', 5))
-    min_duration = float(data.get('min_duration', 5.0))
-    max_duration = float(data.get('max_duration', 60.0))
-    include_speech = data.get('include_speech', True)
-    
+
     if not video_path or not Path(video_path).exists():
-        return jsonify({"error": "Video file not found"}), 404
-    
-    try:
-        import numpy as np
-        from ..audio_analysis import AudioAnalyzer
-        
-        analyzer = AudioAnalyzer(video_path)
-        analyzer.analyze()
-        
-        highlights = []
-        beats = analyzer.beat_times if hasattr(analyzer, 'beat_times') else []
-        energy = analyzer.energy_curve if hasattr(analyzer, 'energy_curve') else []
-        
-        # 1. Energy-based highlights
-        if len(energy) > 0:
-            threshold_high = np.percentile(energy, 85)  # Top 15% energy
-            threshold_low = np.percentile(energy, 70)   # Top 30% for context
-            
-            hop_time = getattr(analyzer, 'hop_length', 512) / getattr(analyzer, 'sr', 22050)
-            
-            in_highlight = False
-            start_time = 0
-            peak_energy = 0
-            
-            for i, e in enumerate(energy):
-                time = i * hop_time
-                
-                if e > threshold_high and not in_highlight:
-                    in_highlight = True
-                    start_time = max(0, time - 0.5)  # Capture lead-in
-                    peak_energy = e
-                elif in_highlight:
-                    peak_energy = max(peak_energy, e)
-                    if e <= threshold_low:
-                        # End of highlight
-                        in_highlight = False
-                        duration = time - start_time
-                        if min_duration <= duration <= max_duration:
-                            # Normalize score to 0-1
-                            score = min(1.0, peak_energy / (np.max(energy) + 0.001))
-                            highlights.append({
-                                "time": start_time,
-                                "start": start_time,
-                                "end": time,
-                                "duration": round(duration, 2),
-                                "score": round(score, 3),
-                                "type": "Energy",
-                                "label": f"🔥 High Energy ({int(score*100)}%)"
-                            })
-        
-        # 2. Beat-drop detection (sudden energy increases)
-        if len(energy) > 20 and len(beats) > 0:
-            energy_diff = np.diff(energy)
-            beat_indices = [int(b * getattr(analyzer, 'sr', 22050) / getattr(analyzer, 'hop_length', 512)) for b in beats]
-            
-            for beat_idx, beat_time in zip(beat_indices[:20], beats[:20]):
-                if 0 < beat_idx < len(energy_diff):
-                    # Check if this beat has a significant energy increase
-                    if energy_diff[beat_idx] > np.percentile(energy_diff, 90):
-                        # This is a "drop" moment
-                        if not any(abs(h['time'] - beat_time) < 3 for h in highlights):  # Not too close to existing
-                            highlights.append({
-                                "time": beat_time,
-                                "start": max(0, beat_time - 1),
-                                "end": beat_time + min_duration,
-                                "duration": min_duration + 1,
-                                "score": 0.85,
-                                "type": "Drop",
-                                "label": "💥 Beat Drop"
-                            })
-        
-        # 3. Speech hook detection (first 30 seconds often contain hooks)
-        if include_speech and len(highlights) < max_clips:
-            try:
-                # Quick transcription to find speech density
-                # Hook = high word density in first 30s
-                from ..transcriber import transcribe_audio
-                transcript = transcribe_audio(video_path, model='tiny', word_timestamps=True)
-                
-                segments = transcript.get('segments', [])
-                for seg in segments[:5]:  # First 5 segments only
-                    start = seg.get('start', 0)
-                    end = seg.get('end', start + 3)
-                    duration = end - start
-                    
-                    # Look for segments with punchy delivery (short, dense)
-                    words = seg.get('words', [])
-                    word_density = len(words) / (duration + 0.001) if duration > 0 else 0
-                    
-                    if word_density > 2.0 and duration >= 2:  # >2 words/sec = energetic delivery
-                        if not any(abs(h['time'] - start) < 3 for h in highlights):
-                            highlights.append({
-                                "time": start,
-                                "start": start,
-                                "end": end,
-                                "duration": round(duration, 2),
-                                "score": min(0.9, 0.5 + word_density * 0.15),
-                                "type": "Speech",
-                                "label": "🎤 Hook"
-                            })
-            except Exception:
-                pass  # Speech analysis optional, don't fail the whole endpoint
-        
-        # 4. Fallback: evenly distributed beat-aligned moments
-        if len(highlights) < max_clips and len(beats) > 4:
-            video_duration = getattr(analyzer, 'duration', 60)
-            interval = video_duration / (max_clips + 1)
-            
-            for i in range(1, max_clips - len(highlights) + 1):
-                target_time = i * interval
-                # Find nearest beat
-                nearest_beat = min(beats, key=lambda b: abs(b - target_time)) if beats else target_time
-                
-                if not any(abs(h['time'] - nearest_beat) < 5 for h in highlights):
-                    highlights.append({
-                        "time": nearest_beat,
-                        "start": nearest_beat,
-                        "end": nearest_beat + min_duration,
-                        "duration": min_duration,
-                        "score": 0.6,
-                        "type": "Beat",
-                        "label": "🎵 Beat"
-                    })
-        
-        # Sort by time for timeline display, then limit
-        highlights.sort(key=lambda x: x['time'])
-        
-        # Take best clips by score if too many
-        if len(highlights) > max_clips:
-            highlights.sort(key=lambda x: x['score'], reverse=True)
-            highlights = highlights[:max_clips]
-            highlights.sort(key=lambda x: x['time'])  # Resort by time
-        
-        return jsonify({
-            "success": True,
-            "highlights": highlights,
-            "total_found": len(highlights)
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "error": str(e)}), 500
+        raise FileNotFoundError("Video file not found")
+
+    highlights = detect_highlights(
+        video_path=video_path,
+        max_clips=int(data.get('max_clips', 5)),
+        min_duration=float(data.get('min_duration', 5.0)),
+        max_duration=float(data.get('max_duration', 60.0)),
+        include_speech=data.get('include_speech', True)
+    )
+
+    return jsonify({
+        "success": True,
+        "highlights": highlights,
+        "total_found": len(highlights)
+    })
 
 
 # =============================================================================

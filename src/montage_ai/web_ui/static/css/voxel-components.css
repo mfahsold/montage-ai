@@ -1,0 +1,456 @@
+/*
+ * Montage AI - Voxel Component Library Styles
+ * Companion to voxel-dark.css for Jinja2 macro components
+ * Reference: docs/DESIGN_SYSTEM.md, templates/components/voxel.html
+ */
+
+/* =============================================================================
+   LOADING STATES
+============================================================================= */
+
+/* Spinner */
+.voxel-spinner {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.voxel-spinner .spinner-block {
+    background: var(--primary);
+    animation: voxel-pulse 0.8s infinite;
+}
+
+.voxel-spinner .spinner-block:nth-child(2) { animation-delay: 0.1s; }
+.voxel-spinner .spinner-block:nth-child(3) { animation-delay: 0.2s; }
+
+.voxel-spinner-sm .spinner-block { width: 6px; height: 6px; }
+.voxel-spinner-md .spinner-block { width: 10px; height: 10px; }
+.voxel-spinner-lg .spinner-block { width: 16px; height: 16px; }
+
+@keyframes voxel-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+/* Loading Overlay */
+.voxel-loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 5, 5, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(4px);
+}
+
+.voxel-loading-overlay .loading-content {
+    text-align: center;
+    padding: 2rem;
+}
+
+.voxel-loading-overlay .loading-message {
+    margin: 1.5rem 0 1rem;
+    font-size: var(--fs-lg);
+    color: var(--fg);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.voxel-loading-overlay .loading-progress {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.voxel-loading-overlay .progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--muted);
+    border: 2px solid var(--border);
+}
+
+.voxel-loading-overlay .progress-fill {
+    height: 100%;
+    background: var(--primary);
+    transition: width 0.3s steps(10);
+}
+
+.voxel-loading-overlay .progress-text {
+    font-size: var(--fs-sm);
+    color: var(--primary);
+    min-width: 3rem;
+    text-align: right;
+}
+
+/* Loading Button */
+.voxel-btn-loading .btn-loading {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.voxel-btn-loading.is-loading .btn-normal {
+    display: none;
+}
+
+.voxel-btn-loading.is-loading .btn-loading {
+    display: inline-flex;
+}
+
+.voxel-btn-loading.is-loading {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+/* =============================================================================
+   PROGRESS & STATUS
+============================================================================= */
+
+.voxel-progress {
+    width: 100%;
+}
+
+.voxel-progress .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.voxel-progress .progress-percent {
+    font-size: var(--fs-sm);
+    color: var(--primary);
+}
+
+.voxel-progress .progress-bar {
+    height: 8px;
+    background: var(--muted);
+    border: 2px solid var(--border);
+}
+
+.voxel-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    position: relative;
+    transition: width 0.3s steps(10);
+}
+
+/* Shimmer effect */
+.voxel-progress .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Status Badges */
+.voxel-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 2px solid;
+}
+
+.voxel-badge-success {
+    color: var(--success);
+    border-color: var(--success);
+    background: rgba(0, 255, 136, 0.1);
+}
+
+.voxel-badge-warning {
+    color: var(--warning);
+    border-color: var(--warning);
+    background: rgba(255, 204, 0, 0.1);
+}
+
+.voxel-badge-error {
+    color: var(--error);
+    border-color: var(--error);
+    background: rgba(255, 51, 51, 0.1);
+}
+
+.voxel-badge-pending {
+    color: var(--muted-fg);
+    border-color: var(--border);
+    background: var(--muted);
+}
+
+.voxel-badge-processing {
+    color: var(--primary);
+    border-color: var(--primary);
+    background: rgba(0, 85, 255, 0.1);
+    animation: badge-pulse 1.5s infinite;
+}
+
+@keyframes badge-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* =============================================================================
+   ALERTS & MESSAGES
+============================================================================= */
+
+.voxel-alert {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 2px solid;
+    margin-bottom: 1rem;
+}
+
+.voxel-alert .alert-icon {
+    font-size: var(--fs-lg);
+    flex-shrink: 0;
+}
+
+.voxel-alert .alert-message {
+    flex: 1;
+    font-size: var(--fs-sm);
+}
+
+.voxel-alert .alert-close {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: var(--fs-base);
+    opacity: 0.6;
+    transition: opacity 0.1s;
+}
+
+.voxel-alert .alert-close:hover {
+    opacity: 1;
+}
+
+.voxel-alert-info {
+    border-color: var(--primary);
+    background: rgba(0, 85, 255, 0.1);
+    color: var(--fg);
+}
+
+.voxel-alert-success {
+    border-color: var(--success);
+    background: rgba(0, 255, 136, 0.1);
+    color: var(--success);
+}
+
+.voxel-alert-warning {
+    border-color: var(--warning);
+    background: rgba(255, 204, 0, 0.1);
+    color: var(--warning);
+}
+
+.voxel-alert-error {
+    border-color: var(--error);
+    background: rgba(255, 51, 51, 0.1);
+    color: var(--error);
+}
+
+/* Toast Container */
+.voxel-toast-container {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
+.voxel-toast {
+    pointer-events: auto;
+    animation: toast-slide-in 0.2s steps(4);
+    max-width: 350px;
+}
+
+.voxel-toast.toast-exit {
+    animation: toast-slide-out 0.2s steps(4) forwards;
+}
+
+@keyframes toast-slide-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes toast-slide-out {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+/* =============================================================================
+   FORM ENHANCEMENTS
+============================================================================= */
+
+.voxel-field {
+    margin-bottom: 1rem;
+}
+
+.voxel-field .tech-label {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+/* Toggle Switch */
+.voxel-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.voxel-toggle input {
+    display: none;
+}
+
+.voxel-toggle .toggle-slider {
+    width: 48px;
+    height: 24px;
+    background: var(--muted);
+    border: 2px solid var(--border);
+    position: relative;
+    transition: all 0.1s steps(2);
+}
+
+.voxel-toggle .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: var(--fg);
+    top: 2px;
+    left: 2px;
+    transition: transform 0.1s steps(2);
+}
+
+.voxel-toggle input:checked + .toggle-slider {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.voxel-toggle input:checked + .toggle-slider::before {
+    transform: translateX(24px);
+}
+
+.voxel-toggle .toggle-label {
+    font-size: var(--fs-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Range Slider */
+.voxel-range {
+    width: 100%;
+    height: 8px;
+    background: var(--muted);
+    border: 2px solid var(--border);
+    appearance: none;
+    cursor: pointer;
+}
+
+.voxel-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--primary);
+    border: 2px solid var(--fg);
+    cursor: pointer;
+}
+
+.voxel-range::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: var(--primary);
+    border: 2px solid var(--fg);
+    cursor: pointer;
+}
+
+.range-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.range-value {
+    font-size: var(--fs-sm);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/* =============================================================================
+   LAYOUT HELPERS
+============================================================================= */
+
+.voxel-section {
+    margin-bottom: 2rem;
+}
+
+.voxel-section .section-title {
+    font-size: var(--fs-xl);
+    color: var(--fg);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+}
+
+.voxel-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.grid-cols-auto {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+    .grid-cols-2,
+    .grid-cols-3 {
+        grid-template-columns: 1fr;
+    }
+}
+
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
+
+/* =============================================================================
+   UTILITY: JavaScript Helpers
+============================================================================= */
+
+/* For JS: show/hide with data attributes */
+[data-loading="true"] .show-when-idle { display: none !important; }
+[data-loading="true"] .show-when-loading { display: flex !important; }
+[data-loading="false"] .show-when-loading { display: none !important; }

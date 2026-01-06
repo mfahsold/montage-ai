@@ -1,0 +1,357 @@
+{# =============================================================================
+   Voxel UI Component Library - Jinja2 Macros
+
+   Usage:
+   {% from "components/voxel.html" import voxel_btn, voxel_card, loading_spinner %}
+   {{ voxel_btn("Generate", variant="primary", id="generate-btn") }}
+
+   Design System Reference: docs/DESIGN_SYSTEM.md
+============================================================================= #}
+
+{# --------------------------------------------------------------------------
+   BUTTONS
+-------------------------------------------------------------------------- #}
+
+{% macro voxel_btn(label, variant="default", id="", type="button", disabled=false, icon="", class="") %}
+{#
+  Voxel Button Component
+
+  Args:
+    label: Button text
+    variant: "primary" | "secondary" | "ghost" | "danger" | "default"
+    id: Optional ID
+    type: "button" | "submit"
+    disabled: Boolean
+    icon: Optional icon emoji (e.g., "🚀")
+    class: Additional CSS classes
+#}
+<button
+    type="{{ type }}"
+    class="voxel-btn voxel-btn-{{ variant }} {{ class }}"
+    {% if id %}id="{{ id }}"{% endif %}
+    {% if disabled %}disabled{% endif %}
+>
+    {% if icon %}<span class="btn-icon">{{ icon }}</span>{% endif %}
+    <span class="btn-label">{{ label }}</span>
+</button>
+{% endmacro %}
+
+
+{# --------------------------------------------------------------------------
+   CARDS
+-------------------------------------------------------------------------- #}
+
+{% macro voxel_card(title="", class="", id="") %}
+{#
+  Voxel Card Component with slot
+
+  Usage:
+    {% call voxel_card("Settings") %}
+      <p>Card content here</p>
+    {% endcall %}
+#}
+<div class="voxel-card {{ class }}" {% if id %}id="{{ id }}"{% endif %}>
+    {% if title %}
+    <h3 class="voxel-card-title">{{ title }}</h3>
+    {% endif %}
+    {{ caller() }}
+</div>
+{% endmacro %}
+
+
+{# --------------------------------------------------------------------------
+   FORM CONTROLS
+-------------------------------------------------------------------------- #}
+
+{% macro voxel_input(name, label="", type="text", value="", placeholder="", required=false, id="") %}
+{#
+  Voxel Input Field
+
+  Args:
+    name: Input name attribute
+    label: Optional label text
+    type: Input type
+    value: Default value
+    placeholder: Placeholder text
+    required: Boolean
+    id: Optional ID (defaults to name)
+#}
+{% set input_id = id if id else name %}
+<div class="voxel-field">
+    {% if label %}
+    <label class="tech-label" for="{{ input_id }}">{{ label }}</label>
+    {% endif %}
+    <input
+        type="{{ type }}"
+        class="voxel-input"
+        name="{{ name }}"
+        id="{{ input_id }}"
+        {% if value %}value="{{ value }}"{% endif %}
+        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+        {% if required %}required{% endif %}
+    >
+</div>
+{% endmacro %}
+
+
+{% macro voxel_select(name, options, label="", selected="", id="") %}
+{#
+  Voxel Select Dropdown
+
+  Args:
+    name: Select name attribute
+    options: List of dicts with "value" and "label" keys
+    label: Optional label text
+    selected: Currently selected value
+    id: Optional ID
+#}
+{% set select_id = id if id else name %}
+<div class="voxel-field">
+    {% if label %}
+    <label class="tech-label" for="{{ select_id }}">{{ label }}</label>
+    {% endif %}
+    <select class="voxel-input" name="{{ name }}" id="{{ select_id }}">
+        {% for opt in options %}
+        <option value="{{ opt.value }}" {% if opt.value == selected %}selected{% endif %}>
+            {{ opt.label }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+{% endmacro %}
+
+
+{% macro voxel_toggle(name, label, checked=false, id="") %}
+{#
+  Voxel Toggle Switch
+
+  Args:
+    name: Input name
+    label: Label text
+    checked: Initial state
+    id: Optional ID
+#}
+{% set toggle_id = id if id else name %}
+<label class="voxel-toggle">
+    <input type="checkbox" name="{{ name }}" id="{{ toggle_id }}" {% if checked %}checked{% endif %}>
+    <span class="toggle-slider"></span>
+    <span class="toggle-label">{{ label }}</span>
+</label>
+{% endmacro %}
+
+
+{% macro voxel_range(name, label, min=0, max=100, value=50, step=1, id="", show_value=true) %}
+{#
+  Voxel Range Slider with value display
+
+  Args:
+    name: Input name
+    label: Label text
+    min/max/value/step: Range attributes
+    id: Optional ID
+    show_value: Whether to show current value
+#}
+{% set range_id = id if id else name %}
+<div class="voxel-field">
+    <div class="range-header">
+        <label class="tech-label" for="{{ range_id }}">{{ label }}</label>
+        {% if show_value %}
+        <span class="range-value" id="{{ range_id }}-value">{{ value }}</span>
+        {% endif %}
+    </div>
+    <input
+        type="range"
+        class="voxel-range"
+        name="{{ name }}"
+        id="{{ range_id }}"
+        min="{{ min }}"
+        max="{{ max }}"
+        value="{{ value }}"
+        step="{{ step }}"
+        {% if show_value %}
+        oninput="document.getElementById('{{ range_id }}-value').textContent = this.value"
+        {% endif %}
+    >
+</div>
+{% endmacro %}
+
+
+{# --------------------------------------------------------------------------
+   LOADING STATES
+-------------------------------------------------------------------------- #}
+
+{% macro loading_spinner(size="md", id="", class="") %}
+{#
+  Loading Spinner Component
+
+  Args:
+    size: "sm" | "md" | "lg"
+    id: Optional ID for show/hide
+    class: Additional classes
+#}
+<div class="voxel-spinner voxel-spinner-{{ size }} {{ class }}" {% if id %}id="{{ id }}"{% endif %}>
+    <div class="spinner-block"></div>
+    <div class="spinner-block"></div>
+    <div class="spinner-block"></div>
+</div>
+{% endmacro %}
+
+
+{% macro loading_overlay(id="loading-overlay", message="Processing...") %}
+{#
+  Full-screen Loading Overlay
+
+  Args:
+    id: ID for show/hide
+    message: Loading message
+#}
+<div class="voxel-loading-overlay" id="{{ id }}" style="display: none;">
+    <div class="loading-content">
+        {{ loading_spinner("lg") }}
+        <p class="loading-message">{{ message }}</p>
+        <div class="loading-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="{{ id }}-progress" style="width: 0%"></div>
+            </div>
+            <span class="progress-text" id="{{ id }}-text">0%</span>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+
+{% macro loading_button(label, loading_label="Processing...", variant="primary", id="", type="submit") %}
+{#
+  Button with loading state
+
+  Args:
+    label: Normal button text
+    loading_label: Text shown while loading
+    variant: Button variant
+    id: Required for state management
+    type: Button type
+#}
+<button
+    type="{{ type }}"
+    class="voxel-btn voxel-btn-{{ variant }} voxel-btn-loading"
+    id="{{ id }}"
+>
+    <span class="btn-normal">{{ label }}</span>
+    <span class="btn-loading" style="display: none;">
+        {{ loading_spinner("sm") }}
+        <span>{{ loading_label }}</span>
+    </span>
+</button>
+{% endmacro %}
+
+
+{# --------------------------------------------------------------------------
+   PROGRESS & STATUS
+-------------------------------------------------------------------------- #}
+
+{% macro progress_bar(id="", value=0, label="", class="") %}
+{#
+  Progress Bar Component
+
+  Args:
+    id: ID for JavaScript updates
+    value: Initial percentage (0-100)
+    label: Optional label
+    class: Additional classes
+#}
+<div class="voxel-progress {{ class }}">
+    {% if label %}
+    <div class="progress-header">
+        <span class="tech-label">{{ label }}</span>
+        <span class="progress-percent" id="{{ id }}-percent">{{ value }}%</span>
+    </div>
+    {% endif %}
+    <div class="progress-bar">
+        <div class="progress-fill" id="{{ id }}" style="width: {{ value }}%"></div>
+    </div>
+</div>
+{% endmacro %}
+
+
+{% macro status_badge(status, text="") %}
+{#
+  Status Badge Component
+
+  Args:
+    status: "success" | "warning" | "error" | "pending" | "processing"
+    text: Badge text (defaults to status)
+#}
+{% set badge_text = text if text else status.title() %}
+<span class="voxel-badge voxel-badge-{{ status }}">{{ badge_text }}</span>
+{% endmacro %}
+
+
+{# --------------------------------------------------------------------------
+   ALERTS & MESSAGES
+-------------------------------------------------------------------------- #}
+
+{% macro alert(message, type="info", dismissible=false, id="") %}
+{#
+  Alert Message Component
+
+  Args:
+    message: Alert text
+    type: "info" | "success" | "warning" | "error"
+    dismissible: Show close button
+    id: Optional ID
+#}
+<div class="voxel-alert voxel-alert-{{ type }}" {% if id %}id="{{ id }}"{% endif %}>
+    <span class="alert-icon">
+        {% if type == "success" %}✓{% elif type == "warning" %}⚠{% elif type == "error" %}✕{% else %}ℹ{% endif %}
+    </span>
+    <span class="alert-message">{{ message }}</span>
+    {% if dismissible %}
+    <button type="button" class="alert-close" onclick="this.parentElement.remove()">✕</button>
+    {% endif %}
+</div>
+{% endmacro %}
+
+
+{% macro toast_container() %}
+{#
+  Container for toast notifications (add once per page)
+#}
+<div id="voxel-toast-container" class="voxel-toast-container"></div>
+{% endmacro %}
+
+
+{# --------------------------------------------------------------------------
+   LAYOUT HELPERS
+-------------------------------------------------------------------------- #}
+
+{% macro section(title, class="") %}
+{#
+  Section with title
+
+  Usage:
+    {% call section("Settings") %}
+      <p>Section content</p>
+    {% endcall %}
+#}
+<section class="voxel-section {{ class }}">
+    <h2 class="section-title">{{ title }}</h2>
+    <div class="section-content">
+        {{ caller() }}
+    </div>
+</section>
+{% endmacro %}
+
+
+{% macro grid(cols="auto", gap="4", class="") %}
+{#
+  Responsive Grid Container
+
+  Args:
+    cols: "auto" | "2" | "3" | "4"
+    gap: "2" | "4" | "6"
+    class: Additional classes
+#}
+<div class="voxel-grid grid-cols-{{ cols }} gap-{{ gap }} {{ class }}">
+    {{ caller() }}
+</div>
+{% endmacro %}
