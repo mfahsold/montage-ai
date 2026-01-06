@@ -2515,14 +2515,14 @@ class MontageBuilder:
                     ))
                 # NEW: Record denoise, sharpen, film_grain
                 if enhancements.get('denoised'):
-                    from ..enhancement_tracking import DenoiseParams
-                    decision.record_denoise(DenoiseParams(method="hqdn3d", strength=5))
+                    from ..clip_enhancement import DenoiseConfig
+                    decision.record_denoise(DenoiseConfig(spatial_strength=0.3))
                 if enhancements.get('sharpened'):
-                    from ..enhancement_tracking import SharpenParams
-                    decision.record_sharpen(SharpenParams(method="unsharp", strength=0.5))
+                    from ..clip_enhancement import SharpenConfig
+                    decision.record_sharpen(SharpenConfig(amount=0.5))
                 if enhancements.get('film_grain'):
                     from ..clip_enhancement import FilmGrainConfig
-                    decision.record_film_grain(FilmGrainConfig(preset=self.ctx.film_grain))
+                    decision.record_film_grain(FilmGrainConfig(grain_type=self.ctx.film_grain, enabled=True))
 
                 meta.enhancement_decision = decision
 
