@@ -236,6 +236,40 @@ def get_hwaccel_by_type(hwaccel: str, preferred_codec: str = "h264") -> Optional
             is_gpu=True
         )
 
+    if accel == "rocm":
+        # AMD ROCm GPU - uses VAAPI for encoding
+        if not _has_rocm():
+            return None
+        # ROCm uses VAAPI for video encoding (AMF not available on Linux FFmpeg)
+        encoder = _pick_encoder("h264_vaapi", "hevc_vaapi", codec_pref)
+        if not encoder:
+            return None
+        return HWConfig(
+            type="rocm",
+            encoder=encoder,
+            decoder_args=["-hwaccel", "vaapi", "-hwaccel_device", "/dev/dri/renderD128"],
+            encoder_args=["-c:v", encoder],
+            is_gpu=True,
+            hwupload_filter="format=nv12,hwupload"
+        )
+
+    if accel == "adreno":
+        # Qualcomm Adreno GPU - uses V4L2 for encoding
+        if not _has_adreno():
+            return None
+        # Adreno uses V4L2 M2M encoder on Linux
+        encoder = _pick_encoder("h264_v4l2m2m", "hevc_v4l2m2m", codec_pref)
+        if not encoder:
+            # Fallback to CPU if V4L2 encoder not available
+            return None
+        return HWConfig(
+            type="adreno",
+            encoder=encoder,
+            decoder_args=[],  # V4L2 doesn't need hwaccel for decoding
+            encoder_args=["-c:v", encoder],
+            is_gpu=True
+        )
+
     return None
 
 
@@ -283,6 +317,101 @@ def _is_intel_gpu() -> bool:
             return True
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
+
+    return False
+
+
+def _has_rocm() -> bool:
+    """Detect AMD ROCm GPU (RX 5000/6000/7000 series)."""
+    # Check for rocm-smi
+    if shutil.which("rocm-smi"):
+        try:
+            result = subprocess.run(
+                ["rocm-smi", "--showid"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and "GPU" in result.stdout:
+                return True
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+    # Check sysfs for AMD GPU (vendor 0x1002)
+    vendor_paths = [
+        "/sys/class/drm/card0/device/vendor",
+        "/sys/class/drm/card1/device/vendor",
+        "/sys/class/drm/renderD128/device/vendor",
+    ]
+    for path in vendor_paths:
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    vendor = f.read().strip()
+                    if "0x1002" in vendor or "1002" in vendor:
+                        return True
+            except (IOError, PermissionError):
+                pass
+
+    # Fallback: check lspci for AMD/ATI VGA
+    try:
+        result = subprocess.run(
+            ["lspci"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if "AMD" in result.stdout and "VGA" in result.stdout:
+            return True
+        if "ATI" in result.stdout and "VGA" in result.stdout:
+            return True
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    return False
+
+
+def _has_adreno() -> bool:
+    """Detect Qualcomm Adreno GPU (Snapdragon platforms)."""
+    # Check for Qualcomm vendor ID (0x5143 = "QC")
+    vendor_paths = [
+        "/sys/class/drm/card0/device/vendor",
+        "/sys/class/drm/renderD128/device/vendor",
+    ]
+    for path in vendor_paths:
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    vendor = f.read().strip()
+                    # Qualcomm vendor IDs: 0x5143, 0x17cb
+                    if "0x5143" in vendor or "0x17cb" in vendor or "5143" in vendor:
+                        return True
+            except (IOError, PermissionError):
+                pass
+
+    # Check for qcom kernel (Snapdragon)
+    try:
+        with open("/proc/version") as f:
+            if "qcom" in f.read().lower():
+                return True
+    except (IOError, FileNotFoundError):
+        pass
+
+    # Check for /dev/video* (V4L2 encoder)
+    v4l2_paths = ["/dev/video0", "/dev/video1", "/dev/video2"]
+    if any(os.path.exists(p) for p in v4l2_paths):
+        # Additional check: Adreno in dmesg or kernel logs
+        try:
+            result = subprocess.run(
+                ["dmesg"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if "adreno" in result.stdout.lower():
+                return True
+        except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
+            pass
 
     return False
 
@@ -343,7 +472,8 @@ def get_best_hwaccel(preferred_codec: str = "h264") -> HWConfig:
 
     Priority order (platform-aware):
     - Jetson: NVMPI first (NVENC doesn't work on Jetson!)
-    - Desktop: NVENC → VideoToolbox → VAAPI → QSV
+    - Adreno (Snapdragon): V4L2 encoder
+    - Desktop: NVENC → ROCm → VideoToolbox → VAAPI → QSV
     - Fallback: CPU
     """
     # Jetson-specific: NVMPI is the only working encoder
@@ -354,12 +484,25 @@ def get_best_hwaccel(preferred_codec: str = "h264") -> HWConfig:
         # Fallback to CPU on Jetson if NVMPI unavailable
         return get_hwaccel_by_type("cpu", preferred_codec=preferred_codec)
 
-    # Desktop/Server: Standard priority order
-    for accel in ("nvenc", "videotoolbox", "vaapi", "qsv"):
+    # Adreno/Snapdragon: V4L2 encoder
+    if _has_adreno():
+        config = get_hwaccel_by_type("adreno", preferred_codec=preferred_codec)
+        if config and check_encoder_works(config):
+            return config
+        # Fallback to CPU on Adreno if V4L2 unavailable
+        return get_hwaccel_by_type("cpu", preferred_codec=preferred_codec)
+
+    # Desktop/Server: Priority order
+    # 1. NVENC (NVIDIA desktop) - fastest for encoding
+    # 2. ROCm (AMD RX 5000/6000/7000) - excellent with large VRAM
+    # 3. VideoToolbox (macOS) - native Apple Silicon
+    # 4. VAAPI (Intel/AMD) - good Linux support
+    # 5. QSV (Intel) - good but less common
+    for accel in ("nvenc", "rocm", "videotoolbox", "vaapi", "qsv"):
         config = get_hwaccel_by_type(accel, preferred_codec=preferred_codec)
         if config and check_encoder_works(config):
             return config
-            
+
     # Fallback to CPU
     return get_hwaccel_by_type("cpu", preferred_codec=preferred_codec)
 

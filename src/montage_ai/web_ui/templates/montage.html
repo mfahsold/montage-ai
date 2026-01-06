@@ -293,9 +293,33 @@
                         </div>
                     </div>
 
+                    <!-- Story Engine -->
+                    <div class="option-group">
+                        <div style="font-weight: 900; font-size: 0.8rem; color: #9b59b6; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📖 STORY ENGINE</div>
+                        <div class="option-item">
+                            <input type="checkbox" name="story_engine" id="story_engine">
+                            <div class="option-label">
+                                <div class="option-label-title">NARRATIVE TENSION</div>
+                                <div class="option-label-desc">AI-driven 5-phase story arc: Intro → Build → Climax → Sustain → Outro.</div>
+                            </div>
+                        </div>
+                        <div class="option-item" style="flex-direction: column; align-items: flex-start; margin-top: 0.75rem;">
+                            <label for="story_arc" class="option-label-title" style="margin-bottom: 0.5rem;">STORY ARC PRESET</label>
+                            <select name="story_arc" id="story_arc" class="voxel-input" style="width: 100%;">
+                                <option value="auto">Auto - Match style</option>
+                                <option value="hero_journey">Hero's Journey - Classic narrative</option>
+                                <option value="mtv_energy">MTV Energy - Peak early, sustain</option>
+                                <option value="documentary">Documentary - Gradual reveal</option>
+                                <option value="thriller">Thriller - Tension build</option>
+                                <option value="flat">Flat - Consistent energy</option>
+                            </select>
+                            <p class="option-label-desc" style="margin-top: 0.5rem;">Controls pacing and energy distribution across the montage.</p>
+                        </div>
+                    </div>
+
                     <!-- Film Emulation -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: #9b59b6; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎬 FILM EMULATION</div>
+                        <div style="font-weight: 900; font-size: 0.8rem; color: #e91e63; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎬 FILM EMULATION</div>
                         <div class="option-item" style="flex-direction: column; align-items: flex-start;">
                             <label for="film_grain" class="option-label-title" style="margin-bottom: 0.5rem;">FILM GRAIN</label>
                             <select name="film_grain" id="film_grain" class="voxel-input" style="width: 100%;">

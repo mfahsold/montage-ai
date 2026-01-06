@@ -1069,7 +1069,19 @@ class SegmentWriter:
 
                 af_chain = ",".join(af_filters)
 
-                cmd = build_ffmpeg_cmd([
+                # Build base command with GPU init if needed
+                base_args = []
+
+                # Add hardware init for GPU encoders (VAAPI needs init_hw_device)
+                if _settings.encoding.normalize_clips and _ffmpeg_config.is_gpu_accelerated:
+                    gpu_type = _ffmpeg_config.gpu_encoder_type
+                    if gpu_type in ("vaapi", "rocm"):
+                        base_args.extend([
+                            "-init_hw_device", "vaapi=va:/dev/dri/renderD128",
+                            "-filter_hw_device", "va",
+                        ])
+
+                base_args.extend([
                     "-f", "concat",
                     "-safe", "0",
                     "-i", concat_list_path,
@@ -1078,13 +1090,20 @@ class SegmentWriter:
                     "-map", "1:a",
                 ])
 
+                cmd = build_ffmpeg_cmd(base_args)
+
                 # Check if we should force re-encode (NORMALIZE_CLIPS=true) or use stream copy
                 if _settings.encoding.normalize_clips:
                     logger.info("   🔄 Re-encoding final output (CFR enforcement)...")
-                    
+
                     # Refresh target codec from config in case it changed or was init early
                     current_target_codec = _ffmpeg_config.codec
-                    logger.info(f"   🎥 Final Encode: codec={current_target_codec} profile={TARGET_PROFILE} pix_fmt={TARGET_PIX_FMT}")
+                    gpu_type = _ffmpeg_config.gpu_encoder_type
+                    logger.info(f"   🎥 Final Encode: codec={current_target_codec} profile={TARGET_PROFILE} pix_fmt={TARGET_PIX_FMT} gpu={gpu_type}")
+
+                    # Add hwupload filter for GPU encoders (VAAPI, ROCm, etc.)
+                    if _ffmpeg_config.hwupload_filter:
+                        cmd.extend(["-vf", _ffmpeg_config.hwupload_filter])
 
                     cmd.extend(_video_params_for_target(
                         _ffmpeg_config,
@@ -1108,14 +1127,32 @@ class SegmentWriter:
                 ])
             else:
                 # Just concatenate video
-                cmd = build_ffmpeg_cmd([
+                base_args = []
+
+                # Add hardware init for GPU encoders (VAAPI needs init_hw_device)
+                if _settings.encoding.normalize_clips and _ffmpeg_config.is_gpu_accelerated:
+                    gpu_type = _ffmpeg_config.gpu_encoder_type
+                    if gpu_type in ("vaapi", "rocm"):
+                        base_args.extend([
+                            "-init_hw_device", "vaapi=va:/dev/dri/renderD128",
+                            "-filter_hw_device", "va",
+                        ])
+
+                base_args.extend([
                     "-f", "concat",
                     "-safe", "0",
                     "-i", concat_list_path,
                 ])
 
+                cmd = build_ffmpeg_cmd(base_args)
+
                 if _settings.encoding.normalize_clips:
                     logger.info("   🔄 Re-encoding final output (CFR enforcement)...")
+
+                    # Add hwupload filter for GPU encoders (VAAPI, ROCm, etc.)
+                    if _ffmpeg_config.hwupload_filter:
+                        cmd.extend(["-vf", _ffmpeg_config.hwupload_filter])
+
                     cmd.extend(_video_params_for_target(
                         _ffmpeg_config,
                         crf=self.ffmpeg_crf,

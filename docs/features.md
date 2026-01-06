@@ -112,6 +112,39 @@ Every AI decision is tracked and exportable.
 
 ---
 
+### Story Engine (Narrative Arc)
+
+AI-driven 5-phase narrative structure for cinematic storytelling.
+
+**Story Arc Phases:**
+| Phase | Position | Energy | Purpose |
+|-------|----------|--------|---------|
+| Intro | 0-15% | Low-Medium | Establish context |
+| Build | 15-40% | Rising | Develop tension |
+| Climax | 40-70% | High | Peak intensity |
+| Sustain | 70-90% | High-Medium | Maintain engagement |
+| Outro | 90-100% | Descending | Resolution |
+
+**Arc Presets:**
+- **hero_journey:** Classic narrative arc
+- **mtv_energy:** Peak early, sustain high
+- **documentary:** Gradual reveal, observational
+- **thriller:** Slow build, explosive release
+- **flat:** Consistent energy throughout
+
+**How it works:**
+1. Analyzes all clips for visual tension (motion, faces, objects)
+2. Maps clips to story phases based on energy fit
+3. Uses CSP solver for optimal clip placement
+4. Ensures narrative coherence across the timeline
+
+**Usage:**
+```bash
+./montage-ai.sh run hitchcock --story-engine --story-arc thriller
+```
+
+---
+
 ### Transcript Editor
 
 Edit video by removing text. AI handles the cuts.

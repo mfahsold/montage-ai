@@ -105,6 +105,14 @@ DEFAULT_OPTIONS = {
     "export_timeline": _settings.features.export_timeline,
     "generate_proxies": _settings.features.generate_proxies,
     "preserve_aspect": _settings.features.preserve_aspect,
+    # New features
+    "denoise": False,
+    "sharpen": False,
+    "dialogue_duck": False,
+    "audio_normalize": False,
+    "film_grain": "none",
+    "auto_reframe": False,
+    "export_recipe": False,
 }
 
 # Flask app

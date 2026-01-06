@@ -52,17 +52,35 @@ ${YELLOW}Styles:${NC}
   ${CYAN}minimalist${NC}      Long contemplative takes
 
 ${YELLOW}Options:${NC}
-  --stabilize     Enable video stabilization
-  --shorts        Enable Shorts mode (9:16 vertical + smart reframing)
-  --no-enhance    Disable color enhancement
-  --variants N    Generate N variants
-  --cgpu          Enable cgpu/Gemini for Creative Director
-  --cgpu-gpu      Enable cgpu cloud GPU for upscaling
-  --cloud-only    Force ALL heavy lifting to cgpu (fails if cgpu unavailable)
-  --export        Export timeline to OTIO/EDL/XML
-  --story-engine  Enable Story Engine (narrative arc optimization)
-  --captions [STYLE]  Burn-in captions (styles: tiktok, youtube, minimal, karaoke, bold, cinematic)
+  ${GREEN}Video Enhancement:${NC}
+  --stabilize         Enable video stabilization
+  --upscale           Enable AI 4K upscaling (Real-ESRGAN)
+  --denoise           Enable AI denoising (best for low-light)
+  --sharpen           Enable sharpening (unsharp mask)
+
+  ${GREEN}Color & Look:${NC}
+  --color-grade [PRESET]  Color grading preset (teal_orange, cinematic, warm, etc.)
+  --film-grain [TYPE]     Add film grain (fine, medium, 35mm, 16mm, 8mm)
+
+  ${GREEN}Audio:${NC}
+  --dialogue-duck     Auto-detect speech and duck music
+  --audio-normalize   Normalize to -14 LUFS
   --isolate-voice     Clean audio via voice isolation (requires cgpu)
+  --captions [STYLE]  Burn-in captions (tiktok, youtube, minimal, karaoke, bold)
+
+  ${GREEN}Story & Output:${NC}
+  --story-engine      Enable Story Engine (narrative arc optimization)
+  --story-arc [ARC]   Story arc preset (hero_journey, mtv_energy, documentary, thriller)
+  --shorts            Enable Shorts mode (9:16 vertical + smart reframing)
+  --export            Export timeline to OTIO/EDL/XML
+  --export-recipe     Generate enhancement Recipe Card (Markdown)
+
+  ${GREEN}Cloud & Workflow:${NC}
+  --cgpu              Enable cgpu/Gemini for Creative Director
+  --cgpu-gpu          Enable cgpu cloud GPU for upscaling
+  --cloud-only        Force ALL heavy lifting to cgpu
+  --variants N        Generate N variants
+  --no-enhance        Disable color enhancement
 
 ${YELLOW}Examples:${NC}
   ./montage-ai.sh run                    # Default dynamic style
@@ -203,33 +221,34 @@ build_image() {
 }
 
 run_montage() {
-    local STYLE="${1:-dynamic}"
-    local PRESET="${2:-medium}"
-    local STABILIZE="${3:-false}"
-    local ENHANCE="${4:-true}"
-    local VARIANTS="${5:-1}"
-    local CGPU_ENABLED="${6:-false}"
-    local CGPU_GPU_ENABLED="${7:-false}"
-    local CAPTIONS="${8:-false}"
-    local CAPTIONS_STYLE="${9:-youtube}"
-    local VOICE_ISOLATION="${10:-false}"
-    local STORY_ENGINE="${11:-false}"
-    local STRICT_CLOUD_COMPUTE="${12:-false}"
-    local SHORTS_MODE="${13:-false}"
-    local EXPORT_TIMELINE="${14:-false}"
-
     echo "🎬 Montage AI"
     echo "   Style: $STYLE"
     echo "   Preset: $PRESET"
-    echo "   Stabilize: $STABILIZE"
-    echo "   Shorts Mode: $SHORTS_MODE"
-    echo "   Export Timeline: $EXPORT_TIMELINE"
-    echo "   cgpu LLM: $CGPU_ENABLED"
-    echo "   cgpu GPU: $CGPU_GPU_ENABLED"
-    echo "   Story Engine: $STORY_ENGINE"
-    echo "   Strict Cloud: $STRICT_CLOUD_COMPUTE"
-    [ "$CAPTIONS" = "true" ] && echo "   Captions: $CAPTIONS_STYLE"
-    [ "$VOICE_ISOLATION" = "true" ] && echo "   Voice Isolation: enabled"
+    echo "   Quality: $QUALITY_PROFILE"
+    echo ""
+    echo "   Video Enhancement:"
+    echo "     Stabilize: $STABILIZE | Upscale: $UPSCALE"
+    echo "     Denoise: $DENOISE | Sharpen: $SHARPEN"
+    echo ""
+    echo "   Color & Look:"
+    [ -n "$COLOR_GRADING" ] && echo "     Color Grade: $COLOR_GRADING @ ${COLOR_INTENSITY}"
+    [ "$FILM_GRAIN" != "none" ] && echo "     Film Grain: $FILM_GRAIN"
+    echo ""
+    echo "   Audio:"
+    [ "$DIALOGUE_DUCK" = "true" ] && echo "     Dialogue Duck: enabled"
+    [ "$AUDIO_NORMALIZE" = "true" ] && echo "     Normalize: -14 LUFS"
+    [ "$VOICE_ISOLATION" = "true" ] && echo "     Voice Isolation: enabled"
+    [ "$CAPTIONS" = "true" ] && echo "     Captions: $CAPTIONS_STYLE"
+    echo ""
+    echo "   Story & Output:"
+    echo "     Story Engine: $STORY_ENGINE"
+    [ -n "$STORY_ARC" ] && echo "     Story Arc: $STORY_ARC"
+    echo "     Shorts Mode: $SHORTS_MODE"
+    echo "     Export Timeline: $EXPORT_TIMELINE"
+    [ "$EXPORT_RECIPE" = "true" ] && echo "     Recipe Card: enabled"
+    echo ""
+    echo "   Cloud:"
+    echo "     cgpu LLM: $CGPU_ENABLED | cgpu GPU: $CGPU_GPU_ENABLED"
     echo ""
 
     # Auto-start cgpu serve if cgpu is enabled or features requiring it are enabled
@@ -253,8 +272,10 @@ run_montage() {
         -e CGPU_GPU_ENABLED="$CGPU_GPU_ENABLED" \
         -e STRICT_CLOUD_COMPUTE="$STRICT_CLOUD_COMPUTE" \
         -e ENABLE_STORY_ENGINE="$STORY_ENGINE" \
+        -e STORY_ARC="$STORY_ARC" \
         -e SHORTS_MODE="$SHORTS_MODE" \
         -e EXPORT_TIMELINE="$EXPORT_TIMELINE" \
+        -e EXPORT_RECIPE="$EXPORT_RECIPE" \
         -e CAPTIONS="$CAPTIONS" \
         -e CAPTIONS_STYLE="$CAPTIONS_STYLE" \
         -e VOICE_ISOLATION="$VOICE_ISOLATION" \
@@ -265,6 +286,11 @@ run_montage() {
         -e COLOR_GRADING="${COLOR_GRADING:-}" \
         -e COLOR_INTENSITY="${COLOR_INTENSITY:-0.7}" \
         -e UPSCALE="${UPSCALE:-false}" \
+        -e DENOISE="$DENOISE" \
+        -e SHARPEN="$SHARPEN" \
+        -e FILM_GRAIN="$FILM_GRAIN" \
+        -e DIALOGUE_DUCK="$DIALOGUE_DUCK" \
+        -e AUDIO_NORMALIZE="$AUDIO_NORMALIZE" \
         montage-ai \
         python3 -m montage_ai
 }
@@ -288,6 +314,14 @@ SHORTS_MODE="false"
 UPSCALE="false"
 COLOR_GRADING=""
 COLOR_INTENSITY="0.7"
+# New options
+DENOISE="false"
+SHARPEN="false"
+FILM_GRAIN="none"
+DIALOGUE_DUCK="false"
+AUDIO_NORMALIZE="false"
+STORY_ARC=""
+EXPORT_RECIPE="false"
 
 case "${1:-run}" in
     run)
@@ -412,6 +446,11 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --story-engine) STORY_ENGINE="true"; shift ;;
+        --story-arc)
+            if [[ -n "$2" && "$2" != --* ]]; then
+                STORY_ARC="$2"; shift
+            fi
+            shift ;;
         --captions)
             CAPTIONS="true"
             # Check if next arg is a style (not another flag)
@@ -420,8 +459,20 @@ while [[ $# -gt 0 ]]; do
             fi
             shift ;;
         --isolate-voice) VOICE_ISOLATION="true"; shift ;;
+        --denoise) DENOISE="true"; shift ;;
+        --sharpen) SHARPEN="true"; shift ;;
+        --dialogue-duck) DIALOGUE_DUCK="true"; shift ;;
+        --audio-normalize) AUDIO_NORMALIZE="true"; shift ;;
+        --film-grain)
+            if [[ -n "$2" && "$2" != --* ]]; then
+                FILM_GRAIN="$2"; shift
+            else
+                FILM_GRAIN="fine"
+            fi
+            shift ;;
+        --export-recipe) EXPORT_RECIPE="true"; shift ;;
         *) shift ;;
     esac
 done
 
-run_montage "$STYLE" "$PRESET" "$STABILIZE" "$ENHANCE" "$VARIANTS" "$CGPU_ENABLED" "$CGPU_GPU_ENABLED" "$CAPTIONS" "$CAPTIONS_STYLE" "$VOICE_ISOLATION" "$STORY_ENGINE" "$STRICT_CLOUD_COMPUTE" "$SHORTS_MODE" "$EXPORT_TIMELINE"
+run_montage

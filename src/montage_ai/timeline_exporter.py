@@ -1141,7 +1141,8 @@ def export_timeline_from_montage(
             start_time=c['start_time'],
             duration=c['duration'],
             timeline_start=c['timeline_start'],
-            metadata=c.get('metadata', {})
+            metadata=c.get('metadata', {}),
+            enhancement_decision=c.get('enhancement_decision'),  # Pass enhancement tracking
         )
         for c in clips_data
     ]

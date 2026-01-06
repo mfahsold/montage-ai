@@ -98,6 +98,31 @@ try:
 except ImportError:
     BROLL_PLANNER_AVAILABLE = False
 
+# StateFlow Director (Deterministic Multi-State Pipeline)
+try:
+    from .stateflow_director import (
+        StateFlowDirector,
+        DirectorState,
+        StateContext,
+        IntentAnalysis,
+        create_director_output,
+    )
+    STATEFLOW_AVAILABLE = True
+except ImportError:
+    STATEFLOW_AVAILABLE = False
+
+# Story Arc CSP Solver (Constraint Satisfaction)
+try:
+    from .story_arc_csp import (
+        StoryArcCSPSolver,
+        StoryPhase,
+        PhaseConstraints,
+        solve_story_arc,
+    )
+    STORY_ARC_CSP_AVAILABLE = True
+except ImportError:
+    STORY_ARC_CSP_AVAILABLE = False
+
 __all__ = [
     # Core
     "create_montage",
@@ -137,6 +162,17 @@ __all__ = [
     # B-Roll Planner
     "plan_broll",
     "format_plan",
+    # StateFlow Director
+    "StateFlowDirector",
+    "DirectorState",
+    "StateContext",
+    "IntentAnalysis",
+    "create_director_output",
+    # Story Arc CSP
+    "StoryArcCSPSolver",
+    "StoryPhase",
+    "PhaseConstraints",
+    "solve_story_arc",
     # Feature flags
     "FFMPEG_TOOLS_AVAILABLE",
     "VIDEO_AGENT_AVAILABLE",
@@ -144,4 +180,6 @@ __all__ = [
     "CGPU_UPSCALER_AVAILABLE",
     "TRANSCRIBER_AVAILABLE",
     "BROLL_PLANNER_AVAILABLE",
+    "STATEFLOW_AVAILABLE",
+    "STORY_ARC_CSP_AVAILABLE",
 ]

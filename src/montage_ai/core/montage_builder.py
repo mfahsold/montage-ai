@@ -32,6 +32,13 @@ from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 from ..timeline_exporter import export_timeline_from_montage
 from ..storytelling import StoryArc, TensionProvider, StorySolver
 from ..proxy_generator import ProxyGenerator
+from ..enhancement_tracking import (
+    EnhancementTracker,
+    EnhancementDecision,
+    StabilizeParams,
+    UpscaleParams,
+    ColorGradeParams,
+)
 
 
 # =============================================================================
@@ -129,6 +136,7 @@ class ClipMetadata:
     beats_per_cut: float
     selection_score: float
     enhancements: Dict[str, bool] = field(default_factory=dict)
+    enhancement_decision: Optional[Any] = None  # EnhancementDecision for NLE export
 
 
 @dataclass
@@ -627,6 +635,7 @@ class MontageBuilder:
         self._intelligent_selector = None
         self._resource_manager: Optional[ResourceManager] = None
         self._scene_provider = None  # Unified scene analysis provider
+        self._enhancement_tracker: Optional[EnhancementTracker] = None  # NLE export tracking
 
         # Parallel processing
         self._executor: Optional[ThreadPoolExecutor] = None
@@ -666,6 +675,13 @@ class MontageBuilder:
             from .scene_provider import get_scene_provider
             self._scene_provider = get_scene_provider()
         return self._scene_provider
+
+    @property
+    def enhancement_tracker(self) -> EnhancementTracker:
+        """Get the enhancement tracker for NLE export (lazy initialized)."""
+        if self._enhancement_tracker is None:
+            self._enhancement_tracker = EnhancementTracker()
+        return self._enhancement_tracker
 
     # =========================================================================
     # Public API
@@ -2387,10 +2403,37 @@ class MontageBuilder:
             try:
                 final_path, enhancements, temp_files = fut.result()
                 meta.enhancements = enhancements
-                
+
+                # Create EnhancementDecision for NLE export tracking
+                decision = self.enhancement_tracker.create_decision(
+                    source_path=meta.source_path,
+                    timeline_in=meta.timeline_start,
+                    timeline_out=meta.timeline_start + meta.duration,
+                )
+
+                # Record applied enhancements with parameters
+                if enhancements.get('stabilized'):
+                    decision.record_stabilize(StabilizeParams(
+                        method="vidstab",
+                        smoothing=30,
+                        crop_mode="black",
+                    ))
+                if enhancements.get('upscaled'):
+                    decision.record_upscale(UpscaleParams(
+                        method="realesrgan" if self.settings.features.upscale else "lanczos",
+                        scale_factor=2,
+                    ))
+                if enhancements.get('enhanced'):
+                    decision.record_color_grade(ColorGradeParams(
+                        preset=self.ctx.color_grade or "teal_orange",
+                        intensity=self.ctx.features.color_intensity,
+                    ))
+
+                meta.enhancement_decision = decision
+
                 if self._progressive_renderer:
                     self._progressive_renderer.add_clip_path(final_path)
-                    
+
                     # Cleanup intermediate temp files
                     for tf in temp_files:
                         if tf != final_path and os.path.exists(tf):
@@ -2426,7 +2469,8 @@ class MontageBuilder:
                     'shot': clip.shot,
                     'selection_score': clip.selection_score,
                     'enhancements': clip.enhancements
-                }
+                },
+                'enhancement_decision': clip.enhancement_decision,  # NLE export tracking
             })
 
         # Get audio path safely

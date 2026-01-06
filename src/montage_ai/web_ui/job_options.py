@@ -121,7 +121,18 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
         "story_arc": str(opts.get("story_arc", data.get("story_arc", ""))),
         "reframe_mode": str(opts.get("reframe_mode", data.get("reframe_mode", "auto"))),
         "caption_style": str(opts.get("caption_style", data.get("caption_style", "tiktok"))),
-        # Color Grading (NEW)
+        # Color Grading
         "color_grading": str(opts.get("color_grading", data.get("color_grading", "auto"))),
         "color_intensity": float(opts.get("color_intensity", data.get("color_intensity", 100)) or 100) / 100.0,
+        # Video Enhancement
+        "denoise": get_bool("denoise"),
+        "sharpen": get_bool("sharpen"),
+        # Audio Enhancement
+        "dialogue_duck": get_bool("dialogue_duck"),
+        "audio_normalize": get_bool("audio_normalize"),
+        # Film Emulation
+        "film_grain": str(opts.get("film_grain", data.get("film_grain", "none"))),
+        # Output Format
+        "auto_reframe": get_bool("auto_reframe"),
+        "export_recipe": get_bool("export_recipe"),
     }
