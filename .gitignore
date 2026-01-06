@@ -84,3 +84,13 @@ venv/
 .env
 run_log.txt
 gallery_montage_*.mp4
+
+# Security & Secrets
+*.crt
+*.key
+*.pem
+cgpu_*.js
+
+# Temporary/Debug
+debug-*.yaml
+*.report.html
