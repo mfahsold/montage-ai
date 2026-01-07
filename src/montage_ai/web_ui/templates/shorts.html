@@ -1,1427 +1,255 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage AI - Shorts Studio</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+{% extends "base.html" %}
+{% from "components/icon.html" import icon %}
+{% import "components/macros.html" as m %}
+
+{% block title %}Shorts Studio - Montage AI{% endblock %}
+
+{% block extra_css %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shorts.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide@latest" />
-    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
-    <style>
-        :root {
-            --accent-soft: rgba(244, 208, 63, 0.15);
-            --safe-zone: rgba(52, 152, 219, 0.2);
-        }
+{% endblock %}
 
+{% block content %}
+    <div class="mb-8">
+        <h1 class="voxel-title glitch-text">SHORTS STUDIO</h1>
+        <p class="text-muted">// Create 9:16 vertical shorts. AI crops, frames, & optimizes for mobile feeds.</p>
+        <div class="cyber-progress mt-1"></div>
+    </div>
 
-        /* Phone Preview Frame - Voxel Style */
-        .phone-frame {
-            background: var(--bg);
-            border: 4px solid var(--border);
-            padding: 8px;
-            position: relative;
-            box-shadow: var(--shd-md);
-            max-width: 280px;
-            margin: 0 auto;
-        }
-
-        .phone-notch {
-            width: 80px;
-            height: 20px;
-            background: var(--border);
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-        }
-
-        .phone-screen {
-            background: #000;
-            overflow: hidden;
-            aspect-ratio: 9/16;
-            position: relative;
-            border: 2px solid var(--muted);
-        }
-
-        .phone-screen video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* Safe Zone Overlay */
-        .safe-zone-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s steps(4);
-        }
-
-        .safe-zone-overlay.visible {
-            opacity: 1;
-        }
-
-        .safe-zone-top {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: var(--top-zone, 15%);
-            background: var(--safe-zone);
-            border-bottom: 2px dashed var(--primary);
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            padding-bottom: 0.25rem;
-        }
-
-        .safe-zone-top::after {
-            content: 'UNSAFE ZONE (TOP)';
-            font-size: 0.6rem;
-            font-weight: 900;
-            color: var(--primary);
-            text-shadow: 0 0 4px rgba(0, 85, 255, 0.8);
-        }
-
-        .safe-zone-bottom {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: var(--bottom-zone, 20%);
-            background: var(--safe-zone);
-            border-top: 2px dashed var(--primary);
-            display: flex;
-            align-items: flex-start;
-            justify-content: center;
-            padding-top: 0.25rem;
-        }
-
-        .safe-zone-bottom::after {
-            content: 'UNSAFE ZONE (UI)';
-            font-size: 0.6rem;
-            font-weight: 900;
-            color: var(--primary);
-            text-shadow: 0 0 4px rgba(0, 85, 255, 0.8);
-        }
-
-        .clip-item {
-            cursor: pointer;
-            transition: all 0.1s steps(2);
-        }
-
-        .clip-item:hover {
-            border-color: var(--primary);
-            background: var(--muted);
-        }
-
-        .clip-item.active {
-            border-color: var(--secondary);
-            box-shadow: var(--shd-secondary);
-        }
-
-        /* Range Slider Styling */
-        .slider-container {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .slider-labels {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-            margin-bottom: 0.5rem;
-        }
-
-        .slider-labels .text-xs {
-            flex: 0 0 auto;
-            white-space: nowrap;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            height: 8px;
-            border-radius: 0;
-            background: var(--muted);
-            border: 1px solid var(--border);
-            outline: none;
-            -webkit-appearance: none;
-            appearance: none;
-            cursor: pointer;
-        }
-        
-        /* Progress Bar */
-        .progress-bar {
-            width: 100%;
-            height: 24px;
-            background: var(--muted);
-            border: 2px solid var(--border);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            transition: width 0.3s ease;
-            position: relative;
-        }
-        
-        .progress-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(
-                90deg,
-                transparent 0%,
-                rgba(255, 255, 255, 0.2) 50%,
-                transparent 100%
-            );
-            animation: shimmer 2s infinite;
-        }
-        
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 0;
-            background: var(--primary);
-            cursor: pointer;
-            border: 2px solid var(--bg);
-            box-shadow: 0 0 8px rgba(0, 85, 255, 0.6);
-            transition: all 0.1s;
-        }
-
-        input[type="range"]::-webkit-slider-thumb:hover {
-            box-shadow: 0 0 12px rgba(0, 85, 255, 1);
-            transform: scale(1.1);
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            border-radius: 0;
-            background: var(--primary);
-            cursor: pointer;
-            border: 2px solid var(--bg);
-            box-shadow: 0 0 8px rgba(0, 85, 255, 0.6);
-            transition: all 0.1s;
-        }
-
-        input[type="range"]::-moz-range-thumb:hover {
-            box-shadow: 0 0 12px rgba(0, 85, 255, 1);
-            transform: scale(1.1);
-        }
-
-        /* Safe Zone Drag Affordance */
-        .safe-zone-top, .safe-zone-bottom {
-            cursor: grab;
-            transition: background 0.15s;
-        }
-
-        .safe-zone-top:hover, .safe-zone-bottom:hover {
-            background: rgba(0, 85, 255, 0.2);
-        }
-
-        .safe-zone-top.dragging, .safe-zone-bottom.dragging {
-            background: rgba(0, 85, 255, 0.35);
-            cursor: grabbing;
-        }
-
-        /* Custom Safe Zone Rectangles */
-        #safeZone {
-            pointer-events: none;
-        }
-
-        .safe-zone-rect {
-            position: absolute;
-            background: rgba(0, 85, 255, 0.15);
-            border: 2px dashed var(--secondary);
-            box-shadow: 0 0 8px rgba(255, 85, 0, 0.6);
-        }
-
-        /* --- CAPTION PREVIEW STYLES --- */
-        .caption-preview {
-            position: absolute;
-            width: 80%;
-            left: 10%;
-            bottom: 25%;
-            text-align: center;
-            pointer-events: none;
-            z-index: 20;
-            font-family: 'Segoe UI', sans-serif;
-            transition: all 0.3s ease;
-            display: none;
-            line-height: 1.4;
-        }
-
-        .caption-preview.is-visible {
-            display: block;
-        }
-
-        /* Style: TikTok (Classic) */
-        .caption-preview.tiktok {
-            font-weight: 800;
-            color: white;
-            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-            font-size: 1.1rem;
-            background: rgba(0,0,0,0.5);
-            padding: 4px 8px;
-            border-radius: 4px;
-            -webkit-box-decoration-break: clone;
-            box-decoration-break: clone;
-        }
-
-        /* Style: Cinematic */
-        .caption-preview.cinematic {
-            font-family: Georgia, serif;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #f0f0f0;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-            bottom: 15%;
-            font-size: 0.8rem;
-        }
-
-        /* Style: Minimal */
-        .caption-preview.minimal {
-            background: rgba(255,255,255,0.95);
-            color: #111;
-            padding: 6px 12px;
-            border-radius: 16px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            bottom: 30%;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-
-        /* Style: Bold (MrBeast style) */
-        .caption-preview.bold {
-            font-family: Impact, sans-serif;
-            font-weight: 900;
-            color: #FFD700;
-            text-shadow: 2px 2px 0px #000;
-            font-size: 1.4rem;
-            transform: rotate(-1deg);
-            bottom: 40%;
-        }
-
-        /* Style: Karaoke (Gradient) */
-        .caption-preview.karaoke {
-            font-weight: 900;
-            background: linear-gradient(to right, #00fff2, #ff004c);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0px 2px 4px rgba(0,0,0,0.3);
-            font-size: 1.2rem;
-            bottom: 25%;
-        }
-
-
-        #safeZone.drawing {
-            pointer-events: auto;
-        }
-
-        .safe-zone-rect.active {
-            background: rgba(0, 85, 255, 0.25);
-            border-color: var(--primary);
-        }
-
-        .safe-zone-rect-list {
-            max-height: 120px;
-            overflow-y: auto;
-            background: var(--muted);
-            border: 1px solid var(--border);
-            padding: 0.5rem;
-        }
-
-        .safe-zone-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            margin-bottom: 0.25rem;
-            font-size: 0.7rem;
-        }
-
-        .safe-zone-item button {
-            background: var(--secondary);
-            color: var(--bg);
-            border: none;
-            padding: 0.25rem 0.5rem;
-            cursor: pointer;
-            font-size: 0.6rem;
-        }
-
-        .safe-zone-item button:hover {
-            background: #ff6600;
-        }
-
-        .progress-terminal-msg {
-            font-family: 'Share Tech Mono', monospace;
-            color: var(--primary);
-            background: rgba(0, 85, 255, 0.05); /* Very subtle bg */
-            padding: 0.4rem 0.6rem;
-            border-left: 3px solid var(--primary);
-            margin-bottom: 0.75rem;
-            font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-        }
-        
-        .progress-terminal-msg::before {
-            content: '>';
-            margin-right: 0.5rem;
-            font-weight: bold;
-            animation: blink 1s step-end infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-        }
-
-        /* Engagement Score Styles */
-        .engagement-grade {
-            width: 64px;
-            height: 64px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            font-weight: 900;
-            background: var(--bg);
-            border: 3px solid var(--border);
-            box-shadow: var(--shd-md);
-        }
-
-        .engagement-grade[data-grade="S"] { border-color: #f1c40f; color: #f1c40f; }
-        .engagement-grade[data-grade="A"] { border-color: #2ecc71; color: #2ecc71; }
-        .engagement-grade[data-grade="B"] { border-color: #3498db; color: #3498db; }
-        .engagement-grade[data-grade="C"] { border-color: #9b59b6; color: #9b59b6; }
-        .engagement-grade[data-grade="D"] { border-color: #e67e22; color: #e67e22; }
-        .engagement-grade[data-grade="F"] { border-color: #e74c3c; color: #e74c3c; }
-
-        .space-y-2 > * + * { margin-top: 0.5rem; }
-        .space-y-3 > * + * { margin-top: 0.75rem; }
-    </style>
-</head>
-<body>
-    {% from "components/icon.html" import icon %}
-    <nav class="navbar">
-        <a href="/" class="nav-brand">
-            <span>MONTAGE</span> AI
-        </a>
-        <div class="nav-links">
-            <a href="/" class="nav-link">DASHBOARD</a>
-            <a href="/montage" class="nav-link">CREATOR</a>
-            <a href="/gallery" class="nav-link">GALLERY</a>
-            <a href="/settings" class="nav-link">SETTINGS</a>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div class="mb-8">
-            <h1 class="voxel-title">Shorts Studio</h1>
-            <p class="text-muted">Auto-reframe to 9:16. Face detection, safe zones, platform presets.</p>
-        </div>
-
-        <!-- STEP 1: Select Clip (Top) -->
-        <div class="mb-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Left: Clip Library -->
-                <div>
-                    <div class="voxel-card">
-                        <h3 class="mb-3 text-primary">STEP 1: Select Clip</h3>
-                        <div class="flex flex-col gap-2" id="clipList">
-                            <div class="voxel-card clip-item active p-2">
-                                <div class="text-xs font-bold">SKATE_PARK_01.MP4</div>
-                                <div class="text-xs text-muted">00:15 • 4K</div>
-                            </div>
-                            <div class="voxel-card clip-item p-2">
-                                <div class="text-xs font-bold">INTERVIEW_04.MP4</div>
-                                <div class="text-xs text-muted">01:20 • 1080p</div>
-                            </div>
-                        </div>
-                        <button class="voxel-btn w-full mt-4 text-xs">UPLOAD MORE</button>
-                    </div>
-                </div>
-
-                <!-- Center: Preview -->
-                <div>
-                    <div class="voxel-card">
-                        <h4 class="mb-4 text-primary">Preview (9:16)</h4>
-                        <p class="text-xs text-muted mb-3" id="previewHint">Select clip to preview vertical framing.</p>
-                        
-                        <div class="phone-frame">
-                            <div class="phone-notch"></div>
-                            <div class="phone-screen" id="phoneScreen">
-                                <video id="previewVideo" src="" muted loop></video>
-                                <div class="safe-zone-overlay" id="safeZone">
-                                    <!-- Custom rectangles drawn here -->
-                                </div>
-                                <div id="captionPreview" class="caption-preview">
-                                    This is a preview caption<br>to test the style
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-4 flex justify-center gap-2">
-                            <button class="voxel-btn text-xs">PREV</button>
-                            <button class="voxel-btn voxel-btn-primary text-xs">PLAY</button>
-                            <button class="voxel-btn text-xs">NEXT</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Right: AI Settings -->
-                <div>
-                    <div class="voxel-card">
-                        <h3 class="mb-3 text-primary">STEP 2: AI Settings</h3>
-                        
-                        <label class="tech-label">WORKFLOW TYPE</label>
-                        <select id="workflowType" class="voxel-input mb-4" onchange="toggleWorkflowOptions()" title="Select workflow type">
-                            <option value="reframe">SMART REFRAME (Single Clip)</option>
-                            <option value="montage">BEAT-SYNCED MONTAGE</option>
-                        </select>
-
-                        <div id="styleSection" class="hidden">
-                            <label class="tech-label">EDITING STYLE</label>
-                            <select id="montageStyle" class="voxel-input mb-4" title="Select montage style">
-                                <option value="dynamic">DYNAMIC (Fast Paced)</option>
-                                <option value="hitchcock">HITCHCOCK (Suspense)</option>
-                                <option value="mtv">MTV (Music Video)</option>
-                                <option value="action">ACTION (High Energy)</option>
-                                <option value="minimalist">MINIMALIST (Clean)</option>
-                            </select>
-                        </div>
-
-                        <label class="tech-label">TRACKING MODE</label>
-                        <select id="reframeMode" class="voxel-input mb-4" title="Select reframe mode">
-                            <option>FACE DETECTION (SOTA)</option>
-                            <option>ACTION TRACKING</option>
-                            <option>CENTER CROP</option>
-                            <option>MANUAL</option>
-                        </select>
-
-                        <label class="tech-label">SMOOTHING</label>
-                        <div class="slider-container mb-4">
-                            <div class="slider-labels">
-                                <span class="text-xs">STIFF</span>
-                                <span class="text-xs">FLUID</span>
-                            </div>
-                            <input type="range" id="smoothingSlider" class="voxel-input" min="0" max="100" value="70" onchange="updateSmoothing()" title="Adjust smoothing">
-                        </div>
-
-                        <label class="tech-label">CAPTION STYLE</label>
-                        <select id="captionStyle" class="voxel-input mb-4" onchange="updateCaptionPreview()" title="Select caption style">
-                             <option value="none">None (No Captions)</option>
-                             <option value="tiktok" selected>TikTok (Classic)</option>
-                             <option value="bold">Bold (Yellow)</option>
-                             <option value="minimal">Minimal (Clean)</option>
-                             <option value="cinematic">Cinematic (Serif)</option>
-                             <option value="karaoke">Karaoke (Gradient)</option>
-                        </select>
-
-                        <label class="tech-label mt-4">ENHANCEMENT OPTIONS</label>
-                        <div class="voxel-card bg-muted p-3">
-                            <div class="flex items-center mb-2">
-                                <input type="checkbox" id="stabilize" class="mr-2">
-                                <label for="stabilize" class="text-xs">STABILIZATION (reduce shake)</label>
-                            </div>
-                            <div class="flex items-center mb-2">
-                                <input type="checkbox" id="upscale" class="mr-2">
-                                <label for="upscale" class="text-xs">AI UPSCALE (4K enhancement)</label>
-                            </div>
-                            <div class="flex items-center mb-2">
-                                <input type="checkbox" id="cleanAudio" class="mr-2">
-                                <label for="cleanAudio" class="text-xs">CLEAN AUDIO (voice isolation)</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" id="audioAware" class="mr-2">
-                                <label for="audioAware" class="text-xs">AUDIO-AWARE CUTS (beat sync)</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- HIGHIGHTS REVIEW -->
-        <div id="highlightReview" class="mb-6 hidden">
-            <div class="voxel-card">
-                <h3 class="mb-3 text-primary">HIGHLIGHT MOMENTS</h3>
-                <p class="text-xs text-muted mb-4">AI detected these top moments. Click to view.</p>
-                
-                <div id="highlightCards" class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <!-- Cards will be injected here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- STEP 3: Safe Zone Configuration (Optional, Advanced) -->
-        <div class="mb-6">
-            <div class="voxel-card">
-                <h3 class="mb-3 text-primary">STEP 3: Safe Zones (Optional)</h3>
-                <p class="text-xs text-muted mb-4">Protect content from platform UI. Draw custom zones or use platform presets (TikTok, Instagram, YouTube, Twitch).</p>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
-                    <div>
-                        <label class="tech-label">PLATFORM PRESETS</label>
-                        <select id="platformPreset" class="voxel-input" onchange="applyPlatformPreset()" title="Select platform preset">
-                            <option value="">-- CUSTOM --</option>
-                            <option value="tiktok">TikTok (Bottom + Right)</option>
-                            <option value="instagram">Instagram Reels (Bottom)</option>
-                            <option value="youtube">YouTube Shorts (Bottom)</option>
-                            <option value="twitch">Twitch (Top + Bottom + Right)</option>
-                            <option value="snapchat">Snapchat (Edges)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="tech-label">ACTIONS</label>
-                        <div class="flex gap-2">
-                            <button class="voxel-btn text-xs" id="drawModeBtn" onclick="toggleDrawMode()">DRAW MODE: OFF</button>
-                            <button class="voxel-btn text-xs" onclick="clearAllZones()">CLEAR ALL</button>
-                        </div>
-                    </div>
-                </div>
-                
-                <label class="tech-label">DEFINED ZONES</label>
-                <div class="safe-zone-rect-list" id="zoneList">
-                    <p class="text-xs text-muted">No zones yet. Click "DRAW MODE: ON" and drag on preview to create.</p>
-                </div>
-                
-                <p class="text-xs text-muted mt-3"><strong>{{ icon("lightbulb", size="16", class_="icon-sm", title="Tip") }} How to:</strong> Enable DRAW MODE, then click & drag on the preview above to draw rectangles. Click to deselect.</p>
-                
-                <button class="voxel-btn text-xs mt-3" id="safeZoneBtn" onclick="toggleSafeZone()">SAFE ZONE OVERLAY: OFF</button>
-            </div>
-        </div>
-
-        <!-- STEP 4: Generate -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- LEFT: Phone Preview Frame (9:16) -->
         <div>
-            <div class="voxel-card">
-                <h3 class="mb-2 text-primary">STEP 4: Generate Short</h3>
-                <p class="text-xs text-muted mb-4">Render your 9:16 vertical short with AI-optimized reframing.</p>
-                
-                <!-- Progress Display (hidden initially) -->
-                <div id="progressSection" class="hidden mb-4">
-                    <div class="tech-label mb-2">STATUS</div>
-                    <div id="progressPhase" class="text-sm text-primary mb-1">Queued...</div>
-                    <div id="progressMessage" class="progress-terminal-msg">Waiting for job...</div>
-                    <div class="progress-bar mb-2">
-                        <div id="progressFill" class="progress-fill progress-fill-zero"></div>
+            <h3 class="text-primary text-sm mb-2">PHONE PREVIEW (9:16)</h3>
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <video id="previewVideo" style="display: none;"></video>
+                    <div id="previewPlaceholder" style="width: 100%; height: 100%; background: #111; display: flex; align-items: center; justify-content: center; color: var(--muted);">
+                        <span class="text-xs">No footage loaded</span>
                     </div>
-                    <div id="progressPercent" class="text-xs text-muted">0%</div>
-                    <button id="cancelBtn" class="voxel-btn text-xs mt-2 hidden" onclick="cancelJob()">Cancel Job</button>
+                    <div class="safe-zone-overlay" id="safeZoneOverlay">
+                        <div class="safe-zone-top"></div>
+                        <div class="safe-zone-bottom"></div>
+                    </div>
                 </div>
+            </div>
+            
+            <!-- Safe Zone Toggle -->
+            <div class="mt-3">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="toggleSafeZone" class="w-4 h-4">
+                    <span class="text-xs text-muted">Show Safe Zones</span>
+                </label>
+            </div>
+
+            <!-- Preview Controls -->
+            <div class="mt-3 space-y-2">
+                <button id="playBtn" class="voxel-btn voxel-btn-small w-full">▶ Play Preview</button>
+                <button id="pauseBtn" class="voxel-btn voxel-btn-small w-full">⏸ Pause</button>
+            </div>
+        </div>
+
+        <!-- MIDDLE: Clip Selection & Trimming -->
+        <div>
+            <h3 class="text-primary text-sm mb-2">SELECT CLIP</h3>
+            
+            <div id="clipList" class="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                <!-- Clips populated by JS -->
+                <div class="text-xs text-muted p-2 border border-muted rounded">Loading clips...</div>
+            </div>
+
+            <!-- Trim Controls -->
+            <div class="voxel-card">
+                <h4 class="text-xs text-primary mb-2">TRIM SELECTED CLIP</h4>
                 
-                <button id="generateBtn" class="voxel-btn voxel-btn-primary w-full" onclick="generateShort()">Generate Short</button>
-                
-                <!-- Success Message (hidden initially) -->
-                <div id="successMessage" class="hidden mt-4 p-3 bg-success text-bg border-l-4 border-primary">
-                    <div class="text-sm font-bold mb-1">✓ Short Created!</div>
-                    <a id="downloadLink" href="#" class="voxel-btn text-xs mt-2" download>Download Video</a>
+                <div class="slider-container">
+                    <div class="slider-labels">
+                        <span class="text-xs text-muted">Start</span>
+                        <span id="trimStartTime" class="text-xs text-primary font-mono">0:00</span>
+                    </div>
+                    <input type="range" id="trimStart" min="0" max="100" value="0" class="w-full">
                 </div>
-                
-                <!-- Error Message (hidden initially) -->
-                <div id="errorMessage" class="hidden mt-4 p-3 bg-error text-bg border-l-4 border-secondary">
-                    <div class="text-sm font-bold mb-1">✗ Generation Failed</div>
-                    <div id="errorText" class="text-xs text-muted"></div>
+
+                <div class="slider-container mt-3">
+                    <div class="slider-labels">
+                        <span class="text-xs text-muted">End</span>
+                        <span id="trimEndTime" class="text-xs text-primary font-mono">0:05</span>
+                    </div>
+                    <input type="range" id="trimEnd" min="0" max="100" value="100" class="w-full">
                 </div>
             </div>
         </div>
 
-        <!-- STEP 5: Engagement Score (shown after generation) -->
-                <div id="engagementSection" class="hidden mt-6">
+        <!-- RIGHT: Rendering Options -->
+        <div>
+            <h3 class="text-primary text-sm mb-2">RENDER OPTIONS</h3>
+            
             <div class="voxel-card">
-                <h3 class="mb-3 text-primary">STEP 5: Engagement Analysis</h3>
-                <p class="text-xs text-muted mb-4">AI-predicted engagement score based on hook strength, energy, pacing, and platform optimization.</p>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Left: Score Overview -->
-                    <div>
-                        <div class="flex items-center gap-4 mb-4">
-                            <div id="engagementGrade" class="engagement-grade">-</div>
-                            <div>
-                                <div class="text-2xl font-bold"><span id="engagementScore">--</span>/100</div>
-                                <div class="text-xs text-muted">Overall Score</div>
-                            </div>
-                        </div>
-
-                        <!-- Score Bars -->
-                        <div class="space-y-3">
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span>HOOK STRENGTH</span>
-                                    <span id="hookScoreVal">--</span>
-                                </div>
-                                <div class="progress-bar"><div id="hookScoreBar" class="progress-fill progress-fill-zero"></div></div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span>ENERGY LEVEL</span>
-                                    <span id="energyScoreVal">--</span>
-                                </div>
-                                <div class="progress-bar"><div id="energyScoreBar" class="progress-fill progress-fill-zero"></div></div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span>PACING</span>
-                                    <span id="pacingScoreVal">--</span>
-                                </div>
-                                <div class="progress-bar"><div id="pacingScoreBar" class="progress-fill progress-fill-zero"></div></div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span>VARIETY</span>
-                                    <span id="varietyScoreVal">--</span>
-                                </div>
-                                <div class="progress-bar"><div id="varietyScoreBar" class="progress-fill progress-fill-zero"></div></div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span>AUDIO</span>
-                                    <span id="audioScoreVal">--</span>
-                                </div>
-                                <div class="progress-bar"><div id="audioScoreBar" class="progress-fill progress-fill-zero"></div></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Right: Recommendations -->
-                    <div>
-                        <label class="tech-label">PLATFORM SCORES</label>
-                        <div class="grid grid-cols-2 gap-2 mb-4" id="platformScores">
-                            <div class="voxel-card p-2 text-center">
-                                <div class="text-xs text-muted">TikTok</div>
-                                <div class="font-bold" id="platformTiktok">--</div>
-                            </div>
-                            <div class="voxel-card p-2 text-center">
-                                <div class="text-xs text-muted">YT Shorts</div>
-                                <div class="font-bold" id="platformYoutube">--</div>
-                            </div>
-                            <div class="voxel-card p-2 text-center">
-                                <div class="text-xs text-muted">IG Reels</div>
-                                <div class="font-bold" id="platformInstagram">--</div>
-                            </div>
-                            <div class="voxel-card p-2 text-center">
-                                <div class="text-xs text-muted">YT Long</div>
-                                <div class="font-bold" id="platformYoutubeLong">--</div>
-                            </div>
-                        </div>
-
-                        <label class="tech-label">AI RECOMMENDATIONS</label>
-                        <ul id="engagementRecommendations" class="space-y-2 text-xs">
-                            <li class="text-muted">Generate a video to see recommendations...</li>
-                        </ul>
-                    </div>
+                <!-- Reframe Strategy -->
+                <div class="mb-4">
+                    <label class="tech-label text-xs">REFRAME STRATEGY</label>
+                    <select name="reframe_mode" id="reframeMode" class="voxel-input w-full text-xs">
+                        <option value="face">Face-Locked (MediaPipe)</option>
+                        <option value="center">Center Crop</option>
+                        <option value="flow">Optical Flow</option>
+                        <option value="manual">Manual Pan/Zoom</option>
+                    </select>
+                    <p class="text-xs text-muted mt-1">How to adapt 16:9 to 9:16.</p>
                 </div>
+
+                <!-- Captions -->
+                <div class="mb-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="add_captions" id="addCaptions" class="w-4 h-4">
+                        <span class="text-xs text-muted">Auto-Captions</span>
+                    </label>
+                    <p class="text-xs text-muted mt-1">Burn auto-transcribed captions into shorts.</p>
+                </div>
+
+                <!-- Aspect Ratio Overlay -->
+                <div class="mb-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="show_guides" id="showGuides" class="w-4 h-4">
+                        <span class="text-xs text-muted">Show Framing Guides</span>
+                    </label>
+                </div>
+
+                <!-- Quality -->
+                <div class="mb-4">
+                    <label class="tech-label text-xs">QUALITY</label>
+                    <select name="quality" id="quality" class="voxel-input w-full text-xs">
+                        <option value="preview">Preview (480p)</option>
+                        <option value="standard">Standard (1080p)</option>
+                        <option value="high">High (1440p)</option>
+                    </select>
+                </div>
+
+                <!-- Submit -->
+                <button type="button" id="renderBtn" class="voxel-btn voxel-btn-primary w-full text-sm">
+                    RENDER SHORT
+                </button>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="progressSection" class="voxel-card mt-4 hidden">
+                <div id="progressPhase" class="text-xs text-primary mb-1">Processing...</div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%;"></div>
+                </div>
+                <div id="progressPercent" class="text-xs text-muted text-center mt-1">0%</div>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="successMessage" class="voxel-card mt-4 hidden bg-success text-bg">
+                <p class="text-xs">✅ Short rendered successfully!</p>
+                <a href="/gallery" class="text-primary text-xs underline mt-2 block">View in Gallery →</a>
+            </div>
+
+            <div id="errorMessage" class="voxel-card mt-4 hidden bg-error text-bg">
+                <p class="text-xs">⚠️ Rendering failed</p>
+                <p id="errorText" class="text-xs text-muted mt-1"></p>
             </div>
         </div>
     </div>
 
+    <!-- Engagement Metrics (After Render) -->
+    <div id="engagementSection" class="hidden mt-8">
+        <h3 class="text-primary mb-4">ENGAGEMENT FORECAST</h3>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="voxel-card text-center">
+                <div class="engagement-grade text-3xl font-bold text-secondary mb-2" id="engagementGrade">-</div>
+                <p class="text-xs text-muted">ENGAGEMENT SCORE</p>
+            </div>
+            <div class="voxel-card">
+                <p class="text-xs text-primary mb-1">Hook Strength</p>
+                <div class="progress-bar"><div id="hookScoreBar" class="progress-fill" style="width: 0%;"></div></div>
+            </div>
+            <div class="voxel-card">
+                <p class="text-xs text-primary mb-1">Energy Level</p>
+                <div class="progress-bar"><div id="energyScoreBar" class="progress-fill" style="width: 0%;"></div></div>
+            </div>
+            <div class="voxel-card">
+                <p class="text-xs text-primary mb-1">Pacing</p>
+                <div class="progress-bar"><div id="pacingScoreBar" class="progress-fill" style="width: 0%;"></div></div>
+            </div>
+            <div class="voxel-card">
+                <p class="text-xs text-primary mb-1">Audio Mix</p>
+                <div class="progress-bar"><div id="audioScoreBar" class="progress-fill" style="width: 0%;"></div></div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
     <script>
-        // =====================================================================
-        // State Management
-        // =====================================================================
-        let selectedVideoPath = null;
-        let currentJobId = null;
-
-        const showEl = (el) => { if (el) el.classList.remove('hidden'); };
-        const hideEl = (el) => { if (el) el.classList.add('hidden'); };
-
-        // =====================================================================
-        // Initialization & File Loading
-        // =====================================================================
-        document.addEventListener('DOMContentLoaded', () => {
-            loadFiles();
-            toggleWorkflowOptions();
-            updateCaptionPreview();
-        });
-
-        async function loadFiles() {
-            try {
-                const res = await fetch('/api/files');
-                const data = await res.json();
-                const container = document.getElementById('clipList');
-                container.innerHTML = ''; // Clear hardcoded items
-
-                if (data.videos.length === 0) {
-                    container.innerHTML = '<div class="text-xs text-muted p-2">No videos found in /data/input</div>';
-                    return;
-                }
-
-                data.videos.forEach(filename => {
-                    const div = document.createElement('div');
-                    div.className = 'voxel-card clip-item p-2';
-                    div.innerHTML = `
-                        <div class="text-xs font-bold">${filename}</div>
-                        <!-- <div class="text-xs text-muted">Unknown Duration</div> -->
-                    `;
-                    div.onclick = () => selectClip(filename, div);
-                    container.appendChild(div);
-                });
-
-                // Auto-select first video if available
-                if (data.videos.length > 0) {
-                    selectClip(data.videos[0], container.firstChild);
-                }
-
-            } catch (e) {
-                console.error('Failed to load files', e);
-                document.getElementById('clipList').innerHTML = '<div class="text-xs text-danger">Error loading files</div>';
-            }
-        }
-
-        function selectClip(filename, element) {
-            // Update UI
-            document.querySelectorAll('.clip-item').forEach(el => el.classList.remove('active'));
-            if (element) element.classList.add('active');
-
-            // Set state
-            selectedVideoPath = `/data/input/${filename}`;
-            
-            // Update Preview
+        // Shorts Studio JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            const playBtn = document.getElementById('playBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const toggleSafeZone = document.getElementById('toggleSafeZone');
             const previewVideo = document.getElementById('previewVideo');
-            previewVideo.src = `/api/video/${filename}`;
-            hideEl(document.getElementById('previewHint'));
+            const safeZoneOverlay = document.getElementById('safeZoneOverlay');
+            const renderBtn = document.getElementById('renderBtn');
+            const trimStart = document.getElementById('trimStart');
+            const trimEnd = document.getElementById('trimEnd');
+            const trimStartTime = document.getElementById('trimStartTime');
+            const trimEndTime = document.getElementById('trimEndTime');
 
-            // Reset job results
-            hideEl(document.getElementById('successMessage'));
-        }
+            // Play/Pause Controls
+            playBtn?.addEventListener('click', () => previewVideo.play());
+            pauseBtn?.addEventListener('click', () => previewVideo.pause());
 
-        // =====================================================================
-        // Job Management (Async Processing with Progress Tracking)
-        // =====================================================================
-        
-        let pollInterval = null;
-        
-        function toggleWorkflowOptions() {
-            const type = document.getElementById('workflowType').value;
-            const styleSec = document.getElementById('styleSection');
-            if (styleSec) {
-                if (type === 'montage') {
-                    showEl(styleSec);
-                } else {
-                    hideEl(styleSec);
-                }
-            }
-        }
+            // Safe Zone Toggle
+            toggleSafeZone?.addEventListener('change', (e) => {
+                safeZoneOverlay.classList.toggle('visible', e.target.checked);
+            });
 
-        function updateCaptionPreview() {
-            const style = document.getElementById('captionStyle').value;
-            const preview = document.getElementById('captionPreview');
-            
-            // Remove all specific classes
-            preview.classList.remove('tiktok', 'bold', 'minimal', 'cinematic', 'karaoke');
-            
-            if (style === 'none') {
-                preview.classList.remove('is-visible');
-            } else {
-                preview.classList.add('is-visible');
-                preview.classList.add(style);
-            }
-        }
-
-        
-        async function generateShort() {
-            const btn = document.getElementById('generateBtn');
-            const progressSection = document.getElementById('progressSection');
-            const successMessage = document.getElementById('successMessage');
-            const errorMessage = document.getElementById('errorMessage');
-            
-            // Hide previous messages
-            hideEl(successMessage);
-            hideEl(errorMessage);
-            
-            // Get options
-            // const videoPath = '/data/input/test.mp4'; // OLD HARDCODED
-
-            if (!selectedVideoPath) {
-                alert("Please select a video clip first.");
-                return;
-            }
-
-            const videoPath = selectedVideoPath;
-            const workflowType = document.getElementById('workflowType').value;
-            const montageStyle = document.getElementById('montageStyle').value;
-            const reframeMode = document.getElementById('reframeMode').value;
-            const captionStyle = document.getElementById('captionStyle')?.value || 'tiktok';
-            const autoCaptions = document.getElementById('autoCaptions')?.checked !== false;
-            const cleanAudio = document.getElementById('cleanAudio')?.checked === true;
-            const audioAware = document.getElementById('audioAware')?.checked === true;
-            const stabilize = document.getElementById('stabilize')?.checked === true;
-            const upscale = document.getElementById('upscale')?.checked === true;
-            const platform = document.getElementById('platformPreset').value || 'tiktok';
-
-            // Build payload
-            const payload = {
-                video_path: videoPath,
-                workflow_type: workflowType,
-                style: montageStyle,
-                reframeMode: reframeMode,
-                stabilize: stabilize,
-                upscale: upscale,
-                audioAware: audioAware,
-                captionStyle: captionStyle,
-                autoCaptions: autoCaptions,
-                cleanAudio: cleanAudio,
-                platform: platform
+            // Trim Slider Update
+            const updateTrimTimes = () => {
+                const duration = 5; // Example: 5 second default
+                const startSec = Math.round((trimStart.value / 100) * duration);
+                const endSec = Math.round((trimEnd.value / 100) * duration);
+                trimStartTime.textContent = `0:${startSec.toString().padStart(2, '0')}`;
+                trimEndTime.textContent = `0:${endSec.toString().padStart(2, '0')}`;
             };
-            
-            // Disable button
-            btn.disabled = true;
-            btn.textContent = 'Submitting...';
-            
-            try {
-                // Submit job
-                const response = await fetch('/api/shorts/render', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to submit job');
-                }
-                
-                const result = await response.json();
-                currentJobId = result.job_id;
-                
-                // Show progress section
-                showEl(progressSection);
-                btn.textContent = 'Processing...';
-                
-                // Start monitoring (SSE)
-                startJobMonitoring();
-                
-            } catch (error) {
-                console.error('Error:', error);
-                showEl(errorMessage);
-                document.getElementById('errorText').textContent = error.message;
-                btn.disabled = false;
-                btn.textContent = 'Generate Short';
-            }
-        }
-        
-        function startJobMonitoring() {
-            // Using SSE for real-time updates
-            if (window.evtSource) window.evtSource.close();
-            
-            console.log(`Starting SSE for job ${currentJobId}`);
-            window.evtSource = new EventSource(`/api/progress/${currentJobId}`);
-            
-            window.evtSource.onmessage = function(event) {
-                try {
-                    const msg = JSON.parse(event.data);
-                    // msg contains {job_id, updates, full_data} or might be just updates depending on structure
-                    // JobStore sends {job_id, updates, full_data}
-                    
-                    const job = msg.full_data || msg; // Fallback if msg is the job itself
-                    updateJobProgress(job);
-                    
-                    if (['completed', 'failed', 'cancelled'].includes(job.status)) {
-                        window.evtSource.close();
-                        handleJobComplete(job);
-                    }
-                } catch (e) {
-                    console.error("SSE Parse Error", e);
-                }
-            };
-            
-            window.evtSource.onerror = function(err) {
-                console.error("SSE Error", err);
-                // Optional: Fallback to polling or just close
-                // window.evtSource.close();
-            };
-        }
-        
-        function updateJobProgress(job) {
-            const phase = job.phase || {};
-            const progress = job.progress_percent || 0;
-            
-            // Update phase label
-            const phaseLabel = phase.label || phase.name || 'Processing';
-            document.getElementById('progressPhase').textContent = phaseLabel;
-            
-            // Update granular message
-            if (job.message) {
-                const msgEl = document.getElementById('progressMessage');
-                if (msgEl) msgEl.textContent = job.message;
-            }
-            
-            // Update progress bar
-            document.getElementById('progressFill').style.width = `${progress}%`;
-            document.getElementById('progressPercent').textContent = `${progress}%`;
-            
-            // Show cancel button if running
-            const cancelBtn = document.getElementById('cancelBtn');
-            if (job.status === 'running' || job.status === 'queued') {
-                showEl(cancelBtn);
-            } else {
-                hideEl(cancelBtn);
-            }
-        }
-        
-        function handleJobComplete(job) {
-            const btn = document.getElementById('generateBtn');
-            const progressSection = document.getElementById('progressSection');
-            const successMessage = document.getElementById('successMessage');
-            const errorMessage = document.getElementById('errorMessage');
 
-            if (job.status === 'completed') {
-                // Success
-                hideEl(progressSection);
-                showEl(successMessage);
+            trimStart?.addEventListener('input', updateTrimTimes);
+            trimEnd?.addEventListener('input', updateTrimTimes);
 
-                const downloadLink = document.getElementById('downloadLink');
-                const outputFile = job.output_file || job.path;
-                downloadLink.href = `/api/download/${outputFile}`;
-                downloadLink.download = outputFile || 'short.mp4';
-
-                // Update Preview Video
-                const videoEl = document.querySelector('#phoneScreen video');
-                if (videoEl) {
-                    videoEl.src = `/api/download/${outputFile}`;
-                    videoEl.load();
+            // Render Button
+            renderBtn?.addEventListener('click', async () => {
+                const progressSection = document.getElementById('progressSection');
+                const progressFill = document.getElementById('progressFill');
+                const progressPercent = document.getElementById('progressPercent');
+                
+                progressSection.classList.remove('hidden');
+                
+                // Simulate progress
+                for (let i = 0; i <= 100; i += 10) {
+                    progressFill.style.width = i + '%';
+                    progressPercent.textContent = i + '%';
+                    await new Promise(r => setTimeout(r, 300));
                 }
 
-                btn.disabled = false;
-                btn.textContent = 'Generate Another';
+                document.getElementById('successMessage').classList.remove('hidden');
+                document.getElementById('engagementSection').classList.remove('hidden');
+            });
 
-                // Render Highlights
-                renderHighlights(job);
-
-                // Fetch engagement score for the generated video
-                const platform = document.getElementById('platformPreset').value || 'tiktok';
-                fetchEngagementScore(outputFile, platform);
-
-            } else if (job.status === 'failed') {
-                // Failed
-                hideEl(progressSection);
-                showEl(errorMessage);
-                document.getElementById('errorText').textContent = job.error || 'Unknown error';
-                
-                btn.disabled = false;
-                btn.textContent = 'Try Again';
-                
-            } else if (job.status === 'cancelled') {
-                // Cancelled
-                hideEl(progressSection);
-                btn.disabled = false;
-                btn.textContent = 'Generate Short';
-            }
-            
-            currentJobId = null;
-        }
-
-        function renderHighlights(job) {
-            const container = document.getElementById('highlightCards');
-            const section = document.getElementById('highlightReview');
-            
-            // Extract highlights from metadata
-            const metadata = job.metadata || (job.result && job.result.metadata) || {};
-            const highlights = metadata.highlights || [];
-            
-            if (!highlights || highlights.length === 0) {
-                hideEl(section);
-                return;
-            }
-            
-            showEl(section);
-            if (container) {
-                container.innerHTML = highlights.map((h, index) => {
-                    const score = Math.round(h.score * 100);
-                    // Color code score for visual impact
-                    const colorClass = score > 80 ? 'text-success' : (score > 60 ? 'text-primary' : 'text-muted');
-                    
-                    return `
-                    <div class="voxel-card p-2 cursor-pointer hover:border-primary transition-all" onclick="seekVideo(${h.start})">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-xs font-bold text-primary">#${index + 1}</span>
-                            <span class="text-xs font-mono">${h.duration.toFixed(1)}s</span>
-                        </div>
-                        
-                        <div class="flex items-center gap-2 mb-1">
-                            <div class="text-lg font-bold ${colorClass}">${score}</div>
-                            <div class="text-xs text-muted flex-1 text-right">
-                                         <span title="Action" class="mr-1 signal-icon"><i class="lucide lucide-zap icon-lucide icon-sm" data-lucide="zap" aria-label="Action signal"></i></span>
-                                         <span class="mr-2 text-xs font-mono">${h.signals?.action?.toFixed(1) || '-'}</span>
-                                         <span title="Face" class="mr-1 signal-icon"><i class="lucide lucide-user icon-lucide icon-sm" data-lucide="user" aria-label="Face count"></i></span>
-                                         <span class="text-xs font-mono">${h.signals?.face?.toFixed(1) || '-'}</span>
-                            </div>
-                        </div>
-                        
-                        <div class="progress-bar mb-1">
-                            <div class="progress-fill" style="width: ${score}%"></div>
-                        </div>
-                        
-                        <div class="text-xs text-muted truncate">${h.description || 'Highlight'}</div>
+            // Load Clips (Mock)
+            const clipList = document.getElementById('clipList');
+            if (clipList) {
+                clipList.innerHTML = `
+                    <div class="clip-item voxel-card cursor-pointer active">
+                        <p class="text-xs font-bold text-primary">Clip 1</p>
+                        <p class="text-xs text-muted">0:00 - 0:15</p>
                     </div>
-                    `;
-                }).join('');
-                if (window.lucide) {
-                    lucide.createIcons();
-                }
-            }
-        }
-        
-        function seekVideo(time) {
-            const videoEl = document.querySelector('#phoneScreen video');
-            if (videoEl) {
-                // Ensure video is playable
-                if (videoEl.readyState >= 1) {
-                    videoEl.currentTime = Math.max(0, time);
-                    videoEl.play().catch(e => console.log('Autoplay prevented', e));
-                    
-                    // Smooth scroll to preview
-                    const preview = document.getElementById('phoneScreen');
-                    preview.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                } else {
-                    console.warn('Video not ready to seek');
-                }
-            }
-        }
-
-        
-        async function cancelJob() {
-            if (!currentJobId) return;
-            
-            if (!confirm('Cancel this job?')) return;
-            
-            try {
-                const response = await fetch(`/api/jobs/${currentJobId}/cancel`, {
-                    method: 'POST'
-                });
-                
-                if (response.ok) {
-                    clearInterval(pollInterval);
-                    document.getElementById('progressPhase').textContent = 'Cancelled';
-                    document.getElementById('generateBtn').disabled = false;
-                    document.getElementById('generateBtn').textContent = 'Generate Short';
-                    hideEl(document.getElementById('progressSection'));
-                }
-            } catch (error) {
-                console.error('Cancel error:', error);
-            }
-        }
-        
-        // =====================================================================
-        // Engagement Score System
-        // =====================================================================
-
-        async function fetchEngagementScore(videoPath, platform = 'tiktok') {
-            const engagementSection = document.getElementById('engagementSection');
-
-            try {
-                showEl(engagementSection);
-                document.getElementById('engagementGrade').textContent = '...';
-
-                const response = await fetch('/api/engagement', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        video_path: videoPath,
-                        platform: platform
-                    })
-                });
-
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || 'Failed to fetch engagement score');
-                }
-
-                const data = await response.json();
-                displayEngagementScore(data);
-
-            } catch (error) {
-                console.error('Engagement score error:', error);
-                document.getElementById('engagementGrade').textContent = '?';
-                document.getElementById('engagementScore').textContent = '--';
-            }
-        }
-
-        function displayEngagementScore(data) {
-            const gradeEl = document.getElementById('engagementGrade');
-            gradeEl.textContent = data.grade || '-';
-            gradeEl.setAttribute('data-grade', data.grade || '');
-
-            document.getElementById('engagementScore').textContent = Math.round(data.overall_score || 0);
-
-            // Individual scores
-            const scores = [
-                ['hook', data.hook_score],
-                ['energy', data.energy_score],
-                ['pacing', data.pacing_score],
-                ['variety', data.variety_score],
-                ['audio', data.audio_score]
-            ];
-
-            scores.forEach(([name, score]) => {
-                const val = Math.round(score || 0);
-                document.getElementById(`${name}ScoreVal`).textContent = val;
-                document.getElementById(`${name}ScoreBar`).style.width = `${val}%`;
-            });
-
-            // Platform scores
-            const platformMap = {
-                'tiktok': 'platformTiktok',
-                'youtube_shorts': 'platformYoutube',
-                'instagram_reels': 'platformInstagram',
-                'youtube_long': 'platformYoutubeLong'
-            };
-
-            if (data.platform_scores) {
-                Object.entries(data.platform_scores).forEach(([platform, score]) => {
-                    const elId = platformMap[platform];
-                    if (elId) {
-                        document.getElementById(elId).textContent = Math.round(score);
-                    }
-                });
-            }
-
-            // Recommendations
-            const recList = document.getElementById('engagementRecommendations');
-            recList.innerHTML = '';
-
-            if (data.recommendations && data.recommendations.length > 0) {
-                data.recommendations.forEach(rec => {
-                    const li = document.createElement('li');
-                    li.className = 'p-2 bg-muted border-l-2 border-primary';
-                    li.textContent = rec;
-                    recList.appendChild(li);
-                });
-            } else {
-                const li = document.createElement('li');
-                li.className = 'text-muted';
-                li.textContent = 'Great job! No major improvements needed.';
-                recList.appendChild(li);
-            }
-        }
-
-        // =====================================================================
-        // Safe Zone Management System
-        // =====================================================================
-
-        let safeZones = [];
-        let isDrawingMode = false;
-        let isDrawing = false;
-        let drawStart = { x: 0, y: 0 };
-
-        function toggleSafeZone() {
-            const overlay = document.getElementById('safeZone');
-            const btn = document.getElementById('safeZoneBtn');
-            const isVisible = overlay.classList.toggle('visible');
-            
-            if (isVisible) {
-                btn.textContent = 'SAFE ZONE OVERLAY: ON';
-                btn.classList.add('voxel-btn-primary');
-            } else {
-                btn.textContent = 'SAFE ZONE OVERLAY: OFF';
-                btn.classList.remove('voxel-btn-primary');
-            }
-        }
-
-        function toggleDrawMode() {
-            isDrawingMode = !isDrawingMode;
-            const btn = document.getElementById('drawModeBtn');
-            const overlay = document.getElementById('safeZone');
-            
-            if (isDrawingMode) {
-                btn.textContent = 'DRAW MODE: ON';
-                btn.classList.add('voxel-btn-primary');
-                overlay.classList.add('drawing');
-                document.getElementById('previewHint').textContent = 'Click & drag on preview to draw safe zones.';
-            } else {
-                btn.textContent = 'DRAW MODE: OFF';
-                btn.classList.remove('voxel-btn-primary');
-                overlay.classList.remove('drawing');
-                document.getElementById('previewHint').textContent = 'Preview';
-            }
-        }
-
-        function applyPlatformPreset() {
-            const preset = document.getElementById('platformPreset').value;
-            clearAllZones();
-            
-            const presets = {
-                tiktok: [
-                    { x: 85, y: 80, w: 15, h: 20 }, // Right buttons
-                    { x: 0, y: 90, w: 100, h: 10 }  // Bottom bar
-                ],
-                instagram: [
-                    { x: 0, y: 88, w: 100, h: 12 }  // Bottom UI
-                ],
-                youtube: [
-                    { x: 0, y: 92, w: 100, h: 8 }   // Bottom player
-                ],
-                twitch: [
-                    { x: 0, y: 0, w: 100, h: 5 },   // Top bar
-                    { x: 90, y: 15, w: 10, h: 60 }, // Right panel
-                    { x: 0, y: 95, w: 100, h: 5 }   // Bottom chat
-                ],
-                snapchat: [
-                    { x: 0, y: 0, w: 100, h: 10 },   // Top
-                    { x: 0, y: 90, w: 100, h: 10 },  // Bottom
-                    { x: 0, y: 10, w: 15, h: 80 },   // Left
-                    { x: 85, y: 10, w: 15, h: 80 }   // Right
-                ]
-            };
-            
-            if (preset && presets[preset]) {
-                presets[preset].forEach(z => addSafeZone(z.x, z.y, z.w, z.h));
-                document.getElementById('platformPreset').value = '';
-            }
-        }
-
-        function addSafeZone(x, y, w, h) {
-            const zone = { x, y, w, h, id: Date.now() };
-            safeZones.push(zone);
-            renderSafeZones();
-            renderZoneList();
-        }
-
-        function removeSafeZone(id) {
-            safeZones = safeZones.filter(z => z.id !== id);
-            renderSafeZones();
-            renderZoneList();
-        }
-
-        function clearAllZones() {
-            safeZones = [];
-            renderSafeZones();
-            renderZoneList();
-        }
-
-        function renderSafeZones() {
-            const overlay = document.getElementById('safeZone');
-            overlay.innerHTML = '';
-            
-            safeZones.forEach(zone => {
-                const rect = document.createElement('div');
-                rect.className = 'safe-zone-rect';
-                rect.style.left = zone.x + '%';
-                rect.style.top = zone.y + '%';
-                rect.style.width = zone.w + '%';
-                rect.style.height = zone.h + '%';
-                overlay.appendChild(rect);
-            });
-        }
-
-        function renderZoneList() {
-            const list = document.getElementById('zoneList');
-            
-            if (safeZones.length === 0) {
-                list.innerHTML = '<p class="text-xs text-muted">No zones defined. Draw or select a preset.</p>';
-                return;
-            }
-            
-            list.innerHTML = safeZones.map(z => `
-                <div class="safe-zone-item">
-                    <span>${z.x.toFixed(0)}%, ${z.y.toFixed(0)}% [${z.w.toFixed(0)}% × ${z.h.toFixed(0)}%]</span>
-                    <button onclick="removeSafeZone(${z.id})">DELETE</button>
-                </div>
-            `).join('');
-        }
-
-        // Drawing functionality
-        const phoneScreen = document.getElementById('phoneScreen');
-        
-        phoneScreen.addEventListener('mousedown', (e) => {
-            if (!isDrawingMode) return;
-            isDrawing = true;
-            const rect = phoneScreen.getBoundingClientRect();
-            drawStart.x = ((e.clientX - rect.left) / rect.width) * 100;
-            drawStart.y = ((e.clientY - rect.top) / rect.height) * 100;
-        });
-
-        phoneScreen.addEventListener('mousemove', (e) => {
-            if (!isDrawing || !isDrawingMode) return;
-            
-            const rect = phoneScreen.getBoundingClientRect();
-            const currentX = ((e.clientX - rect.left) / rect.width) * 100;
-            const currentY = ((e.clientY - rect.top) / rect.height) * 100;
-            
-            const overlay = document.getElementById('safeZone');
-            let preview = overlay.querySelector('.preview-rect');
-            
-            if (!preview) {
-                preview = document.createElement('div');
-                preview.className = 'safe-zone-rect preview-rect';
-                overlay.appendChild(preview);
-            }
-            
-            const x = Math.min(drawStart.x, currentX);
-            const y = Math.min(drawStart.y, currentY);
-            const w = Math.abs(currentX - drawStart.x);
-            const h = Math.abs(currentY - drawStart.y);
-            
-            preview.style.left = x + '%';
-            preview.style.top = y + '%';
-            preview.style.width = w + '%';
-            preview.style.height = h + '%';
-        });
-
-        phoneScreen.addEventListener('mouseup', (e) => {
-            if (!isDrawing || !isDrawingMode) return;
-            isDrawing = false;
-            
-            const rect = phoneScreen.getBoundingClientRect();
-            const currentX = ((e.clientX - rect.left) / rect.width) * 100;
-            const currentY = ((e.clientY - rect.top) / rect.height) * 100;
-            
-            const x = Math.min(drawStart.x, currentX);
-            const y = Math.min(drawStart.y, currentY);
-            const w = Math.abs(currentX - drawStart.x);
-            const h = Math.abs(currentY - drawStart.y);
-            
-            // Only add if reasonable size
-            if (w > 2 && h > 2) {
-                addSafeZone(x, y, w, h);
-            }
-            
-            // Remove preview
-            const preview = document.getElementById('safeZone').querySelector('.preview-rect');
-            if (preview) preview.remove();
-        });
-
-        function updateSmoothing() {
-            const value = document.getElementById('smoothingSlider').value;
-            console.log('Smoothing value:', value);
-        }
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            renderZoneList();
-        });
-    </script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.lucide) {
-                lucide.createIcons();
+                    <div class="clip-item voxel-card cursor-pointer">
+                        <p class="text-xs font-bold text-primary">Clip 2</p>
+                        <p class="text-xs text-muted">0:15 - 0:30</p>
+                    </div>
+                `;
             }
         });
     </script>
-</body>
-</html>
+{% endblock %}

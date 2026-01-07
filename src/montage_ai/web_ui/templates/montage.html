@@ -1,525 +1,388 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage Creator - Voxel Studio</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+{% extends "base.html" %}
+{% from "components/icon.html" import icon %}
+{% import "components/macros.html" as m %}
+
+{% block title %}Montage Creator - Montage AI{% endblock %}
+
+{% block extra_css %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/montage.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide@latest" />
-    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
-    <style>
-        .style-card {
-            border: 2px solid var(--border);
-            padding: 1rem;
-            cursor: pointer;
-            transition: all 0.15s;
-            text-align: center;
-            background: var(--card-bg);
-        }
+{% endblock %}
 
-        .style-card:hover {
-            border-color: var(--primary);
-            background: var(--muted);
-            box-shadow: var(--shd-md);
-        }
-
-        .style-card.active {
-            border-color: var(--secondary);
-            background: rgba(255, 85, 0, 0.1);
-            box-shadow: var(--shd-secondary);
-        }
-
-        .style-card h5 {
-            font-size: 0.9rem;
-            font-weight: 900;
-            margin-bottom: 0.5rem;
-        }
-
-        .style-card p {
-            font-size: 0.7rem;
-            color: var(--muted-fg);
-        }
-
-        .option-group {
-            background: var(--muted);
-            border: 1px solid var(--border);
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-radius: 2px;
-        }
-
-        .option-item {
-            display: flex;
-            gap: 0.75rem;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .option-item:last-child {
-            border-bottom: none;
-        }
-
-        .option-item input[type="checkbox"] {
-            margin-top: 0.25rem;
-            width: 18px;
-            height: 18px;
-        }
-
-        .option-label {
-            flex: 1;
-        }
-
-        .option-label-title {
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: var(--fg);
-        }
-
-        .option-label-desc {
-            font-size: 0.75rem;
-            color: var(--muted-fg);
-            margin-top: 0.25rem;
-        }
-
-        /* Quality Profile Cards */
-        .quality-card {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            cursor: pointer;
-            padding: 1rem;
-            border: 2px solid var(--border);
-            background: var(--card-bg);
-            transition: all 0.15s;
-        }
-
-        .quality-card:hover {
-            border-color: var(--primary);
-            box-shadow: var(--shd-md);
-        }
-
-        .quality-card input[type="radio"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .quality-card-title {
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--fg);
-        }
-
-        .quality-card-desc {
-            font-size: 0.75rem;
-            color: var(--muted-fg);
-            display: block;
-        }
-
-        .quality-card--recommended {
-            border-color: var(--secondary);
-            box-shadow: var(--shd-secondary);
-        }
-    </style>
-</head>
-<body>
-    {% from "components/icon.html" import icon %}
-    <nav class="navbar">
-        <a href="/" class="nav-brand">
-            <span>MONTAGE</span> AI
-        </a>
-        <div class="nav-links">
-            <a href="/" class="nav-link">DASHBOARD</a>
-            <a href="/montage" class="nav-link active">CREATOR</a>
-            <a href="/gallery" class="nav-link">GALLERY</a>
-            <a href="/settings" class="nav-link">SETTINGS</a>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div class="mb-8">
-            <h1 class="voxel-title glitch-text">PROJECT CREATOR</h1>
-            <p class="text-muted">// Compose your montage. Configure AI editing. Source from /data/input.</p>
-            <div class="cyber-progress mt-1"></div>
-        </div>
-
-        <form action="/api/jobs" method="POST" id="montageForm">
-            <!-- STEP 1: Select Style -->
-            <div class="mb-8">
-                <div class="voxel-card gradient-border">
-                    <div class="flex items-center gap-4 mb-4">
-                        <div class="step-number">1</div>
-                        <div>
-                            <h3 class="text-primary mb-1">SELECT STYLE</h3>
-                            <p class="text-xs text-muted">Choose editing rhythm and visual language</p>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <!-- DYNAMIC -->
-                        <label class="style-card active" onclick="selectStyle('dynamic')">
-                            <input type="radio" name="style" value="dynamic" checked class="hidden-input">
-                            <h5>DYNAMIC</h5>
-                            <p>Fast cuts on the beat. High energy. Action & sports.</p>
-                        </label>
-
-                        <!-- HITCHCOCK -->
-                        <label class="style-card" onclick="selectStyle('hitchcock')">
-                            <input type="radio" name="style" value="hitchcock" class="hidden-input">
-                            <h5>HITCHCOCK</h5>
-                            <p>Slow build + tension. Suspenseful. Cinematic reveals.</p>
-                        </label>
-
-                        <!-- MTV -->
-                        <label class="style-card" onclick="selectStyle('mtv')">
-                            <input type="radio" name="style" value="mtv" class="hidden-input">
-                            <h5>MTV</h5>
-                            <p>Quick cuts. Energetic transitions. Music-synced.</p>
-                        </label>
-
-                        <!-- MINIMALIST -->
-                        <label class="style-card" onclick="selectStyle('minimalist')">
-                            <input type="radio" name="style" value="minimalist" class="hidden-input">
-                            <h5>MINIMAL</h5>
-                            <p>Subtle cuts. Long takes. Let footage breathe.</p>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- STEP 2: Director's Prompt -->
-            <div class="mb-8">
-                <div class="voxel-card">
-                    <div class="flex items-center gap-4 mb-4">
-                        <div class="step-number">2</div>
-                        <div>
-                            <h3 class="text-primary mb-1">CREATIVE DIRECTION</h3>
-                            <p class="text-xs text-muted">Describe mood, pacing, and intent</p>
-                        </div>
-                    </div>
-                    
-                    <label class="tech-label">CREATIVE PROMPT</label>
-                    <textarea 
-                        class="voxel-input mb-3" 
-                        name="prompt" 
-                        rows="5" 
-                        placeholder="Examples:&#10;• High-energy skate montage with fast cuts on kick tricks&#10;• Cinematic interview piece with slow zooms and depth&#10;• Music video style with synchronized beat-cuts&#10;• Documentary feel with natural transitions">
-                    </textarea>
-                    
-                    <p class="text-xs text-muted">💡 <strong>Tip:</strong> Be specific about mood, pace, and subject. AI learns from detail.</p>
-                </div>
-            </div>
-
-            <!-- STEP 3: Processing Options -->
-            <div class="mb-8">
-                <div class="voxel-card">
-                    <h3 class="mb-3 text-primary">STEP 3: PROCESSING OPTIONS</h3>
-                    <p class="text-xs text-muted mb-4">Optional AI enhancements applied during rendering.</p>
-                    
-                    <!-- Video Enhancement -->
-                    <div class="option-group">
-                        <div class="section-header">
-                            {{ icon("video", size="18", class_="section-icon", title="Video Enhancement") }}
-                            <span>VIDEO ENHANCEMENT</span>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="upscale" id="upscale" title="Enable AI upscale" aria-label="Enable AI upscale">
-                            <div class="option-label">
-                                <div class="option-label-title">AI UPSCALE (4K)</div>
-                                <div class="option-label-desc">Real-ESRGAN enhancement. Increases file size and render time.</div>
-                            </div>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="stabilize" id="stabilize" checked title="Stabilize footage" aria-label="Stabilize footage">
-                            <div class="option-label">
-                                <div class="option-label-title">STABILIZE FOOTAGE</div>
-                                <div class="option-label-desc">Remove camera shake. Recommended for handheld footage.</div>
-                            </div>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="denoise" id="denoise" title="Denoise footage" aria-label="Denoise footage">
-                            <div class="option-label">
-                                <div class="option-label-title">AI DENOISE</div>
-                                <div class="option-label-desc">Reduce noise/grain. Best for low-light or high-ISO footage.</div>
-                            </div>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="sharpen" id="sharpen" title="Sharpen footage" aria-label="Sharpen footage">
-                            <div class="option-label">
-                                <div class="option-label-title">SHARPEN</div>
-                                <div class="option-label-desc">Enhance edge detail. Subtle unsharp mask with skin protection.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Text & Captions -->
-                    <div class="option-group">
-                        <div class="section-header is-warning">
-                            {{ icon("type", size="18", class_="section-icon", title="Text & Captions") }}
-                            <span>TEXT & CAPTIONS</span>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="captions" id="captions" title="Burn captions" aria-label="Burn captions">
-                            <div class="option-label">
-                                <div class="option-label-title">BURN CAPTIONS</div>
-                                <div class="option-label-desc">Auto-transcribe dialogue and burn subtitles into video.</div>
-                            </div>
-                        </div>
-                        <div class="option-item stacked-option mt-05">
-                            <label for="caption_style" class="option-label-title mb-05">CAPTION STYLE</label>
-                            <select name="caption_style" id="caption_style" class="voxel-input full-width">
-                                <option value="tiktok">TikTok - Bold, Shadowed</option>
-                                <option value="minimal">Minimalist - Clean, Small</option>
-                                <option value="cinematic">Cinematic - Serif, Boxed</option>
-                                <option value="bold">Impact - Large, Bordered</option>
-                                <option value="youtube">YouTube - Classic Boxed</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Audio Selection & Scrubbing -->
-                    <div class="option-group">
-                        <div class="section-header is-success">
-                            {{ icon("music", size="18", class_="section-icon", title="Audio Track") }}
-                            <span>AUDIO TRACK</span>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="option-label-title block mb-2">SELECT MUSIC</label>
-                            <select name="music_track" id="music_track" class="voxel-input w-full" title="Select music track">
-                                <option value="auto">Auto-Select (AI Matched to Style)</option>
-                                {% for track in music_tracks %}
-                                <option value="{{ track }}">{{ track }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- Scrubber Visual -->
-                        <div class="audio-scrubber-container rounded">
-                            <div class="flex justify-between text-xs text-muted mb-2">
-                                <span>START TIME</span>
-                                <span id="start-time-val" class="font-mono text-primary">00:00</span>
-                            </div>
-                            
-                            <!-- Fake Waveform Visual using CSS -->
-                            <div class="waveform-visual" id="waveform-visual">
-                                <!-- Bars generated by JS -->
-                            </div>
-                            
-                            <input type="range" name="music_start_time" id="music_start_time" class="scrubber" min="0" max="300" step="1" value="0" title="Music start time" aria-label="Music start time">
-                            
-                            <div class="flex justify-between text-xs text-muted mt-2">
-                                <span>0:00</span>
-                                <span>END</span>
-                            </div>
-                        </div>
-                        <p class="text-xs text-muted mt-2">Drag to select where the song should start playing.</p>
-                    </div>
-
-                    <!-- Color Grading -->
-                    <div class="option-group">
-                        <div class="section-header is-accent">
-                            {{ icon("palette", size="18", class_="section-icon", title="Color Grading") }}
-                            <span>COLOR GRADING</span>
-                        </div>
-                        <div class="option-item stacked-option">
-                            <label for="color_grading" class="option-label-title mb-05">COLOR PRESET</label>
-                            <select name="color_grading" id="color_grading" class="voxel-input full-width">
-                                <option value="auto">Auto (from style)</option>
-                                <optgroup label="Basic">
-                                    <option value="none">None - No color grading</option>
-                                    <option value="neutral">Neutral - Broadcast safe</option>
-                                    <option value="natural">Natural - True to source</option>
-                                </optgroup>
-                                <optgroup label="Temperature">
-                                    <option value="warm">Warm - Golden warmth</option>
-                                    <option value="cool">Cool - Blue/teal</option>
-                                    <option value="golden_hour">Golden Hour - Sunset</option>
-                                    <option value="blue_hour">Blue Hour - Dawn/dusk</option>
-                                </optgroup>
-                                <optgroup label="Cinematic">
-                                    <option value="teal_orange">Teal & Orange - Hollywood</option>
-                                    <option value="cinematic">Cinematic - S-curve contrast</option>
-                                    <option value="blockbuster">Blockbuster - Action movie</option>
-                                </optgroup>
-                                <optgroup label="Stylized">
-                                    <option value="vibrant">Vibrant - Punchy colors</option>
-                                    <option value="desaturated">Desaturated - Muted filmic</option>
-                                    <option value="high_contrast">High Contrast - Strong B&W</option>
-                                    <option value="vintage">Vintage - Faded film</option>
-                                    <option value="filmic_warm">Filmic Warm - Classic</option>
-                                    <option value="noir">Noir - Desaturated contrast</option>
-                                </optgroup>
-                                <optgroup label="Documentary">
-                                    <option value="documentary">Documentary - Natural sharp</option>
-                                </optgroup>
-                            </select>
-                            <p class="option-label-desc mt-05">Override style's default color grade. "Auto" uses the style's built-in look.</p>
-                        </div>
-                        <div class="option-item stacked-option mt-075">
-                            <label for="color_intensity" class="option-label-title mb-05">INTENSITY: <span id="intensity_value">100</span>%</label>
-                            <input type="range" name="color_intensity" id="color_intensity" min="0" max="100" value="100" class="voxel-input full-width">
-                            <p class="option-label-desc mt-05">Blend strength. 70% often looks more natural than 100%.</p>
-                        </div>
-                    </div>
-
-                    <!-- Audio Enhancement -->
-                    <div class="option-group">
-                        <div class="section-header is-success">
-                            {{ icon("headphones", size="18", class_="section-icon", title="Audio Enhancement") }}
-                            <span>AUDIO ENHANCEMENT</span>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="dialogue_duck" id="dialogue_duck" title="Enable dialogue ducking" aria-label="Enable dialogue ducking">
-                            <div class="option-label">
-                                <div class="option-label-title">DIALOGUE DUCKING</div>
-                                <div class="option-label-desc">Auto-detect speech and lower music during dialogue. NLE-exportable keyframes.</div>
-                            </div>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="audio_normalize" id="audio_normalize" title="Normalize audio" aria-label="Normalize audio">
-                            <div class="option-label">
-                                <div class="option-label-title">NORMALIZE AUDIO (-14 LUFS)</div>
-                                <div class="option-label-desc">Broadcast-safe loudness normalization for consistent levels.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Story Engine -->
-                    <div class="option-group">
-                        <div class="section-header is-purple">
-                            {{ icon("book-open", size="18", class_="section-icon", title="Story Engine") }}
-                            <span>STORY ENGINE</span>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="story_engine" id="story_engine" title="Enable story engine" aria-label="Enable story engine">
-                            <div class="option-label">
-                                <div class="option-label-title">NARRATIVE TENSION</div>
-                                <div class="option-label-desc">AI-driven 5-phase story arc: Intro → Build → Climax → Sustain → Outro.</div>
-                            </div>
-                        </div>
-                        <div class="option-item stacked-option mt-075">
-                            <label for="story_arc" class="option-label-title mb-05">STORY ARC PRESET</label>
-                            <select name="story_arc" id="story_arc" class="voxel-input full-width">
-                                <option value="auto">Auto - Match style</option>
-                                <option value="hero_journey">Hero's Journey - Classic narrative</option>
-                                <option value="mtv_energy">MTV Energy - Peak early, sustain</option>
-                                <option value="documentary">Documentary - Gradual reveal</option>
-                                <option value="thriller">Thriller - Tension build</option>
-                                <option value="flat">Flat - Consistent energy</option>
-                            </select>
-                            <p class="option-label-desc mt-05">Controls pacing and energy distribution across the montage.</p>
-                        </div>
-                    </div>
-
-                    <!-- Film Emulation -->
-                    <div class="option-group">
-                        <div class="section-header is-rose">
-                            {{ icon("clapperboard", size="18", class_="section-icon", title="Film Emulation") }}
-                            <span>FILM EMULATION</span>
-                        </div>
-                        <div class="option-item stacked-option">
-                            <label for="film_grain" class="option-label-title mb-05">FILM GRAIN</label>
-                            <select name="film_grain" id="film_grain" class="voxel-input full-width">
-                                <option value="none">None - Clean digital</option>
-                                <option value="fine">Fine - Subtle texture</option>
-                                <option value="medium">Medium - Visible grain</option>
-                                <option value="35mm">35mm Film - Classic cinema</option>
-                                <option value="16mm">16mm Film - Documentary</option>
-                                <option value="8mm">8mm Film - Vintage home movie</option>
-                            </select>
-                            <p class="option-label-desc mt-05">Add authentic film grain texture for cinematic look.</p>
-                        </div>
-                    </div>
-
-                    <!-- Output Format -->
-                    <div class="option-group">
-                        <div class="section-header is-secondary">
-                            {{ icon("smartphone", size="18", class_="section-icon", title="Output Format") }}
-                            <span>OUTPUT FORMAT</span>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="auto_reframe" id="auto_reframe" title="Enable auto reframe" aria-label="Enable auto reframe">
-                            <div class="option-label">
-                                <div class="option-label-title">AUTO-REFRAME (9:16)</div>
-                                <div class="option-label-desc">Generate vertical version. Creates additional output file.</div>
-                            </div>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="export_timeline" id="export_timeline" checked title="Export timeline" aria-label="Export timeline">
-                            <div class="option-label">
-                                <div class="option-label-title">EXPORT TIMELINE (OTIO/EDL)</div>
-                                <div class="option-label-desc">Generate NLE project files for DaVinci Resolve, Premiere Pro.</div>
-                            </div>
-                        </div>
-                        <div class="option-item">
-                            <input type="checkbox" name="export_recipe" id="export_recipe" title="Export recipe" aria-label="Export recipe">
-                            <div class="option-label">
-                                <div class="option-label-title">GENERATE RECIPE CARD</div>
-                                <div class="option-label-desc">Export enhancement parameters as human-readable instructions.</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- STEP 4: Quality Profile -->
-            <div class="mb-8">
-                <div class="voxel-card">
-                    <h3 class="mb-3 text-primary">STEP 4: QUALITY PROFILE</h3>
-                    <p class="text-xs text-muted mb-4">Balance speed vs. quality. Choose based on your goal.</p>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <label class="quality-card">
-                            <input type="radio" name="quality" value="preview">
-                            <div>
-                                <span class="quality-card-title">PREVIEW</span>
-                                <span class="quality-card-desc">360p • Ultrafast • Tests setup</span>
-                            </div>
-                        </label>
-                        <label class="quality-card quality-card--recommended">
-                            <input type="radio" name="quality" value="standard" checked>
-                            <div>
-                                <span class="quality-card-title">STANDARD</span>
-                                <span class="quality-card-desc">1080p • Balanced • Recommended</span>
-                            </div>
-                        </label>
-                        <label class="quality-card">
-                            <input type="radio" name="quality" value="high">
-                            <div>
-                                <span class="quality-card-title">HIGH</span>
-                                <span class="quality-card-desc">4K • Slow • Cinema-quality</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- STEP 5: Submit -->
-            <div class="mb-8">
-                <div class="voxel-card">
-                    <h3 class="mb-3 text-primary">STEP 5: START RENDER</h3>
-                    <p class="text-xs text-muted mb-4">Review settings and submit. AI processes your footage into finished video.</p>
-                    <button type="submit" class="voxel-btn voxel-btn-primary w-full">Start Render</button>
-                </div>
-            </div>
-        </form>
+{% block content %}
+    <div class="mb-8">
+        <h1 class="voxel-title glitch-text">PROJECT CREATOR</h1>
+        <p class="text-muted">// Compose your montage. Configure AI editing. Source from /data/input.</p>
+        <div class="cyber-progress mt-1"></div>
     </div>
 
+    <form action="/api/jobs" method="POST" id="montageForm">
+        <!-- STEP 1: Select Style -->
+        <div class="mb-8">
+            <div class="voxel-card gradient-border">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="step-number">1</div>
+                    <div>
+                        <h3 class="text-primary mb-1">SELECT STYLE</h3>
+                        <p class="text-xs text-muted">Choose editing rhythm and visual language</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <label class="style-card active" onclick="selectStyle('dynamic')">
+                        <input type="radio" name="style" value="dynamic" checked class="hidden-input">
+                        <h5>DYNAMIC</h5>
+                        <p>Fast cuts on the beat. High energy. Action & sports.</p>
+                    </label>
+
+                    <label class="style-card" onclick="selectStyle('hitchcock')">
+                        <input type="radio" name="style" value="hitchcock" class="hidden-input">
+                        <h5>HITCHCOCK</h5>
+                        <p>Slow build + tension. Suspenseful. Cinematic reveals.</p>
+                    </label>
+
+                    <label class="style-card" onclick="selectStyle('mtv')">
+                        <input type="radio" name="style" value="mtv" class="hidden-input">
+                        <h5>MTV</h5>
+                        <p>Quick cuts. Energetic transitions. Music-synced.</p>
+                    </label>
+
+                    <label class="style-card" onclick="selectStyle('minimalist')">
+                        <input type="radio" name="style" value="minimalist" class="hidden-input">
+                        <h5>MINIMAL</h5>
+                        <p>Subtle cuts. Long takes. Let footage breathe.</p>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: Director's Prompt -->
+        <div class="mb-8">
+            <div class="voxel-card">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="step-number">2</div>
+                    <div>
+                        <h3 class="text-primary mb-1">CREATIVE DIRECTION</h3>
+                        <p class="text-xs text-muted">Describe mood, pacing, and intent</p>
+                    </div>
+                </div>
+                
+                <label class="tech-label">CREATIVE PROMPT</label>
+                <textarea 
+                    class="voxel-input mb-3" 
+                    name="prompt" 
+                    rows="5" 
+                    placeholder="Examples:&#10;• High-energy skate montage with fast cuts on kick tricks&#10;• Cinematic interview piece with slow zooms and depth&#10;• Music video style with synchronized beat-cuts&#10;• Documentary feel with natural transitions">
+                </textarea>
+                
+                <p class="text-xs text-muted">💡 <strong>Tip:</strong> Be specific about mood, pace, and subject. AI learns from detail.</p>
+            </div>
+        </div>
+
+        <!-- STEP 3: Processing Options -->
+        <div class="mb-8">
+            <div class="voxel-card">
+                <h3 class="mb-3 text-primary">STEP 3: PROCESSING OPTIONS</h3>
+                <p class="text-xs text-muted mb-4">Optional AI enhancements applied during rendering.</p>
+                
+                <!-- Video Enhancement -->
+                <div class="option-group">
+                    <div class="section-header">
+                        {{ icon("video", size="18", class_="section-icon", title="Video Enhancement") }}
+                        <span>VIDEO ENHANCEMENT</span>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="upscale" id="upscale" title="Enable AI upscale" aria-label="Enable AI upscale">
+                        <div class="option-label">
+                            <div class="option-label-title">AI UPSCALE (4K)</div>
+                            <div class="option-label-desc">Real-ESRGAN enhancement. Increases file size and render time.</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="stabilize" id="stabilize" checked title="Stabilize footage" aria-label="Stabilize footage">
+                        <div class="option-label">
+                            <div class="option-label-title">STABILIZE FOOTAGE</div>
+                            <div class="option-label-desc">Remove camera shake. Recommended for handheld footage.</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="denoise" id="denoise" title="Denoise footage" aria-label="Denoise footage">
+                        <div class="option-label">
+                            <div class="option-label-title">AI DENOISE</div>
+                            <div class="option-label-desc">Reduce noise/grain. Best for low-light or high-ISO footage.</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="sharpen" id="sharpen" title="Sharpen footage" aria-label="Sharpen footage">
+                        <div class="option-label">
+                            <div class="option-label-title">SHARPEN</div>
+                            <div class="option-label-desc">Enhance edge detail. Subtle unsharp mask with skin protection.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Text & Captions -->
+                <div class="option-group">
+                    <div class="section-header is-warning">
+                        {{ icon("type", size="18", class_="section-icon", title="Text & Captions") }}
+                        <span>TEXT & CAPTIONS</span>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="captions" id="captions" title="Burn captions" aria-label="Burn captions">
+                        <div class="option-label">
+                            <div class="option-label-title">BURN CAPTIONS</div>
+                            <div class="option-label-desc">Auto-transcribe dialogue and burn subtitles into video.</div>
+                        </div>
+                    </div>
+                    <div class="option-item stacked-option mt-05">
+                        <label for="caption_style" class="option-label-title mb-05">CAPTION STYLE</label>
+                        <select name="caption_style" id="caption_style" class="voxel-input full-width">
+                            <option value="tiktok">TikTok - Bold, Shadowed</option>
+                            <option value="minimal">Minimalist - Clean, Small</option>
+                            <option value="cinematic">Cinematic - Serif, Boxed</option>
+                            <option value="bold">Impact - Large, Bordered</option>
+                            <option value="youtube">YouTube - Classic Boxed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Audio Selection & Scrubbing -->
+                <div class="option-group">
+                    <div class="section-header is-success">
+                        {{ icon("music", size="18", class_="section-icon", title="Audio Track") }}
+                        <span>AUDIO TRACK</span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="option-label-title block mb-2">SELECT MUSIC</label>
+                        <select name="music_track" id="music_track" class="voxel-input w-full" title="Select music track">
+                            <option value="auto">Auto-Select (AI Matched to Style)</option>
+                            {% for track in music_tracks %}
+                            <option value="{{ track }}">{{ track }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Scrubber Visual -->
+                    <div class="audio-scrubber-container rounded">
+                        <div class="flex justify-between text-xs text-muted mb-2">
+                            <span>START TIME</span>
+                            <span id="start-time-val" class="font-mono text-primary">00:00</span>
+                        </div>
+                        
+                        <div class="waveform-visual" id="waveform-visual"></div>
+                        
+                        <input type="range" name="music_start_time" id="music_start_time" class="scrubber" min="0" max="300" step="1" value="0" title="Music start time" aria-label="Music start time">
+                        
+                        <div class="flex justify-between text-xs text-muted mt-2">
+                            <span>0:00</span>
+                            <span>END</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-muted mt-2">Drag to select where the song should start playing.</p>
+                </div>
+
+                <!-- Color Grading -->
+                <div class="option-group">
+                    <div class="section-header is-accent">
+                        {{ icon("palette", size="18", class_="section-icon", title="Color Grading") }}
+                        <span>COLOR GRADING</span>
+                    </div>
+                    <div class="option-item stacked-option">
+                        <label for="color_grading" class="option-label-title mb-05">COLOR PRESET</label>
+                        <select name="color_grading" id="color_grading" class="voxel-input full-width">
+                            <option value="auto">Auto (from style)</option>
+                            <optgroup label="Basic">
+                                <option value="none">None - No color grading</option>
+                                <option value="neutral">Neutral - Broadcast safe</option>
+                                <option value="natural">Natural - True to source</option>
+                            </optgroup>
+                            <optgroup label="Temperature">
+                                <option value="warm">Warm - Golden warmth</option>
+                                <option value="cool">Cool - Blue/teal</option>
+                                <option value="golden_hour">Golden Hour - Sunset</option>
+                                <option value="blue_hour">Blue Hour - Dawn/dusk</option>
+                            </optgroup>
+                            <optgroup label="Cinematic">
+                                <option value="teal_orange">Teal & Orange - Hollywood</option>
+                                <option value="cinematic">Cinematic - S-curve contrast</option>
+                                <option value="blockbuster">Blockbuster - Action movie</option>
+                            </optgroup>
+                            <optgroup label="Stylized">
+                                <option value="vibrant">Vibrant - Punchy colors</option>
+                                <option value="desaturated">Desaturated - Muted filmic</option>
+                                <option value="high_contrast">High Contrast - Strong B&W</option>
+                                <option value="vintage">Vintage - Faded film</option>
+                                <option value="filmic_warm">Filmic Warm - Classic</option>
+                                <option value="noir">Noir - Desaturated contrast</option>
+                            </optgroup>
+                            <optgroup label="Documentary">
+                                <option value="documentary">Documentary - Natural sharp</option>
+                            </optgroup>
+                        </select>
+                        <p class="option-label-desc mt-05">Override style's default color grade. "Auto" uses the style's built-in look.</p>
+                    </div>
+                    <div class="option-item stacked-option mt-075">
+                        <label for="color_intensity" class="option-label-title mb-05">INTENSITY: <span id="intensity_value">100</span>%</label>
+                        <input type="range" name="color_intensity" id="color_intensity" min="0" max="100" value="100" class="voxel-input full-width">
+                        <p class="option-label-desc mt-05">Blend strength. 70% often looks more natural than 100%.</p>
+                    </div>
+                </div>
+
+                <!-- Audio Enhancement -->
+                <div class="option-group">
+                    <div class="section-header is-success">
+                        {{ icon("headphones", size="18", class_="section-icon", title="Audio Enhancement") }}
+                        <span>AUDIO ENHANCEMENT</span>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="dialogue_duck" id="dialogue_duck" title="Enable dialogue ducking" aria-label="Enable dialogue ducking">
+                        <div class="option-label">
+                            <div class="option-label-title">DIALOGUE DUCKING</div>
+                            <div class="option-label-desc">Auto-detect speech and lower music during dialogue. NLE-exportable keyframes.</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="audio_normalize" id="audio_normalize" title="Normalize audio" aria-label="Normalize audio">
+                        <div class="option-label">
+                            <div class="option-label-title">NORMALIZE AUDIO (-14 LUFS)</div>
+                            <div class="option-label-desc">Broadcast-safe loudness normalization for consistent levels.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Story Engine -->
+                <div class="option-group">
+                    <div class="section-header is-purple">
+                        {{ icon("book-open", size="18", class_="section-icon", title="Story Engine") }}
+                        <span>STORY ENGINE</span>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="story_engine" id="story_engine" title="Enable story engine" aria-label="Enable story engine">
+                        <div class="option-label">
+                            <div class="option-label-title">NARRATIVE TENSION</div>
+                            <div class="option-label-desc">AI-driven 5-phase story arc: Intro → Build → Climax → Sustain → Outro.</div>
+                        </div>
+                    </div>
+                    <div class="option-item stacked-option mt-075">
+                        <label for="story_arc" class="option-label-title mb-05">STORY ARC PRESET</label>
+                        <select name="story_arc" id="story_arc" class="voxel-input full-width">
+                            <option value="auto">Auto - Match style</option>
+                            <option value="hero_journey">Hero's Journey - Classic narrative</option>
+                            <option value="mtv_energy">MTV Energy - Peak early, sustain</option>
+                            <option value="documentary">Documentary - Gradual reveal</option>
+                            <option value="thriller">Thriller - Tension build</option>
+                            <option value="flat">Flat - Consistent energy</option>
+                        </select>
+                        <p class="option-label-desc mt-05">Controls pacing and energy distribution across the montage.</p>
+                    </div>
+                </div>
+
+                <!-- Film Emulation -->
+                <div class="option-group">
+                    <div class="section-header is-rose">
+                        {{ icon("clapperboard", size="18", class_="section-icon", title="Film Emulation") }}
+                        <span>FILM EMULATION</span>
+                    </div>
+                    <div class="option-item stacked-option">
+                        <label for="film_grain" class="option-label-title mb-05">FILM GRAIN</label>
+                        <select name="film_grain" id="film_grain" class="voxel-input full-width">
+                            <option value="none">None - Clean digital</option>
+                            <option value="fine">Fine - Subtle texture</option>
+                            <option value="medium">Medium - Visible grain</option>
+                            <option value="35mm">35mm Film - Classic cinema</option>
+                            <option value="16mm">16mm Film - Documentary</option>
+                            <option value="8mm">8mm Film - Vintage home movie</option>
+                        </select>
+                        <p class="option-label-desc mt-05">Add authentic film grain texture for cinematic look.</p>
+                    </div>
+                </div>
+
+                <!-- Output Format -->
+                <div class="option-group">
+                    <div class="section-header is-secondary">
+                        {{ icon("smartphone", size="18", class_="section-icon", title="Output Format") }}
+                        <span>OUTPUT FORMAT</span>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="auto_reframe" id="auto_reframe" title="Enable auto reframe" aria-label="Enable auto reframe">
+                        <div class="option-label">
+                            <div class="option-label-title">AUTO-REFRAME (9:16)</div>
+                            <div class="option-label-desc">Generate vertical version. Creates additional output file.</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="export_timeline" id="export_timeline" checked title="Export timeline" aria-label="Export timeline">
+                        <div class="option-label">
+                            <div class="option-label-title">EXPORT TIMELINE (OTIO/EDL)</div>
+                            <div class="option-label-desc">Generate NLE project files for DaVinci Resolve, Premiere Pro.</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="export_recipe" id="export_recipe" title="Export recipe" aria-label="Export recipe">
+                        <div class="option-label">
+                            <div class="option-label-title">GENERATE RECIPE CARD</div>
+                            <div class="option-label-desc">Export enhancement parameters as human-readable instructions.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 4: Quality Profile -->
+        <div class="mb-8">
+            <div class="voxel-card">
+                <h3 class="mb-3 text-primary">STEP 4: QUALITY PROFILE</h3>
+                <p class="text-xs text-muted mb-4">Balance speed vs. quality. Choose based on your goal.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label class="quality-card">
+                        <input type="radio" name="quality" value="preview">
+                        <div>
+                            <span class="quality-card-title">PREVIEW</span>
+                            <span class="quality-card-desc">360p • Ultrafast • Tests setup</span>
+                        </div>
+                    </label>
+                    <label class="quality-card quality-card--recommended">
+                        <input type="radio" name="quality" value="standard" checked>
+                        <div>
+                            <span class="quality-card-title">STANDARD</span>
+                            <span class="quality-card-desc">1080p • Balanced • Recommended</span>
+                        </div>
+                    </label>
+                    <label class="quality-card">
+                        <input type="radio" name="quality" value="high">
+                        <div>
+                            <span class="quality-card-title">HIGH</span>
+                            <span class="quality-card-desc">4K • Slow • Cinema-quality</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 5: Submit -->
+        <div class="mb-8">
+            <div class="voxel-card">
+                <h3 class="mb-3 text-primary">STEP 5: START RENDER</h3>
+                <p class="text-xs text-muted mb-4">Review settings and submit. AI processes your footage into finished video.</p>
+                <button type="submit" class="voxel-btn voxel-btn-primary w-full">Start Render</button>
+            </div>
+        </div>
+    </form>
+{% endblock %}
+
+{% block extra_js %}
     <script>
         function selectStyle(styleName) {
-            // Update radio button
             document.querySelector(`input[name="style"][value="${styleName}"]`).checked = true;
-
-            // Update visual state
             document.querySelectorAll('.style-card').forEach(card => {
                 card.classList.remove('active');
             });
             event.currentTarget.classList.add('active');
         }
 
-        // Color grading intensity slider
         document.addEventListener('DOMContentLoaded', function() {
             const intensitySlider = document.getElementById('color_intensity');
             const intensityValue = document.getElementById('intensity_value');
@@ -529,32 +392,30 @@
                     intensityValue.textContent = this.value;
                 });
             }
+
+            // Audio Scrubbing Logic
+            const slider = document.getElementById('music_start_time');
+            const valDisplay = document.getElementById('start-time-val');
+            const waveform = document.getElementById('waveform-visual');
+
+            if (waveform) {
+                for (let i = 0; i < 50; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'wave-bar';
+                    const height = Math.floor(Math.random() * 80) + 20;
+                    bar.style.height = height + '%';
+                    waveform.appendChild(bar);
+                }
+            }
+
+            if (slider) {
+                slider.addEventListener('input', (e) => {
+                    const val = parseInt(e.target.value);
+                    const mins = Math.floor(val / 60);
+                    const secs = val % 60;
+                    valDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                });
+            }
         });
     </script>
-</body>
-</html>
-<script>
-    // Audio Scrubbing Logic
-    document.addEventListener('DOMContentLoaded', () => {
-        const slider = document.getElementById('music_start_time');
-        const valDisplay = document.getElementById('start-time-val');
-        const waveform = document.getElementById('waveform-visual');
-
-        // Generate fake waveform bars
-        for (let i = 0; i < 50; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'wave-bar';
-            // Random height between 20% and 100%
-            const height = Math.floor(Math.random() * 80) + 20;
-            bar.style.height = height + '%';
-            waveform.appendChild(bar);
-        }
-
-        slider.addEventListener('input', (e) => {
-            const val = parseInt(e.target.value);
-            const mins = Math.floor(val / 60);
-            const secs = val % 60;
-            valDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        });
-    });
-</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+/* Settings Page Styles */
+
+.settings-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border: 2px solid var(--border);
+    box-shadow: var(--shd-sm);
+    margin-bottom: 1rem;
+}
+
+.settings-item-info .text-sm {
+    font-weight: bold;
+}
+
+.settings-item-info .text-xs {
+    color: var(--muted-fg);
+}
