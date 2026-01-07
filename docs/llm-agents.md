@@ -87,10 +87,72 @@ We recently added a "Preview" quality profile.
 
 ## 📝 Documentation Strategy
 
-When updating docs:
-1.  **`README.md`**: High-level "What is this?".
-2.  **`docs/features.md`**: "What can it do?" (User facing).
-3.  **`docs/architecture.md`**: "How does it work?" (Dev facing).
-4.  **`docs/llm-agents.md`**: "How do I code this?" (Agent facing).
+### Public vs. Private Repository Structure
 
-Keep `STRATEGY.md` aligned with the "Polish, don't generate" vision.
+**🟢 PUBLIC REPO** (user-facing):
+
+* **Code**: `src/`, `tests/`, workflows
+* **Examples**: `test_data/`, `scripts/examples/`
+* **User Documentation**: `README.md`, `docs/getting-started.md`, `docs/features.md`, `docs/configuration.md`, `docs/performance-tuning.md`, `QUICK_START.md`
+* **Technical Guides**: `docs/architecture.md`, `docs/algorithms.md`, `docs/models.md`, `docs/ci.md`, `docs/cgpu-setup.md`
+* **Policies**: `SECURITY.md`, `.github/CODEOWNERS`, `CODE_OF_CONDUCT.md`
+* **Ethics**: `docs/responsible-ai.md`, `docs/privacy.md`
+
+**🔴 PRIVATE REPO** (internal tracking):
+
+* **Audit Results**: `private/docs/audits/` (dependency audits, performance benchmarks, security scans)
+* **Status Tracking**: `private/docs/status/` (deployment logs, incident reports)
+* **Strategy & Planning**: `private/archive/` (business strategy, roadmap planning, internal decisions)
+* **Sensitive Configuration**: `private/secrets/` (API keys, deployment credentials)
+
+### Pre-Push Validation
+
+Before every commit, verify:
+
+1. **No Internal Docs in `/docs`**: Check that no audit, status, or strategy files are in the public `docs/` folder.
+
+```bash
+# Fail if audit/status docs exist in public docs/
+find docs/ -type f \( -name "*AUDIT*" -o -name "*STATUS*" -o -name "*STRATEGY*" -o -name "*DEPLOYMENT*" \) 2>/dev/null && exit 1
+```
+
+2. **No Private Config in Root**: Verify no `.env`, `secrets.yaml`, or credentials files are committed.
+
+```bash
+git diff --cached --name-only | grep -E "(\.env|secrets|credentials|private)" && exit 1 || true
+```
+
+3. **Documentation Alignment**: Confirm all user-facing docs describe public features only.
+
+* No mentions of "private/", "internal deployment", "business strategy"
+* No sensitive paths or credentials
+* Links point to public resources only
+
+4. **Optional: Create Pre-Commit Hook**
+
+```bash
+# .git/hooks/pre-push
+#!/bin/bash
+find docs/ -type f \( -name "*AUDIT*" -o -name "*STATUS*" -o -name "*STRATEGY*" \) && {
+  echo "❌ ERROR: Found internal docs in public docs/ folder"
+  echo "Move to private/docs/audits/ or private/archive/"
+  exit 1
+}
+git diff --cached --name-only | grep -E "(\.env|secrets|credentials)" && {
+  echo "❌ ERROR: Detected sensitive files in commit"
+  exit 1
+}
+```
+
+### Documentation Placement Guidelines
+
+When updating docs:
+
+1. **`README.md`**: High-level "What is this?".
+2. **`docs/features.md`**: "What can it do?" (User facing).
+3. **`docs/architecture.md`**: "How does it work?" (Dev facing).
+4. **`docs/llm-agents.md`**: "How do I code this?" (Agent facing).
+5. **`private/docs/audits/`**: Audit results, benchmarks, CVE reports.
+6. **`private/archive/`**: Strategic planning, business decisions, deployment logs.
+
+Keep all public docs aligned with the "Polish, don't generate" vision. Reserve internal docs for internal tracking only.
