@@ -225,8 +225,9 @@ class SceneProvider:
         except ImportError:
             pass
 
-        # Try cgpu if enabled
-        if os.getenv("CGPU_ENABLED", "").lower() == "true":
+        # Try cgpu if enabled (central settings)
+        from ..config import get_settings
+        if get_settings().llm.cgpu_enabled:
             return "cgpu"
 
         # Fall back to histogram (OpenCV-based)
@@ -241,14 +242,14 @@ class SceneProvider:
 
     def _select_analysis_backend(self) -> str:
         """Select best available analysis backend."""
-        # Check for AI backends
-        if os.getenv("CGPU_ENABLED", "").lower() == "true":
+        # Check for AI backends via centralized settings
+        from ..config import get_settings
+        llm = get_settings().llm
+        if llm.cgpu_enabled:
             return "cgpu"
-
-        if os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_API_KEY"):
+        if llm.has_openai_backend:
             return "openai"
-
-        if os.getenv("OLLAMA_HOST"):
+        if bool(llm.ollama_host):
             return "ollama"
 
         # Local CV fallback

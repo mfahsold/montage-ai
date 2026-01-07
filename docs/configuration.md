@@ -286,23 +286,25 @@ UPSCALE=true
 
 ---
 
+<!-- markdownlint-disable MD060 MD032 -->
 ## Memory Management
 
-Settings for large projects and constrained hardware.
+Centralized in `resources` configuration and exported as environment variables for subprocess compatibility.
 
-| Variable           | Default | Description                                                   |
-| ------------------ | ------- | ------------------------------------------------------------- |
-| `MEMORY_LIMIT_GB`  | `16`    | Docker container memory limit (GB) - match docker-compose.yml |
-| `MAX_CLIPS_IN_RAM` | `50`    | Maximum clips to keep in RAM simultaneously                   |
-| `AUTO_CLEANUP`     | `true`  | Automatically delete temp files after rendering               |
+| Variable                      | Default | Description                                                     |
+| ----------------------------- | ------- | --------------------------------------------------------------- |
+| `MEMORY_LIMIT_GB`             | `8`     | Effective memory limit for adaptive memory manager (in GB)      |
+| `MEMORY_WARNING_THRESHOLD`    | `0.75`  | Fraction of limit that triggers proactive cleanup               |
+| `MEMORY_CRITICAL_THRESHOLD`   | `0.90`  | Fraction of limit that indicates critical pressure              |
+| `MEMORY_SAFETY_MARGIN_MB`     | `500`   | Reserved headroom when estimating safe batch sizes              |
+
+These map to `settings.resources.memory_limit_gb`, `memory_warning_threshold`, and `memory_critical_threshold`.
 
 **Hardware-specific recommendations:**
 
-- **8-16GB RAM:** `MEMORY_LIMIT_GB=12`, `MAX_CLIPS_IN_RAM=30`, `CGPU_GPU_ENABLED=true`
-- **16-32GB RAM:** Default settings are optimal
-- **32GB+ RAM:** `MEMORY_LIMIT_GB=48`, `MAX_CLIPS_IN_RAM=100`
-
-See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
+- 8–16GB RAM: Increase `MEMORY_LIMIT_GB` to match container limit if higher.
+- 16–32GB RAM: Defaults are generally safe.
+- 32GB+ RAM: Consider `MEMORY_LIMIT_GB=48` for long-form edits.
 
 ---
 
@@ -329,6 +331,34 @@ See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
 
 ---
 
+## Caching
+
+Caching is unified across analysis and metadata subsystems.
+
+| Variable                     | Default | Description                                        |
+| ---------------------------- | ------- | -------------------------------------------------- |
+| `CACHE_INVALIDATION_HOURS`   | `24`    | TTL for cache entries (hours)                      |
+| `DISABLE_ANALYSIS_CACHE`     | `false` | Disable analysis cache when `true`                 |
+| `CACHE_VERSION`              | `1.0`   | Global cache version; bump to invalidate all caches|
+
+## Monitoring
+
+Centralized in `monitoring` configuration with environment exports for compatibility.
+
+| Variable                | Default | Description                                 |
+| ----------------------- | ------- | ------------------------------------------- |
+| `MONITOR_MEM_INTERVAL`  | `30.0`  | Memory telemetry log interval (seconds)     |
+| `LOG_FILE`              | *(auto)*| Path to tee log file (defaults to output dir)|
+
+
+These map to `settings.cache.analysis_ttl_hours`, `settings.cache.metadata_ttl_hours`, and `settings.cache.version`.
+
+Notes:
+- Metadata cache shares the same TTL unless overridden.
+- Both analysis and metadata caches use the same `CACHE_VERSION`.
+
+<!-- markdownlint-enable MD060 MD032 -->
+
 ## Output / Export
 
 | Variable           | Default | Description                                                                               |
@@ -347,6 +377,10 @@ See [archive/OPERATIONS_LOG.md](archive/OPERATIONS_LOG.md) for stability notes.
 - `standard`: medium + CRF 18
 - `high`: slow + CRF 17
 - `master`: slow + CRF 16, `libx265` + `yuv420p10le` + `main10` (10-bit output)
+
+### Encoding Overrides
+
+- `FORCE_CGPU_ENCODING`: When `true`, routes encoding to the CGPU backend regardless of local GPU availability. Maps to `settings.gpu.force_cgpu_encoding` and is exported to subprocess env for compatibility.
 
 ---
 

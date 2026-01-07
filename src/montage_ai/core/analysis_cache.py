@@ -66,7 +66,8 @@ from ..logger import logger
 # Constants
 # =============================================================================
 
-CACHE_VERSION = "1.0"
+# Use unified cache version from central settings (env-aware)
+CACHE_VERSION = get_settings().cache.version
 DEFAULT_TTL_HOURS = 24
 
 
@@ -968,18 +969,19 @@ def get_analysis_cache() -> AnalysisCache:
     """
     Get the global analysis cache instance.
 
-    Configuration via environment variables:
-    - CACHE_INVALIDATION_HOURS: TTL in hours (default: 24)
-    - DISABLE_ANALYSIS_CACHE: Set to "true" to disable caching
+    Configuration via central settings (env-aware):
+    - settings.cache.analysis_ttl_hours
+    - settings.cache.analysis_enabled
     """
     global _cache
     if _cache is None:
-        ttl = int(os.environ.get("CACHE_INVALIDATION_HOURS", str(DEFAULT_TTL_HOURS)))
-        enabled = os.environ.get("DISABLE_ANALYSIS_CACHE", "false").lower() != "true"
+        settings = get_settings()
+        ttl = int(settings.cache.analysis_ttl_hours or DEFAULT_TTL_HOURS)
+        enabled = bool(settings.cache.analysis_enabled)
         _cache = AnalysisCache(
             ttl_hours=ttl,
             enabled=enabled,
-            cache_dir=str(get_settings().paths.metadata_cache_dir),
+            cache_dir=str(settings.paths.metadata_cache_dir),
         )
     return _cache
 

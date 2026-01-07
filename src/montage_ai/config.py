@@ -285,6 +285,8 @@ class GPUConfig:
     ffmpeg_hwaccel: str = field(default_factory=lambda: os.environ.get("FFMPEG_HWACCEL", "auto"))
     use_ffmpeg_mcp: bool = field(default_factory=lambda: os.environ.get("USE_FFMPEG_MCP", "false").lower() == "true")
     ffmpeg_mcp_endpoint: str = field(default_factory=lambda: os.environ.get("FFMPEG_MCP_ENDPOINT", "http://ffmpeg-mcp.montage-ai.svc.cluster.local:8080"))
+    # Force routing encoding to CGPU service when beneficial or explicitly requested
+    force_cgpu_encoding: bool = field(default_factory=lambda: os.environ.get("FORCE_CGPU_ENCODING", "false").lower() == "true")
 
 
 # =============================================================================
@@ -609,6 +611,52 @@ class SessionConfig:
 
 
 # =============================================================================
+# Cache Configuration
+# =============================================================================
+@dataclass
+class CacheConfig:
+    """Caching configuration (TTL and enable/disable flags).
+
+    Defaults preserve current behavior and respect existing env vars.
+    """
+
+    # Unify default TTL via legacy env var; allow independent overrides later if needed
+    analysis_ttl_hours: int = field(default_factory=lambda: int(os.environ.get("CACHE_INVALIDATION_HOURS", "24")))
+    metadata_ttl_hours: int = field(default_factory=lambda: int(os.environ.get("CACHE_INVALIDATION_HOURS", "24")))
+
+    # Legacy toggle only existed for analysis cache; keep semantics
+    analysis_enabled: bool = field(default_factory=lambda: os.environ.get("DISABLE_ANALYSIS_CACHE", "false").lower() != "true")
+
+    # Unified cache version across subsystems
+    version: str = field(default_factory=lambda: os.environ.get("CACHE_VERSION", "1.0"))
+
+
+# =============================================================================
+# Resource / Memory Thresholds Configuration
+# =============================================================================
+@dataclass
+class ResourceThresholdsConfig:
+    """Resource limits and memory pressure thresholds."""
+
+    memory_limit_gb: float = field(default_factory=lambda: float(os.environ.get("MEMORY_LIMIT_GB", "8")))
+    memory_warning_threshold: float = field(default_factory=lambda: float(os.environ.get("MEMORY_WARNING_THRESHOLD", "0.75")))
+    memory_critical_threshold: float = field(default_factory=lambda: float(os.environ.get("MEMORY_CRITICAL_THRESHOLD", "0.90")))
+    # Optional safety margin applied when estimating safe batch sizes
+    memory_safety_margin_mb: int = field(default_factory=lambda: int(os.environ.get("MEMORY_SAFETY_MARGIN_MB", "500")))
+
+
+# =============================================================================
+# Monitoring Configuration
+# =============================================================================
+@dataclass
+class MonitoringConfig:
+    """Monitoring settings for live telemetry and tee logging."""
+
+    mem_interval_sec: float = field(default_factory=lambda: float(os.environ.get("MONITOR_MEM_INTERVAL", "30.0")))
+    log_file: Optional[str] = field(default_factory=lambda: os.environ.get("LOG_FILE") or None)
+
+
+# =============================================================================
 # =============================================================================
 # File Type Configuration
 # =============================================================================
@@ -686,6 +734,9 @@ class Settings:
     audio: AudioConfig = field(default_factory=AudioConfig)
     thresholds: ThresholdsConfig = field(default_factory=ThresholdsConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
+    cache: CacheConfig = field(default_factory=CacheConfig)
+    resources: ResourceThresholdsConfig = field(default_factory=ResourceThresholdsConfig)
+    monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
 
     # Job ID (generated per run)
@@ -846,6 +897,7 @@ class Settings:
             "RENDER_TIMEOUT": str(self.processing.render_timeout),
             "FINAL_CRF": str(self.encoding.crf),
             "EXTRACT_REENCODE": str(self.encoding.extract_reencode).lower(),
+            "FORCE_CGPU_ENCODING": str(self.gpu.force_cgpu_encoding).lower(),
             "EXPORT_WIDTH": str(self.export.resolution_width),
             "EXPORT_HEIGHT": str(self.export.resolution_height),
             "EXPORT_FPS": str(self.export.fps),
@@ -870,6 +922,17 @@ class Settings:
             # Session/Redis
             "REDIS_HOST": str(self.session.redis_host or ""),
             "REDIS_PORT": str(self.session.redis_port),
+            # Cache/TTL (unified legacy keys for compatibility)
+            "CACHE_INVALIDATION_HOURS": str(self.cache.analysis_ttl_hours),
+            "DISABLE_ANALYSIS_CACHE": str(not self.cache.analysis_enabled).lower(),
+            "CACHE_VERSION": self.cache.version,
+            # Memory/Resource thresholds
+            "MEMORY_LIMIT_GB": str(self.resources.memory_limit_gb),
+            "MEMORY_WARNING_THRESHOLD": str(self.resources.memory_warning_threshold),
+            "MEMORY_CRITICAL_THRESHOLD": str(self.resources.memory_critical_threshold),
+            # Monitoring
+            "MONITOR_MEM_INTERVAL": str(self.monitoring.mem_interval_sec),
+            "LOG_FILE": self.monitoring.log_file or "",
         }
 
 

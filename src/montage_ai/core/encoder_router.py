@@ -182,8 +182,9 @@ class EncoderRouter:
         2. No local GPU available AND file is large enough
         3. Explicitly requested via environment
         """
-        # Check environment override
-        force_cgpu = os.environ.get("FORCE_CGPU_ENCODING", "").lower() == "true"
+        # Central override via settings (env-aware)
+        from ..config import get_settings
+        force_cgpu = bool(get_settings().gpu.force_cgpu_encoding)
         if force_cgpu:
             return True
 

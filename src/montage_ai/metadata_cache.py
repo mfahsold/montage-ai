@@ -23,7 +23,8 @@ from .config import get_settings
 class MetadataCache:
     """Manages video metadata caching for performance optimization."""
 
-    CACHE_VERSION = "1.0"
+    # Unified cache version shared with analysis cache (central settings)
+    CACHE_VERSION = get_settings().cache.version
 
     def __init__(self, cache_dir: Optional[str] = None, invalidation_hours: int = 24):
         """
@@ -473,9 +474,10 @@ def get_metadata_cache(cache_dir: Optional[str] = None) -> MetadataCache:
     """Get the default metadata cache instance."""
     global _default_cache
     if _default_cache is None:
-        invalidation_hours = int(os.environ.get('CACHE_INVALIDATION_HOURS', '24'))
-        # Check for env var if cache_dir not explicitly provided
+        settings = get_settings()
+        invalidation_hours = int(settings.cache.metadata_ttl_hours)
+        # Check for explicit override; else use settings path
         if cache_dir is None:
-            cache_dir = str(get_settings().paths.metadata_cache_dir)
+            cache_dir = str(settings.paths.metadata_cache_dir)
         _default_cache = MetadataCache(cache_dir=cache_dir, invalidation_hours=invalidation_hours)
     return _default_cache

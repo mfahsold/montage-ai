@@ -210,7 +210,8 @@ class FootagePoolManager:
     """
     
     # Max times a single detected scene may be reused (soft cap when strict_once=False)
-    MAX_REUSE = int(os.environ.get("MAX_SCENE_REUSE", "3"))
+    # Centralized via settings.processing.max_scene_reuse
+    MAX_REUSE = None  # Deprecated; use instance-level value
 
     def __init__(self, 
                  clips: List[FootageClip],
@@ -228,6 +229,13 @@ class FootagePoolManager:
         self.used_clips: Set[str] = set()
         self.strict_once = strict_once
         self.verbose = verbose
+        # Centralized configuration for reuse cap
+        try:
+            from .config import get_settings
+            self.max_reuse = int(get_settings().processing.max_scene_reuse)
+        except Exception:
+            # Fallback to legacy default if settings unavailable
+            self.max_reuse = 3
         
         # Timeline tracking
         self.timeline: List[Dict] = []
@@ -312,7 +320,7 @@ class FootagePoolManager:
                 continue
 
             # Reuse cap in flexible mode
-            if not self.strict_once and clip.usage_count >= self.MAX_REUSE:
+            if not self.strict_once and clip.usage_count >= self.max_reuse:
                 continue
             
             # Duration filter

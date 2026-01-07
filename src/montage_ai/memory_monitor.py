@@ -7,13 +7,13 @@ Dynamically adjusts batch sizes based on available RAM.
 Saves ~150MB peak memory by preventing spikes through early intervention.
 """
 
-import os
 import gc
 import psutil
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
 from .logger import logger
+from .config import get_settings
 
 
 @dataclass
@@ -50,15 +50,18 @@ class AdaptiveMemoryManager:
         """
         self.process = psutil.Process()
 
-        # Determine memory limit
-        if memory_limit_gb is None:
-            memory_limit_gb = float(os.environ.get("MEMORY_LIMIT_GB", "8"))
+        settings = get_settings()
 
-        self.memory_limit_gb = memory_limit_gb
+        # Determine memory limit (explicit arg overrides settings)
+        if memory_limit_gb is None:
+            memory_limit_gb = settings.resources.memory_limit_gb
+
+        self.memory_limit_gb = float(memory_limit_gb)
         self.memory_limit_mb = memory_limit_gb * 1024
 
-        self.warning_threshold = float(os.environ.get("MEMORY_WARNING_THRESHOLD", str(warning_threshold)))
-        self.critical_threshold = float(os.environ.get("MEMORY_CRITICAL_THRESHOLD", str(critical_threshold)))
+        # Determine thresholds (explicit args override settings)
+        self.warning_threshold = float(warning_threshold if warning_threshold is not None else settings.resources.memory_warning_threshold)
+        self.critical_threshold = float(critical_threshold if critical_threshold is not None else settings.resources.memory_critical_threshold)
 
         # Statistics
         self.cleanup_count = 0
@@ -180,8 +183,12 @@ class AdaptiveMemoryManager:
         current_usage_mb = self.get_current_usage_mb()
         available_mb = self.memory_limit_mb - current_usage_mb
 
-        # Reserve 500MB for overhead and system
-        safety_margin_mb = 500
+        # Reserve overhead for system/process (configurable via settings)
+        try:
+            from .config import get_settings
+            safety_margin_mb = int(get_settings().resources.__dict__.get("memory_safety_margin_mb", 500))
+        except Exception:
+            safety_margin_mb = 500
         usable_mb = max(0, available_mb - safety_margin_mb)
 
         # Calculate how many clips can fit

@@ -75,7 +75,8 @@ class Monitor:
         self._log_file = None
         self._tee_enabled = False
         self._mem_thread = None
-        self._mem_interval = float(os.environ.get("MONITOR_MEM_INTERVAL", "30.0"))
+        # Use centralized monitoring settings (env-aware via Settings)
+        self._mem_interval = float(get_settings().monitoring.mem_interval_sec)
         self._stop_event = threading.Event()
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
@@ -150,9 +151,8 @@ class Monitor:
         Keeps full pod logs on the output PVC so they are retrievable
         even after the Job has finished.
         """
-        log_path = os.environ.get("LOG_FILE")
-        if not log_path:
-            log_path = str(get_settings().paths.output_dir / "render.log")
+        cfg = get_settings().monitoring
+        log_path = cfg.log_file or str(get_settings().paths.output_dir / "render.log")
 
         try:
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
