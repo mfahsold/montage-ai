@@ -1,122 +1,59 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Montage AI - Transcript Editor</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
-    <style>
-        .transcript-panel {
-            background: var(--input-bg);
-            border: 2px solid var(--border);
-            padding: 1.5rem;
-            overflow-y: auto;
-            max-height: 60vh;
-            line-height: 1.8;
-            box-shadow: var(--shd-sm);
-        }
-        .word {
-            cursor: pointer;
-            padding: 2px 4px;
-            transition: all 0.1s steps(2);
-            display: inline-block;
-            border: 1px solid transparent;
-        }
-        .word:hover {
-            border-color: var(--primary);
-            background: var(--muted);
-        }
-        .word.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-        .word.deleted {
-            text-decoration: line-through;
-            color: var(--muted-fg);
-            opacity: 0.5;
-        }
-        .filler-word {
-            border-bottom: 2px solid var(--error);
-        }
-        .energy-canvas {
-            width: 100%;
-            height: 80px;
-            background: var(--input-bg);
-            border: 2px solid var(--border);
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar">
-        <a href="/" class="nav-brand">
-            <span>MONTAGE</span> AI
-        </a>
-        <div class="nav-links">
-            <a href="/" class="nav-link">DASHBOARD</a>
-            <a href="/montage" class="nav-link">CREATOR</a>
-            <a href="/gallery" class="nav-link">GALLERY</a>
-            <a href="/settings" class="nav-link">SETTINGS</a>
-        </div>
-    </nav>
+{% extends "base.html" %}
+{% import "components/macros.html" as m %}
 
-    <div class="container">
-        <div class="mb-8">
-            <h1 class="voxel-title">Transcript Editor</h1>
-            <p class="text-muted">Edit video by removing text. AI handles the cuts.</p>
+{% block title %}Transcript Editor - Montage AI{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/transcript.css') }}">
+{% endblock %}
+
+{% block content %}
+    {% call m.section_header("TRANSCRIPT EDITOR", "Edit video by removing text. AI handles the cuts.") %}{% endcall %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Left: Video & Analysis -->
+        <div class="flex flex-col gap-4">
+            {% call m.voxel_card("PREVIEW") %}
+                <div style="aspect-ratio: 16/9; background: #000; border: 2px solid var(--border); position: relative;">
+                    <video id="mainVideo" style="width: 100%; height: 100%; object-fit: contain;"></video>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button class="voxel-btn voxel-btn-primary">PLAY</button>
+                    <button class="voxel-btn">PAUSE</button>
+                    <div class="flex-grow"></div>
+                    <span class="text-sm text-muted">00:12 / 01:45</span>
+                </div>
+            {% endcall %}
+
+            {% call m.voxel_card("AUDIO ENERGY") %}
+                <canvas class="energy-canvas" id="energyCanvas"></canvas>
+                <div class="flex justify-between mt-2">
+                    <span class="text-xs text-muted">BEAT DETECTION: ACTIVE</span>
+                    <span class="text-xs text-muted">BPM: 124</span>
+                </div>
+            {% endcall %}
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Left: Video & Analysis -->
-            <div class="flex flex-col gap-4">
-                <div class="voxel-card">
-                    <h3 class="mb-4">Preview</h3>
-                    <div style="aspect-ratio: 16/9; background: #000; border: 2px solid var(--border); position: relative;">
-                        <video id="mainVideo" style="width: 100%; height: 100%; object-fit: contain;"></video>
-                    </div>
-                    <div class="mt-4 flex gap-2">
-                        <button class="voxel-btn voxel-btn-primary">PLAY</button>
-                        <button class="voxel-btn">PAUSE</button>
-                        <div class="flex-grow"></div>
-                        <span class="text-sm text-muted">00:12 / 01:45</span>
+        <!-- Right: Transcript -->
+        <div class="flex flex-col gap-4">
+            {% call m.voxel_card("TRANSCRIPT") %}
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex gap-2">
+                        <button class="voxel-btn text-xs">Remove Fillers</button>
+                        <button class="voxel-btn text-xs">Export OTIO</button>
                     </div>
                 </div>
-
-                <div class="voxel-card">
-                    <h3 class="mb-2">Audio Energy</h3>
-                    <canvas class="energy-canvas" id="energyCanvas"></canvas>
-                    <div class="flex justify-between mt-2">
-                        <span class="text-xs text-muted">BEAT DETECTION: ACTIVE</span>
-                        <span class="text-xs text-muted">BPM: 124</span>
-                    </div>
+                
+                <div class="transcript-panel" id="transcriptArea">
+                    <!-- Placeholder Words -->
+                    <span class="word">So</span> <span class="word">basically</span> <span class="word filler-word">uh</span> 
+                    <span class="word">we</span> <span class="word">are</span> <span class="word">looking</span> <span class="word">at</span> 
+                    <span class="word">the</span> <span class="word">new</span> <span class="word">pipeline</span> <span class="word">and</span> 
+                    <span class="word">it</span> <span class="word">looks</span> <span class="word">really</span> <span class="word">good.</span>
                 </div>
-            </div>
 
-            <!-- Right: Transcript -->
-            <div class="flex flex-col gap-4">
-                <div class="voxel-card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3>Transcript</h3>
-                        <div class="flex gap-2">
-                            <button class="voxel-btn text-xs">Remove Fillers</button>
-                            <button class="voxel-btn text-xs">Export OTIO</button>
-                        </div>
-                    </div>
-                    
-                    <div class="transcript-panel" id="transcriptArea">
-                        <!-- Placeholder Words -->
-                        <span class="word">So</span> <span class="word">basically</span> <span class="word filler-word">uh</span> 
-                        <span class="word">we</span> <span class="word">are</span> <span class="word">looking</span> <span class="word">at</span> 
-                        <span class="word">the</span> <span class="word">new</span> <span class="word">pipeline</span> <span class="word">and</span> 
-                        <span class="word">it</span> <span class="word">looks</span> <span class="word">really</span> <span class="word">good.</span>
-                    </div>
-
-                    <div class="mt-6">
-                        <button class="voxel-btn voxel-btn-primary w-full">Apply Edits & Render</button>
-                    </div>
-                </div>
-            </div>
+                <button class="voxel-btn voxel-btn-primary w-full mt-6">Apply Edits & Render</button>
+            {% endcall %}
         </div>
     </div>
-</body>
-</html>
+{% endblock %}

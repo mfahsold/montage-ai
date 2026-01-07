@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Montage AI{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- CONSISTENT NAVBAR (2-LINE VOXEL DESIGN) -->
+    <nav class="navbar navbar-voxel">
+        <!-- Line 1: Brand + Primary Navigation -->
+        <div class="navbar-top">
+            <a href="/" class="nav-brand">
+                <span>●</span> MONTAGE AI
+            </a>
+            <div class="nav-links nav-primary">
+                <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">DASHBOARD</a>
+                <a href="/montage" class="nav-link {% if request.path == '/montage' %}active{% endif %}">CREATOR</a>
+            </div>
+        </div>
+        
+        <!-- Line 2: Secondary Navigation (Context-aware Dropdowns) -->
+        <div class="navbar-bottom">
+            <div class="nav-links nav-secondary">
+                <div class="nav-group">
+                    <a href="#" class="nav-link dropdown-toggle">TOOLS</a>
+                    <div class="nav-dropdown">
+                        <a href="/gallery" class="nav-link {% if request.path == '/gallery' %}active{% endif %}">GALLERY</a>
+                        <a href="/transcript" class="nav-link {% if request.path == '/transcript' %}active{% endif %}">TRANSCRIPT EDITOR</a>
+                    </div>
+                </div>
+                <div class="nav-group">
+                    <a href="#" class="nav-link dropdown-toggle">RESOURCES</a>
+                    <div class="nav-dropdown">
+                        <a href="/features" class="nav-link {% if request.path == '/features' %}active{% endif %}">FEATURES</a>
+                        <a href="/settings" class="nav-link {% if request.path == '/settings' %}active{% endif %}">SETTINGS</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- PAGE CONTENT (Consistent Container) -->
+    <div class="page-wrapper">
+        <div class="container container-app">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- CONSISTENT FOOTER -->
+    <footer class="app-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <p class="footer-tagline">// Polish, don't generate.</p>
+            </div>
+            <div class="footer-section footer-links">
+                <a href="https://github.com/mfahsold/montage-ai" target="_blank">GITHUB</a>
+                <a href="/" class="text-muted">v0.1.0</a>
+            </div>
+        </div>
+    </footer>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,4 +1,6 @@
-/* Montage AI - Cyber-NLE Design System */
+/* Montage AI - Cyber-NLE Design System (v2: Artsy & Responsive) */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
     /* Palette (Dark Mode / Cyber-NLE) */
@@ -17,15 +19,18 @@
     --danger: #E74C3C;        /* Record Red */
     --success: #2ECC71;       /* Success Green */
 
-    /* Typography */
-    --font-display: 'Inter', sans-serif;
-    --font-body: 'Space Mono', 'Courier New', monospace;
+    /* Typography - Artsy & Modern */
+    --font-display: 'Space Grotesk', 'Inter', sans-serif;  /* Geometric, artsy headings */
+    --font-body: 'Inter', sans-serif;                       /* Clean, readable body */
+    --font-mono: 'JetBrains Mono', 'Space Mono', monospace; /* Modern tech monospace */
 
     /* Dimensions */
-    --radius: 4px;
+    --radius: 6px;
     --shadow: 0 4px 20px rgba(0,0,0,0.5);
     --border-width: 1px;
-    --gap: 1.25rem;
+    --gap: 1.5rem;
+    --gap-sm: 1rem;
+    --gap-lg: 2rem;
 }
 
 * {
@@ -37,10 +42,13 @@
 body {
     background-color: var(--bg);
     color: var(--fg);
-    font-family: var(--font-display); /* UI is Sans, Data is Mono */
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 400;
     min-height: 100vh;
-    line-height: 1.5;
+    line-height: 1.6;
     padding-bottom: 4rem;
+    letter-spacing: 0.3px;
 }
 
 /* Voxel Card Pattern */
@@ -49,31 +57,52 @@ body {
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    padding: 1.5rem;
+    padding: clamp(1.5rem, 4vw, 2rem);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
 }
 
 .container {
-    max-width: 1400px; /* Wider for NLE view */
+    max-width: 1440px;
     margin: 0 auto;
-    padding: 2rem 1.25rem 3rem;
+    padding: 2.5rem 2rem 3rem;
     display: flex;
     flex-direction: column;
-    gap: var(--gap);
+    gap: var(--gap-lg);
 }
 
-/* Typography */
+/* Typography - Artsy & Responsive */
 h1, h2, h3, h4 {
     font-family: var(--font-display);
-    font-weight: 900;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     margin-bottom: 1rem;
     color: var(--fg);
+    word-break: break-word;
 }
 
-h1 { font-size: 2rem; line-height: 1; }
-h2 { font-size: 1rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; letter-spacing: 0.1em; }
-h3 { font-size: 0.875rem; color: var(--primary); margin-bottom: 0.5rem; }
+h1 { 
+    font-size: clamp(2rem, 4vw, 2.8rem); 
+    line-height: 1.1;
+    font-weight: 700;
+}
+h2 { 
+    font-size: clamp(1rem, 2vw, 1.25rem); 
+    color: var(--text-secondary); 
+    border-bottom: 2px solid var(--border-color); 
+    padding-bottom: 0.75rem; 
+    margin-bottom: 1.5rem; 
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+h3 { 
+    font-size: clamp(0.875rem, 1.5vw, 1rem); 
+    color: var(--primary); 
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
 
 /* Header / Console Top */
 header {
@@ -127,33 +156,79 @@ header {
     text-transform: uppercase;
 }
 
-/* Voxel Components (Updated for Cyber-NLE) */
+/* Responsive Grid System */
+.grid {
+    display: grid;
+    gap: var(--gap-lg);
+}
+
+.grid-cols-1 { grid-template-columns: 1fr; }
+.grid-cols-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+@media (max-width: 768px) {
+    .grid-cols-2,
+    .grid-cols-3,
+    .grid-cols-4 {
+        grid-template-columns: 1fr;
+    }
+    
+    .container {
+        padding: 1.5rem 1rem 2rem;
+        gap: var(--gap);
+    }
+}
+
+/* Flexbox Utilities - Responsive */
+.flex {
+    display: flex;
+    align-items: center;
+}
+
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-center { justify-content: center; }
+.flex-between { justify-content: space-between; }
+.flex-end { justify-content: flex-end; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+
+.gap-1 { gap: var(--gap-sm); }
+.gap-2 { gap: var(--gap); }
+.gap-3 { gap: var(--gap-lg); }
+
+/* Voxel Components (Updated for Artsy Design) */
 .voxel-btn {
     background: transparent;
-    border: 1px solid var(--fg);
+    border: 2px solid var(--fg);
     box-shadow: none;
     color: var(--fg);
     padding: 0.75rem 1.5rem;
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
+    font-size: 0.875rem;
     cursor: pointer;
-    transition: all 0.1s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     display: inline-block;
-    border-radius: 2px;
+    border-radius: var(--radius);
+    letter-spacing: 0.05em;
 }
 
 .voxel-btn:hover {
-    transform: none;
-    background: rgba(255,255,255,0.1);
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.08);
     border-color: var(--primary);
     color: var(--primary);
-    box-shadow: 0 0 10px rgba(244, 208, 63, 0.2);
+    box-shadow: 0 8px 24px rgba(244, 208, 63, 0.15);
 }
 
 .voxel-btn:active {
-    transform: translateY(1px);
-    box-shadow: none;
+    transform: translateY(0px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .voxel-btn.btn-primary {
@@ -163,9 +238,9 @@ header {
 }
 
 .voxel-btn.btn-primary:hover {
-    background: #F7DC6F; /* Lighter yellow */
-    color: black;
-    box-shadow: 0 0 15px rgba(244, 208, 63, 0.4);
+    background: #F7DC6F;
+    color: #000;
+    box-shadow: 0 12px 32px rgba(244, 208, 63, 0.3);
 }
 
 .voxel-btn.small {

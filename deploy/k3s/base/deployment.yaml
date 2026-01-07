@@ -27,7 +27,7 @@ spec:
         command: ["python", "-u", "-m", "montage_ai.web_ui.app"]
         ports:
         - name: http
-          containerPort: 5000
+          containerPort: 8080
           protocol: TCP
         env:
         - name: FLASK_ENV
@@ -80,14 +80,14 @@ spec:
         livenessProbe:
           httpGet:
             path: /api/status
-            port: 5000
+            port: 8080
           initialDelaySeconds: 30
           periodSeconds: 30
           timeoutSeconds: 10
         readinessProbe:
           httpGet:
             path: /api/status
-            port: 5000
+            port: 8080
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5

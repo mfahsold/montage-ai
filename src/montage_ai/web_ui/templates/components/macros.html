@@ -1,0 +1,98 @@
+{# Reusable Macros for Montage AI Web UI #}
+
+{# Voxel Card wrapper #}
+{% macro voxel_card(title=None, subtitle=None, class="") %}
+    <div class="voxel-card {{ class }}">
+        {% if title %}<h3 class="text-primary mb-2">{{ title }}</h3>{% endif %}
+        {% if subtitle %}<p class="text-xs text-muted mb-4">{{ subtitle }}</p>{% endif %}
+        {{ caller() }}
+    </div>
+{% endmacro %}
+
+{# Button groups #}
+{% macro button_group(class="flex gap-3") %}
+    <div class="{{ class }}">
+        {{ caller() }}
+    </div>
+{% endmacro %}
+
+{# Badge/Status indicator #}
+{% macro badge(label, status="primary", class="") %}
+    <span class="badge badge-{{ status }} text-xs {{ class }}">{{ label }}</span>
+{% endmacro %}
+
+{# Job card for recent jobs list #}
+{% macro job_card(title, status, timestamp, action_label="VIEW", is_completed=False) %}
+    <div class="voxel-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-4 flex-1">
+            <div class="job-preview-container">
+                {% if is_completed %}
+                    <img src="{{ url_for('static', filename='img/thumb-default.jpg') }}" alt="Thumbnail" class="job-thumbnail">
+                {% else %}
+                    <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#111;">
+                        <div class="loading-spinner"></div>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="min-w-0">
+                <h4 class="truncate">{{ title }}</h4>
+                {% if is_completed %}
+                    <span class="text-xs text-muted">1080p • {{ status }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap justify-between md:justify-end">
+            {{ self.badge(status, "success" if is_completed else "secondary", "text-xs") }}
+            <span class="text-xs text-muted">{{ timestamp }}</span>
+            <button class="voxel-btn {% if is_completed %}voxel-btn-primary{% else %}text-xs{% endif %}" {% if not is_completed %}disabled{% endif %}>
+                {{ action_label }}
+            </button>
+        </div>
+    </div>
+{% endmacro %}
+
+{# Workflow card with icon and description #}
+{% macro workflow_card(title, subtitle, icon_class, button_label, button_url, theme="primary") %}
+    <a href="{{ button_url }}" class="voxel-card workflow-card flex flex-col justify-between" style="text-decoration: none;">
+        <div class="mb-6">
+            <div class="workflow-icon mb-3">
+                <svg class="anim-icon {{ icon_class }}" viewBox="0 0 24 24">
+                    {% if icon_class == "icon-camera" %}
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    {% elif icon_class == "icon-mobile" %}
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    {% endif %}
+                </svg>
+            </div>
+            <h3 class="text-{{ theme }} mb-2">{{ title }}</h3>
+            <p class="text-xs text-muted leading-relaxed">{{ subtitle }}</p>
+        </div>
+        <button class="voxel-btn voxel-btn-{{ theme }} text-xs w-full justify-center">{{ button_label }}</button>
+    </a>
+{% endmacro %}
+
+{# Section header #}
+{% macro section_header(title, subtitle=None, icon=None, class="") %}
+    <div class="mb-6 {{ class }}">
+        <h2 class="text-primary mb-2 flex items-center gap-2">
+            {% if icon %}
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    {{ icon|safe }}
+                </svg>
+            {% endif %}
+            {{ title }}
+        </h2>
+        {% if subtitle %}<p class="text-xs text-muted">{{ subtitle }}</p>{% endif %}
+    </div>
+{% endmacro %}
+
+{# Empty state #}
+{% macro empty_state(message, action_label="Go Back", action_url="/", icon="📭") %}
+    <div class="voxel-card text-center py-12">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">{{ icon }}</div>
+        <h3 class="text-muted mb-4">{{ message }}</h3>
+        <a href="{{ action_url }}" class="voxel-btn voxel-btn-primary text-xs">{{ action_label }}</a>
+    </div>
+{% endmacro %}

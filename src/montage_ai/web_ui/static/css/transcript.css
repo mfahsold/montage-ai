@@ -1,0 +1,47 @@
+/* Transcript Editor Styles */
+
+.transcript-panel {
+    background: var(--input-bg);
+    border: 2px solid var(--border);
+    padding: 1.5rem;
+    overflow-y: auto;
+    max-height: 60vh;
+    line-height: 1.8;
+    box-shadow: var(--shd-sm);
+}
+
+.word {
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: all 0.1s steps(2);
+    display: inline-block;
+    border: 1px solid transparent;
+}
+
+.word:hover {
+    border-color: var(--primary);
+    background: var(--muted);
+}
+
+.word.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.word.deleted {
+    text-decoration: line-through;
+    color: var(--muted-fg);
+    opacity: 0.5;
+}
+
+.filler-word {
+    border-bottom: 2px solid var(--error);
+}
+
+.energy-canvas {
+    width: 100%;
+    height: 80px;
+    background: var(--input-bg);
+    border: 2px solid var(--border);
+}

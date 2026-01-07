@@ -10,11 +10,22 @@
 
 ## Session 7 In Progress 🚀
 
-### Distributed Build & K3s Deployment
+### Web UI Consistency & Maintainability (NEW) ✨
+
+- **Problem**: 5 templates with duplicate HTML structure, navbar code copied 6 times
+- **Solution**: Template inheritance (base.html) + 7 reusable macros
+- **Benefit**: 1 navbar to maintain (not 6), new pages in 5 min (not 1 hour)
+- **Status**: Infrastructure ✅ 100%, Templates 1/6 migrated (gallery.html done)
+- **Next**: Migrate transcript.html, features.html, settings.html, then montage.html, shorts.html
+- **Docs**: See `docs/WEB_UI_ARCHITECTURE.md` & `docs/WEB_UI_ROADMAP.md`
+- **Tool**: `./scripts/check-template-consistency.sh` validates consistency
+
+### Distributed Build & K3s Deployment (Previous)
+
 - **Cluster Status**: 7 nodes ready (AMD GPU, Jetson, Raspberry Pi, etc.)
 - **Registry**: montage-ai images in 192.168.1.12:5000
 - **Kustomize Overlays**: dev/staging/prod configured
-- **Current Blocker**: K3s HTTP registry not configured (ImagePullBackOff)
+- **Previous Blocker**: K3s HTTP registry not configured (ImagePullBackOff)
 - **Action**: Add K3s registries.yaml for insecure HTTP registry
 - **Commit**: `d6b1675` - simplified K3s deployment
 

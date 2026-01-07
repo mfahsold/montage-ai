@@ -1,35 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gallery - Voxel Studio</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
-</head>
-<body>
-    <nav class="navbar">
-        <a href="/" class="nav-brand">
-            <span>MONTAGE</span> AI
-        </a>
-        <div class="nav-links">
-            <a href="/" class="nav-link">DASHBOARD</a>
-            <a href="/montage" class="nav-link">CREATOR</a>
-            <a href="/gallery" class="nav-link active">GALLERY</a>
-            <a href="/settings" class="nav-link">SETTINGS</a>
-        </div>
-    </nav>
+{% extends "base.html" %}
+{% import "components/macros.html" as m %}
 
-    <div class="container">
-        <div class="mb-8">
-            <h1 class="voxel-title">Gallery</h1>
-            <p class="text-xs text-muted">Your completed projects. AI-directed masterpieces.</p>
-        </div>
+{% block title %}Gallery - Montage AI{% endblock %}
 
-        <div class="voxel-card text-center py-12">
-            <h3 class="text-muted mb-4">No Videos Found</h3>
-            <p class="text-xs text-muted mb-8">Gallery is empty. Create a new montage to see it here.</p>
-            <a href="/montage" class="voxel-btn voxel-btn-primary">Create Montage</a>
-        </div>
-    </div>
-</body>
-</html>
+{% block content %}
+    {% call m.section_header("GALLERY", "Your completed projects. AI-directed masterpieces.") %}{% endcall %}
+
+    {% call m.empty_state("No Videos Found", "Create Montage", "/montage") %}
+        <p class="text-xs text-muted mb-8">Gallery is empty. Create a new montage to see it here.</p>
+    {% endcall %}
+{% endblock %}
