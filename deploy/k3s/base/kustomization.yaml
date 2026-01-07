@@ -4,28 +4,23 @@ kind: Kustomization
 namespace: montage-ai
 
 resources:
+  - deployment.yaml
+  - service-ingress.yaml
   - namespace.yaml
-  - configmap.yaml
-  - pvc.yaml
-  - job.yaml
-  - web-service.yaml
-  - cgpu-server.yaml
-  - registry.yaml
-  - ingress.yaml
-  - network-policies/networkpolicy-default-deny.yaml
-  - network-policies/allow-registry-ingress.yaml
-  - network-policies/allow-renderer-egress.yaml
-  - network-policies/allow-cgpu-egress.yaml
-  - network-policies/allow-web-ingress.yaml
+  - network-policy.yaml
 
-labels:
-  - pairs:
-      app.kubernetes.io/name: montage-ai
-      app.kubernetes.io/version: "1.0.0"
-      app.kubernetes.io/managed-by: kustomize
+# Patches for upstream integration (non-invasive fixes)
+# Allows external teams to maintain their own configs
+patchesStrategicMerge:
+  - patches/fix-registry-url.yaml
 
-# Image configuration - use local cluster registry
+# DRY: Map any registry URL to cluster standard
+# This handles both upstream variations and ensures consistency
 images:
-  - name: ghcr.io/mfahsold/montage-ai
+  - name: 192.168.1.16:30500/montage-ai  # Upstream uses wrong registry
+    newName: 192.168.1.12:5000/montage-ai  # Cluster standard
+    newTag: latest
+  - name: montage-ai  # Also handle bare image name
     newName: 192.168.1.12:5000/montage-ai
     newTag: latest
+

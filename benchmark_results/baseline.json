@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-01-07T21:31:23.208184",
+  "python_version": "3.12.3",
+  "benchmarks": {
+    "imports": {
+      "montage_ai": 3045.58,
+      "montage_ai.config": 0.0,
+      "montage_ai.core.montage_builder": 0.0,
+      "montage_ai.broll_planner": 0.0
+    },
+    "config": {
+      "config_load": 0.01
+    },
+    "features": {
+      "mediapipe": false,
+      "librosa": true,
+      "scipy": true,
+      "flask": true,
+      "redis": true,
+      "torch": false
+    },
+    "tests": {
+      "test_collection": 15.22,
+      "test_config": 10.65
+    },
+    "installation": {
+      "core_venv": "35.6 MB"
+    }
+  }
+}

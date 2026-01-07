@@ -4,4 +4,4 @@ metadata:
   name: montage-ai
   labels:
     app.kubernetes.io/name: montage-ai
-    app.kubernetes.io/part-of: montage-ai
+    app.kubernetes.io/component: web-ui
