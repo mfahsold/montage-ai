@@ -28,8 +28,29 @@ class AudioEnhancer:
 
     def _check_available_filters(self):
         """Check availability of advanced filters."""
-        # TODO: Run ffmpeg -filters and parse
-        pass
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-filters"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            available_filters = result.stdout
+            
+            # Check for key filters
+            self.has_sidechaincompress = "sidechaincompress" in available_filters
+            self.has_astats = "astats" in available_filters
+            self.has_volumedetect = "volumedetect" in available_filters
+            self.has_silencedetect = "silencedetect" in available_filters
+            
+            logger.debug(f"Audio filters available: sidechaincompress={self.has_sidechaincompress}, "
+                        f"astats={self.has_astats}, volumedetect={self.has_volumedetect}")
+        except Exception as e:
+            logger.warning(f"Could not check filter availability: {e}. Assuming all available.")
+            self.has_sidechaincompress = True
+            self.has_astats = True
+            self.has_volumedetect = True
+            self.has_silencedetect = True
 
     def enhance_voice(self, input_path: str, output_path: str, strength: float = 0.5) -> bool:
         """
@@ -66,8 +87,17 @@ class AudioEnhancer:
         logger.info(f"Applying auto-ducking (Music: {music_track} under Voice: {voice_track})")
         
         # FFmpeg sidechaincompress filter params from config
-        # TODO: Dynamically adjust ratio based on ducking_amount
-        core_filter = AUDIO_FILTERS.get("ducking_core", "sidechaincompress=threshold=0.1:ratio=5:attack=50:release=300:link=average")
+        # Dynamically adjust ratio based on ducking_amount (dB reduction)
+        # ducking_amount: 15dB = ratio ~5, 20dB = ratio ~10, 10dB = ratio ~3
+        ratio = max(2, min(20, ducking_amount / 3.0))  # Convert dB to ratio (clamped 2-20)
+        threshold = 0.1 if ducking_amount < 20 else 0.05  # Lower threshold for more aggressive ducking
+        
+        core_filter = AUDIO_FILTERS.get(
+            "ducking_core", 
+            f"sidechaincompress=threshold={threshold}:ratio={ratio:.1f}:attack=50:release=300:link=average"
+        )
+        
+        logger.debug(f"Ducking parameters: amount={ducking_amount}dB, ratio={ratio:.1f}, threshold={threshold}")
         
         # [1] (music) is compressed based on signal from [0] (voice)
         # acompressor inputs: [main][sidechain]
@@ -95,18 +125,69 @@ class AudioEnhancer:
 
     def check_snr(self, input_path: str) -> float:
         """
-        Approximate Signal-to-Noise Ratio using rms levels of silence vs speech.
+        Approximate Signal-to-Noise Ratio using volumedetect and astats filters.
         Returns estimated SNR in dB.
+        
+        Method: Use astats to get mean and peak RMS levels, then estimate SNR
+        by comparing peak signal (90th percentile) to mean noise floor.
         """
-        # 1. Detect silence levels (volumedetect? astats?)
-        # A simple robust way: 10th percentile (noise) vs 90th percentile (signal) RMS
+        if not self.has_astats:
+            logger.warning("astats filter not available, cannot measure SNR")
+            return 0.0
         
-        # Using astats
-        cmd = ["ffmpeg", "-i", input_path, "-af", "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level", "-f", "null", "-"]
-        # This produces A LOT of output.
-        
-        # Alternative: measure mean volume.
-        # It's hard to get true SNR without VAD.
-        
-        # For MVP: Run volumedetect filter
-        return 0.0 # TODO: Implement accurate measurement
+        try:
+            # Use astats to get detailed audio statistics
+            cmd = [
+                "ffmpeg",
+                "-i", input_path,
+                "-af", "astats=measure_perchannel=none:measure_overall=Peak_level+RMS_level+RMS_peak:metadata=1",
+                "-f", "null",
+                "-"
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            # Parse stderr for statistics
+            stderr = result.stderr
+            
+            # Extract RMS levels (dB)
+            rms_level = None
+            rms_peak = None
+            
+            for line in stderr.split('\n'):
+                if 'RMS level dB:' in line:
+                    try:
+                        rms_level = float(line.split(':')[-1].strip())
+                    except ValueError:
+                        pass
+                elif 'RMS peak dB:' in line:
+                    try:
+                        rms_peak = float(line.split(':')[-1].strip())
+                    except ValueError:
+                        pass
+            
+            if rms_level is not None and rms_peak is not None:
+                # Estimate SNR as difference between peak signal and average level
+                # This is a rough approximation: peak signal represents "signal",
+                # average RMS represents noise floor + signal
+                estimated_snr = abs(rms_peak - rms_level)
+                
+                logger.info(f"Audio SNR analysis: RMS={rms_level:.1f}dB, Peak={rms_peak:.1f}dB, "
+                           f"Estimated SNR={estimated_snr:.1f}dB")
+                
+                return max(0.0, estimated_snr)  # Clamp to positive values
+            else:
+                logger.warning(f"Could not parse audio statistics from ffmpeg output")
+                return 0.0
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"SNR measurement timed out for {input_path}")
+            return 0.0
+        except Exception as e:
+            logger.error(f"SNR measurement failed: {e}")
+            return 0.0

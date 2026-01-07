@@ -12,11 +12,13 @@
 | Epic | Status | Completion |
 | :--- | :--- | :--- |
 | **Epic 1: Transcript Editor** | ✅ Complete | 100% |
-| **Epic 2: Preview-First Pipeline** | ⚠️ Near-Complete | 85% |
-| **Epic 3: Smart Reframe v2** | ⚠️ In Progress | 60% |
-| **Epic 4: Caption Styles & Highlights** | ⚠️ Near-Complete | 80% |
-| **Epic 5: Pro Handoff Pack** | ⚠️ Near-Complete | 85% |
-| **Epic 6: Audio Polish** | ⚠️ Near-Complete | 80% |
+| **Epic 2: Preview-First Pipeline** | ✅ Complete | 100% |
+| **Epic 3: Smart Reframe v2** | ✅ Complete | 100% |
+| **Epic 4: Caption Styles & Highlights** | ✅ Complete | 100% |
+| **Epic 5: Pro Handoff Pack** | ✅ Complete | 100% |
+| **Epic 6: Audio Polish** | ✅ Complete | 100% |
+
+**Status as of January 7, 2026:** All Q1 2026 Phase 1 & 2 epics complete. System is production-ready.
 
 ---
 

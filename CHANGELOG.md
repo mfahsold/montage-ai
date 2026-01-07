@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Test Suite Reliability**: Fixed 47 failing tests caused by numpy 2.0 incompatibility and pytest-flask conflicts
+  - Pinned numpy to 1.26.4 to prevent pytest.approx type checking errors
+  - Disabled pytest-flask plugin (incompatible with Flask 3.x metaclass)
+  - Removed global module mocking that poisoned test sessions
+  - Fixed integration test collection by renaming helper functions from `test_*` to `_check_*`
+  - All 514 unit tests now passing (513 passed, 1 skipped)
 - **cgpu Integration**: Fixed API key propagation issue where `GOOGLE_API_KEY` was being unset, causing 502 errors.
 - **Creative Director**: Added robust fallback logic (cgpu -> Google AI -> Ollama) to ensure generation continues even if primary backend fails.
 - **Environment Config**: Updated `.env` and `montage-ai.sh` to correctly handle Google API keys for the cgpu wrapper.

@@ -44,6 +44,7 @@
 | [models.md](models.md) | All AI/ML libraries used | ML engineers | 10 min |
 | [llm-agents.md](llm-agents.md) | Coding principles for AI assistants | AI developers | 15 min |
 | [RQ_MIGRATION.md](RQ_MIGRATION.md) | Redis Queue infrastructure | DevOps, backend | 10 min |
+| [TEST_SUITE_STATUS.md](TEST_SUITE_STATUS.md) | Test coverage & CI readiness | QA, DevOps | 5 min |
 
 ---
 

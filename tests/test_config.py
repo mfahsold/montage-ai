@@ -30,7 +30,8 @@ class TestPathConfig:
             assert config.input_dir == Path("/data/input")
             assert config.output_dir == Path("/data/output")
             assert config.music_dir == Path("/data/music")
-            assert config.temp_dir == Path("/tmp")
+            # OPTIMIZATION: temp_dir now uses /dev/shm (RAM disk) when available
+            assert config.temp_dir in [Path("/dev/shm"), Path("/tmp")]
 
     def test_custom_paths_from_env(self):
         """Paths can be overridden via environment."""

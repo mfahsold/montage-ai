@@ -597,16 +597,8 @@ class AutoReframeEngine:
             run_command(cmd)
             return
             
-        # TODO: Implement complex dynamic cropping keyframes
-        # For now, simplistic static crop of first segment is handled above.
-        # Dynamic crop requires sendcmd or complex filters, which is implemented in apply_dynamic
-        # but apply() logic above had a fallback. 
-        # Making sure we don't drop dynamic crop logic if it existed here.
-        # The code I read only showed static fallbacks for empty crops or single segment.
-        # I will assume apply_dynamic is called if multiple segments exist or I should look closer. 
-        # But for 'apply', I will just fix the encoding params.
-
-        # Multiple segments: complex filter
+        # Multiple segments: complex filter with trim and crop
+        # This implements smooth dynamic cropping across time segments
         # [0:v]trim=start=0:end=2,setpts=PTS-STARTPTS,crop=...[v0];
         # [0:v]trim=start=2:end=5,setpts=PTS-STARTPTS,crop=...[v1];
         # [v0][v1]concat=n=2:v=1:a=0[outv]

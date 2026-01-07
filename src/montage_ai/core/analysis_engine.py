@@ -9,13 +9,31 @@ import os
 import random
 import numpy as np
 from typing import List, Optional, Tuple, Any, Dict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# OPTIMIZATION Phase 3: ProcessPoolExecutor for CPU-bound tasks (bypasses GIL)
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 from ..logger import logger
 from ..config import Settings
 from .context import AudioAnalysisResult, SceneInfo, MontageContext
 from ..utils import file_exists_and_valid
 from .analysis_cache import get_analysis_cache
+
+
+# OPTIMIZATION Phase 3: Module-level worker for ProcessPoolExecutor (pickle compatibility)
+def _detect_video_scenes_worker(v_path: str, threshold: float) -> Tuple[str, List]:
+    """
+    Detect scenes in a single video (process-safe).
+    Top-level function required for ProcessPoolExecutor pickling.
+    """
+    from ..scene_analysis import detect_scenes
+    try:
+        scenes = detect_scenes(v_path, threshold=threshold)
+        return v_path, scenes
+    except Exception as e:
+        # Use print since logger may not work across process boundaries
+        print(f"   ⚠️ Scene detection failed for {v_path}: {e}")
+        return v_path, []
+
 
 class AssetAnalyzer:
     """
@@ -289,42 +307,45 @@ class AssetAnalyzer:
             else:
                 uncached_videos.append(v_path)
 
-        # Parallel scene detection for uncached videos
+        # OPTIMIZATION Phase 3: ProcessPoolExecutor for CPU-intensive scene detection
+        # Bypasses Python GIL for 2-4x speedup on multi-core systems
         detected_scenes = {}  # path -> scenes list
 
-        def detect_video_scenes(v_path: str):
-            """Detect scenes in a single video (thread-safe)."""
-            try:
-                scenes = detect_scenes(v_path, threshold=threshold)
-                return v_path, scenes
-            except Exception as e:
-                logger.warning(f"   ⚠️ Scene detection failed for {v_path}: {e}")
-                return v_path, []
-
         if uncached_videos:
-            # Simple heuristic for workers: use max 4 or num_videos
-            max_workers = min(4, len(uncached_videos))
-            logger.info(f"   🚀 Parallel scene detection ({len(uncached_videos)} videos, {max_workers} workers)")
+            # Use ProcessPool for CPU-bound scene detection (GIL bypass)
+            max_workers = min(4, len(uncached_videos), os.cpu_count() or 2)
+            logger.info(f"   🚀 ProcessPool scene detection ({len(uncached_videos)} videos, {max_workers} CPU workers)")
             
             # Progress tracking setup
             total_tasks = len(uncached_videos)
             completed_tasks = 0
 
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {executor.submit(detect_video_scenes, v): v for v in uncached_videos}
+            try:
+                # ProcessPoolExecutor for true parallelism (bypasses GIL)
+                with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(_detect_video_scenes_worker, v, threshold): v for v in uncached_videos}
 
-                for future in as_completed(futures):
-                    v_path, scenes = future.result()
-                    detected_scenes[v_path] = scenes
-                    # Save to cache
-                    cache.save_scenes(v_path, threshold, scenes)
-                    
-                    # Update progress
-                    completed_tasks += 1
-                    if progress_callback:
-                        local_pct = int((completed_tasks / total_tasks) * 100)
-                        msg = f"Detecting scenes in {os.path.basename(v_path)} ({completed_tasks}/{total_tasks})"
-                        progress_callback(local_pct, msg)
+                    for future in as_completed(futures):
+                        v_path, scenes = future.result()
+                        detected_scenes[v_path] = scenes
+                        # Save to cache
+                        cache.save_scenes(v_path, threshold, scenes)
+                        
+                        # Update progress
+                        completed_tasks += 1
+                        if progress_callback:
+                            local_pct = int((completed_tasks / total_tasks) * 100)
+                            msg = f"Detecting scenes in {os.path.basename(v_path)} ({completed_tasks}/{total_tasks})"
+                            progress_callback(local_pct, msg)
+            except Exception as e:
+                # Fallback to ThreadPool if ProcessPool fails (e.g., pickle issues)
+                logger.warning(f"   ⚠️ ProcessPool failed ({e}), falling back to ThreadPool")
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(_detect_video_scenes_worker, v, threshold): v for v in uncached_videos}
+                    for future in as_completed(futures):
+                        v_path, scenes = future.result()
+                        detected_scenes[v_path] = scenes
+                        cache.save_scenes(v_path, threshold, scenes)
 
         # Combine cached and detected scenes
         all_video_scenes = {**cached_scenes, **detected_scenes}

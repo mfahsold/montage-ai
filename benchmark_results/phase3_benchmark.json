@@ -1,0 +1,27 @@
+[
+  {
+    "test": "parallel_execution",
+    "thread_time_ms": 66.31930299954547,
+    "process_time_ms": 72.51614800043171,
+    "speedup": 0.9145453092620233
+  },
+  {
+    "test": "serialization",
+    "json_write_ms": 142.53921799991076,
+    "msgpack_write_ms": 5.763191000369261,
+    "json_read_ms": 35.33214700019016,
+    "msgpack_read_ms": 1.8009940004048985,
+    "write_speedup": 24.73269027363104,
+    "read_speedup": 19.618136980049243,
+    "avg_speedup": 22.17541362684014,
+    "size_ratio": 2.211709570440297
+  },
+  {
+    "test": "cumulative_impact",
+    "phase1_speedup": 1.52,
+    "phase2_speedup": 28.8,
+    "phase3_speedup": 2.8,
+    "theoretical_speedup": 122.5728,
+    "realistic_speedup": 73.54368
+  }
+]

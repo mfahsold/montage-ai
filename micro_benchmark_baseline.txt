@@ -1,0 +1,32 @@
+🎮 GPU Encoding: h264_vaapi (vaapi)
+
+🚀 Montage AI Micro-Benchmark Suite
+
+Running benchmarks...
+
+Traceback (most recent call last):
+  File "/home/codeai/montage-ai/micro_benchmark.py", line 448, in <module>
+    main()
+  File "/home/codeai/montage-ai/micro_benchmark.py", line 430, in main
+    test_cache_operations(suite)
+  File "/home/codeai/montage-ai/micro_benchmark.py", line 367, in test_cache_operations
+    json_cache_write()
+  File "/home/codeai/montage-ai/micro_benchmark.py", line 86, in wrapper
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/codeai/montage-ai/micro_benchmark.py", line 356, in json_cache_write
+    json.dump(cache_data, f)
+  File "/usr/lib/python3.12/json/__init__.py", line 179, in dump
+    for chunk in iterable:
+  File "/usr/lib/python3.12/json/encoder.py", line 432, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/usr/lib/python3.12/json/encoder.py", line 406, in _iterencode_dict
+    yield from chunks
+  File "/usr/lib/python3.12/json/encoder.py", line 406, in _iterencode_dict
+    yield from chunks
+  File "/usr/lib/python3.12/json/encoder.py", line 439, in _iterencode
+    o = _default(o)
+        ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type bool_ is not JSON serializable

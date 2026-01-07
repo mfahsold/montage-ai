@@ -109,9 +109,9 @@ Three focused workflows:
 
 ### 2. Shorts Studio 2.0
 
-- **Smart-Reframe v2:** Subject Tracking + Motion Smoothing. ⚠️ Base tracking works, v2 smoothing TBD
+- **Smart-Reframe v2:** Subject Tracking + Motion Smoothing. ✅ Implemented (Kalman Filter + Camera Motion Optimizer)
 - **Caption-Styles:** Real styles (TikTok/Bold/Karaoke) with Live-Preview. ✅ Implemented
-- **Highlight-Detection:** MVP with Review-Cards. ⚠️ API exists, UI needs wiring
+- **Highlight-Detection:** MVP with Review-Cards. ✅ Implemented (Multi-modal scoring: Audio + Face + Action)
 
 ### 3. Preview-First Pipeline
 

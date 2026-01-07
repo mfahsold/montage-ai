@@ -1,0 +1,58 @@
+🎮 GPU Encoding: h264_vaapi (vaapi)
+
+🚀 Montage AI Micro-Benchmark Suite
+
+Running benchmarks...
+
+
+✅ Results saved to: /home/codeai/montage-ai/benchmark_results/micro_benchmark_baseline.json
+
+================================================================================
+MONTAGE AI MICRO-BENCHMARK RESULTS
+================================================================================
+
+📊 Configuration
+--------------------------------------------------------------------------------
+  Config: Load Settings                                    0.01ms
+  Config: Reload Settings (cached)                         0.01ms
+  TOTAL                                                    0.01ms
+
+📊 Audio Analysis
+--------------------------------------------------------------------------------
+  NumPy: Energy Profile Calculation                      363.27ms
+  NumPy: Beat Detection Simulation                         5.78ms
+  TOTAL                                                  369.05ms
+
+📊 Timeline Assembly
+--------------------------------------------------------------------------------
+  Selection: Weighted Scoring (1000 scenes)               16.58ms
+  Selection: Recent Video Tracking (10000 ops)             4.81ms
+  TOTAL                                                   21.39ms
+
+📊 Rendering
+--------------------------------------------------------------------------------
+  FFmpeg: Command Execution Test                           0.00ms
+  TOTAL                                                    0.00ms
+
+📊 Data I/O
+--------------------------------------------------------------------------------
+  FFmpeg: Create Test Video (1s)                        1785.06ms
+  File I/O: Write 100 temp files (1MB each)               97.27ms
+  File I/O: Read 100 files                               108.63ms
+  TOTAL                                                 1990.95ms
+
+📊 Caching
+--------------------------------------------------------------------------------
+  Cache: JSON write (1000 entries)                        97.85ms
+  Cache: JSON read (1000 entries)                         23.86ms
+  TOTAL                                                  121.71ms
+
+📊 Concurrency
+--------------------------------------------------------------------------------
+  Parallel: ThreadPoolExecutor (100 tasks)                35.12ms
+  TOTAL                                                   35.12ms
+
+================================================================================
+TOTAL: 2538.24ms (2.54s)
+================================================================================
+

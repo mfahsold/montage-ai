@@ -1,0 +1,128 @@
+{
+  "results": [
+    {
+      "name": "Config: Load Settings",
+      "duration_ms": 0.006104000021878164,
+      "throughput": "",
+      "details": {
+        "num_features": 32,
+        "num_paths": 8
+      }
+    },
+    {
+      "name": "Config: Reload Settings (cached)",
+      "duration_ms": 0.007196999831649009,
+      "throughput": "",
+      "details": {
+        "iterations": 100
+      }
+    },
+    {
+      "name": "NumPy: Energy Profile Calculation",
+      "duration_ms": 363.2680930004426,
+      "throughput": "",
+      "details": {
+        "samples": 3969000,
+        "windows": 7748
+      }
+    },
+    {
+      "name": "NumPy: Beat Detection Simulation",
+      "duration_ms": 5.783607000012125,
+      "throughput": "",
+      "details": {
+        "duration_sec": 180,
+        "beats_detected": 3527,
+        "expected_beats": 360
+      }
+    },
+    {
+      "name": "Selection: Weighted Scoring (1000 scenes)",
+      "duration_ms": 16.578755999944406,
+      "throughput": "",
+      "details": {
+        "candidates": 1000,
+        "selected": 100
+      }
+    },
+    {
+      "name": "Selection: Recent Video Tracking (10000 ops)",
+      "duration_ms": 4.808784000488231,
+      "throughput": "",
+      "details": {
+        "operations": 10000,
+        "unique_tracked": 20
+      }
+    },
+    {
+      "name": "FFmpeg: Command Execution Test",
+      "duration_ms": 0.0016290005078190006,
+      "throughput": "",
+      "details": {
+        "test": "ffmpeg_available"
+      }
+    },
+    {
+      "name": "FFmpeg: Create Test Video (1s)",
+      "duration_ms": 1785.0557219999246,
+      "throughput": "",
+      "details": {
+        "success": true,
+        "size_kb": 24.5927734375
+      }
+    },
+    {
+      "name": "File I/O: Write 100 temp files (1MB each)",
+      "duration_ms": 97.26629199940362,
+      "throughput": "",
+      "details": {
+        "files": 100,
+        "total_mb": 100.0
+      }
+    },
+    {
+      "name": "File I/O: Read 100 files",
+      "duration_ms": 108.63162599980569,
+      "throughput": "",
+      "details": {
+        "files": 100,
+        "total_mb": 100.0
+      }
+    },
+    {
+      "name": "Cache: JSON write (1000 entries)",
+      "duration_ms": 97.85265000027721,
+      "throughput": "",
+      "details": {
+        "entries": 1000,
+        "size_kb": 152.6259765625
+      }
+    },
+    {
+      "name": "Cache: JSON read (1000 entries)",
+      "duration_ms": 23.8594969996484,
+      "throughput": "",
+      "details": {
+        "entries": 1000
+      }
+    },
+    {
+      "name": "Parallel: ThreadPoolExecutor (100 tasks)",
+      "duration_ms": 35.12295400014409,
+      "throughput": "",
+      "details": {
+        "tasks": 100,
+        "workers": 4
+      }
+    }
+  ],
+  "categories": [
+    "Configuration",
+    "Audio Analysis",
+    "Timeline Assembly",
+    "Rendering",
+    "Data I/O",
+    "Caching",
+    "Concurrency"
+  ]
+}

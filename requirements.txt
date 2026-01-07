@@ -41,3 +41,6 @@ rq>=1.16.0
 librosa>=0.10.2
 numba>=0.60.0
 opentimelineio>=0.15.0
+
+# OPTIMIZATION Phase 3: msgpack for 22x faster cache serialization
+msgpack>=1.0.0

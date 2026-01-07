@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from ...cgpu_utils import is_cgpu_available
 from ...ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
+from ..highlights import detect_highlights
 
 analysis_bp = Blueprint('analysis', __name__, url_prefix='/api')
 
@@ -89,6 +90,75 @@ def api_audio_analyze():
             },
             "recommendations": recommendations,
             "clean_audio_available": True
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@analysis_bp.route('/highlights/detect', methods=['POST'])
+def api_detect_highlights():
+    """
+    Detect highlight moments in video using multi-signal analysis.
+    
+    POST /api/highlights/detect
+    Body: {
+        "video_path": "/path/to/video.mp4",
+        "max_clips": 5,
+        "min_duration": 5.0,
+        "max_duration": 60.0,
+        "include_speech": true
+    }
+    
+    Returns:
+        {
+            "success": true,
+            "highlights": [
+                {
+                    "time": 10.5,
+                    "start": 10.0,
+                    "end": 15.0,
+                    "duration": 5.0,
+                    "score": 0.85,
+                    "type": "Energy",
+                    "label": "🔥 High Energy (85%)"
+                },
+                ...
+            ]
+        }
+    """
+    data = request.json or {}
+    video_path = data.get('video_path')
+    
+    if not video_path:
+        return jsonify({"error": "video_path is required"}), 400
+    
+    if not Path(video_path).exists():
+        return jsonify({"error": f"Video file not found: {video_path}"}), 404
+    
+    try:
+        # Parse options
+        max_clips = data.get('max_clips', 5)
+        min_duration = data.get('min_duration', 5.0)
+        max_duration = data.get('max_duration', 60.0)
+        include_speech = data.get('include_speech', True)
+        
+        # Detect highlights using multi-signal analysis
+        highlights = detect_highlights(
+            video_path=video_path,
+            max_clips=max_clips,
+            min_duration=min_duration,
+            max_duration=max_duration,
+            include_speech=include_speech
+        )
+        
+        return jsonify({
+            "success": True,
+            "highlights": highlights,
+            "count": len(highlights),
+            "video_path": video_path
         })
         
     except Exception as e:

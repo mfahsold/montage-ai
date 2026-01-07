@@ -265,9 +265,9 @@ def test_style_specific_configs():
     youtube = CaptionBurner(style=CaptionStyle.YOUTUBE)
     bold = CaptionBurner(style=CaptionStyle.BOLD)
     
-    # TikTok: large, centered
+    # TikTok: large, lower middle (above TikTok UI)
     assert tiktok.config.fontsize == 64
-    assert tiktok.config.y_expr == "(h-text_h)/2"
+    assert tiktok.config.y_expr == "(h-text_h)*0.75"
     
     # YouTube: medium, bottom, with box
     assert youtube.config.fontsize == 42

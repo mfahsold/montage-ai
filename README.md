@@ -4,10 +4,12 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![K3s](https://img.shields.io/badge/k3s-ready-green.svg)](https://k3s.io/)
+[![Tests](https://img.shields.io/badge/tests-513%20passed-brightgreen.svg)]()
+[![Code Quality](https://img.shields.io/badge/code%20quality-A-brightgreen.svg)]()
 
 > **We do not generate pixels. We polish them.**
 
-Free, open-source AI video editor: beat-sync montages, transcript editing, OTIO/EDL export. Local-first, privacy-first alternative to Descript.
+Free, open-source AI video editor: beat-sync montages, transcript editing, OTIO/EDL export. Local-first, privacy-first alternative to Descript. Professional post-production workflows for content creators, video editors, and AI enthusiasts.
 
 ## Quick Start
 

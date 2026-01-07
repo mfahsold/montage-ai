@@ -205,8 +205,8 @@ FEATURE_MATRIX = {
 # Test Functions
 # =============================================================================
 
-def test_parameter_loading() -> List[ParameterTest]:
-    """Test that all parameters load correctly from config."""
+def _check_parameter_loading() -> List[ParameterTest]:
+    """Check that all parameters load correctly from config (helper function)."""
     from montage_ai.config import get_settings
 
     results = []
@@ -310,8 +310,8 @@ def test_parameter_loading() -> List[ParameterTest]:
     return results
 
 
-def test_feature_category(category: str, config: dict) -> FeatureTest:
-    """Test a single feature category."""
+def _check_feature_category(category: str, config: dict) -> FeatureTest:
+    """Check a single feature category (helper function, not a pytest test)."""
     start_time = time.time()
 
     try:
@@ -370,8 +370,8 @@ def test_feature_category(category: str, config: dict) -> FeatureTest:
         )
 
 
-def test_montage_builder_integration() -> FeatureTest:
-    """Test that MontageBuilder accepts all feature parameters."""
+def _check_montage_builder_integration() -> FeatureTest:
+    """Check that MontageBuilder accepts all feature parameters (helper function)."""
     start_time = time.time()
 
     try:
@@ -383,15 +383,15 @@ def test_montage_builder_integration() -> FeatureTest:
         # Create builder
         builder = MontageBuilder(variant_id=1, settings=settings)
 
-        # Check context attributes
-        ctx_attrs = [
+        # Check context.features attributes
+        feature_attrs = [
             "stabilize", "upscale", "enhance", "denoise", "sharpen",
             "film_grain", "dialogue_duck", "color_grade"
         ]
 
         missing = []
-        for attr in ctx_attrs:
-            if not hasattr(builder.ctx, attr):
+        for attr in feature_attrs:
+            if not hasattr(builder.ctx.features, attr):
                 missing.append(attr)
 
         duration_ms = (time.time() - start_time) * 1000
@@ -402,7 +402,7 @@ def test_montage_builder_integration() -> FeatureTest:
                 category="Core Pipeline",
                 status=TestStatus.FAIL,
                 duration_ms=duration_ms,
-                details=f"Missing ctx attributes: {missing}"
+                details=f"Missing ctx.features attributes: {missing}"
             )
 
         return FeatureTest(
@@ -410,7 +410,7 @@ def test_montage_builder_integration() -> FeatureTest:
             category="Core Pipeline",
             status=TestStatus.PASS,
             duration_ms=duration_ms,
-            details=f"All {len(ctx_attrs)} context attributes present"
+            details=f"All {len(feature_attrs)} context.features attributes present"
         )
 
     except Exception as e:
@@ -424,7 +424,7 @@ def test_montage_builder_integration() -> FeatureTest:
         )
 
 
-def test_enhancement_tracking() -> FeatureTest:
+def _check_enhancement_tracking() -> FeatureTest:
     """Test that EnhancementTracker records all enhancement types."""
     start_time = time.time()
 
@@ -496,7 +496,7 @@ def test_enhancement_tracking() -> FeatureTest:
         )
 
 
-def test_clip_enhancer_methods() -> FeatureTest:
+def _check_clip_enhancer_methods() -> FeatureTest:
     """Test that ClipEnhancer has all required methods."""
     start_time = time.time()
 
@@ -548,7 +548,7 @@ def test_clip_enhancer_methods() -> FeatureTest:
         )
 
 
-def test_dialogue_ducking() -> FeatureTest:
+def _check_dialogue_ducking() -> FeatureTest:
     """Test dialogue ducking module."""
     start_time = time.time()
 
@@ -603,7 +603,7 @@ def test_dialogue_ducking() -> FeatureTest:
         )
 
 
-def test_color_grading_presets() -> FeatureTest:
+def _check_color_grading_presets() -> FeatureTest:
     """Test all color grading presets are available."""
     start_time = time.time()
 
@@ -652,7 +652,7 @@ def test_color_grading_presets() -> FeatureTest:
         )
 
 
-def test_cut_style_templates() -> FeatureTest:
+def _check_cut_style_templates() -> FeatureTest:
     """Test all cut style templates load correctly."""
     start_time = time.time()
 
@@ -708,8 +708,8 @@ def test_cut_style_templates() -> FeatureTest:
         )
 
 
-def test_timeline_exporter() -> FeatureTest:
-    """Test timeline export formats."""
+def _check_timeline_exporter() -> FeatureTest:
+    """Check timeline export formats (helper function)."""
     start_time = time.time()
 
     try:
@@ -773,7 +773,7 @@ def test_timeline_exporter() -> FeatureTest:
         )
 
 
-def test_story_engine() -> FeatureTest:
+def _check_story_engine() -> FeatureTest:
     """Test Story Engine components."""
     start_time = time.time()
 
@@ -839,7 +839,7 @@ def run_full_feature_matrix_test() -> E2ETestResult:
 
     # 1. Test parameter loading
     print("[1/10] Testing parameter loading...")
-    param_results = test_parameter_loading()
+    param_results = _check_parameter_loading()
     param_valid = sum(1 for p in param_results if p.valid)
     param_total = len(param_results)
     print(f"       {param_valid}/{param_total} parameters valid")
@@ -847,55 +847,55 @@ def run_full_feature_matrix_test() -> E2ETestResult:
     # 2. Test each feature category
     print("\n[2/10] Testing feature categories...")
     for category, config in FEATURE_MATRIX.items():
-        result = test_feature_category(category, config)
+        result = _check_feature_category(category, config)
         feature_results.append(result)
         print(f"       {result}")
 
     # 3. Test MontageBuilder integration
     print("\n[3/10] Testing MontageBuilder integration...")
-    result = test_montage_builder_integration()
+    result = _check_montage_builder_integration()
     feature_results.append(result)
     print(f"       {result}")
 
     # 4. Test EnhancementTracker
     print("\n[4/10] Testing EnhancementTracker...")
-    result = test_enhancement_tracking()
+    result = _check_enhancement_tracking()
     feature_results.append(result)
     print(f"       {result}")
 
     # 5. Test ClipEnhancer
     print("\n[5/10] Testing ClipEnhancer methods...")
-    result = test_clip_enhancer_methods()
+    result = _check_clip_enhancer_methods()
     feature_results.append(result)
     print(f"       {result}")
 
     # 6. Test DialogueDucking
     print("\n[6/10] Testing DialogueDucking...")
-    result = test_dialogue_ducking()
+    result = _check_dialogue_ducking()
     feature_results.append(result)
     print(f"       {result}")
 
     # 7. Test ColorGrading presets
     print("\n[7/10] Testing ColorGrading presets...")
-    result = test_color_grading_presets()
+    result = _check_color_grading_presets()
     feature_results.append(result)
     print(f"       {result}")
 
     # 8. Test CutStyle templates
     print("\n[8/10] Testing CutStyle templates...")
-    result = test_cut_style_templates()
+    result = _check_cut_style_templates()
     feature_results.append(result)
     print(f"       {result}")
 
     # 9. Test TimelineExporter
     print("\n[9/10] Testing TimelineExporter...")
-    result = test_timeline_exporter()
+    result = _check_timeline_exporter()
     feature_results.append(result)
     print(f"       {result}")
 
     # 10. Test StoryEngine
     print("\n[10/10] Testing StoryEngine...")
-    result = test_story_engine()
+    result = _check_story_engine()
     feature_results.append(result)
     print(f"       {result}")
 
