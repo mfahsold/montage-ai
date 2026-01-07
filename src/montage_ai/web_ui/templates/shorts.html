@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Montage AI - Shorts Studio</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide@latest" />
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
     <style>
         :root {
             --accent-soft: rgba(244, 208, 63, 0.15);
             --safe-zone: rgba(52, 152, 219, 0.2);
         }
+
 
         /* Phone Preview Frame - Voxel Style */
         .phone-frame {
@@ -268,6 +272,10 @@
             line-height: 1.4;
         }
 
+        .caption-preview.is-visible {
+            display: block;
+        }
+
         /* Style: TikTok (Classic) */
         .caption-preview.tiktok {
             font-weight: 800;
@@ -277,6 +285,7 @@
             background: rgba(0,0,0,0.5);
             padding: 4px 8px;
             border-radius: 4px;
+            -webkit-box-decoration-break: clone;
             box-decoration-break: clone;
         }
 
@@ -417,6 +426,7 @@
     </style>
 </head>
 <body>
+    {% from "components/icon.html" import icon %}
     <nav class="navbar">
         <a href="/" class="nav-brand">
             <span>MONTAGE</span> AI
@@ -489,14 +499,14 @@
                         <h3 class="mb-3 text-primary">STEP 2: AI Settings</h3>
                         
                         <label class="tech-label">WORKFLOW TYPE</label>
-                        <select id="workflowType" class="voxel-input mb-4" onchange="toggleWorkflowOptions()">
+                        <select id="workflowType" class="voxel-input mb-4" onchange="toggleWorkflowOptions()" title="Select workflow type">
                             <option value="reframe">SMART REFRAME (Single Clip)</option>
                             <option value="montage">BEAT-SYNCED MONTAGE</option>
                         </select>
 
-                        <div id="styleSection" style="display: none;">
+                        <div id="styleSection" class="hidden">
                             <label class="tech-label">EDITING STYLE</label>
-                            <select id="montageStyle" class="voxel-input mb-4">
+                            <select id="montageStyle" class="voxel-input mb-4" title="Select montage style">
                                 <option value="dynamic">DYNAMIC (Fast Paced)</option>
                                 <option value="hitchcock">HITCHCOCK (Suspense)</option>
                                 <option value="mtv">MTV (Music Video)</option>
@@ -506,7 +516,7 @@
                         </div>
 
                         <label class="tech-label">TRACKING MODE</label>
-                        <select id="reframeMode" class="voxel-input mb-4">
+                        <select id="reframeMode" class="voxel-input mb-4" title="Select reframe mode">
                             <option>FACE DETECTION (SOTA)</option>
                             <option>ACTION TRACKING</option>
                             <option>CENTER CROP</option>
@@ -519,11 +529,11 @@
                                 <span class="text-xs">STIFF</span>
                                 <span class="text-xs">FLUID</span>
                             </div>
-                            <input type="range" id="smoothingSlider" class="voxel-input" min="0" max="100" value="70" onchange="updateSmoothing()">
+                            <input type="range" id="smoothingSlider" class="voxel-input" min="0" max="100" value="70" onchange="updateSmoothing()" title="Adjust smoothing">
                         </div>
 
                         <label class="tech-label">CAPTION STYLE</label>
-                        <select id="captionStyle" class="voxel-input mb-4" onchange="updateCaptionPreview()">
+                        <select id="captionStyle" class="voxel-input mb-4" onchange="updateCaptionPreview()" title="Select caption style">
                              <option value="none">None (No Captions)</option>
                              <option value="tiktok" selected>TikTok (Classic)</option>
                              <option value="bold">Bold (Yellow)</option>
@@ -557,7 +567,7 @@
         </div>
 
         <!-- HIGHIGHTS REVIEW -->
-        <div id="highlightReview" class="mb-6 hidden" style="display: none;">
+        <div id="highlightReview" class="mb-6 hidden">
             <div class="voxel-card">
                 <h3 class="mb-3 text-primary">HIGHLIGHT MOMENTS</h3>
                 <p class="text-xs text-muted mb-4">AI detected these top moments. Click to view.</p>
@@ -577,7 +587,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label class="tech-label">PLATFORM PRESETS</label>
-                        <select id="platformPreset" class="voxel-input" onchange="applyPlatformPreset()">
+                        <select id="platformPreset" class="voxel-input" onchange="applyPlatformPreset()" title="Select platform preset">
                             <option value="">-- CUSTOM --</option>
                             <option value="tiktok">TikTok (Bottom + Right)</option>
                             <option value="instagram">Instagram Reels (Bottom)</option>
@@ -600,7 +610,7 @@
                     <p class="text-xs text-muted">No zones yet. Click "DRAW MODE: ON" and drag on preview to create.</p>
                 </div>
                 
-                <p class="text-xs text-muted mt-3"><strong>💡 How to:</strong> Enable DRAW MODE, then click & drag on the preview above to draw rectangles. Click to deselect.</p>
+                <p class="text-xs text-muted mt-3"><strong>{{ icon("lightbulb", size="16", class_="icon-sm", title="Tip") }} How to:</strong> Enable DRAW MODE, then click & drag on the preview above to draw rectangles. Click to deselect.</p>
                 
                 <button class="voxel-btn text-xs mt-3" id="safeZoneBtn" onclick="toggleSafeZone()">SAFE ZONE OVERLAY: OFF</button>
             </div>
@@ -613,27 +623,27 @@
                 <p class="text-xs text-muted mb-4">Render your 9:16 vertical short with AI-optimized reframing.</p>
                 
                 <!-- Progress Display (hidden initially) -->
-                <div id="progressSection" style="display: none;" class="mb-4">
+                <div id="progressSection" class="hidden mb-4">
                     <div class="tech-label mb-2">STATUS</div>
                     <div id="progressPhase" class="text-sm text-primary mb-1">Queued...</div>
                     <div id="progressMessage" class="progress-terminal-msg">Waiting for job...</div>
                     <div class="progress-bar mb-2">
-                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                        <div id="progressFill" class="progress-fill progress-fill-zero"></div>
                     </div>
                     <div id="progressPercent" class="text-xs text-muted">0%</div>
-                    <button id="cancelBtn" class="voxel-btn text-xs mt-2" onclick="cancelJob()" style="display: none;">Cancel Job</button>
+                    <button id="cancelBtn" class="voxel-btn text-xs mt-2 hidden" onclick="cancelJob()">Cancel Job</button>
                 </div>
                 
                 <button id="generateBtn" class="voxel-btn voxel-btn-primary w-full" onclick="generateShort()">Generate Short</button>
                 
                 <!-- Success Message (hidden initially) -->
-                <div id="successMessage" style="display: none;" class="mt-4 p-3 bg-success text-bg border-l-4 border-primary">
+                <div id="successMessage" class="hidden mt-4 p-3 bg-success text-bg border-l-4 border-primary">
                     <div class="text-sm font-bold mb-1">✓ Short Created!</div>
                     <a id="downloadLink" href="#" class="voxel-btn text-xs mt-2" download>Download Video</a>
                 </div>
                 
                 <!-- Error Message (hidden initially) -->
-                <div id="errorMessage" style="display: none;" class="mt-4 p-3 bg-error text-bg border-l-4 border-secondary">
+                <div id="errorMessage" class="hidden mt-4 p-3 bg-error text-bg border-l-4 border-secondary">
                     <div class="text-sm font-bold mb-1">✗ Generation Failed</div>
                     <div id="errorText" class="text-xs text-muted"></div>
                 </div>
@@ -641,7 +651,7 @@
         </div>
 
         <!-- STEP 5: Engagement Score (shown after generation) -->
-        <div id="engagementSection" style="display: none;" class="mt-6">
+                <div id="engagementSection" class="hidden mt-6">
             <div class="voxel-card">
                 <h3 class="mb-3 text-primary">STEP 5: Engagement Analysis</h3>
                 <p class="text-xs text-muted mb-4">AI-predicted engagement score based on hook strength, energy, pacing, and platform optimization.</p>
@@ -664,35 +674,35 @@
                                     <span>HOOK STRENGTH</span>
                                     <span id="hookScoreVal">--</span>
                                 </div>
-                                <div class="progress-bar"><div id="hookScoreBar" class="progress-fill" style="width:0%"></div></div>
+                                <div class="progress-bar"><div id="hookScoreBar" class="progress-fill progress-fill-zero"></div></div>
                             </div>
                             <div>
                                 <div class="flex justify-between text-xs mb-1">
                                     <span>ENERGY LEVEL</span>
                                     <span id="energyScoreVal">--</span>
                                 </div>
-                                <div class="progress-bar"><div id="energyScoreBar" class="progress-fill" style="width:0%"></div></div>
+                                <div class="progress-bar"><div id="energyScoreBar" class="progress-fill progress-fill-zero"></div></div>
                             </div>
                             <div>
                                 <div class="flex justify-between text-xs mb-1">
                                     <span>PACING</span>
                                     <span id="pacingScoreVal">--</span>
                                 </div>
-                                <div class="progress-bar"><div id="pacingScoreBar" class="progress-fill" style="width:0%"></div></div>
+                                <div class="progress-bar"><div id="pacingScoreBar" class="progress-fill progress-fill-zero"></div></div>
                             </div>
                             <div>
                                 <div class="flex justify-between text-xs mb-1">
                                     <span>VARIETY</span>
                                     <span id="varietyScoreVal">--</span>
                                 </div>
-                                <div class="progress-bar"><div id="varietyScoreBar" class="progress-fill" style="width:0%"></div></div>
+                                <div class="progress-bar"><div id="varietyScoreBar" class="progress-fill progress-fill-zero"></div></div>
                             </div>
                             <div>
                                 <div class="flex justify-between text-xs mb-1">
                                     <span>AUDIO</span>
                                     <span id="audioScoreVal">--</span>
                                 </div>
-                                <div class="progress-bar"><div id="audioScoreBar" class="progress-fill" style="width:0%"></div></div>
+                                <div class="progress-bar"><div id="audioScoreBar" class="progress-fill progress-fill-zero"></div></div>
                             </div>
                         </div>
                     </div>
@@ -735,6 +745,9 @@
         // =====================================================================
         let selectedVideoPath = null;
         let currentJobId = null;
+
+        const showEl = (el) => { if (el) el.classList.remove('hidden'); };
+        const hideEl = (el) => { if (el) el.classList.add('hidden'); };
 
         // =====================================================================
         // Initialization & File Loading
@@ -790,10 +803,10 @@
             // Update Preview
             const previewVideo = document.getElementById('previewVideo');
             previewVideo.src = `/api/video/${filename}`;
-            document.getElementById('previewHint').style.display = 'none';
+            hideEl(document.getElementById('previewHint'));
 
             // Reset job results
-            document.getElementById('successMessage').style.display = 'none';
+            hideEl(document.getElementById('successMessage'));
         }
 
         // =====================================================================
@@ -806,7 +819,11 @@
             const type = document.getElementById('workflowType').value;
             const styleSec = document.getElementById('styleSection');
             if (styleSec) {
-                styleSec.style.display = (type === 'montage') ? 'block' : 'none';
+                if (type === 'montage') {
+                    showEl(styleSec);
+                } else {
+                    hideEl(styleSec);
+                }
             }
         }
 
@@ -818,9 +835,9 @@
             preview.classList.remove('tiktok', 'bold', 'minimal', 'cinematic', 'karaoke');
             
             if (style === 'none') {
-                preview.style.display = 'none';
+                preview.classList.remove('is-visible');
             } else {
-                preview.style.display = 'block';
+                preview.classList.add('is-visible');
                 preview.classList.add(style);
             }
         }
@@ -833,8 +850,8 @@
             const errorMessage = document.getElementById('errorMessage');
             
             // Hide previous messages
-            successMessage.style.display = 'none';
-            errorMessage.style.display = 'none';
+            hideEl(successMessage);
+            hideEl(errorMessage);
             
             // Get options
             // const videoPath = '/data/input/test.mp4'; // OLD HARDCODED
@@ -892,7 +909,7 @@
                 currentJobId = result.job_id;
                 
                 // Show progress section
-                progressSection.style.display = 'block';
+                showEl(progressSection);
                 btn.textContent = 'Processing...';
                 
                 // Start monitoring (SSE)
@@ -900,7 +917,7 @@
                 
             } catch (error) {
                 console.error('Error:', error);
-                errorMessage.style.display = 'block';
+                showEl(errorMessage);
                 document.getElementById('errorText').textContent = error.message;
                 btn.disabled = false;
                 btn.textContent = 'Generate Short';
@@ -960,9 +977,9 @@
             // Show cancel button if running
             const cancelBtn = document.getElementById('cancelBtn');
             if (job.status === 'running' || job.status === 'queued') {
-                cancelBtn.style.display = 'inline-block';
+                showEl(cancelBtn);
             } else {
-                cancelBtn.style.display = 'none';
+                hideEl(cancelBtn);
             }
         }
         
@@ -974,8 +991,8 @@
 
             if (job.status === 'completed') {
                 // Success
-                progressSection.style.display = 'none';
-                successMessage.style.display = 'block';
+                hideEl(progressSection);
+                showEl(successMessage);
 
                 const downloadLink = document.getElementById('downloadLink');
                 const outputFile = job.output_file || job.path;
@@ -1001,8 +1018,8 @@
 
             } else if (job.status === 'failed') {
                 // Failed
-                progressSection.style.display = 'none';
-                errorMessage.style.display = 'block';
+                hideEl(progressSection);
+                showEl(errorMessage);
                 document.getElementById('errorText').textContent = job.error || 'Unknown error';
                 
                 btn.disabled = false;
@@ -1010,7 +1027,7 @@
                 
             } else if (job.status === 'cancelled') {
                 // Cancelled
-                progressSection.style.display = 'none';
+                hideEl(progressSection);
                 btn.disabled = false;
                 btn.textContent = 'Generate Short';
             }
@@ -1027,11 +1044,11 @@
             const highlights = metadata.highlights || [];
             
             if (!highlights || highlights.length === 0) {
-                if (section) section.style.display = 'none';
+                hideEl(section);
                 return;
             }
             
-            if (section) section.style.display = 'block';
+            showEl(section);
             if (container) {
                 container.innerHTML = highlights.map((h, index) => {
                     const score = Math.round(h.score * 100);
@@ -1048,8 +1065,10 @@
                         <div class="flex items-center gap-2 mb-1">
                             <div class="text-lg font-bold ${colorClass}">${score}</div>
                             <div class="text-xs text-muted flex-1 text-right">
-                               <span title="Action" class="mr-1">⚡${h.signals?.action?.toFixed(1) || '-'}</span> 
-                               <span title="Face">👤${h.signals?.face?.toFixed(1) || '-'}</span>
+                                         <span title="Action" class="mr-1 signal-icon"><i class="lucide lucide-zap icon-lucide icon-sm" data-lucide="zap" aria-label="Action signal"></i></span>
+                                         <span class="mr-2 text-xs font-mono">${h.signals?.action?.toFixed(1) || '-'}</span>
+                                         <span title="Face" class="mr-1 signal-icon"><i class="lucide lucide-user icon-lucide icon-sm" data-lucide="user" aria-label="Face count"></i></span>
+                                         <span class="text-xs font-mono">${h.signals?.face?.toFixed(1) || '-'}</span>
                             </div>
                         </div>
                         
@@ -1061,6 +1080,9 @@
                     </div>
                     `;
                 }).join('');
+                if (window.lucide) {
+                    lucide.createIcons();
+                }
             }
         }
         
@@ -1097,7 +1119,7 @@
                     document.getElementById('progressPhase').textContent = 'Cancelled';
                     document.getElementById('generateBtn').disabled = false;
                     document.getElementById('generateBtn').textContent = 'Generate Short';
-                    document.getElementById('progressSection').style.display = 'none';
+                    hideEl(document.getElementById('progressSection'));
                 }
             } catch (error) {
                 console.error('Cancel error:', error);
@@ -1112,7 +1134,7 @@
             const engagementSection = document.getElementById('engagementSection');
 
             try {
-                engagementSection.style.display = 'block';
+                showEl(engagementSection);
                 document.getElementById('engagementGrade').textContent = '...';
 
                 const response = await fetch('/api/engagement', {
@@ -1391,6 +1413,14 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             renderZoneList();
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
         });
     </script>
 </body>

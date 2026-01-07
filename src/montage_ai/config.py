@@ -184,6 +184,80 @@ class FeatureConfig:
 
 
 # =============================================================================
+# Processing Configuration (High-Res Support)
+# =============================================================================
+@dataclass
+class ProcessingSettings:
+    """Processing settings with adaptive batch sizing for high-resolution media."""
+    
+    batch_size: int = field(default_factory=lambda: int(os.environ.get("BATCH_SIZE", "5")))
+    max_input_resolution: int = field(default_factory=lambda: int(os.environ.get("MAX_INPUT_RESOLUTION", "8294400")))  # 4K default
+    warn_threshold_resolution: int = 33177600  # 6K (6144x3160)
+    
+    def get_adaptive_batch_size_for_resolution(
+        self, width: int, height: int, low_memory: bool = False
+    ) -> int:
+        """Adaptive batch sizing based on input resolution.
+        
+        Resolution Brackets:
+        - 1080p (2MP): batch_size = 5
+        - 4K (8MP): batch_size = 2
+        - 6K (19MP): batch_size = 1
+        - 8K+ (33MP): ❌ Error (proxy required)
+        """
+        pixels = width * height
+        
+        # 8K+ (33MP+): Not supported without proxy workflow
+        if pixels > 33_177_600:
+            from .logger import logger
+            logger.error(
+                f"Resolution {width}x{height} ({pixels/1e6:.1f}MP) exceeds 8K limit. "
+                "Please generate proxies first using: "
+                "python -m montage_ai.proxy_generator --format h264 --scale 1920:-1"
+            )
+            raise ValueError(f"Resolution {width}x{height} requires proxy workflow")
+        
+        # 6K (15-33MP): Single clip processing (6144x3160 = 19.4MP)
+        elif pixels >= 15_000_000:
+            from .logger import logger
+            logger.warning(
+                f"⚠️ High resolution detected: {width}x{height} ({pixels/1e6:.1f}MP). "
+                "Using batch_size=1 for safety. Consider proxy workflow for better performance."
+            )
+            return 1
+        
+        # 4K (8-15MP): Half batch size (3840x2160 = 8.3MP)
+        elif pixels >= 8_000_000:
+            return max(1, self.batch_size // 2)
+        
+        # 1080p/2K: Standard batch size
+        else:
+            if low_memory:
+                return max(1, self.batch_size // 2)
+            return self.batch_size
+    
+    def validate_resolution(self, width: int, height: int) -> bool:
+        """Validate resolution is within safe limits."""
+        from .logger import logger
+        pixels = width * height
+        
+        if pixels > self.warn_threshold_resolution:
+            logger.warning(
+                f"⚠️ High resolution detected: {width}x{height} ({pixels/1e6:.1f}MP). "
+                "Consider using proxy workflow for better performance."
+            )
+        
+        if pixels > self.max_input_resolution * 4:  # 8K
+            logger.error(
+                f"❌ Resolution {width}x{height} exceeds safe limits. "
+                "Use proxy workflow or reduce resolution."
+            )
+            return False
+        
+        return True
+
+
+# =============================================================================
 # GPU Configuration
 # =============================================================================
 @dataclass
@@ -530,6 +604,7 @@ class Settings:
     export: ExportConfig = field(default_factory=ExportConfig)
     upscale: UpscaleConfig = field(default_factory=UpscaleConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
+    high_res: ProcessingSettings = field(default_factory=ProcessingSettings)  # Phase 4: High-res support
     creative: CreativeConfig = field(default_factory=CreativeConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)

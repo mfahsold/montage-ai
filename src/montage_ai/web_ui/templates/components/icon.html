@@ -1,0 +1,27 @@
+{%- macro icon(name, size="24", class_="", title="", animated=True) -%}
+  {# Lucide icon wrapper; animated flag kept for future extensions #}
+  {%- set size_map = {
+        "12": "icon-xs",
+        "16": "icon-sm",
+        "18": "icon-18",
+        "20": "icon-20",
+        "24": "icon-md",
+        "32": "icon-lg",
+        "48": "icon-xl"
+      } -%}
+  {%- set size_class = size_map.get(size|string) -%}
+  <i
+    class="lucide lucide-{{ name }} icon-lucide {{ size_class or '' }} {{ class_ }}"
+    data-lucide="{{ name }}"
+    {% if not size_class %}style="width: {{ size }}px; height: {{ size }}px; display: inline-block;"{% endif %}
+    {% if title %}title="{{ title }}" aria-label="{{ title }}"{% else %}aria-label="{{ name }}"{% endif %}
+    role="img"
+  ></i>
+{%- endmacro -%}
+
+{#
+Icon reference (used replacements):
+- video, type, music, palette, headphones, book-open, clapperboard, smartphone
+- zap, user, lightbulb, rocket, settings, play-circle, pause-circle,
+  check-circle, alert-circle, x-circle
+#}

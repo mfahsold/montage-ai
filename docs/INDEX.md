@@ -15,11 +15,9 @@
 
 | Document | Focus | Audience | Length |
 |----------|-------|----------|--------|
-| [STRATEGY_SUMMARY.md](STRATEGY_SUMMARY.md) | **Quick overview of everything** | Everyone | 5 min |
-| [COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md) | How we compare to Descript, Adobe, Opus | Decision makers, PMs | 15 min |
-| [BUSINESS_PLAN.md](BUSINESS_PLAN.md) | Market, financials, revenue model, hiring | Investors, partners | 20 min |
-| [MARKETING_PLAYBOOK.md](MARKETING_PLAYBOOK.md) | LinkedIn, Twitter, email templates | Marketing, growth | 15 min |
-| [STRATEGY.md](STRATEGY.md) | Product vision & Q1-Q4 priorities | Product, exec | 15 min |
+| [STRATEGY.md](STRATEGY.md) | Product vision & priorities | Product, exec | 15 min |
+| [getting-started.md](getting-started.md) | Quick start guide | New users | 10 min |
+| [features.md](features.md) | Complete feature overview | Technical users | 20 min |
 
 ---
 

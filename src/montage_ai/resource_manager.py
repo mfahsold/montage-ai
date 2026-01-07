@@ -211,6 +211,8 @@ class ResourceManager:
             (available, type, info) tuple
         """
         from .core import hardware
+        from .config_timeouts import TimeoutConfig
+        
         hw_config = hardware.get_best_hwaccel()
 
         if not hw_config.is_gpu:
@@ -225,7 +227,7 @@ class ResourceManager:
                     ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=TimeoutConfig.probe_quick()
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     info = f"NVENC: {result.stdout.strip()}"
@@ -267,6 +269,8 @@ class ResourceManager:
         Returns:
             (available, node_names, ready_count) tuple
         """
+        from .config_timeouts import TimeoutConfig
+        
         if not shutil.which("kubectl"):
             return False, [], 0
 
@@ -276,7 +280,7 @@ class ResourceManager:
                  "custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=TimeoutConfig.probe_kubernetes()
             )
 
             if result.returncode != 0:

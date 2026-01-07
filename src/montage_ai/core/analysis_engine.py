@@ -312,9 +312,14 @@ class AssetAnalyzer:
         detected_scenes = {}  # path -> scenes list
 
         if uncached_videos:
-            # Use ProcessPool for CPU-bound scene detection (GIL bypass)
-            max_workers = min(4, len(uncached_videos), os.cpu_count() or 2)
-            logger.info(f"   🚀 ProcessPool scene detection ({len(uncached_videos)} videos, {max_workers} CPU workers)")
+            # PHASE 5: Scale with available cores (cluster-optimized)
+            cpu_count = os.cpu_count() or 2
+            max_workers = min(
+                len(uncached_videos),
+                max(4, cpu_count // 2),  # Use 50% of cores (reserve for system)
+                int(os.environ.get("MAX_SCENE_WORKERS", str(cpu_count)))  # Allow override
+            )
+            logger.info(f"   🚀 ProcessPool scene detection ({len(uncached_videos)} videos, {max_workers}/{cpu_count} CPU workers)")
             
             # Progress tracking setup
             total_tasks = len(uncached_videos)
@@ -340,7 +345,9 @@ class AssetAnalyzer:
             except Exception as e:
                 # Fallback to ThreadPool if ProcessPool fails (e.g., pickle issues)
                 logger.warning(f"   ⚠️ ProcessPool failed ({e}), falling back to ThreadPool")
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                from ..config_pools import PoolConfig
+                thread_workers = PoolConfig.thread_workers()
+                with ThreadPoolExecutor(max_workers=thread_workers) as executor:
                     futures = {executor.submit(_detect_video_scenes_worker, v, threshold): v for v in uncached_videos}
                     for future in as_completed(futures):
                         v_path, scenes = future.result()

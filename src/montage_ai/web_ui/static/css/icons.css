@@ -1,0 +1,89 @@
+/* Lucide icon styling shared across pages */
+.icon-lucide {
+  display: inline-block;
+  vertical-align: middle;
+  transition: all 0.12s steps(2);
+  color: inherit;
+  stroke-width: 2;
+  width: var(--icon-size, 24px);
+  height: var(--icon-size, 24px);
+  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.3));
+}
+
+.icon-lucide:hover {
+  transform: scale(1.08);
+  filter: drop-shadow(3px 3px 0px var(--primary));
+}
+
+.section-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 900;
+  font-size: 0.8rem;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+}
+
+.section-header span {
+  line-height: 1.2;
+}
+
+.section-header.is-warning { color: #f1c40f; }
+.section-header.is-success { color: var(--success); }
+.section-header.is-accent { color: var(--accent, #e67e22); }
+.section-header.is-purple { color: #9b59b6; }
+.section-header.is-rose { color: #e91e63; }
+.section-header.is-secondary { color: var(--secondary); }
+
+.section-icon {
+  margin-right: 0.1rem;
+  vertical-align: text-bottom;
+}
+
+.signal-icon {
+  display: inline-block;
+  margin-right: 0.25rem;
+  vertical-align: middle;
+}
+
+.icon-xs { --icon-size: 12px; }
+.icon-sm { --icon-size: 16px; }
+.icon-18 { --icon-size: 18px; }
+.icon-20 { --icon-size: 20px; }
+.icon-md { --icon-size: 24px; }
+.icon-lg { --icon-size: 32px; }
+.icon-xl { --icon-size: 48px; }
+
+.icon-primary { color: var(--primary); }
+.icon-secondary { color: var(--secondary); }
+.icon-success { color: var(--success); }
+.icon-warning { color: var(--warning); }
+.icon-error { color: var(--error); }
+.icon-muted { color: var(--muted-fg); }
+
+.icon-spin { animation: spin 1s linear infinite; }
+.icon-pulse { animation: pulse 2s steps(2) infinite; }
+.icon-bounce { animation: bounce 0.6s steps(3); }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.25rem); }
+}
+
+.icon-lucide[role="img"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

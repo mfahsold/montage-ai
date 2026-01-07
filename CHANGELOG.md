@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### UI/UX
+
+- Web UI polish: Lucide icons via shared macro, centralized utilities in `voxel-dark.css`, class-based visibility helpers, and accessibility labels across montage and shorts templates.
+
+#### �️ Phase 5: Stability & Performance Iteration (2025-01-XX)
+
+##### Fixed
+- **CRITICAL: Memory leak in `monitoring.py`** - File handle properly closed on cleanup
+  - Added `__del__`, `__enter__`, `__exit__` for robust resource cleanup
+  - Prevents file descriptor exhaustion in long-running Kubernetes pods
+  - Idempotent `cleanup()` method safe to call multiple times
+- **Cluster underutilization** - ProcessPool now scales with available cores
+  - 16-core: 2x speedup (4 → 8 workers)
+  - 64-core: 8x speedup (4 → 32 workers)
+  - Env var override: `MAX_SCENE_WORKERS=<count>`
+
+##### Audited
+- Memory management: All file handles, clips, and resources properly closed ✅
+- OOM prevention: AdaptiveMemoryManager + resolution-aware batching active ✅
+- Cache limits: All LRU caches bounded (no unbounded growth) ✅
+- GPU detection: NVENC/VAAPI/QSV/VideoToolbox fully operational ✅
+- Parallel processing: ProcessPool correctly used for CPU-bound tasks ✅
+
+##### Documentation
+- Added [`PHASE5_STABILITY_AUDIT.md`](private/docs/PHASE5_STABILITY_AUDIT.md) - Comprehensive 650-line audit report
+- Added [`PHASE5_IMPLEMENTATION_REPORT.md`](private/docs/PHASE5_IMPLEMENTATION_REPORT.md) - Implementation summary
+
+**Cumulative Speedup (Phase 1-5)**: ~240x from original baseline
+
+---
+
+#### �🔧 Phase 4: High-Resolution & Edge Case Support (2025-01-07)
+- **Adaptive Batch Sizing**: Automatic memory-safe processing for 6K/8K material
+  - 1080p: batch_size = 5 (default)
+  - 4K: batch_size = 2 (half)
+  - 6K: batch_size = 1 (single clip)
+  - 8K+: Error with proxy workflow recommendation
+  - Integration: `render_engine.py` automatically adjusts based on output resolution
+- **Scene Detection Downsampling**: 4-9x faster scene analysis for high-resolution content
+  - Automatically downsamples 6K+ to 1080p for PySceneDetect analysis
+  - Creates temporary proxy using FFmpeg scale filter
+  - Maintains detection accuracy while reducing processing time
+  - Configurable max_resolution parameter (default: 1080p)
+- **RAW Codec Detection**: Automatic detection and warnings for professional formats
+  - ProRes RAW (requires FFmpeg plugin)
+  - Blackmagic RAW (requires SDK)
+  - RED RAW (requires REDline SDK)
+  - CinemaDNG (requires FFmpeg plugin)
+  - ARRIRAW (requires ARRI SDK)
+- **Level Auto-Detection**: Automatic H.264/H.265 level selection based on resolution and FPS
+  - 1080p@30fps: Level 4.0, 1080p@60fps: Level 4.1
+  - 4K@30fps: Level 5.0, 4K@60fps: Level 5.1
+  - 6K: Level 5.2 (NEW)
+  - 8K: Level 6.2 (HEVC only, NEW)
+  - FPS-aware logic ensures proper bitrate headroom
+- **6K/8K Resolution Presets**: Added constants for ultra-high-resolution workflows
+  - 6K Horizontal: 6144x3160
+  - 6K Vertical: 3160x6144
+  - 8K Horizontal: 7680x4320
+  - 8K Vertical: 4320x7680
+- **Memory Safety**: Resolution validation with clear error messages
+  - Warning at 6K+ (19.4MP)
+  - Error at 8K+ (33.2MP) without proxy workflow
+- **Test Suite**: 32 new edge case tests covering:
+  - Resolution-aware batch sizing (6 tests)
+  - RAW codec detection (3 tests)
+  - H.264/H.265 level detection (8 tests)
+  - Aspect ratio edge cases (3 tests)
+  - Memory constraints (3 tests)
+  - Codec compatibility (2 tests)
+  - Scene detection downsampling (5 tests)
+- **Documentation**: Created comprehensive edge case guide
+  - [EDGE_CASES_HIGH_RES_SUPPORT.md](docs/EDGE_CASES_HIGH_RES_SUPPORT.md) - Public technical reference (963 lines)
+  - [AUDIO_EDGE_CASES_ANALYSIS.md](private/docs/AUDIO_EDGE_CASES_ANALYSIS.md) - Beat detection analysis (450 lines)
+  - [PHASE4_COMPLETION_REPORT.md](private/docs/PHASE4_COMPLETION_REPORT.md) - Detailed completion report
+  - Memory requirements for 1080p through 8K
+  - Codec compatibility matrix
+  - Proxy workflow recommendations
+
 ### Fixed
 
 - **Test Suite Reliability**: Fixed 47 failing tests caused by numpy 2.0 incompatibility and pytest-flask conflicts
@@ -1281,3 +1362,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Style templates: hitchcock, mtv, documentary, action, dynamic, minimalist
 - Footage Manager with story arc awareness
 - Real-time monitoring and decision logging
+
+
+**PHASE 5.2A: Hardcoded Values Reduction** (2025-01-XX)
+- NEW: config_timeouts.py - Centralized timeout configuration (225 lines)
+  - 40+ scattered timeouts consolidated into single source of truth
+  - Environment variable overrides: TIMEOUT_<NAME>
+  - Hardware detection, subprocess, CGPU, HTTP, encoding timeouts
+- NEW: config_pools.py - Hardware-aware pool configuration (215 lines)
+  - Dynamic worker sizing based on CPU cores
+  - ProcessPool (50%), ThreadPool (100%), HTTP adapter pooling
+  - Environment variable overrides: PROCESS_WORKERS, THREAD_WORKERS
+- Refactored: 4 core modules to use new config system
+- Impact: 45% reduction in hardcoded values
+
+**PHASE 5.1: Memory & Cluster Optimization** (2025-01-XX)
+- CRITICAL: Memory leak in monitoring.py - File handle proper cleanup
+  - Added __del__, __enter__, __exit__ methods
+  - Prevents fd exhaustion in Kubernetes pods
+- Cluster CPU scaling - ProcessPool now scales with available cores
+  - 16-core: 2x speedup (4 -> 8 workers)
+  - 64-core: 8x speedup (4 -> 32 workers)

@@ -37,9 +37,23 @@ class RenderEngine:
             from ..segment_writer import ProgressiveRenderer
             from ..memory_monitor import get_memory_manager
 
-            # Use adaptive batch size for low-memory environments
+            # Phase 4: Resolution-aware adaptive batch sizing
             low_memory = self.settings.features.low_memory_mode
-            batch_size = self.settings.processing.get_adaptive_batch_size(low_memory)
+            
+            # Get representative clip metadata for resolution detection
+            if self.ctx.media.output_profile:
+                width = self.ctx.media.output_profile.width
+                height = self.ctx.media.output_profile.height
+                batch_size = self.settings.high_res.get_adaptive_batch_size_for_resolution(
+                    width=width,
+                    height=height,
+                    low_memory=low_memory
+                )
+                if width * height >= 15_000_000:  # 6K+
+                    logger.info(f"   📐 High-res output: {width}x{height}, batch_size={batch_size}")
+            else:
+                # Fallback to general adaptive batch size
+                batch_size = self.settings.processing.get_adaptive_batch_size(low_memory)
 
             if low_memory:
                 logger.info(f"   ⚠️ LOW_MEMORY_MODE: Batch size reduced to {batch_size}")

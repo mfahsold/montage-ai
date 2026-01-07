@@ -12,6 +12,67 @@ Complete guide to Montage AI capabilities.
 
 Professional video enhancement with full NLE compatibility.
 
+#### 🔧 High-Resolution & Edge Case Support (Phase 4)
+
+**Resolution Support:**
+- ✅ **1080p**: Fully optimized (default batch_size=5)
+- ✅ **4K**: Fully supported (adaptive batch_size=2)
+- ⚠️ **6K** (6144x3160): Supported with automatic memory optimization (batch_size=1)
+- ⚠️ **8K** (7680x4320): Requires proxy workflow (automatic error with instructions)
+
+**RAW Codec Detection:**
+Montage AI automatically detects professional RAW formats and provides guidance:
+- **ProRes RAW** (requires FFmpeg with `--enable-libprores_raw`)
+- **Blackmagic RAW** (requires Blackmagic RAW SDK)
+- **RED RAW** (requires REDline SDK or FFmpeg plugin)
+- **CinemaDNG** (requires FFmpeg with `--enable-libraw`)
+- **ARRIRAW** (requires ARRI SDK)
+
+**Automatic Optimizations:**
+| Resolution | Memory/Frame | Batch Size | H.264 Level | HEVC Level |
+|------------|--------------|------------|-------------|------------|
+| 1080p | 6.2 MB | 5 | 4.1 | 4.1 |
+| 4K | 24.8 MB | 2 | 5.0/5.1 | 5.0/5.1 |
+| 6K | 58.2 MB | 1 | ❌ | 5.2 |
+| 8K | 99.5 MB | ❌ Proxy | ❌ | 6.2 |
+
+**Usage Examples:**
+
+```bash
+# 6K material (automatic handling)
+export INPUT_DIR=/data/input_6k
+./montage-ai.sh run
+# → Batch size automatically reduced to 1
+# → HEVC Level 5.2 selected automatically
+
+# ProRes RAW (with warning)
+export INPUT_DIR=/data/prores_raw
+./montage-ai.sh run
+# → Warning: "Consider generating H.264/H.265 proxies"
+
+# 8K material (requires proxy workflow)
+export INPUT_DIR=/data/8k
+./montage-ai.sh run
+# → Error with proxy generation instructions
+
+# Generate proxies for 6K+ material
+python -m montage_ai.proxy_generator \
+    --input /data/8k/*.mp4 \
+    --output /data/proxies \
+    --format h264 \
+    --scale 1920:-1 \
+    --preset fast
+```
+
+**Recommendations:**
+- **6K workflows**: Native support works, but proxy workflow recommended for faster iteration
+- **8K workflows**: Proxy workflow mandatory (1080p → conform to 8K in DaVinci Resolve/FCPX)
+- **RAW codecs**: Generate H.264/H.265 proxies first for best compatibility
+
+See [EDGE_CASES_HIGH_RES_SUPPORT.md](EDGE_CASES_HIGH_RES_SUPPORT.md) for detailed technical specifications.
+
+---
+
 #### AI Denoising
 
 Reduce noise while preserving film grain texture.

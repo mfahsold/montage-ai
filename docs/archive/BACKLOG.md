@@ -1,5 +1,7 @@
 # Montage AI – Product Backlog
 
+> Archived (2026-01-07): This backlog is historical and not maintained. Refer to current strategy docs for active work.
+
 **Last Updated:** January 2026  
 **Format:** Epic → User Stories → Tasks
 

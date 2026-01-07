@@ -337,7 +337,13 @@ def _get_ffmpeg_mcp_session() -> requests.Session:
     global _FFMPEG_MCP_SESSION
     if _FFMPEG_MCP_SESSION is None:
         session = requests.Session()
-        adapter = requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=8)
+        # Setup HTTP adapter with hardware-aware pool sizing
+        from .config_pools import PoolConfig
+        pool_conn, pool_maxsize = PoolConfig.http_pool_size()
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=pool_conn,
+            pool_maxsize=pool_maxsize
+        )
         session.mount("http://", adapter)
         session.mount("https://", adapter)
         _FFMPEG_MCP_SESSION = session

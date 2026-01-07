@@ -33,6 +33,7 @@ except ImportError:
     SCIPY_AVAILABLE = False
 
 from .logger import logger
+from .config_thresholds import ThresholdConfig
 from .core.cmd_runner import run_command
 from .ffmpeg_utils import build_ffmpeg_cmd
 
@@ -280,7 +281,7 @@ class AutoReframeEngine:
             self.mp_face_detection = mp.solutions.face_detection
             self.face_detector = self.mp_face_detection.FaceDetection(
                 model_selection=1, # 1 = full range (better for video)
-                min_detection_confidence=0.6
+                min_detection_confidence=ThresholdConfig.face_detection_confidence()
             )
 
     # Backward compatibility alias

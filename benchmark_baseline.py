@@ -162,8 +162,8 @@ class TestDataManager:
     """Manages test video and audio files."""
     
     def __init__(self):
-        # Use test_data directory if /data doesn't exist
-        if Path("/data").exists():
+        # Use /data directory if it exists, otherwise fall back to test_data
+        if Path("/data").exists() and (Path("/data") / "input").exists():
             self.data_dir = Path("/data")
         else:
             self.data_dir = Path(__file__).parent / "test_data"
@@ -172,25 +172,35 @@ class TestDataManager:
         self.music_dir = self.data_dir / "music"
         self.output_dir = Path(__file__).parent / "benchmark_results"
         self.temp_dir = Path(tempfile.mkdtemp(prefix="montage_benchmark_"))
+        self._cached_videos: Optional[List[Path]] = None
+        self._cached_music: Optional[Path] = None
         
     def setup(self):
         """Ensure test data exists."""
+        if self._cached_videos is not None and self._cached_music is not None:
+            return self._cached_videos, self._cached_music
+
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Check for test videos
         video_files = list(self.input_dir.glob("*.mp4")) + list(self.input_dir.glob("*.mov"))
         if not video_files:
-            raise RuntimeError(f"No test videos found in {self.input_dir}")
+            print(f"⚠️  No test videos found in {self.input_dir}. Baseline benchmark will be skipped.")
+            self._cached_videos, self._cached_music = [], None
+            return self._cached_videos, self._cached_music
         
         # Check for test music
         music_files = list(self.music_dir.glob("*.mp3")) + list(self.music_dir.glob("*.wav"))
         if not music_files:
-            raise RuntimeError(f"No test music found in {self.music_dir}")
+            print(f"⚠️  No test music found in {self.music_dir}. Baseline benchmark will be skipped.")
+            self._cached_videos, self._cached_music = [], None
+            return self._cached_videos, self._cached_music
         
         print(f"✅ Found {len(video_files)} test videos")
         print(f"✅ Found {len(music_files)} test music files")
         
-        return video_files[:5], music_files[0]  # Use first 5 videos
+        self._cached_videos, self._cached_music = video_files[:5], music_files[0]
+        return self._cached_videos, self._cached_music  # Use first 5 videos
     
     def cleanup(self):
         """Remove temporary files."""
@@ -207,6 +217,9 @@ def benchmark_audio_analysis(suite: BenchmarkSuite, data: TestDataManager):
     from montage_ai.audio_analysis import analyze_audio
     
     _, music_file = data.setup()
+    if not music_file:
+        print("⚠️  Skipping audio analysis benchmark (no test music).")
+        return
     
     with benchmark("Audio: Beat Detection (librosa)", "Audio Analysis", suite):
         beat_info, energy_profile = analyze_audio(str(music_file))
@@ -224,6 +237,9 @@ def benchmark_scene_detection(suite: BenchmarkSuite, data: TestDataManager):
     from montage_ai.scene_analysis import detect_scenes
     
     videos, _ = data.setup()
+    if not videos:
+        print("⚠️  Skipping scene detection benchmark (no test videos).")
+        return
     
     for i, video in enumerate(videos[:3]):  # Test first 3 videos
         with benchmark(f"Scene: Detection #{i+1} ({video.name})", "Scene Detection", suite):
@@ -240,6 +256,9 @@ def benchmark_content_analysis(suite: BenchmarkSuite, data: TestDataManager):
     from montage_ai.scene_analysis import analyze_scene_content, Scene
     
     videos, _ = data.setup()
+    if not videos:
+        print("⚠️  Skipping content analysis benchmark (no test videos).")
+        return
     
     # Create test scene
     test_scene = Scene(
@@ -313,6 +332,9 @@ def benchmark_clip_enhancement(suite: BenchmarkSuite, data: TestDataManager):
     from montage_ai.config import get_settings
     
     videos, _ = data.setup()
+    if not videos:
+        print("⚠️  Skipping enhancement benchmark (no test videos).")
+        return
     test_video = videos[0]
     
     settings = get_settings()
@@ -342,6 +364,9 @@ def benchmark_rendering(suite: BenchmarkSuite, data: TestDataManager):
     from montage_ai.config import get_settings
     
     videos, _ = data.setup()
+    if not videos:
+        print("⚠️  Skipping rendering benchmark (no test videos).")
+        return
     settings = get_settings()
     
     # Create segment writer
@@ -370,6 +395,9 @@ def benchmark_rendering(suite: BenchmarkSuite, data: TestDataManager):
 def benchmark_ffmpeg_operations(suite: BenchmarkSuite, data: TestDataManager):
     """Test FFmpeg operations."""
     videos, music = data.setup()
+    if not videos:
+        print("⚠️  Skipping FFmpeg operations benchmark (no test videos).")
+        return
     test_video = videos[0]
     
     # FFprobe metadata extraction
@@ -435,6 +463,11 @@ def run_baseline_benchmark():
         system_info=get_system_info()
     )
     data = TestDataManager()
+    videos, music = data.setup()
+    if not videos or not music:
+        print("⚠️  Baseline benchmark skipped. Add sample media to test_data/input and test_data/music (or /data) to enable.")
+        data.cleanup()
+        return
     
     try:
         # Print system info

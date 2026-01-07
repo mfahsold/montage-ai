@@ -51,6 +51,17 @@ STANDARD_HEIGHT_HORIZONTAL = 1080
 STANDARD_WIDTH_VERTICAL = 1080
 STANDARD_HEIGHT_VERTICAL = 1920
 
+# High-Resolution presets (6K/8K)
+STANDARD_WIDTH_6K_HORIZONTAL = 6144
+STANDARD_HEIGHT_6K_HORIZONTAL = 3160
+STANDARD_WIDTH_6K_VERTICAL = 3160
+STANDARD_HEIGHT_6K_VERTICAL = 6144
+
+STANDARD_WIDTH_8K_HORIZONTAL = 7680
+STANDARD_HEIGHT_8K_HORIZONTAL = 4320
+STANDARD_WIDTH_8K_VERTICAL = 4320
+STANDARD_HEIGHT_8K_VERTICAL = 7680
+
 # Preview presets (Low latency, low res for fast feedback)
 PREVIEW_WIDTH = 640
 PREVIEW_HEIGHT = 360  # 360p
@@ -63,6 +74,8 @@ STANDARD_PIX_FMT = "yuv420p"
 STANDARD_CODEC = "libx264"
 STANDARD_PROFILE = "high"
 STANDARD_LEVEL = "4.1"  # Max 1080p60 or 4K30
+LEVEL_6K = "5.2"  # Max 6K60
+LEVEL_8K = "6.2"  # Max 8K60 (HEVC only)
 STANDARD_PRESET = "medium"
 STANDARD_CRF = 18  # Visually lossless for most content
 STANDARD_AUDIO_CODEC = "aac"
@@ -110,6 +123,50 @@ COLOR_PRESETS = {
 # Audio Processing Chains (DRY Definition)
 # =============================================================================
 
+def _get_audio_filters() -> Dict[str, str]:
+    """
+    Build audio filter dictionary with dynamic threshold values.
+    
+    Ducking thresholds come from ThresholdConfig to allow environment-based tuning.
+    This function is called at runtime to pick up any environment variable overrides.
+    
+    Returns:
+        Dict with audio filter definitions
+    """
+    # Lazy import to avoid circular dependency
+    from .config_thresholds import ThresholdConfig
+    
+    # Get dynamic thresholds
+    core_threshold = ThresholdConfig.ducking_core_threshold()
+    soft_threshold = ThresholdConfig.ducking_soft_threshold()
+    
+    return {
+        # Voice Polish: Rumble removal -> Denoise -> Compress -> EQ -> Limit
+        "voice_polish": (
+            "highpass=f=80,"
+            "afftdn=nf=-25,"
+            "acompressor=threshold=-12dB:ratio=4:attack=20:release=250,"
+            "equalizer=f=3000:t=q:w=1:g=2,"
+            "alimiter=limit=-1dB"
+        ),
+
+        # Fast noise reduction for web previews (lighter CPU/latency)
+        "noise_reduction_fast": (
+            "afftdn=nf=-25:nr=10:nt=w,"
+            "highpass=f=80,"
+            "lowpass=f=14000,"
+            "compand=attacks=0.3:decays=0.8:points=-80/-900|-45/-15|-27/-9|0/-7:soft-knee=6:gain=3"
+        ),
+        
+        # Auto-Ducking: Duck [1] based on [0]
+        # Note: Requires complex filter graph construction in code, this is the core effect params
+        "ducking_core": f"sidechaincompress=threshold={core_threshold}:ratio=5:attack=50:release=300:link=average",
+
+        # Softer ducking for general B-roll/music mixing
+        "ducking_soft": f"sidechaincompress=threshold={soft_threshold}:ratio=4:attack=200:release=1000"
+    }
+
+# Static audio filters (legacy access)
 AUDIO_FILTERS = {
     # Voice Polish: Rumble removal -> Denoise -> Compress -> EQ -> Limit
     "voice_polish": (
@@ -244,6 +301,48 @@ class FFmpegConfig:
     def gpu_encoder_type(self) -> Optional[str]:
         """Get the active GPU encoder type (nvenc, vaapi, etc.)."""
         return self._hw_config.type if self._hw_config and self._hw_config.is_gpu else None
+    
+    def get_level_for_resolution(self, width: int, height: int, fps: float) -> str:
+        """Determine H.264/H.265 level based on resolution and FPS.
+        
+        Args:
+            width: Video width in pixels
+            height: Video height in pixels
+            fps: Frame rate
+            
+        Returns:
+            H.264/H.265 level string (e.g., "5.2")
+            
+        Raises:
+            ValueError: If resolution requires HEVC but H.264 is configured
+        """
+        pixels = width * height
+        
+        # 8K (7680x4320): Level 6.2 (HEVC only)
+        if pixels > 33_177_600:
+            if "265" not in self.effective_codec and "hevc" not in self.effective_codec:
+                raise ValueError(
+                    f"8K resolution ({width}x{height}) requires HEVC/H.265. "
+                    f"Current codec: {self.effective_codec}. Set OUTPUT_CODEC=hevc or use proxy workflow."
+                )
+            return LEVEL_8K
+        
+        # 6K (6144x3160): Level 5.2
+        elif pixels > 19_660_800:
+            logger.info(f"6K resolution detected ({width}x{height}), using Level 5.2")
+            return LEVEL_6K
+        
+        # 4K (3840x2160): Level 5.1 (4K60) or 5.0 (4K30)
+        elif pixels > 8_294_400:
+            return "5.1" if fps > 30 else "5.0"
+        
+        # 1080p: Level 4.1 (1080p60) or 4.0 (1080p30)
+        elif pixels > 2_073_600:
+            return "4.1" if fps > 30 else "4.0"
+        
+        # SD/720p: Level 3.1
+        else:
+            return "3.1"
     
     @property
     def effective_codec(self) -> str:

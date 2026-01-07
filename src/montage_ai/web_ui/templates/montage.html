@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Montage Creator - Voxel Studio</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide@latest" />
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
     <style>
         .style-card {
             border: 2px solid var(--border);
@@ -113,9 +116,15 @@
             color: var(--muted-fg);
             display: block;
         }
+
+        .quality-card--recommended {
+            border-color: var(--secondary);
+            box-shadow: var(--shd-secondary);
+        }
     </style>
 </head>
 <body>
+    {% from "components/icon.html" import icon %}
     <nav class="navbar">
         <a href="/" class="nav-brand">
             <span>MONTAGE</span> AI
@@ -132,7 +141,7 @@
         <div class="mb-8">
             <h1 class="voxel-title glitch-text">PROJECT CREATOR</h1>
             <p class="text-muted">// Compose your montage. Configure AI editing. Source from /data/input.</p>
-            <div class="cyber-progress" style="margin-top: 1rem;"></div>
+            <div class="cyber-progress mt-1"></div>
         </div>
 
         <form action="/api/jobs" method="POST" id="montageForm">
@@ -150,28 +159,28 @@
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <!-- DYNAMIC -->
                         <label class="style-card active" onclick="selectStyle('dynamic')">
-                            <input type="radio" name="style" value="dynamic" checked style="display:none">
+                            <input type="radio" name="style" value="dynamic" checked class="hidden-input">
                             <h5>DYNAMIC</h5>
                             <p>Fast cuts on the beat. High energy. Action & sports.</p>
                         </label>
 
                         <!-- HITCHCOCK -->
                         <label class="style-card" onclick="selectStyle('hitchcock')">
-                            <input type="radio" name="style" value="hitchcock" style="display:none">
+                            <input type="radio" name="style" value="hitchcock" class="hidden-input">
                             <h5>HITCHCOCK</h5>
                             <p>Slow build + tension. Suspenseful. Cinematic reveals.</p>
                         </label>
 
                         <!-- MTV -->
                         <label class="style-card" onclick="selectStyle('mtv')">
-                            <input type="radio" name="style" value="mtv" style="display:none">
+                            <input type="radio" name="style" value="mtv" class="hidden-input">
                             <h5>MTV</h5>
                             <p>Quick cuts. Energetic transitions. Music-synced.</p>
                         </label>
 
                         <!-- MINIMALIST -->
                         <label class="style-card" onclick="selectStyle('minimalist')">
-                            <input type="radio" name="style" value="minimalist" style="display:none">
+                            <input type="radio" name="style" value="minimalist" class="hidden-input">
                             <h5>MINIMAL</h5>
                             <p>Subtle cuts. Long takes. Let footage breathe.</p>
                         </label>
@@ -210,30 +219,33 @@
                     
                     <!-- Video Enhancement -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--primary); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📹 VIDEO ENHANCEMENT</div>
+                        <div class="section-header">
+                            {{ icon("video", size="18", class_="section-icon", title="Video Enhancement") }}
+                            <span>VIDEO ENHANCEMENT</span>
+                        </div>
                         <div class="option-item">
-                            <input type="checkbox" name="upscale" id="upscale">
+                            <input type="checkbox" name="upscale" id="upscale" title="Enable AI upscale" aria-label="Enable AI upscale">
                             <div class="option-label">
                                 <div class="option-label-title">AI UPSCALE (4K)</div>
                                 <div class="option-label-desc">Real-ESRGAN enhancement. Increases file size and render time.</div>
                             </div>
                         </div>
                         <div class="option-item">
-                            <input type="checkbox" name="stabilize" id="stabilize" checked>
+                            <input type="checkbox" name="stabilize" id="stabilize" checked title="Stabilize footage" aria-label="Stabilize footage">
                             <div class="option-label">
                                 <div class="option-label-title">STABILIZE FOOTAGE</div>
                                 <div class="option-label-desc">Remove camera shake. Recommended for handheld footage.</div>
                             </div>
                         </div>
                         <div class="option-item">
-                            <input type="checkbox" name="denoise" id="denoise">
+                            <input type="checkbox" name="denoise" id="denoise" title="Denoise footage" aria-label="Denoise footage">
                             <div class="option-label">
                                 <div class="option-label-title">AI DENOISE</div>
                                 <div class="option-label-desc">Reduce noise/grain. Best for low-light or high-ISO footage.</div>
                             </div>
                         </div>
                         <div class="option-item">
-                            <input type="checkbox" name="sharpen" id="sharpen">
+                            <input type="checkbox" name="sharpen" id="sharpen" title="Sharpen footage" aria-label="Sharpen footage">
                             <div class="option-label">
                                 <div class="option-label-title">SHARPEN</div>
                                 <div class="option-label-desc">Enhance edge detail. Subtle unsharp mask with skin protection.</div>
@@ -243,17 +255,20 @@
 
                     <!-- Text & Captions -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: #f1c40f; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📝 TEXT & CAPTIONS</div>
+                        <div class="section-header is-warning">
+                            {{ icon("type", size="18", class_="section-icon", title="Text & Captions") }}
+                            <span>TEXT & CAPTIONS</span>
+                        </div>
                         <div class="option-item">
-                            <input type="checkbox" name="captions" id="captions">
+                            <input type="checkbox" name="captions" id="captions" title="Burn captions" aria-label="Burn captions">
                             <div class="option-label">
                                 <div class="option-label-title">BURN CAPTIONS</div>
                                 <div class="option-label-desc">Auto-transcribe dialogue and burn subtitles into video.</div>
                             </div>
                         </div>
-                        <div class="option-item" style="flex-direction: column; align-items: flex-start; margin-top: 0.5rem;">
-                            <label for="caption_style" class="option-label-title" style="margin-bottom: 0.5rem;">CAPTION STYLE</label>
-                            <select name="caption_style" id="caption_style" class="voxel-input" style="width: 100%;">
+                        <div class="option-item stacked-option mt-05">
+                            <label for="caption_style" class="option-label-title mb-05">CAPTION STYLE</label>
+                            <select name="caption_style" id="caption_style" class="voxel-input full-width">
                                 <option value="tiktok">TikTok - Bold, Shadowed</option>
                                 <option value="minimal">Minimalist - Clean, Small</option>
                                 <option value="cinematic">Cinematic - Serif, Boxed</option>
@@ -265,11 +280,14 @@
 
                     <!-- Audio Selection & Scrubbing -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--success); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎵 AUDIO TRACK</div>
+                        <div class="section-header is-success">
+                            {{ icon("music", size="18", class_="section-icon", title="Audio Track") }}
+                            <span>AUDIO TRACK</span>
+                        </div>
                         
                         <div class="mb-4">
                             <label class="option-label-title block mb-2">SELECT MUSIC</label>
-                            <select name="music_track" id="music_track" class="voxel-input w-full">
+                            <select name="music_track" id="music_track" class="voxel-input w-full" title="Select music track">
                                 <option value="auto">Auto-Select (AI Matched to Style)</option>
                                 {% for track in music_tracks %}
                                 <option value="{{ track }}">{{ track }}</option>
@@ -289,7 +307,7 @@
                                 <!-- Bars generated by JS -->
                             </div>
                             
-                            <input type="range" name="music_start_time" id="music_start_time" class="scrubber" min="0" max="300" step="1" value="0">
+                            <input type="range" name="music_start_time" id="music_start_time" class="scrubber" min="0" max="300" step="1" value="0" title="Music start time" aria-label="Music start time">
                             
                             <div class="flex justify-between text-xs text-muted mt-2">
                                 <span>0:00</span>
@@ -301,10 +319,13 @@
 
                     <!-- Color Grading -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--accent, #e67e22); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎨 COLOR GRADING</div>
-                        <div class="option-item" style="flex-direction: column; align-items: flex-start;">
-                            <label for="color_grading" class="option-label-title" style="margin-bottom: 0.5rem;">COLOR PRESET</label>
-                            <select name="color_grading" id="color_grading" class="voxel-input" style="width: 100%;">
+                        <div class="section-header is-accent">
+                            {{ icon("palette", size="18", class_="section-icon", title="Color Grading") }}
+                            <span>COLOR GRADING</span>
+                        </div>
+                        <div class="option-item stacked-option">
+                            <label for="color_grading" class="option-label-title mb-05">COLOR PRESET</label>
+                            <select name="color_grading" id="color_grading" class="voxel-input full-width">
                                 <option value="auto">Auto (from style)</option>
                                 <optgroup label="Basic">
                                     <option value="none">None - No color grading</option>
@@ -334,27 +355,30 @@
                                     <option value="documentary">Documentary - Natural sharp</option>
                                 </optgroup>
                             </select>
-                            <p class="option-label-desc" style="margin-top: 0.5rem;">Override style's default color grade. "Auto" uses the style's built-in look.</p>
+                            <p class="option-label-desc mt-05">Override style's default color grade. "Auto" uses the style's built-in look.</p>
                         </div>
-                        <div class="option-item" style="flex-direction: column; align-items: flex-start; margin-top: 0.75rem;">
-                            <label for="color_intensity" class="option-label-title" style="margin-bottom: 0.5rem;">INTENSITY: <span id="intensity_value">100</span>%</label>
-                            <input type="range" name="color_intensity" id="color_intensity" min="0" max="100" value="100" class="voxel-input" style="width: 100%;">
-                            <p class="option-label-desc" style="margin-top: 0.5rem;">Blend strength. 70% often looks more natural than 100%.</p>
+                        <div class="option-item stacked-option mt-075">
+                            <label for="color_intensity" class="option-label-title mb-05">INTENSITY: <span id="intensity_value">100</span>%</label>
+                            <input type="range" name="color_intensity" id="color_intensity" min="0" max="100" value="100" class="voxel-input full-width">
+                            <p class="option-label-desc mt-05">Blend strength. 70% often looks more natural than 100%.</p>
                         </div>
                     </div>
 
                     <!-- Audio Enhancement -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--success); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎧 AUDIO ENHANCEMENT</div>
+                        <div class="section-header is-success">
+                            {{ icon("headphones", size="18", class_="section-icon", title="Audio Enhancement") }}
+                            <span>AUDIO ENHANCEMENT</span>
+                        </div>
                         <div class="option-item">
-                            <input type="checkbox" name="dialogue_duck" id="dialogue_duck">
+                            <input type="checkbox" name="dialogue_duck" id="dialogue_duck" title="Enable dialogue ducking" aria-label="Enable dialogue ducking">
                             <div class="option-label">
                                 <div class="option-label-title">DIALOGUE DUCKING</div>
                                 <div class="option-label-desc">Auto-detect speech and lower music during dialogue. NLE-exportable keyframes.</div>
                             </div>
                         </div>
                         <div class="option-item">
-                            <input type="checkbox" name="audio_normalize" id="audio_normalize">
+                            <input type="checkbox" name="audio_normalize" id="audio_normalize" title="Normalize audio" aria-label="Normalize audio">
                             <div class="option-label">
                                 <div class="option-label-title">NORMALIZE AUDIO (-14 LUFS)</div>
                                 <div class="option-label-desc">Broadcast-safe loudness normalization for consistent levels.</div>
@@ -364,17 +388,20 @@
 
                     <!-- Story Engine -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: #9b59b6; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📖 STORY ENGINE</div>
+                        <div class="section-header is-purple">
+                            {{ icon("book-open", size="18", class_="section-icon", title="Story Engine") }}
+                            <span>STORY ENGINE</span>
+                        </div>
                         <div class="option-item">
-                            <input type="checkbox" name="story_engine" id="story_engine">
+                            <input type="checkbox" name="story_engine" id="story_engine" title="Enable story engine" aria-label="Enable story engine">
                             <div class="option-label">
                                 <div class="option-label-title">NARRATIVE TENSION</div>
                                 <div class="option-label-desc">AI-driven 5-phase story arc: Intro → Build → Climax → Sustain → Outro.</div>
                             </div>
                         </div>
-                        <div class="option-item" style="flex-direction: column; align-items: flex-start; margin-top: 0.75rem;">
-                            <label for="story_arc" class="option-label-title" style="margin-bottom: 0.5rem;">STORY ARC PRESET</label>
-                            <select name="story_arc" id="story_arc" class="voxel-input" style="width: 100%;">
+                        <div class="option-item stacked-option mt-075">
+                            <label for="story_arc" class="option-label-title mb-05">STORY ARC PRESET</label>
+                            <select name="story_arc" id="story_arc" class="voxel-input full-width">
                                 <option value="auto">Auto - Match style</option>
                                 <option value="hero_journey">Hero's Journey - Classic narrative</option>
                                 <option value="mtv_energy">MTV Energy - Peak early, sustain</option>
@@ -382,16 +409,19 @@
                                 <option value="thriller">Thriller - Tension build</option>
                                 <option value="flat">Flat - Consistent energy</option>
                             </select>
-                            <p class="option-label-desc" style="margin-top: 0.5rem;">Controls pacing and energy distribution across the montage.</p>
+                            <p class="option-label-desc mt-05">Controls pacing and energy distribution across the montage.</p>
                         </div>
                     </div>
 
                     <!-- Film Emulation -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: #e91e63; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">🎬 FILM EMULATION</div>
-                        <div class="option-item" style="flex-direction: column; align-items: flex-start;">
-                            <label for="film_grain" class="option-label-title" style="margin-bottom: 0.5rem;">FILM GRAIN</label>
-                            <select name="film_grain" id="film_grain" class="voxel-input" style="width: 100%;">
+                        <div class="section-header is-rose">
+                            {{ icon("clapperboard", size="18", class_="section-icon", title="Film Emulation") }}
+                            <span>FILM EMULATION</span>
+                        </div>
+                        <div class="option-item stacked-option">
+                            <label for="film_grain" class="option-label-title mb-05">FILM GRAIN</label>
+                            <select name="film_grain" id="film_grain" class="voxel-input full-width">
                                 <option value="none">None - Clean digital</option>
                                 <option value="fine">Fine - Subtle texture</option>
                                 <option value="medium">Medium - Visible grain</option>
@@ -399,29 +429,32 @@
                                 <option value="16mm">16mm Film - Documentary</option>
                                 <option value="8mm">8mm Film - Vintage home movie</option>
                             </select>
-                            <p class="option-label-desc" style="margin-top: 0.5rem;">Add authentic film grain texture for cinematic look.</p>
+                            <p class="option-label-desc mt-05">Add authentic film grain texture for cinematic look.</p>
                         </div>
                     </div>
 
                     <!-- Output Format -->
                     <div class="option-group">
-                        <div style="font-weight: 900; font-size: 0.8rem; color: var(--secondary); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">📱 OUTPUT FORMAT</div>
+                        <div class="section-header is-secondary">
+                            {{ icon("smartphone", size="18", class_="section-icon", title="Output Format") }}
+                            <span>OUTPUT FORMAT</span>
+                        </div>
                         <div class="option-item">
-                            <input type="checkbox" name="auto_reframe" id="auto_reframe">
+                            <input type="checkbox" name="auto_reframe" id="auto_reframe" title="Enable auto reframe" aria-label="Enable auto reframe">
                             <div class="option-label">
                                 <div class="option-label-title">AUTO-REFRAME (9:16)</div>
                                 <div class="option-label-desc">Generate vertical version. Creates additional output file.</div>
                             </div>
                         </div>
                         <div class="option-item">
-                            <input type="checkbox" name="export_timeline" id="export_timeline" checked>
+                            <input type="checkbox" name="export_timeline" id="export_timeline" checked title="Export timeline" aria-label="Export timeline">
                             <div class="option-label">
                                 <div class="option-label-title">EXPORT TIMELINE (OTIO/EDL)</div>
                                 <div class="option-label-desc">Generate NLE project files for DaVinci Resolve, Premiere Pro.</div>
                             </div>
                         </div>
                         <div class="option-item">
-                            <input type="checkbox" name="export_recipe" id="export_recipe">
+                            <input type="checkbox" name="export_recipe" id="export_recipe" title="Export recipe" aria-label="Export recipe">
                             <div class="option-label">
                                 <div class="option-label-title">GENERATE RECIPE CARD</div>
                                 <div class="option-label-desc">Export enhancement parameters as human-readable instructions.</div>
@@ -445,7 +478,7 @@
                                 <span class="quality-card-desc">360p • Ultrafast • Tests setup</span>
                             </div>
                         </label>
-                        <label class="quality-card" style="border-color: var(--secondary); box-shadow: var(--shd-secondary);">
+                        <label class="quality-card quality-card--recommended">
                             <input type="radio" name="quality" value="standard" checked>
                             <div>
                                 <span class="quality-card-title">STANDARD</span>

@@ -1,5 +1,7 @@
 # Montage AI – Strategic Backlog (Q1 2026)
 
+> Archived (2026-01-07): Historical plan for Q1 2026. Kept for record; not maintained.
+
 **Based on:** [STRATEGY.md](STRATEGY.md) (Implementation Reality Check)
 **Timeline:** 90 Days (Weeks 0-12)
 **Focus:** Polish, Don't Generate.

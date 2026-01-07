@@ -13,9 +13,10 @@ import tempfile
 import json
 import subprocess
 import numpy as np
+from typing import Any
 from pathlib import Path
 from dataclasses import dataclass, asdict
-from typing import Dict, List, Any
+from typing import Dict, List
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -23,6 +24,13 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from montage_ai.config import get_settings
 from montage_ai.logger import logger
 from montage_ai.scene_analysis import Scene, SceneSimilarityIndex
+
+
+def _json_default(obj: Any):
+    """Convert NumPy scalars to native Python types for JSON serialization."""
+    if isinstance(obj, np.generic):
+        return obj.item()
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
 # ============================================================================
 # Performance Measurement
@@ -76,7 +84,7 @@ class BenchmarkSuite:
             json.dump({
                 'results': [asdict(r) for r in self.results],
                 'categories': list(self.categories.keys())
-            }, f, indent=2)
+            }, f, indent=2, default=_json_default)
 
 
 def benchmark(name: str, category: str, suite: BenchmarkSuite):
@@ -354,7 +362,7 @@ def test_cache_operations(suite: BenchmarkSuite):
         }
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(cache_data, f)
+            json.dump(cache_data, f, default=_json_default)
             cache_file = f.name
         
         size_kb = os.path.getsize(cache_file) / 1024

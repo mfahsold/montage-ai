@@ -165,6 +165,20 @@ def clear_metadata_cache() -> None:
 
 
 # =============================================================================
+# RAW Codec Detection
+# =============================================================================
+
+# Professional RAW codecs that require special handling
+RAW_CODECS = {
+    "prores_raw": "ProRes RAW (requires FFmpeg with --enable-libprores_raw)",
+    "braw": "Blackmagic RAW (requires Blackmagic RAW SDK)",
+    "redcode": "RED RAW (requires REDline SDK or FFmpeg plugin)",
+    "cinemadng": "CinemaDNG (requires FFmpeg with --enable-libraw)",
+    "arriraw": "ARRIRAW (requires ARRI SDK)",
+}
+
+
+# =============================================================================
 # Data Classes
 # =============================================================================
 
@@ -467,6 +481,14 @@ def probe_metadata(video_path: str, timeout: Optional[int] = None, use_cache: bo
         duration = float(format_info.get("duration") or 0.0)
         codec = (stream.get("codec_name") or "unknown").lower()
         pix_fmt = (stream.get("pix_fmt") or "unknown").lower()
+
+        # Warn on RAW codecs that may need special SDKs
+        if codec in RAW_CODECS:
+            logger.warning(
+                f"⚠️  RAW codec detected: {codec}\n"
+                f"   {RAW_CODECS[codec]}\n"
+                f"   Consider generating H.264/H.265 proxies for better compatibility."
+            )
 
         # Try to get bitrate from stream or format
         bitrate = int(stream.get("bit_rate") or format_info.get("bit_rate") or 0)

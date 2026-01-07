@@ -1,5 +1,7 @@
 # Test Suite Status Report
 
+> Note (2026-01-07): This report is historical (last verified 2025-01-07) and needs a refresh to reflect current deps (NumPy 2.4 blocking librosa) and missing sample media for benchmarks. Core pass/skip counts should be revalidated before use.
+
 **Last Updated:** January 7, 2025  
 **Test Framework:** pytest 9.0.2  
 **Python Version:** 3.12.3  

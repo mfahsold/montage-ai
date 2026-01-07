@@ -91,6 +91,19 @@ class Monitor:
         self._setup_tee()
         self._print_header()
         self._start_mem_probe()
+    
+    def __del__(self):
+        """Cleanup resources on object destruction (memory leak prevention)."""
+        self.cleanup()
+    
+    def __enter__(self):
+        """Context manager support."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Ensure cleanup on context manager exit."""
+        self.cleanup()
+        return False
 
     def _start_mem_probe(self):
         """Periodically log process and system memory to stdout (and tee)."""
@@ -175,29 +188,44 @@ class Monitor:
             self._tee_enabled = True
             logger.info(f"[monitor] tee logging enabled → {log_path}")
 
-            def _cleanup():
-                try:
-                    self._stop_event.set()
-                    if self._mem_thread and self._mem_thread.is_alive():
-                        self._mem_thread.join(timeout=1)
-                except Exception:
-                    pass
-                try:
-                    if self._tee_enabled:
-                        sys.stdout = self._orig_stdout
-                        sys.stderr = self._orig_stderr
-                except Exception:
-                    pass
-                try:
-                    if self._log_file:
-                        self._log_file.flush()
-                        self._log_file.close()
-                except Exception:
-                    pass
-
-            atexit.register(_cleanup)
+            # Register cleanup on normal exit
+            atexit.register(self.cleanup)
         except Exception as exc:
             logger.warning(f"[monitor] ⚠️ Could not enable tee logging: {exc}")
+    
+    def cleanup(self):
+        """
+        Cleanup resources (file handles, threads, restore stdout/stderr).
+        
+        Called by:
+        - __del__() on object destruction
+        - __exit__() on context manager exit
+        - atexit on normal program termination
+        
+        Safe to call multiple times (idempotent).
+        """
+        try:
+            self._stop_event.set()
+            if self._mem_thread and self._mem_thread.is_alive():
+                self._mem_thread.join(timeout=1)
+        except Exception:
+            pass
+        
+        try:
+            if self._tee_enabled:
+                sys.stdout = self._orig_stdout
+                sys.stderr = self._orig_stderr
+                self._tee_enabled = False
+        except Exception:
+            pass
+        
+        try:
+            if self._log_file:
+                self._log_file.flush()
+                self._log_file.close()
+                self._log_file = None
+        except Exception:
+            pass
     
     def _print_header(self):
         """Print startup banner with job info"""
