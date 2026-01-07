@@ -127,6 +127,14 @@ clean: ## Clean local caches and Docker resources
 	docker buildx prune -f
 	@echo "$(GREEN)✓ Caches cleared$(RESET)"
 
+validate-deps: ## Validate optional dependencies installation
+	@echo "$(CYAN)Validating optional dependencies...$(RESET)"
+	@./scripts/validate_optional_deps.sh
+
+benchmark: ## Run performance baseline benchmarks
+	@echo "$(CYAN)Running performance baseline...$(RESET)"
+	@python3 scripts/benchmark_baseline.py
+
 # ============================================================================
 # LEGACY COMMANDS (use golden path above)
 # ============================================================================
