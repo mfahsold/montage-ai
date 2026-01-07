@@ -1,1 +1,2 @@
-.github/CODEOWNERS
+# Ignore files with legacy markdown style
+docs/INDEX.md
