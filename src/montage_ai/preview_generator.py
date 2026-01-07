@@ -24,10 +24,12 @@ from .ffmpeg_config import (
     PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_CRF, PREVIEW_PRESET,
     STANDARD_AUDIO_CODEC, STANDARD_AUDIO_BITRATE
 )
+from .config import get_settings
 from .core.hardware import get_best_hwaccel
 
-# Maximum preview duration in seconds (for speed)
-MAX_PREVIEW_DURATION = 30.0
+# Maximum preview duration in seconds (for speed) from centralized settings
+_settings = get_settings()
+MAX_PREVIEW_DURATION = float(_settings.preview.max_duration)
 
 class PreviewGenerator:
     def __init__(self, output_dir: str, max_duration: float = MAX_PREVIEW_DURATION):

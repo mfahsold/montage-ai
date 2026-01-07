@@ -16,18 +16,20 @@ Cloud Acceleration:
 """
 
 import os
+from .config import get_settings
 from typing import Dict, Any, Optional
 
 # Quality Profile Definitions (Single Source of Truth)
+_settings = get_settings()
 QUALITY_PROFILES = {
     "preview": {
         "enhance": False,
         "stabilize": False,
         "upscale": False,
-        "width": 640,
-        "height": 360,
-        "crf": 28,
-        "preset": "ultrafast",
+        "width": _settings.preview.width,
+        "height": _settings.preview.height,
+        "crf": _settings.preview.crf,
+        "preset": _settings.preview.preset,
     },
     "standard": {
         "enhance": True,

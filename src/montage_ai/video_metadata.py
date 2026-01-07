@@ -185,7 +185,6 @@ RAW_CODECS = {
 @dataclass
 class VideoMetadata:
     """Metadata extracted from a video file via ffprobe."""
-    path: str
     width: int
     height: int
     fps: float
@@ -194,6 +193,10 @@ class VideoMetadata:
     pix_fmt: str
     bitrate: int
     rotation: int = 0
+    # Optional field for tests and extended info; not used in core logic
+    filesize: int = 0
+    # Path is optional in tests; default to empty string when not provided
+    path: str = ""
 
     @property
     def aspect_ratio(self) -> float:

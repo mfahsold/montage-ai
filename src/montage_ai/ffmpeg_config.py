@@ -63,10 +63,12 @@ STANDARD_WIDTH_8K_VERTICAL = 4320
 STANDARD_HEIGHT_8K_VERTICAL = 7680
 
 # Preview presets (Low latency, low res for fast feedback)
-PREVIEW_WIDTH = 640
-PREVIEW_HEIGHT = 360  # 360p
-PREVIEW_CRF = 28      # Lower quality
-PREVIEW_PRESET = "ultrafast"
+# Values sourced from centralized settings for consistency and override support.
+_settings = get_settings()
+PREVIEW_WIDTH = _settings.preview.width
+PREVIEW_HEIGHT = _settings.preview.height  # 360p by default
+PREVIEW_CRF = _settings.preview.crf        # Lower quality by default
+PREVIEW_PRESET = _settings.preview.preset
 
 # Encoding defaults
 STANDARD_FPS = 30
@@ -317,7 +319,7 @@ class FFmpegConfig:
         pixels = width * height
         
         # 8K (7680x4320): Level 6.2 (HEVC only)
-        if pixels > 33_177_600:
+        if pixels >= 33_177_600:
             if "265" not in self.effective_codec and "hevc" not in self.effective_codec:
                 raise ValueError(
                     f"8K resolution ({width}x{height}) requires HEVC/H.265. "
@@ -326,16 +328,16 @@ class FFmpegConfig:
             return LEVEL_8K
         
         # 6K (6144x3160): Level 5.2
-        elif pixels > 19_660_800:
+        elif pixels >= 19_660_800:
             logger.info(f"6K resolution detected ({width}x{height}), using Level 5.2")
             return LEVEL_6K
         
         # 4K (3840x2160): Level 5.1 (4K60) or 5.0 (4K30)
-        elif pixels > 8_294_400:
+        elif pixels >= 8_294_400:
             return "5.1" if fps > 30 else "5.0"
         
         # 1080p: Level 4.1 (1080p60) or 4.0 (1080p30)
-        elif pixels > 2_073_600:
+        elif pixels >= 2_073_600:
             return "4.1" if fps > 30 else "4.0"
         
         # SD/720p: Level 3.1

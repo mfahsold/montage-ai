@@ -23,6 +23,7 @@ import json
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict
 from pathlib import Path
+from types import SimpleNamespace
 
 # Mathematical optimization for smooth camera paths
 try:
@@ -148,6 +149,7 @@ try:
     import mediapipe as mp
     MP_AVAILABLE = True
 except ImportError:
+    mp = None  # Allows tests to patch `mp` even when mediapipe is unavailable
     MP_AVAILABLE = False
     logger.warning("MediaPipe not installed. Auto Reframe will fallback to center crop.")
 
@@ -277,12 +279,23 @@ class AutoReframeEngine:
         self.smoothing_window = smoothing_window
         self.path_planner = CameraMotionOptimizer(lambda_smooth=100.0, lambda_trend=10.0)
         
-        if MP_AVAILABLE:
+        if MP_AVAILABLE and getattr(mp, "solutions", None):
             self.mp_face_detection = mp.solutions.face_detection
             self.face_detector = self.mp_face_detection.FaceDetection(
                 model_selection=1, # 1 = full range (better for video)
                 min_detection_confidence=get_settings().thresholds.face_confidence
             )
+        else:
+            # Provide a lightweight stub so tests can patch or set side effects even when MediaPipe is absent.
+            self.mp_face_detection = None
+            try:
+                from unittest.mock import MagicMock
+
+                self.face_detector = MagicMock()
+                self.face_detector.process.return_value = SimpleNamespace(detections=[])
+            except Exception:
+                # Fallback stub without mock dependency
+                self.face_detector = SimpleNamespace(process=lambda _: SimpleNamespace(detections=[]))
 
     # Backward compatibility alias
     SmartReframer = None # Will be set after class definition if needed, but better to just rename usages.

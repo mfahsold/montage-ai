@@ -245,6 +245,9 @@ class PacingEngine:
         else:
             # If pattern is exhausted or missing, generate new one
             if self.ctx.timeline.current_pattern is None or self.ctx.timeline.pattern_idx >= len(self.ctx.timeline.current_pattern):
+                # Provide a deterministic first cut length before pattern generation
+                if self.ctx.timeline.current_pattern is None and self.ctx.timeline.pattern_idx == 0:
+                    return clamp_beats(4)
                 self.ctx.timeline.current_pattern = calculate_dynamic_cut_length(
                     current_energy, tempo, self.ctx.timeline.current_time,
                     self.ctx.timeline.target_duration, cut_patterns

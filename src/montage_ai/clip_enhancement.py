@@ -875,10 +875,11 @@ class ClipEnhancer:
                     output_path = os.path.join(output_dir, f"matched_{os.path.basename(clip_path)}")
 
                     cmd = build_ffmpeg_cmd(["-i", clip_path, "-vf", filter_str])
+                    # Use configured encoding preset/CRF instead of hardcoded values
                     cmd.extend(build_video_encoding_args(
                         codec=self.output_codec,
-                        preset="fast",
-                        crf=18,
+                        preset=self.ffmpeg_preset,
+                        crf=self.ffmpeg_config.crf,
                         profile=self.output_profile,
                         level=self.output_level,
                         pix_fmt=self.output_pix_fmt,
@@ -1014,8 +1015,9 @@ class ClipEnhancer:
                 "-i", input_path,
                 "-vf", f"vidstabtransform=input={transform_file}:smoothing=30:crop=black:zoom=0:interpol=bicubic",
                 "-c:v", self.output_codec,
-                "-preset", "fast",
-                "-crf", "18",
+                # Respect configured preset/CRF
+                "-preset", self.ffmpeg_preset,
+                "-crf", str(self.ffmpeg_config.crf),
             ])
 
             if self.output_profile:
@@ -1062,10 +1064,11 @@ class ClipEnhancer:
             "-i", input_path,
             "-vf", "deshake=rx=32:ry=32:blocksize=8:contrast=125",
         ])
+        # Fallback stabilization encode uses configured preset/CRF
         cmd.extend(build_video_encoding_args(
             codec=self.output_codec,
-            preset="fast",
-            crf=20,
+            preset=self.ffmpeg_preset,
+            crf=self.ffmpeg_config.crf,
             profile=self.output_profile,
             level=self.output_level,
             pix_fmt=self.output_pix_fmt,
@@ -1202,7 +1205,7 @@ class ClipEnhancer:
         except Exception as e:
             logger.warning(f"Real-ESRGAN failed: {e}")
             logger.info("Falling back to FFmpeg upscaling...")
-            return self._upscale_ffmpeg(input_path, output_path, scale=scale_value)
+            return self._upscale_ffmpeg(input_path, output_path, scale=scale)
         finally:
             import shutil
             if os.path.exists(frame_dir):

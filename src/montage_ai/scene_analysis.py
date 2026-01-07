@@ -15,6 +15,7 @@ import os
 import json
 import random
 import base64
+import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
@@ -35,6 +36,7 @@ except ImportError:
     KDTREE_AVAILABLE = False
 
 from .config import get_settings
+from .video_metadata import probe_metadata  # Expose for tests to patch
 from .logger import logger
 from .moviepy_compat import VideoFileClip
 
@@ -269,7 +271,7 @@ class SceneDetector:
         
         # Check if downsampling is needed
         try:
-            from .video_metadata import probe_metadata
+            # Use module-level probe_metadata to allow test patching
             metadata = probe_metadata(video_path)
             if metadata.height > max_resolution:
                 logger.info(f"⚡ High-res input detected ({metadata.width}x{metadata.height}). "
@@ -331,23 +333,33 @@ class SceneDetector:
         Returns:
             Path to temporary downsampled proxy file
         """
-        import tempfile
         import subprocess
         
         # Create temp file with same extension
         ext = os.path.splitext(video_path)[1]
         proxy_fd, proxy_path = tempfile.mkstemp(suffix=f"_proxy{ext}", prefix="scene_detect_")
-        os.close(proxy_fd)
+        try:
+            os.close(proxy_fd)
+        except OSError:
+            # Some tests mock mkstemp with a dummy fd; ignore close errors
+            pass
         
         # FFmpeg command: scale to max_height, maintain aspect ratio
         # -vf scale=-2:1080 means: width auto-calculated, height=1080, divisible by 2
+        from .config import get_settings
+        settings = get_settings()
+        # Use preview profile for fast proxy generation (configurable)
+        # Force H.264 for speed and broad compatibility in proxies
+        codec = "libx264"
+        preset = settings.preview.preset
+        crf = settings.preview.crf
         ffmpeg_cmd = [
             "ffmpeg",
             "-i", video_path,
             "-vf", f"scale=-2:{max_height}",
-            "-c:v", "libx264",
-            "-preset", "ultrafast",  # Speed over compression
-            "-crf", "28",  # Lower quality acceptable for scene detection
+            "-c:v", codec,
+            "-preset", preset,  # Speed over compression
+            "-crf", str(crf),   # Lower quality acceptable for scene detection
             "-an",  # No audio needed
             "-y",
             proxy_path

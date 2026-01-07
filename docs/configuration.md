@@ -341,6 +341,18 @@ Caching is unified across analysis and metadata subsystems.
 | `DISABLE_ANALYSIS_CACHE`     | `false` | Disable analysis cache when `true`                 |
 | `CACHE_VERSION`              | `1.0`   | Global cache version; bump to invalidate all caches|
 
+### Cache Locations
+
+| Variable                | Default                                              | Description |
+| ----------------------- | ---------------------------------------------------- | ----------- |
+| `METADATA_CACHE_DIR`    | `${XDG_CACHE_HOME:-~/.cache}/montage_ai/metadata`   | Centralized cache directory for metadata and analysis when set. If unset, analysis results default to sidecar files located next to each input clip to avoid permission issues outside containers. |
+| `TENSION_METADATA_DIR`  | `${XDG_CACHE_HOME:-~/.cache}/montage_ai/tension`    | Directory for derived metrics (e.g., tension/energy) used across runs. |
+
+Notes:
+- Defaults follow the OS XDG cache convention to avoid writing to `/data` on non-container hosts.
+- Sidecar caching is the default for analysis results unless `METADATA_CACHE_DIR` is explicitly provided.
+- Both locations are created on demand; respect `CACHE_INVALIDATION_HOURS` and `CACHE_VERSION`.
+
 ## Monitoring
 
 Centralized in `monitoring` configuration with environment exports for compatibility.
@@ -349,6 +361,7 @@ Centralized in `monitoring` configuration with environment exports for compatibi
 | ----------------------- | ------- | ------------------------------------------- |
 | `MONITOR_MEM_INTERVAL`  | `30.0`  | Memory telemetry log interval (seconds)     |
 | `LOG_FILE`              | *(auto)*| Path to tee log file (defaults to output dir)|
+| `PREVIEW_TIME_TARGET`   | `180`   | KPI target for Time-to-First-Preview (s)    |
 
 
 These map to `settings.cache.analysis_ttl_hours`, `settings.cache.metadata_ttl_hours`, and `settings.cache.version`.
@@ -359,6 +372,7 @@ Notes:
 
 <!-- markdownlint-enable MD060 MD032 -->
 
+<!-- markdownlint-disable MD060 MD032 -->
 ## Output / Export
 
 | Variable           | Default | Description                                                                               |
@@ -384,6 +398,32 @@ Notes:
 
 ---
 
+## Preview Profile
+
+Preview generation (Transcript/Shorts previews, analysis proxies) uses fast, low‑latency defaults that are now configurable centrally via `settings.preview`.
+
+| Variable             | Default     | Description                                               |
+| -------------------- | ----------- | --------------------------------------------------------- |
+| `PREVIEW_WIDTH`      | `640`       | Preview width (pixels)                                    |
+| `PREVIEW_HEIGHT`     | `360`       | Preview height (pixels)                                   |
+| `PREVIEW_CRF`        | `28`        | Quality for previews (lower = higher quality, larger)     |
+| `PREVIEW_PRESET`     | `ultrafast` | Encoder preset for previews                               |
+| `PREVIEW_MAX_DURATION` | `30.0`    | Max duration for previews (seconds)                       |
+
+Where it’s used:
+- `ffmpeg_config`: preview params and constants now mirror `settings.preview`.
+- `scene_analysis`: proxy generation uses preview preset/CRF instead of literals.
+- `preview_generator`: duration and encoder params come from preview config.
+- `text_editor`: preview resolution and params are read via `ffmpeg_config`.
+
+Notes:
+- `QUALITY_PROFILE=preview` still maps encoder `preset` and `crf` for the final render pipeline. The preview profile above controls dedicated fast previews and analysis proxies.
+
+Orientation and sizing:
+- Previews preserve the source orientation. Defaults (640x360) apply to landscape; portrait sources will map to 360x640 automatically.
+- Proxy generation preserves aspect ratio and typically limits by height (e.g., `scale=-2:PREVIEW_HEIGHT`), so final dimensions may be rounded by encoder constraints.
+
+
 ## Export Settings
 
 Control the format and specifications of the final video output.
@@ -397,6 +437,12 @@ Control the format and specifications of the final video output.
 | `GENERATE_PROXIES`| `false` | Generate low-res proxy files for NLE import                                 |
 
 ---
+
+### Resolution Overrides
+
+- When both `EXPORT_WIDTH` and `EXPORT_HEIGHT` are set, they force an explicit output resolution and orientation.
+- When not set, output resolution and orientation are inferred from the dominant input footage (orientation, median size, common FPS) to minimize re-encoding.
+- Explicit overrides are only applied when the variables are present; otherwise inference remains in effect.
 
 ## Paths (Container)
 
@@ -463,3 +509,5 @@ CUT_STYLE=mtv \
 NUM_VARIANTS=5 \
 ./montage-ai.sh run
 ```
+
+<!-- markdownlint-enable MD060 MD032 -->

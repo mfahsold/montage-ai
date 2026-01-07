@@ -206,10 +206,13 @@ class AnalysisCache:
         self.ttl_hours = ttl_hours
         self.enabled = enabled
         
-        # Allow override via environment variable if not explicitly provided
+        # Allow override via environment variable if not explicitly provided.
+        # Default to sidecar files (cache_dir=None) unless METADATA_CACHE_DIR is set.
         if cache_dir is None:
-            cache_dir = str(get_settings().paths.metadata_cache_dir)
-        self.cache_dir = cache_dir
+            env_dir = os.environ.get("METADATA_CACHE_DIR")
+            self.cache_dir = str(env_dir) if env_dir else None
+        else:
+            self.cache_dir = cache_dir
 
     def _cache_path(self, source_path: str, suffix: str) -> Path:
         """Get cache file path (sidecar or centralized)."""
@@ -976,8 +979,11 @@ def get_analysis_cache() -> AnalysisCache:
     global _cache
     if _cache is None:
         settings = get_settings()
-        ttl = int(settings.cache.analysis_ttl_hours or DEFAULT_TTL_HOURS)
-        enabled = bool(settings.cache.analysis_enabled)
+        # Allow direct env overrides for testability without reloading settings
+        ttl_env = os.environ.get("CACHE_INVALIDATION_HOURS")
+        ttl = int(ttl_env) if ttl_env is not None else int(settings.cache.analysis_ttl_hours or DEFAULT_TTL_HOURS)
+        disable_env = os.environ.get("DISABLE_ANALYSIS_CACHE")
+        enabled = (disable_env.lower() != "true") if disable_env is not None else bool(settings.cache.analysis_enabled)
         _cache = AnalysisCache(
             ttl_hours=ttl,
             enabled=enabled,

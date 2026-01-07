@@ -423,17 +423,20 @@ def get_aggregate() -> AggregateMetrics:
 def get_kpis() -> Dict[str, Any]:
     """Get KPIs in a format suitable for display."""
     agg = get_aggregate()
+    from .config import get_settings
+    _settings = get_settings()
+    preview_target = int(_settings.monitoring.preview_target_seconds)
     return {
         "success_rate_percent": round(agg.success_rate * 100, 1),
         "total_jobs": agg.total_jobs,
         "avg_time_to_preview_seconds": round(agg.avg_time_to_preview, 1) if agg.avg_time_to_preview else None,
         "avg_render_duration_seconds": round(agg.avg_render_duration, 1) if agg.avg_render_duration else None,
         "kpi_targets": {
-            "time_to_preview_target": 180,  # 3 minutes
+            "time_to_preview_target": preview_target,  # Configurable target (seconds)
             "success_rate_target": 95,  # 95%
         },
         "kpi_status": {
-            "time_to_preview": "ok" if (agg.avg_time_to_preview or 0) < 180 else "warning",
+            "time_to_preview": "ok" if (agg.avg_time_to_preview or 0) < preview_target else "warning",
             "success_rate": "ok" if agg.success_rate >= 0.95 else "warning",
         }
     }

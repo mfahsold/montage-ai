@@ -16,6 +16,7 @@ This document provides a comprehensive reference of all parameters that Montage 
 5. [Style Template Parameters](#5-style-template-parameters)
 6. [Clip Analysis Parameters](#6-clip-analysis-parameters)
 7. [NLE Mapping Tables](#7-nle-mapping-tables)
+8. [Preview Profile](#8-preview-profile)
 
 ---
 
@@ -247,6 +248,25 @@ unsharp=<size>:<size>:<amount*2>:<size>:<size>:<amount>
 | `unusable` | <8 dB | Reject or manual review |
 
 ---
+
+## 8. Preview Profile
+
+Centralized preview settings used by Transcript/Shorts previews and internal proxies. These improve iteration speed and can be tuned per environment.
+
+| Parameter              | Type  | Default    | Description                                     |
+|------------------------|-------|------------|-------------------------------------------------|
+| `PREVIEW_WIDTH`        | int   | `640`      | Preview width (pixels)                          |
+| `PREVIEW_HEIGHT`       | int   | `360`      | Preview height (pixels)                         |
+| `PREVIEW_CRF`          | int   | `28`       | Quality factor for previews                     |
+| `PREVIEW_PRESET`       | str   | `ultrafast`| Encoder preset for previews                     |
+| `PREVIEW_MAX_DURATION` | float | `30.0`     | Max preview duration (seconds)                  |
+| `PREVIEW_TIME_TARGET`  | int   | `180`      | KPI target for Time-to-First-Preview (seconds)  |
+
+Implementation notes:
+- `ffmpeg_config` exposes `PREVIEW_*` constants that mirror `settings.preview`.
+- `scene_analysis` proxy generation and `preview_generator` now use `settings.preview`.
+- Changing these values does not affect final export settings; they only affect previews and proxies.
+
 
 ## 4. Timeline & Editing Parameters
 

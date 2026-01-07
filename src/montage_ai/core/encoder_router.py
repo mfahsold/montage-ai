@@ -389,6 +389,9 @@ class EncoderRouter:
             )
 
             if should_cgpu:
+                # Pull centralized settings for CRF/preset mapping
+                from ..config import get_settings as _get_settings
+                _s = _get_settings()
                 return EncoderConfig(
                     tier=EncoderTier.CGPU,
                     use_cgpu=True,
@@ -397,8 +400,9 @@ class EncoderRouter:
                     estimated_speed=10.0,
                     params={
                         "codec": preferred_codec,
-                        "quality": 18 if quality_profile != "preview" else 28,
-                        "preset": "slow" if quality_profile == "master" else "medium",
+                        # Derive quality from centralized settings
+                        "quality": (_s.encoding.crf if quality_profile != "preview" else _s.preview.crf),
+                        "preset": ("slow" if quality_profile == "master" else _s.encoding.preset),
                     }
                 )
 

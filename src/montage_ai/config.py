@@ -41,16 +41,32 @@ class PathConfig:
     transcript_dir: Path = field(default_factory=lambda: Path(os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_transcript")))
     shorts_dir: Path = field(default_factory=lambda: Path(os.environ.get("SHORTS_DIR", "/tmp/montage_shorts")))
     metadata_cache_dir: Path = field(
-        default_factory=lambda: Path(
-            os.environ.get("METADATA_CACHE_DIR")
-            or Path(os.environ.get("OUTPUT_DIR", "/data/output")) / "metadata_cache"
+        default_factory=lambda: (
+            Path(os.environ.get("METADATA_CACHE_DIR"))
+            if os.environ.get("METADATA_CACHE_DIR")
+            else (
+                # Prefer XDG cache (user-writable); fallback to ~/.cache
+                Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+                / "montage_ai"
+                / "metadata"
+            )
         )
     )
     tension_metadata_dir: Path = field(
-        default_factory=lambda: Path(
-            os.environ.get("TENSION_METADATA_DIR")
-            or (Path(os.environ.get("METADATA_CACHE_DIR")) / "tension" if os.environ.get("METADATA_CACHE_DIR") else None)
-            or Path(os.environ.get("OUTPUT_DIR", "/data/output")) / "tension_analysis"
+        default_factory=lambda: (
+            Path(os.environ.get("TENSION_METADATA_DIR"))
+            if os.environ.get("TENSION_METADATA_DIR")
+            else (
+                (
+                    Path(os.environ.get("METADATA_CACHE_DIR")) / "tension"
+                    if os.environ.get("METADATA_CACHE_DIR")
+                    else (
+                        Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+                        / "montage_ai"
+                        / "tension"
+                    )
+                )
+            )
         )
     )
     style_preset_path: Optional[Path] = field(default_factory=lambda: Path(os.environ.get("STYLE_PRESET_PATH")) if os.environ.get("STYLE_PRESET_PATH") else None)
@@ -654,6 +670,28 @@ class MonitoringConfig:
 
     mem_interval_sec: float = field(default_factory=lambda: float(os.environ.get("MONITOR_MEM_INTERVAL", "30.0")))
     log_file: Optional[str] = field(default_factory=lambda: os.environ.get("LOG_FILE") or None)
+    # KPI target for Time-to-First-Preview in seconds (default: 180s)
+    preview_target_seconds: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_TIME_TARGET", "180")))
+
+
+# =============================================================================
+# Preview Configuration
+# =============================================================================
+@dataclass
+class PreviewConfig:
+    """Preview profile settings (resolution and speed/quality defaults).
+
+    These values are used by preview generators and analysis/proxy steps and
+    can be overridden via environment variables. They intentionally default to
+    a fast, low-latency profile to optimize iteration speed.
+    """
+
+    width: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_WIDTH", "640")))
+    height: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_HEIGHT", "360")))
+    crf: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_CRF", "28")))
+    preset: str = field(default_factory=lambda: os.environ.get("PREVIEW_PRESET", "ultrafast"))
+    # Max duration for generated previews (seconds)
+    max_duration: float = field(default_factory=lambda: float(os.environ.get("PREVIEW_MAX_DURATION", "30.0")))
 
 
 # =============================================================================
@@ -738,6 +776,7 @@ class Settings:
     resources: ResourceThresholdsConfig = field(default_factory=ResourceThresholdsConfig)
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
+    preview: PreviewConfig = field(default_factory=PreviewConfig)
 
     # Job ID (generated per run)
     job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", ""))
@@ -933,6 +972,12 @@ class Settings:
             # Monitoring
             "MONITOR_MEM_INTERVAL": str(self.monitoring.mem_interval_sec),
             "LOG_FILE": self.monitoring.log_file or "",
+            # Preview profile exports (for subprocesses/tools)
+            "PREVIEW_WIDTH": str(self.preview.width),
+            "PREVIEW_HEIGHT": str(self.preview.height),
+            "PREVIEW_CRF": str(self.preview.crf),
+            "PREVIEW_PRESET": self.preview.preset,
+            "PREVIEW_MAX_DURATION": str(self.preview.max_duration),
         }
 
 

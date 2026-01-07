@@ -594,6 +594,8 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
     if USE_FFMPEG_MCP:
         try:
             session = _get_ffmpeg_mcp_session()
+            from .config import get_settings
+            preset = get_settings().encoding.preset
             resp = session.post(
                 f"{FFMPEG_MCP_ENDPOINT}/clip",
                 json={
@@ -602,7 +604,7 @@ def extract_subclip_ffmpeg(input_path: str, start: float, duration: float, outpu
                     "duration": duration,
                     "output": output_path,
                     "video_codec": OUTPUT_CODEC,
-                    "preset": "ultrafast",
+                    "preset": preset,
                     "copy_audio": True
                 },
                 timeout=settings.processing.ffmpeg_timeout
