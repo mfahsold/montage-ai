@@ -8,7 +8,7 @@ proglog>=0.1.10
 tqdm>=4.66.0
 scenedetect[opencv]>=0.6.4
 requests>=2.32.0
-numpy>=2.4.0,<3.0.0  # Keep modern numpy; avoid legacy numba/librosa pinning
+numpy>=1.24.0,<2.0.0  # Python 3.10 compatible
 scipy>=1.10.0  # For mathematical path optimization (Smart Reframing)
 
 # Color Matching (Shot-to-Shot consistency)

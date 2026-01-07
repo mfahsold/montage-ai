@@ -54,6 +54,10 @@ class TestStatus(Enum):
     WARN = "WARN"
 
 
+# Prevent pytest from collecting Enum as a test class
+TestStatus.__test__ = False
+
+
 @dataclass
 class ParameterTest:
     """Result of testing a single parameter."""

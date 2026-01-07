@@ -18,6 +18,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -155,12 +157,8 @@ def test_cgpu_availability():
         print_status("CGPU Module", False, str(e))
 
 
-def test_actual_encoding(encoder_type: str = "auto") -> bool:
-    """
-    Test actual video encoding with specified encoder.
-
-    Returns True if encoding succeeded.
-    """
+def test_actual_encoding(encoder_type: str = "auto") -> None:
+    """Test actual video encoding with specified encoder."""
     print_header(f"Actual Encoding Test ({encoder_type})")
 
     # Create test input
@@ -182,7 +180,7 @@ def test_actual_encoding(encoder_type: str = "auto") -> bool:
         result = subprocess.run(gen_cmd, capture_output=True, text=True)
         if result.returncode != 0:
             print_status("Generate input", False, result.stderr[:100])
-            return False
+            pytest.fail("Failed to generate test input video")
         print_status("Generate input", True)
 
         # Select encoder
@@ -192,7 +190,7 @@ def test_actual_encoding(encoder_type: str = "auto") -> bool:
             hw = get_hwaccel_by_type(encoder_type)
             if not hw:
                 print_status(f"Encoder {encoder_type}", False, "not available")
-                return False
+                pytest.skip(f"Encoder {encoder_type} not available on this host")
 
         # Build encode command
         cmd = ["ffmpeg", "-y"]
@@ -222,11 +220,11 @@ def test_actual_encoding(encoder_type: str = "auto") -> bool:
         if result.returncode == 0 and os.path.exists(output_path):
             size = os.path.getsize(output_path)
             print_status(f"Encode with {hw.encoder}", True, f"{size} bytes")
-            return True
-        else:
-            error = result.stderr[-200:] if result.stderr else "Unknown error"
-            print_status(f"Encode with {hw.encoder}", False, error[:50])
-            return False
+            return
+
+        error = result.stderr[-200:] if result.stderr else "Unknown error"
+        print_status(f"Encode with {hw.encoder}", False, error[:50])
+        pytest.fail(f"Encoding failed for {hw.encoder}: {error}")
 
 
 def main():

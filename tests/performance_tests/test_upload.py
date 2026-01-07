@@ -4,11 +4,12 @@ import os
 
 # Create a dummy file
 with open('test_upload.txt', 'wb') as f:
-    f.write(b'x' * 1024 * 1024) # 1MB
+    f.write(b'x' * 1024 * 1024)  # 1MB
 
 url = 'http://localhost:5001/api/upload'
-files = {'file': open('test_upload.txt', 'rb')}
 data = {'type': 'video'}
+upload_file = open('test_upload.txt', 'rb')
+files = {'file': upload_file}
 
 try:
     print(f"Uploading to {url}...")
@@ -18,4 +19,5 @@ try:
 except Exception as e:
     print(f"Error: {e}")
 finally:
+    upload_file.close()
     os.remove('test_upload.txt')

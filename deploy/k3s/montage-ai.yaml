@@ -1,0 +1,176 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: montage-ai
+  labels:
+    app: montage-ai
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-data
+  namespace: montage-ai
+  annotations:
+    volume.kubernetes.io/selected-node: codeai-worker-amd64
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: montage-config
+  namespace: montage-ai
+data:
+  # Creative Direction
+  CUT_STYLE: "dynamic"
+  
+  # AI / LLM Configuration
+  # Point to Exo API in cluster
+  OPENAI_API_BASE: "http://exo-api.default.svc.cluster.local:8000/v1"
+  OPENAI_API_KEY: "not-needed"
+  OPENAI_MODEL: "llama-3.2-1b"
+  OPENAI_VISION_MODEL: "llama-3.2-1b"
+  
+  # Ollama fallback (if Exo unavailable)
+  OLLAMA_HOST: "http://host.docker.internal:11434"
+  OLLAMA_MODEL: "llava"
+  
+  # LLM-powered clip selection
+  LLM_CLIP_SELECTION: "true"
+  
+  # Enhancement Settings
+  STABILIZE: "false"
+  UPSCALE: "false"
+  ENHANCE: "true"
+  COLORLEVELS: "true"
+  LUMA_NORMALIZE: "true"
+  
+  # Output Configuration
+  NUM_VARIANTS: "1"
+  VERBOSE: "true"
+  
+  # Python
+  PYTHONUNBUFFERED: "1"
+  FLASK_APP: "src/montage_ai/web_ui/app.py"
+  NUMBA_CACHE_DIR: "/tmp/numba_cache"
+  PYTHONPATH: "/app/src"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai
+  namespace: montage-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: montage-ai
+  template:
+    metadata:
+      labels:
+        app: montage-ai
+    spec:
+      # Schedule on AMD64 nodes only (image is AMD64)
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # Allow scheduling on any node with toleration
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: montage-ai
+        image: 192.168.1.12:5000/montage-ai:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: web
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: montage-config
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        # Source is baked into container image
+        # - name: src
+        #   mountPath: /app/src
+        #   readOnly: true
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+          limits:
+            memory: "12Gi"
+            cpu: "4000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: montage-data
+      # Remove hostPath for now - copy source into container instead
+      # - name: src
+      #   hostPath:
+      #     path: /home/codeai/montage-ai/src
+      #     type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: montage-ai
+  namespace: montage-ai
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: web
+  selector:
+    app: montage-ai
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: montage-ai
+  namespace: montage-ai
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - montage-ai.fluxibri.local
+    secretName: montage-ai-tls
+  rules:
+  - host: montage-ai.fluxibri.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: montage-ai
+            port:
+              number: 8080

@@ -9,6 +9,8 @@ Usage:
 import os
 import sys
 
+import pytest
+
 # Enable LLM clip selection for testing
 os.environ['LLM_CLIP_SELECTION'] = 'true'
 
@@ -83,7 +85,7 @@ def test_intelligent_selector():
         print(f"\n❌ Error during selection: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        pytest.fail("Intelligent selector failed during selection")
 
     # Get statistics
     print("\n5. Selector Statistics:")
@@ -92,9 +94,7 @@ def test_intelligent_selector():
         print(f"   {key}: {value}")
 
     print("\n✅ Test completed successfully!")
-    return True
 
 
 if __name__ == "__main__":
-    success = test_intelligent_selector()
-    sys.exit(0 if success else 1)
+    sys.exit(pytest.main([__file__]))

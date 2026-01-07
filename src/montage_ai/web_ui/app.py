@@ -141,17 +141,32 @@ job_store = JobStore()
 
 def redis_listener():
     """Listen for updates from Redis and broadcast to SSE clients."""
-    # Create a dedicated connection for pubsub to avoid conflicts
-    pubsub_conn = Redis(host=redis_host, port=redis_port, decode_responses=True)
-    pubsub = pubsub_conn.pubsub()
-    pubsub.subscribe('job_updates')
-    
-    for message in pubsub.listen():
-        if message['type'] == 'message':
-            announcer.announce(message['data'])
+    try:
+        # Create a dedicated connection for pubsub to avoid conflicts
+        pubsub_conn = Redis(host=redis_host, port=redis_port, decode_responses=True)
+        pubsub = pubsub_conn.pubsub()
+        pubsub.subscribe('job_updates')
 
-# Start background thread
-threading.Thread(target=redis_listener, daemon=True).start()
+        for message in pubsub.listen():
+            if message['type'] == 'message':
+                announcer.announce(message['data'])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Redis listener stopped; skipping SSE broadcast: %s", exc)
+
+
+def start_redis_listener_if_available() -> None:
+    """Start listener thread only when Redis is reachable to avoid noisy thread errors in tests."""
+    try:
+        redis_conn.ping()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Redis unavailable; skipping listener thread: %s", exc)
+        return
+
+    threading.Thread(target=redis_listener, daemon=True).start()
+
+
+# Start background thread (fail-open when Redis is not reachable)
+start_redis_listener_if_available()
 
 # jobs = {} # Removed
 # job_lock = threading.Lock() # Removed
