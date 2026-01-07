@@ -5,28 +5,9 @@ import os
 import sys
 import tempfile
 
-# Mock missing dependencies
-sys.modules['librosa'] = MagicMock()
-sys.modules['soundfile'] = MagicMock()
-sys.modules['moviepy'] = MagicMock()
-sys.modules['moviepy.editor'] = MagicMock()
-sys.modules['proglog'] = MagicMock()
-sys.modules['scenedetect'] = MagicMock()
-sys.modules['scenedetect.detectors'] = MagicMock()
-sys.modules['PIL'] = MagicMock()
-sys.modules['cv2'] = MagicMock()
-sys.modules['numpy'] = MagicMock()
-sys.modules['opentimelineio'] = MagicMock()
-sys.modules['opentimelineio.schema'] = MagicMock()
-sys.modules['tqdm'] = MagicMock()
-sys.modules['requests'] = MagicMock()
-sys.modules['flask'] = MagicMock()
-sys.modules['werkzeug'] = MagicMock()
-sys.modules['werkzeug.utils'] = MagicMock()
-sys.modules['psutil'] = MagicMock()
-sys.modules['jsonschema'] = MagicMock()
-sys.modules['color_matcher'] = MagicMock()
-sys.modules['openai'] = MagicMock()
+# Mocks removed to prevent global pollution
+# If dependencies are missing, tests should skip or use explicit patching
+
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))

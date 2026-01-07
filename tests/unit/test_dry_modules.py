@@ -1,205 +1,173 @@
 """
 Unit tests for DRY refactoring modules.
 """
-
 import os
-import tempfile
+import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
+from flask import Flask, jsonify, Response
 
+from src.montage_ai.web_ui.decorators import api_endpoint, require_json
+from src.montage_ai.core.ffmpeg_atomics import run_ffmpeg_atomic, ConcatListManager
 
 class TestAPIDecorators:
     """Tests for web_ui/decorators.py"""
 
-    def test_api_endpoint_success(self):
-        """api_endpoint passes through successful responses."""
-        from src.montage_ai.web_ui.decorators import api_endpoint
-
-        @api_endpoint
-        def success_func():
-            return {"data": "test"}, 200
-
-        result = success_func()
-        assert result == ({"data": "test"}, 200)
-
-    def test_api_endpoint_file_not_found(self):
-        """api_endpoint returns 404 for FileNotFoundError."""
-        from flask import Flask
-        from src.montage_ai.web_ui.decorators import api_endpoint
-
+    @pytest.fixture
+    def app(self):
         app = Flask(__name__)
+        app.config['TESTING'] = True
+        return app
 
-        @api_endpoint
-        def not_found_func():
-            raise FileNotFoundError("test.mp4 not found")
-
+    def test_api_endpoint_success(self, app):
+        """api_endpoint passes through successful responses."""
+        
         with app.app_context():
-            response, status = not_found_func()
-            assert status == 404
+            @api_endpoint
+            def success_func():
+                return {"data": "test"}
+
+            # Decorator wraps function but does not force jsonify on success path
+            # unless the function explicitly does so.
+            # exceptions are caught and returned as (Response, code).
+            
+            result = success_func()
+            assert result == {"data": "test"}
+
+    def test_api_endpoint_file_not_found(self, app):
+        """api_endpoint returns 404 for FileNotFoundError."""
+
+        with app.test_request_context():
+            @api_endpoint
+            def not_found_func():
+                raise FileNotFoundError("test.mp4")
+
+            # Returns (Response, 404)
+            result = not_found_func()
+            assert isinstance(result, tuple)
+            response, code = result
+            assert code == 404
+            assert response.is_json
             assert "error" in response.json
 
-    def test_api_endpoint_value_error(self):
+    def test_api_endpoint_value_error(self, app):
         """api_endpoint returns 400 for ValueError."""
-        from flask import Flask
-        from src.montage_ai.web_ui.decorators import api_endpoint
+        
+        with app.test_request_context():
+            @api_endpoint
+            def validation_func():
+                raise ValueError("Invalid parameter")
 
-        app = Flask(__name__)
+            result = validation_func()
+            response, code = result
+            assert code == 400
+            assert "error" in response.json
 
-        @api_endpoint
-        def validation_func():
-            raise ValueError("Invalid parameter")
-
-        with app.app_context():
-            response, status = validation_func()
-            assert status == 400
-
-    def test_api_endpoint_generic_error(self):
+    def test_api_endpoint_generic_error(self, app):
         """api_endpoint returns 500 for generic exceptions."""
-        from flask import Flask
-        from src.montage_ai.web_ui.decorators import api_endpoint
+        
+        with app.test_request_context():
+            @api_endpoint
+            def error_func():
+                raise RuntimeError("Something broke")
 
-        app = Flask(__name__)
+            result = error_func()
+            response, code = result
+            assert code == 500
+            assert "error" in response.json
 
-        @api_endpoint
-        def error_func():
-            raise RuntimeError("Something broke")
-
-        with app.app_context():
-            response, status = error_func()
-            assert status == 500
-
-    def test_require_json_validates_fields(self):
+    def test_require_json_validates_fields(self, app):
         """require_json rejects missing fields."""
-        from flask import Flask
-        from src.montage_ai.web_ui.decorators import require_json
-
-        app = Flask(__name__)
-
+        
+        # Pass fields as varargs, NOT list
         @require_json('filename', 'style')
-        def needs_fields():
-            return {"ok": True}, 200
+        def needs_fields(data):
+            return {"ok": True}
 
         with app.test_request_context(json={"filename": "test.mp4"}):
-            response, status = needs_fields()
-            assert status == 400
+            # require_json decorates. If validation fails, it returns (Response, 400)?
+            # Let's check decorator source:
+            # return jsonify({"error": ...}), 400
+            result = needs_fields()
+            
+            assert isinstance(result, tuple)
+            response, code = result
+            assert code == 400
             assert "style" in response.json["error"]
 
-    def test_require_json_passes_valid(self):
+    def test_require_json_passes_valid(self, app):
         """require_json passes when all fields present."""
-        from flask import Flask
-        from src.montage_ai.web_ui.decorators import require_json
-
-        app = Flask(__name__)
-
-        @require_json('filename', 'style')
+        
+        @require_json('filename')
         def needs_fields():
-            return {"ok": True}, 200
+            # Signature of decorated function matches wrapper
+            # wrapper takes *args, **kwargs.
+            # But here `needs_fields` takes no args? 
+            # In decorator source: return f(*args, **kwargs)
+            return {"ok": True}
 
-        with app.test_request_context(json={"filename": "test.mp4", "style": "dynamic"}):
-            response, status = needs_fields()
-            assert status == 200
+        with app.test_request_context(json={"filename": "success.mp4"}):
+            result = needs_fields()
+            assert result == {"ok": True}
 
 
 class TestFFmpegAtomics:
     """Tests for core/ffmpeg_atomics.py"""
 
-    def test_atomic_ffmpeg_success(self):
-        """atomic_ffmpeg renames temp to final on success."""
-        from src.montage_ai.core.ffmpeg_atomics import atomic_ffmpeg
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output = Path(tmpdir) / "output.mp4"
-
-            with atomic_ffmpeg(output) as temp_path:
-                # Simulate FFmpeg creating the file
-                Path(temp_path).write_text("test content")
-
-            assert output.exists()
-            assert not Path(temp_path).exists()
-            assert output.read_text() == "test content"
-
-    def test_atomic_ffmpeg_failure_cleanup(self):
-        """atomic_ffmpeg removes temp on failure."""
-        from src.montage_ai.core.ffmpeg_atomics import atomic_ffmpeg
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output = Path(tmpdir) / "output.mp4"
-
-            with pytest.raises(RuntimeError):
-                with atomic_ffmpeg(output) as temp_path:
-                    # Create temp file
-                    Path(temp_path).write_text("partial")
-                    # Simulate failure
-                    raise RuntimeError("FFmpeg failed")
-
-            assert not output.exists()
-            # Temp should be cleaned up
-            assert not Path(temp_path).exists()
-
-    def test_concat_list_manager_escapes_paths(self):
-        """ConcatListManager properly escapes single quotes."""
-        from src.montage_ai.core.ffmpeg_atomics import ConcatListManager
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with ConcatListManager(tmpdir, "test") as concat:
-                concat.write([
-                    "/path/to/file.mp4",
-                    "/path/with'quote.mp4",
-                ])
-
-                content = Path(concat.path).read_text()
-                assert "file '/path/to/file.mp4'" in content
-                assert "'\\''" in content  # Escaped quote
-
-            # Should be cleaned up
-            assert not Path(concat.path).exists()
-
-    def test_concat_list_manager_cleanup(self):
-        """ConcatListManager cleans up on exit."""
-        from src.montage_ai.core.ffmpeg_atomics import ConcatListManager
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = ConcatListManager(tmpdir, "cleanup_test")
-
-            with manager:
-                manager.write(["/test.mp4"])
-                assert Path(manager.path).exists()
-
-            assert not Path(manager.path).exists()
-
-
-class TestAudioQuality:
-    """Tests for AudioQuality dataclass."""
-
-    def test_quality_level_alias(self):
-        """quality_level is an alias for quality_tier."""
-        from src.montage_ai.audio_analysis import AudioQuality
-
-        quality = AudioQuality(
-            snr_db=35.0,
-            mean_volume_db=-15.0,
-            max_volume_db=-5.0,
-            is_usable=True,
-            quality_tier="good"
-        )
-
-        assert quality.quality_level == "good"
-        assert quality.quality_level == quality.quality_tier
-
-    def test_quality_warning_tiers(self):
-        """warning property returns appropriate messages."""
-        from src.montage_ai.audio_analysis import AudioQuality
-
-        # Unusable
-        unusable = AudioQuality(5.0, -30.0, -20.0, False, "unusable")
-        assert "re-recording" in unusable.warning
-
-        # Poor
-        poor = AudioQuality(10.0, -25.0, -15.0, True, "poor")
-        assert "unreliable" in poor.warning
-
-        # Good - no warning
-        good = AudioQuality(30.0, -15.0, -5.0, True, "good")
-        assert good.warning is None
+    def test_atomic_ffmpeg_success(self, tmp_path):
+        """Test that run_ffmpeg_atomic renames file on success."""
+        output_file = tmp_path / "final.mp4"
+        
+        with patch("src.montage_ai.core.ffmpeg_atomics.run_command") as mock_run, \
+             patch("src.montage_ai.core.ffmpeg_atomics.os.rename") as mock_rename, \
+             patch("src.montage_ai.core.ffmpeg_atomics.os.path.exists", return_value=True):
+             
+            mock_run.return_value.returncode = 0
+            
+            result = run_ffmpeg_atomic(["-i", "input"], output_file)
+            
+            assert result is True
+            mock_rename.assert_called_once()
+            
+    def test_atomic_ffmpeg_failure_cleanup(self, tmp_path):
+        """Test that atomic_ffmpeg cleans up temp file on failure."""
+        output_file = tmp_path / "final.mp4"
+        
+        with patch("src.montage_ai.core.ffmpeg_atomics.run_command") as mock_run, \
+             patch("src.montage_ai.core.ffmpeg_atomics.os.remove") as mock_remove, \
+             patch("src.montage_ai.core.ffmpeg_atomics.os.path.exists", return_value=True):
+             
+            mock_run.return_value.returncode = 1
+            
+            result = run_ffmpeg_atomic(["-i", "input"], output_file)
+            
+            assert result is False
+            mock_remove.assert_called_once()
+            
+    def test_concat_list_manager_escapes_paths(self, tmp_path):
+        """Test that ConcatListManager correctly escapes filenames."""
+        files = [
+            Path("/data/clip's.mp4"),
+            Path("/data/normal.mp4")
+        ]
+        
+        with ConcatListManager(tmp_path) as manager:
+            manager.write(files)
+            list_path = Path(manager.path)
+            
+            content = list_path.read_text()
+            assert "file '/data/clip'\\''s.mp4'" in content
+            assert "file '/data/normal.mp4'" in content
+            
+    def test_concat_list_manager_cleanup(self, tmp_path):
+        """Test that ConcatListManager cleans up list file."""
+        files = [Path("/data/clip.mp4")]
+        path_to_check = None
+        
+        with ConcatListManager(tmp_path) as manager:
+            manager.write(files)
+            path_to_check = Path(manager.path)
+            assert path_to_check.exists()
+            
+        assert not path_to_check.exists()

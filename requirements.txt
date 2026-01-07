@@ -8,7 +8,7 @@ proglog>=0.1.10
 tqdm>=4.66.0
 scenedetect[opencv]>=0.6.4
 requests>=2.32.0
-numpy>=1.24.0,<2.4  # numba 0.60.0 requires numpy<2.4
+numpy>=1.24.0,<2.0 # Pinned <2.0 for ecosystem compatibility (numba, moviepy, pytest)
 scipy>=1.10.0  # For mathematical path optimization (Smart Reframing)
 
 # Color Matching (Shot-to-Shot consistency)

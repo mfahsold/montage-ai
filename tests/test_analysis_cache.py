@@ -136,13 +136,13 @@ class TestAnalysisCache:
         # Create mock beat_info and energy_profile
         beat_info = MagicMock()
         beat_info.tempo = 120.0
-        beat_info.beat_times = np.array([0.5, 1.0, 1.5])
+        beat_info.beat_times.tolist.return_value = [0.5, 1.0, 1.5]
         beat_info.duration = 60.0
         beat_info.sample_rate = 22050
 
         energy_profile = MagicMock()
-        energy_profile.times = np.array([0.0, 0.5, 1.0])
-        energy_profile.rms = np.array([0.2, 0.8, 0.5])
+        energy_profile.times.tolist.return_value = [0.0, 0.5, 1.0]
+        energy_profile.rms.tolist.return_value = [0.2, 0.8, 0.5]
 
         # Save
         success = cache.save_audio(audio_file, beat_info, energy_profile)
@@ -178,7 +178,7 @@ class TestAnalysisCache:
         energy_profile.times = np.array([0.0])
         energy_profile.rms = np.array([0.5])
 
-        cache.save_audio(audio_file, beat_info, energy_profile)
+        assert cache.save_audio(audio_file, beat_info, energy_profile) is True
 
         # Verify cache hit
         assert cache.load_audio(audio_file) is not None
@@ -323,13 +323,13 @@ class TestAnalysisCache:
         """clear_audio_cache removes cache file."""
         beat_info = MagicMock()
         beat_info.tempo = 120.0
-        beat_info.beat_times = np.array([0.5])
+        beat_info.beat_times.tolist.return_value = [0.5]
         beat_info.duration = 30.0
         beat_info.sample_rate = 22050
 
         energy_profile = MagicMock()
-        energy_profile.times = np.array([0.0])
-        energy_profile.rms = np.array([0.5])
+        energy_profile.times.tolist.return_value = [0.0]
+        energy_profile.rms.tolist.return_value = [0.5]
 
         cache.save_audio(audio_file, beat_info, energy_profile)
         assert cache.load_audio(audio_file) is not None
