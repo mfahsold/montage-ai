@@ -7,10 +7,10 @@ listen = ['default']
 
 def start_worker():
     settings = get_settings()
-    # Use REDIS_URL or construct from host/port
-    redis_host = os.getenv('REDIS_HOST', 'localhost')
-    redis_port = int(os.getenv('REDIS_PORT', 6379))
-    
+    # Use centralized session config (fallback to localhost if unset)
+    redis_host = settings.session.redis_host or 'localhost'
+    redis_port = settings.session.redis_port
+
     conn = redis.Redis(host=redis_host, port=redis_port)
     
     print(f"Starting RQ worker listening on {listen}...")

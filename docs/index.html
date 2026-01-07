@@ -23,6 +23,9 @@
     
     <!-- Canonical URL -->
     <link rel="canonical" href="https://mfahsold.github.io/montage-ai/">
+    <meta name="robots" content="index, follow">
+    <!-- Privacy-friendly analytics: Plausible (override src to self-host if preferred) -->
+    <script defer data-domain="mfahsold.github.io/montage-ai" src="https://plausible.io/js/script.js"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,6 +55,38 @@
       "featureList": "Beat-sync montages, Transcript editing, OTIO/EDL export, Vertical video (9:16), Quality profiles, Local processing, Privacy-first, Story Engine, Color Grading (16+ presets), Dialogue Ducking, Film Grain Simulation, Recipe Cards, Multi-GPU Encoding, Distributed Rendering, Smart Reframing, Highlight Detection, Caption Styles"
     }
     </script>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": "Is Montage AI offline and private?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes. Montage AI is local-first with no tracking or uploads. Cloud GPU is optional for upscaling and transcription."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Does Montage AI support vertical video?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Shorts Studio auto-reframes 16:9 to 9:16 with face tracking, beat alignment, and caption presets."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Can I export to professional NLEs?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes. Montage AI exports OTIO/EDL for DaVinci Resolve, Premiere Pro, and Final Cut workflows."
+                    }
+                }
+            ]
+        }
+        </script>
 </head>
 <body>
     <div class="container">
@@ -271,6 +306,8 @@
                 <a href="features.md">Features</a>
                 <a href="getting-started.md">Docs</a>
                 <a href="COMPETITIVE_ANALYSIS.md">Analysis</a>
+                <a href="privacy.html">Privacy</a>
+                <a href="imprint.html">Imprint</a>
             </div>
             <p class="copyright">© 2026 Montage AI · <a href="https://github.com/mfahsold/montage-ai/blob/main/LICENSE">PolyForm NC</a></p>
         </footer>

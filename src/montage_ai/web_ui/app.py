@@ -132,9 +132,9 @@ from redis import Redis
 from ..core.job_store import JobStore
 from ..tasks import run_montage, run_transcript_render
 
-# Redis connection
-redis_host = os.getenv('REDIS_HOST', 'localhost')
-redis_port = int(os.getenv('REDIS_PORT', 6379))
+# Redis connection (centralized via settings)
+redis_host = _settings.session.redis_host or 'localhost'
+redis_port = _settings.session.redis_port
 redis_conn = Redis(host=redis_host, port=redis_port)
 q = Queue(connection=redis_conn)
 job_store = JobStore()
@@ -1489,7 +1489,8 @@ def api_session_render_preview(session_id):
 # =============================================================================
 
 # Create upload directory for transcript videos
-TRANSCRIPT_UPLOAD_DIR = Path(os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_transcript"))
+from ..config import get_settings
+TRANSCRIPT_UPLOAD_DIR = get_settings().paths.transcript_dir
 TRANSCRIPT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -1763,7 +1764,7 @@ def api_transcript_export():
 # =============================================================================
 
 # Create upload directory for shorts videos
-SHORTS_UPLOAD_DIR = Path(os.environ.get("SHORTS_DIR", "/tmp/montage_shorts"))
+SHORTS_UPLOAD_DIR = get_settings().paths.shorts_dir
 SHORTS_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

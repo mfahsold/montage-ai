@@ -38,8 +38,6 @@ except ImportError:
     OPENAI_AVAILABLE = False
     OpenAI = None
 
-from .config import get_settings
-
 VERSION = "0.3.0"
 
 # Backend configuration
@@ -47,13 +45,6 @@ VERSION = "0.3.0"
 
 def _get_llm_config():
     return get_settings().llm
-
-# OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.)
-# These are now accessed via get_settings().llm.* inside functions to ensure fresh config
-# Keeping them as properties for backward compatibility if needed, but pointing to config
-
-# Google AI (direct API)
-GOOGLE_AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
 class CreativeDirector:
@@ -471,7 +462,7 @@ class CreativeDirector:
         try:
             # cgpu serve (Gemini) via OpenAI Responses API
             response = self.cgpu_client.responses.create(
-                model=os.environ.get("CGPU_MODEL", "gemini-2.0-flash"),
+                model=self.llm_config.cgpu_model,
                 instructions=system_prompt,
                 input=user_prompt,
             )

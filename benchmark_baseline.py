@@ -162,11 +162,11 @@ class TestDataManager:
     """Manages test video and audio files."""
     
     def __init__(self):
-        # Use /data directory if it exists, otherwise fall back to test_data
+        # Use /data directory if it exists, otherwise fall back to repo data
         if Path("/data").exists() and (Path("/data") / "input").exists():
             self.data_dir = Path("/data")
         else:
-            self.data_dir = Path(__file__).parent / "test_data"
+            self.data_dir = Path(__file__).parent / "data"
         
         self.input_dir = self.data_dir / "input"
         self.music_dir = self.data_dir / "music"

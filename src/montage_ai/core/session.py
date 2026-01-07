@@ -22,22 +22,19 @@ except ImportError:
     redis = None
 
 from ..logger import logger
+from ..config import get_settings
 
-SESSION_DIR = Path(os.environ.get("SESSION_DIR", "/tmp/montage_sessions"))
+_settings = get_settings()
+SESSION_DIR = _settings.paths.session_dir
 SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
-# Redis Configuration
-REDIS_HOST = os.environ.get("REDIS_HOST")
-# Note: Kubernetes sets REDIS_PORT as URL when service named 'redis' exists
-_redis_port_env = os.environ.get("REDIS_SERVICE_PORT", os.environ.get("REDIS_PORT", "6379"))
-REDIS_PORT = int(_redis_port_env) if _redis_port_env.isdigit() else 6379
 redis_client = None
 
-if REDIS_HOST and redis:
+if _settings.session.redis_host and redis:
     try:
-        redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+        redis_client = redis.Redis(host=_settings.session.redis_host, port=_settings.session.redis_port, decode_responses=True)
         redis_client.ping()
-        logger.info(f"Connected to Redis at {REDIS_HOST}:{REDIS_PORT}")
+        logger.info(f"Connected to Redis at {_settings.session.redis_host}:{_settings.session.redis_port}")
     except Exception as e:
         logger.warning(f"Failed to connect to Redis: {e}. Falling back to file storage.")
         redis_client = None

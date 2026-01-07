@@ -660,8 +660,10 @@ class OutputProfileBuilder:
         common_fps = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60]
         target_fps = min(common_fps, key=lambda f: abs(f - raw_fps))
 
-        # Codec selection: honor env override, otherwise follow dominant input
-        env_codec = os.environ.get("OUTPUT_CODEC")
+        # Codec selection: honor centralized settings, otherwise follow dominant input
+        from .config import get_settings
+        settings = get_settings()
+        env_codec = settings.encoding.codec
         codec_map = {"hevc": "libx265", "h265": "libx265", "h264": "libx264", "avc": "libx264"}
         input_codec_weights: Dict[str, float] = {}
         for meta, weight in zip(metadata_list, weights):
@@ -672,7 +674,7 @@ class OutputProfileBuilder:
         target_codec = codec_map.get(env_codec.lower(), "libx264") if env_codec else codec_map.get(dominant_input_codec, "libx264")
 
         # Pixel format selection
-        env_pix_fmt = os.environ.get("OUTPUT_PIX_FMT")
+        env_pix_fmt = settings.encoding.pix_fmt
         pix_fmt_weights: Dict[str, float] = {}
         for meta, weight in zip(metadata_list, weights):
             pf = meta.pix_fmt or "yuv420p"
@@ -697,11 +699,11 @@ class OutputProfileBuilder:
         # Profile/level: keep safe defaults, bump level for 4K/high fps
         high_res = max_long_side >= 3200 or target_fps > 60
         if target_codec == "libx265":
-            target_profile = os.environ.get("OUTPUT_PROFILE") or "main"
-            target_level = os.environ.get("OUTPUT_LEVEL") or ("5.1" if high_res else "4.0")
+            target_profile = settings.encoding.profile or "main"
+            target_level = settings.encoding.level or ("5.1" if high_res else "4.0")
         else:
-            target_profile = os.environ.get("OUTPUT_PROFILE") or "high"
-            target_level = os.environ.get("OUTPUT_LEVEL") or ("5.1" if high_res else "4.1")
+            target_profile = settings.encoding.profile or "high"
+            target_level = settings.encoding.level or ("5.1" if high_res else "4.1")
 
         return OutputProfile(
             width=target_w,

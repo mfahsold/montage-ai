@@ -8,7 +8,7 @@ proglog>=0.1.10
 tqdm>=4.66.0
 scenedetect[opencv]>=0.6.4
 requests>=2.32.0
-numpy>=2.0.0,<2.3.0 # Pinned >=2.0,<2.3 for opencv-python + librosa compatibility
+numpy>=2.4.0,<3.0.0  # Keep modern numpy; avoid legacy numba/librosa pinning
 scipy>=1.10.0  # For mathematical path optimization (Smart Reframing)
 
 # Color Matching (Shot-to-Shot consistency)
@@ -38,8 +38,8 @@ redis>=5.0.0
 rq>=1.16.0
 
 # Audio Analysis
-librosa>=0.10.2,<0.11  # Requires NumPy >=2.0,<2.3
-numba>=0.60.0,<0.61  # Requires NumPy >=2.0,<2.3
+# librosa/numba omitted to avoid numpy pinning; audio_analysis falls back to FFmpeg when unavailable.
+# If you need librosa features, install it separately with a compatible numpy/numba pair.
 opentimelineio>=0.15.0
 
 # OPTIMIZATION Phase 3: msgpack for 22x faster cache serialization

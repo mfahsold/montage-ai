@@ -37,7 +37,6 @@ from pathlib import Path
 import numpy as np
 
 from .config import get_settings
-from .config_thresholds import ThresholdConfig
 from .logger import logger
 from .core.cmd_runner import run_command, CommandError
 from .ffmpeg_utils import build_ffmpeg_cmd
@@ -183,9 +182,9 @@ def _detect_with_silero(audio_path: str, sample_rate: int = 16000) -> List[Dialo
         wav,
         model,
         sampling_rate=sample_rate,
-        threshold=ThresholdConfig.speech_detection(),
-        min_speech_duration_ms=ThresholdConfig.speech_min_duration(),
-        min_silence_duration_ms=ThresholdConfig.speech_min_silence(),
+        threshold=_settings.thresholds.speech_threshold,
+        min_speech_duration_ms=_settings.thresholds.speech_min_duration_ms,
+        min_silence_duration_ms=_settings.thresholds.speech_min_silence_ms,
         window_size_samples=512,
         speech_pad_ms=30,
     )
@@ -218,12 +217,12 @@ def _detect_with_ffmpeg(audio_path: str, duration: float) -> List[DialogueSegmen
     but works without additional dependencies.
     """
     # Step 1: Run silencedetect with voice-appropriate threshold
-    # Voice threshold: uses ThresholdConfig.silence_detection()
-    # Minimum silence: uses ThresholdConfig.silence_duration()
+    # Voice threshold: from settings.thresholds.silence_level_db
+    # Minimum silence: from settings.thresholds.silence_duration_s
     cmd = build_ffmpeg_cmd(
         [
             "-i", audio_path,
-            "-af", f"silencedetect=n={ThresholdConfig.silence_detection()}dB:d={ThresholdConfig.silence_duration()}",
+            "-af", f"silencedetect=n={_settings.thresholds.silence_level_db}dB:d={_settings.thresholds.silence_duration_s}",
             "-f", "null", "-"
         ],
         overwrite=False

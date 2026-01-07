@@ -1,0 +1,450 @@
+---
+# Global Configuration Values for Fluxibri K3s Cluster
+# DRY (Don't Repeat Yourself) principle - single source of truth
+# KISS (Keep It Simple, Stupid) - minimal configuration complexity
+
+# =============================================================================
+# Registry Configuration (SINGLE SOURCE OF TRUTH)
+# =============================================================================
+registry:
+  # Primary registry for all cluster images
+  host: "192.168.1.12"
+  port: 5000
+  url: "192.168.1.12:5000"
+  
+  # Alternative access (LoadBalancer NodePort)
+  nodePort: 30500
+  
+  # Registry namespace
+  namespace: "registry"
+  
+  # Common image prefixes (DRY - use these everywhere)
+  images:
+    exo: "192.168.1.12:5000/exo"
+    montage: "192.168.1.12:5000/montage-ai"
+    axera: "192.168.1.12:5000/fluxibri-axera-worker"
+    comfyui: "192.168.1.12:5000/comfyui"
+    n8n: "192.168.1.12:5000/n8n"
+    openwebui: "192.168.1.12:5000/open-webui"
+    # MCP Servers (Official Anthropic)
+    mcp_filesystem: "192.168.1.12:5000/fluxibri/mcp-filesystem"
+    mcp_fetch: "192.168.1.12:5000/fluxibri/mcp-fetch"
+    mcp_git: "192.168.1.12:5000/fluxibri/mcp-git"
+    mcp_sqlite: "192.168.1.12:5000/fluxibri/mcp-sqlite"
+    mcp_puppeteer: "192.168.1.12:5000/fluxibri/mcp-puppeteer"
+
+# =============================================================================
+# Cluster Network Configuration (SINGLE SOURCE OF TRUTH)
+# =============================================================================
+cluster:
+  # Control plane
+  controlPlane:
+    host: "192.168.1.12"
+    port: 6443
+    apiServer: "https://192.168.1.12:6443"
+  
+  # Worker nodes (for node-specific targeting)
+  nodes:
+    - name: "control-plane"
+      ip: "192.168.1.12"
+      arch: "arm64"
+      role: "control-plane"
+    - name: "jetson"
+      ip: "192.168.1.15"
+      arch: "arm64"
+      gpu: "nvidia-tegra"
+      role: "worker"
+    - name: "gpu-station"
+      ip: "192.168.1.16"
+      arch: "amd64"
+      gpu: "amd-rocm"
+      role: "worker"
+    - name: "pi5-worker"
+      ip: "192.168.1.17"
+      arch: "arm64"
+      role: "worker"
+    - name: "x86-worker-1"
+      ip: "192.168.1.37"
+      arch: "amd64"
+      role: "worker"
+    - name: "x86-worker-2"
+      ip: "192.168.1.157"
+      arch: "amd64"
+      role: "worker"
+    - name: "snapdragon-laptop"
+      ip: "192.168.1.237"
+      arch: "arm64"
+      gpu: "qualcomm-adreno"
+      role: "worker"
+
+  # DNS/Service mesh
+  clusterDomain: "cluster.local"
+  serviceCIDR: "10.43.0.0/16"
+  podCIDR: "10.42.0.0/16"
+  
+  # DNS hostnames (DRY - single source for all ingress rules)
+  hostnames:
+    exo: "exo.fluxibri.lan"
+    api: "api.fluxibri.lan"
+    openwebui: "openwebui.fluxibri.lan"
+    grafana: "grafana.fluxibri.lan"
+    prometheus: "prometheus.fluxibri.lan"
+    n8n: "n8n.fluxibri.lan"
+    comfyui: "comfyui.fluxibri.lan"
+    searxng: "search.fluxibri.lan"
+    mcp: "mcp.fluxibri.lan"
+    immich: "immich.fluxibri.lan"
+    registry: "registry.fluxibri.lan"
+  
+  # Service ports (SOTA - canonical port assignments)
+  services:
+    mcp:
+      router: 8200
+      filesystem: 3000
+      fetch: 5000
+      git: 5001
+      sqlite: 3003
+      puppeteer: 3004
+    exo:
+      api: 8000
+      metrics: 9090
+    prometheus: 9090
+    grafana: 3000
+    kepler: 8888
+
+# =============================================================================
+# Deployment Defaults (DRY - consistent replica counts)
+# =============================================================================
+deployments:
+  # Standard replica counts for different availability tiers
+  replicas:
+    single: 1        # Non-HA services (registry, single-node databases)
+    ha: 2            # HA services (routers, gateways)
+    scaled: 3        # Load-balanced services (fetch, search)
+    daemonset: null  # Node-local services (exo, kepler)
+  
+  # Common restart policies
+  restartPolicy: "Always"
+  
+  # Default update strategy
+  updateStrategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+
+# =============================================================================
+# Resource Defaults (DRY - consistent across all services)
+# =============================================================================
+resources:
+  # Default resource requests/limits for different tiers
+  tiers:
+    minimal:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+    
+    small:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+    
+    medium:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    
+    large:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "8"
+        memory: "16Gi"
+    
+    gpu:
+      requests:
+        cpu: "1"
+        memory: "4Gi"
+      limits:
+        cpu: "16"
+        memory: "32Gi"
+
+# =============================================================================
+# Common Labels & Annotations (KISS - standardized metadata)
+# =============================================================================
+labels:
+  # Standard Kubernetes labels (use these consistently)
+  app: "app.kubernetes.io/name"
+  version: "app.kubernetes.io/version"
+  component: "app.kubernetes.io/component"
+  partOf: "app.kubernetes.io/part-of"
+  managedBy: "app.kubernetes.io/managed-by"
+  instance: "app.kubernetes.io/instance"
+  
+  # Fluxibri custom labels
+  project: "fluxibri.ai/project"
+  tier: "fluxibri.ai/tier"
+  gpu: "fluxibri.ai/gpu-enabled"
+  arch: "fluxibri.ai/architecture"
+
+annotations:
+  # Common annotations
+  description: "fluxibri.ai/description"
+  documentation: "fluxibri.ai/documentation"
+  monitoring: "prometheus.io/scrape"
+  backupPolicy: "fluxibri.ai/backup-policy"
+
+# =============================================================================
+# Storage Configuration (DRY - centralized PVC settings)
+# =============================================================================
+storage:
+  # Storage classes
+  classes:
+    default: "local-path"
+    nfs: "nfs-client"
+    fast: "local-path"  # SSD on GPU nodes
+  
+  # Common PVC templates
+  pvc:
+    models:
+      storageClass: "nfs-client"
+      size: "500Gi"
+      accessMode: "ReadWriteMany"
+    
+    data:
+      storageClass: "local-path"
+      size: "100Gi"
+      accessMode: "ReadWriteOnce"
+    
+    cache:
+      storageClass: "local-path"
+      size: "50Gi"
+      accessMode: "ReadWriteOnce"
+
+  # NFS server
+  nfs:
+    server: "192.168.1.16"
+    path: "/mnt/nfs-models"
+
+# =============================================================================
+# Image Versions (SINGLE SOURCE OF TRUTH - update once, apply everywhere)
+# =============================================================================
+imageVersions:
+  # Base images
+  alpine: "3.19"
+  busybox: "1.36"
+  ubuntu: "22.04"
+  python: "3.11-slim"
+  
+  # Tools
+  kubectl: "bitnami/kubectl:1.31"
+  git: "alpine/git:2.43.0"
+  kaniko: "gcr.io/kaniko-project/executor:v1.23.2"
+  
+  # AI/ML backends
+  ollama: "ollama/ollama:0.11.11"
+  vllm: "vllm/vllm-openai:v0.6.6"
+  exo: "192.168.1.12:5000/exo:latest"
+  
+  # Applications
+  openwebui: "ghcr.io/open-webui/open-webui:main"
+  n8n: "n8nio/n8n:latest"
+  comfyui: "yanwk/comfyui-boot:latest"
+  
+  # Monitoring
+  prometheus: "prom/prometheus:v2.48.0"
+  grafana: "grafana/grafana:10.2.2"
+  kepler: "quay.io/sustainable_computing_io/kepler:latest"
+
+# =============================================================================
+# Service Ports (DRY - consistent port allocation)
+# =============================================================================
+ports:
+  # Inference APIs
+  exo: 8000
+  ollama: 11434
+  vllm: 8080
+  kubeai: 8080
+  
+  # Web UIs
+  openwebui: 8080
+  n8n: 5678
+  comfyui: 8188
+  grafana: 3000
+  
+  # Monitoring
+  prometheus: 9090
+  kepler: 8888
+  metricsServer: 4443
+  
+  # Infrastructure
+  registry: 5000
+  registryNodePort: 30500
+  apiServer: 6443
+
+# =============================================================================
+# GPU Configuration (Platform-specific settings)
+# =============================================================================
+gpu:
+  # AMD ROCm
+  amd:
+    enabled: true
+    env:
+      HSA_OVERRIDE_GFX_VERSION: "11.0.0"
+      HIP_DEVICE_ORDER: "PCI"
+      HIP_VISIBLE_DEVICES: "all"
+    devices:
+      - /dev/dri
+      - /dev/kfd
+    hostPaths:
+      - path: /opt/rocm
+        mountPath: /opt/rocm
+  
+  # NVIDIA CUDA/Tegra
+  nvidia:
+    enabled: true
+    env:
+      CUDA_DEVICE_ORDER: "PCI"
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+    devices:
+      - /dev/nvidia0
+      - /dev/nvidiactl
+      - /dev/nvidia-uvm
+    hostPaths:
+      - path: /usr/local/cuda
+        mountPath: /usr/local/cuda
+      - path: /usr/lib/aarch64-linux-gnu/tegra
+        mountPath: /usr/lib/aarch64-linux-gnu/tegra
+  
+  # Qualcomm Adreno (tinygrad)
+  adreno:
+    enabled: true
+    env:
+      TINYGRAD_GPU: "1"
+    devices:
+      - /dev/dri/renderD128
+    hostPaths:
+      - path: /lib/firmware/qcom
+        mountPath: /lib/firmware/qcom
+
+# =============================================================================
+# Backup & Maintenance (Automated policies)
+# =============================================================================
+maintenance:
+  # Cleanup policies
+  cleanup:
+    schedule: "0 2 * * 0"  # Every Sunday at 2 AM
+    retentionDays: 7
+    targets:
+      - failed-pods
+      - completed-jobs
+      - orphaned-replicasets
+  
+  # Backup policies
+  backup:
+    registry:
+      enabled: true
+      schedule: "0 3 * * *"  # Daily at 3 AM
+      retention: 7
+    
+    prometheus:
+      enabled: true
+      schedule: "0 4 * * *"  # Daily at 4 AM
+      retention: 14
+
+# =============================================================================
+# Monitoring & Observability
+# =============================================================================
+monitoring:
+  # Prometheus scraping defaults
+  prometheus:
+    scrapeInterval: "30s"
+    evaluationInterval: "30s"
+    retentionTime: "15d"
+  
+  # Grafana defaults
+  grafana:
+    adminUser: "admin"
+    theme: "dark"
+  
+  # Kepler (energy monitoring)
+  kepler:
+    enabled: true
+    updateInterval: "5s"
+
+# =============================================================================
+# Networking & Ingress (Traefik configuration)
+# =============================================================================
+ingress:
+  # Domain configuration
+  domain: "fluxibri.lan"
+  tlsEnabled: true
+  
+  # Common ingress class
+  ingressClass: "traefik"
+  
+  # Certificate configuration
+  certificates:
+    issuer: "selfsigned"
+    secretName: "fluxibri-tls"
+
+# =============================================================================
+# Build Configuration (Multi-arch builds)
+# =============================================================================
+build:
+  # Buildkit settings
+  buildkit:
+    version: "v0.13.2"
+    cacheMode: "max"
+    platforms:
+      - "linux/amd64"
+      - "linux/arm64"
+  
+  # Tekton pipeline defaults
+  tekton:
+    serviceAccount: "tekton-build-sa"
+    workspace: "source"
+    timeout: "30m"
+
+# =============================================================================
+# Security & RBAC (Cluster-wide policies)
+# =============================================================================
+security:
+  # Pod security standards
+  podSecurityStandard: "restricted"
+  
+  # Network policies
+  networkPolicies:
+    enabled: true
+    defaultDeny: false
+  
+  # RBAC
+  rbac:
+    enabled: true
+    defaultServiceAccount: "default"
+
+# =============================================================================
+# Feature Flags (Enable/disable components)
+# =============================================================================
+features:
+  exo: true
+  kubeai: false  # Replaced by Exo
+  ollama: false  # Legacy, replaced by Exo
+  tekton: true
+  kepler: true
+  prometheus: true
+  grafana: true
+  openwebui: true
+  n8n: true
+  zrok: true

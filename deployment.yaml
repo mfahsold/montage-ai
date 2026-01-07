@@ -1,0 +1,137 @@
+---
+# Montage-AI Web UI Deployment
+# Deploys to AMD GPU node for hardware-accelerated video processing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-web
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: web-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: montage-ai
+      app.kubernetes.io/component: web-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: web-ui
+    spec:
+      # Target AMD GPU node for video encoding/upscaling
+      # PVs are bound to this node
+      nodeSelector:
+        accelerator: amd-gpu
+        tier: render
+      containers:
+      - name: montage-ai
+        # Flux Image Automation will update this tag automatically
+        # {"$imagepolicy": "montage-ai:montage-ai"}
+        image: 192.168.1.16:30500/montage-ai:latest
+        imagePullPolicy: Always
+        # Web UI entrypoint
+        command: ["python", "-u", "-m", "montage_ai.web_ui.app"]
+        ports:
+        - name: http
+          containerPort: 5000
+          protocol: TCP
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: INPUT_DIR
+          value: "/data/input"
+        - name: MUSIC_DIR
+          value: "/data/music"
+        - name: OUTPUT_DIR
+          value: "/data/output"
+        - name: ASSETS_DIR
+          value: "/data/assets"
+        # === LLM Configuration (KubeAI) ===
+        # OpenAI-compatible API (recommended)
+        - name: OPENAI_API_BASE
+          value: "http://kubeai.kubeai-system.svc.cluster.local/openai/v1"
+        - name: OPENAI_MODEL
+          value: "gemma3-4b"  # Fast text generation for Creative Director
+        - name: OPENAI_VISION_MODEL
+          value: "moondream2"  # For frame/scene analysis
+        - name: LLM_TIMEOUT_SECONDS
+          value: "120"
+        # Legacy Ollama endpoint (for backwards compatibility)
+        - name: OLLAMA_HOST
+          value: "http://ollama.kubeai-system.svc.cluster.local:11434"
+        # === Processing settings ===
+        - name: VERBOSE
+          value: "true"
+        - name: MAX_CONCURRENT_JOBS
+          value: "1"
+        - name: ENHANCE
+          value: "true"
+        - name: PARALLEL_ENHANCE
+          value: "false"
+        - name: MAX_PARALLEL_JOBS
+          value: "2"
+        - name: FFMPEG_THREADS
+          value: "4"
+        # Default style
+        - name: CUT_STYLE
+          value: "dynamic"
+        volumeMounts:
+        - name: input
+          mountPath: /data/input
+        - name: music
+          mountPath: /data/music
+        - name: output
+          mountPath: /data/output
+        - name: assets
+          mountPath: /data/assets
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1"
+          limits:
+            memory: "16Gi"
+            cpu: "4"
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: input
+        persistentVolumeClaim:
+          claimName: montage-ai-input
+      - name: music
+        persistentVolumeClaim:
+          claimName: montage-ai-music
+      - name: output
+        persistentVolumeClaim:
+          claimName: montage-ai-output
+      - name: assets
+        persistentVolumeClaim:
+          claimName: montage-ai-assets
+---
+# Output PVC (if not exists)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-output
+  namespace: montage-ai
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 100Gi

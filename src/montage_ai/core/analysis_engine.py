@@ -57,14 +57,12 @@ class AssetAnalyzer:
 
         profile = _determine_profile(self.ctx.media.video_files)
         
-        # Override if EXPORT_WIDTH/HEIGHT are explicitly set in env
-        env_width = os.environ.get("EXPORT_WIDTH")
-        env_height = os.environ.get("EXPORT_HEIGHT")
-        
-        if env_width and env_height:
+        # Override if export resolution explicitly requested
+        export_cfg = self.settings.export
+        if export_cfg.explicit_resolution_override:
              try:
-                 w = int(env_width)
-                 h = int(env_height)
+                 w = int(export_cfg.resolution_width)
+                 h = int(export_cfg.resolution_height)
                  logger.info(f"   🔧 Explicit resolution override: {w}x{h}")
                  profile.width = w
                  profile.height = h
@@ -75,7 +73,7 @@ class AssetAnalyzer:
                  else:
                      profile.orientation = "square"
                  profile.reason = "explicit_override"
-             except ValueError:
+             except (TypeError, ValueError):
                  pass
 
         # Override for Shorts Mode
@@ -291,8 +289,8 @@ class AssetAnalyzer:
         self.ctx.media.all_scenes = []
         self.ctx.media.all_scenes_dicts = []
 
-        # Scene detection threshold (from scenedetect defaults)
-        threshold = 30.0
+        # Scene detection threshold (centralized)
+        threshold = self.settings.thresholds.scene_threshold
         cache = get_analysis_cache()
         cache_hits = 0
         uncached_videos = []
@@ -314,10 +312,11 @@ class AssetAnalyzer:
         if uncached_videos:
             # PHASE 5: Scale with available cores (cluster-optimized)
             cpu_count = os.cpu_count() or 2
+            cfg_workers = self.settings.processing.max_scene_workers
             max_workers = min(
                 len(uncached_videos),
                 max(4, cpu_count // 2),  # Use 50% of cores (reserve for system)
-                int(os.environ.get("MAX_SCENE_WORKERS", str(cpu_count)))  # Allow override
+                cfg_workers
             )
             logger.info(f"   🚀 ProcessPool scene detection ({len(uncached_videos)} videos, {max_workers}/{cpu_count} CPU workers)")
             

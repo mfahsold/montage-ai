@@ -35,6 +35,7 @@ from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
 
 from .logger import logger
+from .config import get_settings
 
 
 @dataclass
@@ -132,7 +133,9 @@ class TelemetryCollector:
     MAX_HISTORY = 1000  # Max jobs to keep in history
 
     def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path or Path("/data/output/telemetry")
+        base_output = get_settings().paths.output_dir
+        default_storage = base_output / "telemetry"
+        self.storage_path = Path(storage_path) if storage_path else default_storage
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         self._lock = threading.Lock()

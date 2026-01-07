@@ -37,12 +37,28 @@ class PathConfig:
     # /dev/shm is tmpfs mounted in RAM, falls back to /tmp if not available
     temp_dir: Path = field(default_factory=lambda: Path(os.environ.get("TEMP_DIR") or ("/dev/shm" if Path("/dev/shm").exists() and Path("/dev/shm").is_dir() else "/tmp")))
     lut_dir: Path = field(default_factory=lambda: Path(os.environ.get("LUT_DIR", "/data/luts")))
+    session_dir: Path = field(default_factory=lambda: Path(os.environ.get("SESSION_DIR", "/tmp/montage_sessions")))
+    transcript_dir: Path = field(default_factory=lambda: Path(os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_transcript")))
+    shorts_dir: Path = field(default_factory=lambda: Path(os.environ.get("SHORTS_DIR", "/tmp/montage_shorts")))
+    metadata_cache_dir: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("METADATA_CACHE_DIR")
+            or Path(os.environ.get("OUTPUT_DIR", "/data/output")) / "metadata_cache"
+        )
+    )
+    tension_metadata_dir: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("TENSION_METADATA_DIR")
+            or (Path(os.environ.get("METADATA_CACHE_DIR")) / "tension" if os.environ.get("METADATA_CACHE_DIR") else None)
+            or Path(os.environ.get("OUTPUT_DIR", "/data/output")) / "tension_analysis"
+        )
+    )
     style_preset_path: Optional[Path] = field(default_factory=lambda: Path(os.environ.get("STYLE_PRESET_PATH")) if os.environ.get("STYLE_PRESET_PATH") else None)
     style_preset_dir: Optional[Path] = field(default_factory=lambda: Path(os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")) if (os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")) else None)
 
     def ensure_directories(self) -> None:
         """Create all directories if they don't exist."""
-        for path in [self.input_dir, self.music_dir, self.output_dir, self.assets_dir]:
+        for path in [self.input_dir, self.music_dir, self.output_dir, self.assets_dir, self.metadata_cache_dir, self.tension_metadata_dir, self.session_dir, self.transcript_dir, self.shorts_dir]:
             path.mkdir(parents=True, exist_ok=True)
 
     def get_log_path(self, job_id: str) -> Path:
@@ -399,6 +415,12 @@ class ExportConfig:
     resolution_height: int = field(default_factory=lambda: int(os.environ.get("EXPORT_HEIGHT", "1920")))
     fps: float = field(default_factory=lambda: float(os.environ.get("EXPORT_FPS", "30.0")))
     project_name_template: str = field(default_factory=lambda: os.environ.get("EXPORT_PROJECT_NAME", "fluxibri_montage"))
+    explicit_resolution_override: bool = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.explicit_resolution_override = (
+            "EXPORT_WIDTH" in os.environ or "EXPORT_HEIGHT" in os.environ
+        )
 
 
 # =============================================================================
@@ -423,6 +445,7 @@ class ProcessingConfig:
     """Batch processing and performance settings."""
 
     batch_size: int = field(default_factory=lambda: int(os.environ.get("BATCH_SIZE", "25")))
+    max_scene_workers: int = field(default_factory=lambda: int(os.environ.get("MAX_SCENE_WORKERS", str(os.cpu_count() or 2))))
     force_gc: bool = field(default_factory=lambda: os.environ.get("FORCE_GC", "true").lower() == "true")
     parallel_enhance: bool = field(default_factory=lambda: os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true")
     skip_existing_outputs: bool = field(default_factory=lambda: os.environ.get("SKIP_EXISTING_OUTPUTS", "true").lower() == "true")
@@ -532,6 +555,60 @@ class AudioConfig:
 
 
 # =============================================================================
+# Thresholds Configuration (centralized)
+# =============================================================================
+@dataclass
+class ThresholdsConfig:
+    """Detection thresholds and sensitivity parameters (single source of truth).
+
+    Defaults preserve current behavior; env vars allow tuning per deployment.
+    """
+
+    # Scene detection (PySceneDetect ContentDetector)
+    scene_threshold: float = field(default_factory=lambda: float(os.environ.get("SCENE_THRESHOLD", "30.0")))
+
+    # Speech/VAD (silero/pyannote style)
+    speech_threshold: float = field(default_factory=lambda: float(os.environ.get("SPEECH_THRESHOLD", "0.5")))
+    speech_min_duration_ms: int = field(default_factory=lambda: int(os.environ.get("SPEECH_MIN_DURATION", "250")))
+    speech_min_silence_ms: int = field(default_factory=lambda: int(os.environ.get("SPEECH_MIN_SILENCE", "100")))
+
+    # Silence detection for FFmpeg silencedetect
+    # Stored without unit; append 'dB' at call sites when needed
+    silence_level_db: str = field(default_factory=lambda: os.environ.get("SILENCE_THRESHOLD", "-35"))
+    silence_duration_s: float = field(default_factory=lambda: float(os.environ.get("SILENCE_DURATION", "0.5")))
+
+    # Face detection (MediaPipe)
+    face_confidence: float = field(default_factory=lambda: float(os.environ.get("FACE_CONFIDENCE", "0.6")))
+
+    # Audio ducking thresholds (sidechaincompress)
+    ducking_core_threshold: float = field(default_factory=lambda: float(os.environ.get("DUCKING_CORE_THRESHOLD", "0.1")))
+    ducking_soft_threshold: float = field(default_factory=lambda: float(os.environ.get("DUCKING_SOFT_THRESHOLD", "0.03")))
+
+    # Music analysis
+    music_min_duration_s: float = field(default_factory=lambda: float(os.environ.get("MUSIC_MIN_DURATION", "5.0")))
+
+
+# =============================================================================
+# Session / Queue Configuration (Redis)
+# =============================================================================
+@dataclass
+class SessionConfig:
+    """Session/backing store configuration (Redis optional)."""
+
+    redis_host: Optional[str] = field(default_factory=lambda: os.environ.get("REDIS_HOST"))
+    # Prefer REDIS_SERVICE_PORT when provided by Kubernetes service env
+    _redis_port_raw: str = field(default_factory=lambda: os.environ.get("REDIS_SERVICE_PORT", os.environ.get("REDIS_PORT", "6379")))
+    
+    @property
+    def redis_port(self) -> int:
+        raw = self._redis_port_raw
+        try:
+            return int(raw) if raw and raw.isdigit() else 6379
+        except (TypeError, ValueError):
+            return 6379
+
+
+# =============================================================================
 # =============================================================================
 # File Type Configuration
 # =============================================================================
@@ -607,6 +684,8 @@ class Settings:
     high_res: ProcessingSettings = field(default_factory=ProcessingSettings)  # Phase 4: High-res support
     creative: CreativeConfig = field(default_factory=CreativeConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
+    thresholds: ThresholdsConfig = field(default_factory=ThresholdsConfig)
+    session: SessionConfig = field(default_factory=SessionConfig)
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
 
     # Job ID (generated per run)
@@ -727,6 +806,11 @@ class Settings:
             "OUTPUT_DIR": str(self.paths.output_dir),
             "ASSETS_DIR": str(self.paths.assets_dir),
             "TEMP_DIR": str(self.paths.temp_dir),
+            "METADATA_CACHE_DIR": str(self.paths.metadata_cache_dir),
+            "TENSION_METADATA_DIR": str(self.paths.tension_metadata_dir),
+            "SESSION_DIR": str(self.paths.session_dir),
+            "TRANSCRIPT_DIR": str(self.paths.transcript_dir),
+            "SHORTS_DIR": str(self.paths.shorts_dir),
             "STABILIZE": str(self.features.stabilize).lower(),
             "UPSCALE": str(self.features.upscale).lower(),
             "ENHANCE": str(self.features.enhance).lower(),
@@ -772,6 +856,20 @@ class Settings:
             "UPSCALE_TILE_SIZE": str(self.upscale.tile_size),
             "UPSCALE_CRF": str(self.upscale.crf),
             "JOB_ID": self.job_id,
+            # Threshold exports for compatibility with subprocesses/tools
+            "SCENE_THRESHOLD": str(self.thresholds.scene_threshold),
+            "SPEECH_THRESHOLD": str(self.thresholds.speech_threshold),
+            "SILENCE_THRESHOLD": str(self.thresholds.silence_level_db),
+            "SILENCE_DURATION": str(self.thresholds.silence_duration_s),
+            "FACE_CONFIDENCE": str(self.thresholds.face_confidence),
+            "DUCKING_CORE_THRESHOLD": str(self.thresholds.ducking_core_threshold),
+            "DUCKING_SOFT_THRESHOLD": str(self.thresholds.ducking_soft_threshold),
+            "MUSIC_MIN_DURATION": str(self.thresholds.music_min_duration_s),
+            "SPEECH_MIN_DURATION": str(self.thresholds.speech_min_duration_ms),
+            "SPEECH_MIN_SILENCE": str(self.thresholds.speech_min_silence_ms),
+            # Session/Redis
+            "REDIS_HOST": str(self.session.redis_host or ""),
+            "REDIS_PORT": str(self.session.redis_port),
         }
 
 

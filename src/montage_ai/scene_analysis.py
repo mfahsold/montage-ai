@@ -35,7 +35,6 @@ except ImportError:
     KDTREE_AVAILABLE = False
 
 from .config import get_settings
-from .config_thresholds import ThresholdConfig
 from .logger import logger
 from .moviepy_compat import VideoFileClip
 
@@ -209,7 +208,7 @@ class SceneDetector:
                       If None, uses ThresholdConfig.scene_detection()
             verbose: Override verbose setting
         """
-        self.threshold = threshold if threshold is not None else ThresholdConfig.scene_detection()
+        self.threshold = threshold if threshold is not None else _settings.thresholds.scene_threshold
         self.verbose = verbose if verbose is not None else _settings.features.verbose
 
     def detect(self, video_path: str, max_resolution: Optional[int] = None) -> List[Scene]:
@@ -628,9 +627,10 @@ Return ONLY valid JSON, no markdown code blocks.'''
         This is the primary backend for semantic scene analysis.
         """
         try:
-            from .cgpu_utils import CGPU_ENABLED, CGPU_HOST, CGPU_PORT, CGPU_MODEL
+            from .config import get_settings
 
-            if not CGPU_ENABLED:
+            llm = get_settings().llm
+            if not llm.cgpu_enabled:
                 return None
             
             # Skip local API key check if using cgpu-server (it handles auth)
@@ -646,12 +646,12 @@ Return ONLY valid JSON, no markdown code blocks.'''
 
             # cgpu serve exposes OpenAI-compatible Responses API at /v1
             client = OpenAI(
-                base_url=f"http://{CGPU_HOST}:{CGPU_PORT}/v1",
+                base_url=f"http://{llm.cgpu_host}:{llm.cgpu_port}/v1",
                 api_key="unused"
             )
 
             response = client.responses.create(
-                model=CGPU_MODEL,
+                model=llm.cgpu_model,
                 input=[{
                     "role": "user",
                     "content": [

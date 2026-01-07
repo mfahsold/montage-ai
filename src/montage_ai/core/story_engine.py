@@ -36,13 +36,7 @@ class StoryEngine:
 
     def _get_tension_metadata_dir(self) -> Path:
         """Resolve the directory for tension metadata."""
-        env_dir = os.environ.get("TENSION_METADATA_DIR")
-        if env_dir:
-            return Path(env_dir)
-        cache_dir = os.environ.get("METADATA_CACHE_DIR")
-        if cache_dir:
-            return Path(cache_dir) / "tension"
-        return self.ctx.paths.output_dir / "tension_analysis"
+        return self.settings.paths.tension_metadata_dir
 
     def ensure_analysis(self):
         """

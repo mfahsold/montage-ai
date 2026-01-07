@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 
 from .logger import logger
+from .config import get_settings
 
 
 class MetadataCache:
@@ -34,7 +35,7 @@ class MetadataCache:
         """
         # Allow override via environment variable if not explicitly provided
         if cache_dir is None:
-            cache_dir = os.environ.get("METADATA_CACHE_DIR")
+            cache_dir = str(get_settings().paths.metadata_cache_dir)
             
         self.cache_dir = cache_dir
         self.invalidation_hours = invalidation_hours
@@ -475,6 +476,6 @@ def get_metadata_cache(cache_dir: Optional[str] = None) -> MetadataCache:
         invalidation_hours = int(os.environ.get('CACHE_INVALIDATION_HOURS', '24'))
         # Check for env var if cache_dir not explicitly provided
         if cache_dir is None:
-            cache_dir = os.environ.get('METADATA_CACHE_DIR')
+            cache_dir = str(get_settings().paths.metadata_cache_dir)
         _default_cache = MetadataCache(cache_dir=cache_dir, invalidation_hours=invalidation_hours)
     return _default_cache

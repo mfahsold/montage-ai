@@ -15,12 +15,12 @@ Benefits:
 Version: 0.1.0
 """
 
-import os
 import json
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 
 from .logger import logger
+from .config import get_settings
 
 # Import Creative Director for LLM access
 try:
@@ -33,7 +33,7 @@ except ImportError:
 VERSION = "0.1.0"
 
 # Feature toggle - enabled by default for better clip selection
-LLM_CLIP_SELECTION = os.environ.get("LLM_CLIP_SELECTION", "true").lower() == "true"
+LLM_CLIP_SELECTION = get_settings().features.llm_clip_selection
 
 
 @dataclass

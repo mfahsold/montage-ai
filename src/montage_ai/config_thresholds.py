@@ -38,8 +38,8 @@ Environment Variables:
     SPEECH_MIN_SILENCE: Minimum silence between speech segments (default: 100ms)
 """
 
-import os
 from typing import Tuple, Dict, Any
+from .config import get_settings
 
 
 class ThresholdConfig:
@@ -76,8 +76,7 @@ class ThresholdConfig:
         Returns:
             float: Threshold value for scenedetect.ContentDetector
         """
-        default = 30.0
-        return float(os.environ.get(name, default))
+        return float(get_settings().thresholds.scene_threshold)
 
     @staticmethod
     def speech_detection(name: str = "SPEECH_THRESHOLD") -> float:
@@ -105,8 +104,7 @@ class ThresholdConfig:
         Returns:
             float: Probability threshold (0.0-1.0)
         """
-        default = 0.5
-        return float(os.environ.get(name, default))
+        return float(get_settings().thresholds.speech_threshold)
 
     @staticmethod
     def silence_detection(name: str = "SILENCE_THRESHOLD") -> str:
@@ -131,8 +129,7 @@ class ThresholdConfig:
         Returns:
             str: dB level for ffmpeg (e.g., "-35")
         """
-        default = "-35"
-        return os.environ.get(name, default)
+        return str(get_settings().thresholds.silence_level_db)
 
     @staticmethod
     def silence_duration(name: str = "SILENCE_DURATION") -> float:
@@ -158,8 +155,7 @@ class ThresholdConfig:
         Returns:
             float: Duration in seconds
         """
-        default = 0.5
-        return float(os.environ.get(name, default))
+        return float(get_settings().thresholds.silence_duration_s)
 
     @staticmethod
     def face_detection_confidence(name: str = "FACE_CONFIDENCE") -> float:
@@ -187,8 +183,7 @@ class ThresholdConfig:
         Returns:
             float: Confidence threshold (0.0-1.0)
         """
-        default = 0.6
-        return float(os.environ.get(name, default))
+        return float(get_settings().thresholds.face_confidence)
 
     @staticmethod
     def ducking_core_threshold(name: str = "DUCKING_CORE_THRESHOLD") -> float:
@@ -218,8 +213,7 @@ class ThresholdConfig:
         Returns:
             float: Threshold value (0.0-1.0)
         """
-        default = 0.1
-        return float(os.environ.get(name, default))
+        return float(get_settings().thresholds.ducking_core_threshold)
 
     @staticmethod
     def ducking_soft_threshold(name: str = "DUCKING_SOFT_THRESHOLD") -> float:
@@ -248,8 +242,7 @@ class ThresholdConfig:
         Returns:
             float: Threshold value (0.0-1.0)
         """
-        default = 0.03
-        return float(os.environ.get(name, default))
+        return float(get_settings().thresholds.ducking_soft_threshold)
 
     @staticmethod
     def music_min_duration(name: str = "MUSIC_MIN_DURATION") -> float:
@@ -276,8 +269,7 @@ class ThresholdConfig:
         Returns:
             float: Duration in seconds
         """
-        default = 5.0
-        return float(os.environ.get(name, default))
+        return float(get_settings().thresholds.music_min_duration_s)
 
     @staticmethod
     def speech_min_duration(name: str = "SPEECH_MIN_DURATION") -> int:
@@ -303,8 +295,7 @@ class ThresholdConfig:
         Returns:
             int: Duration in milliseconds
         """
-        default = 250
-        return int(os.environ.get(name, default))
+        return int(get_settings().thresholds.speech_min_duration_ms)
 
     @staticmethod
     def speech_min_silence(name: str = "SPEECH_MIN_SILENCE") -> int:
@@ -330,8 +321,7 @@ class ThresholdConfig:
         Returns:
             int: Duration in milliseconds
         """
-        default = 100
-        return int(os.environ.get(name, default))
+        return int(get_settings().thresholds.speech_min_silence_ms)
 
     @staticmethod
     def get(operation: str, default: float) -> float:
@@ -352,8 +342,9 @@ class ThresholdConfig:
         Returns:
             float: Threshold value
         """
-        env_name = operation.upper()
-        return float(os.environ.get(env_name, default))
+        # Generic passthrough is no longer supported via settings; return default
+        # Callers should prefer explicit fields on settings.thresholds
+        return float(default)
 
     @staticmethod
     def print_config() -> None:

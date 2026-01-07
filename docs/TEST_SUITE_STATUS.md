@@ -1,19 +1,23 @@
 # Test Suite Status Report
 
-> Note (2026-01-07): This report is historical (last verified 2025-01-07) and needs a refresh to reflect current deps (NumPy 2.4 blocking librosa) and missing sample media for benchmarks. Core pass/skip counts should be revalidated before use.
+> Note (2026-01-07): Historical snapshot. Last full verification was 2025-01-07. Current environment differs (NumPy 2.4, librosa disabled without numba; audio analysis uses FFmpeg fallback; baseline benchmark was interrupted mid scene-detect). Treat counts below as **stale** until re-run.
 
-**Last Updated:** January 7, 2025  
+**Last Verified:** January 7, 2025  
 **Test Framework:** pytest 9.0.2  
 **Python Version:** 3.12.3  
 **Total Tests:** 559
 
-## Executive Summary
+## Executive Summary (Stale)
 
-✅ **545/559 tests passing (97.5% pass rate)**  
+⚠️ **Needs refresh** — numbers below are from 2025-01-07 and do not reflect current deps.
 ⏭️ 14 skipped (optional features: NLE export, CGPU integration, debug env)  
 ⚠️ 22 warnings (deprecation notices)
 
-The test suite is **production-ready** for all core workflows. All critical unit and integration tests pass. Skipped tests are for optional pro features (OTIO/EDL export) and performance testing infrastructure.
+Core workflows were green at last verification. Current blockers to revalidate:
+
+- NumPy 2.4 with librosa disabled (numba removed) → using FFmpeg fallback.
+- Baseline benchmark run interrupted during scene detection; rerun pending on cluster hardware.
+- Sample media now lives in `data/` (not `test_data/`); benchmarks updated accordingly.
 
 ---
 

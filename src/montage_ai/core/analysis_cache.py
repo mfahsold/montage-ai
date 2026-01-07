@@ -50,6 +50,8 @@ import hashlib
 import os
 from datetime import datetime
 
+from ..config import get_settings
+
 # OPTIMIZATION Phase 3: msgpack for 22x faster serialization
 try:
     import msgpack
@@ -205,7 +207,7 @@ class AnalysisCache:
         
         # Allow override via environment variable if not explicitly provided
         if cache_dir is None:
-            cache_dir = os.environ.get("METADATA_CACHE_DIR")
+            cache_dir = str(get_settings().paths.metadata_cache_dir)
         self.cache_dir = cache_dir
 
     def _cache_path(self, source_path: str, suffix: str) -> Path:
@@ -974,7 +976,11 @@ def get_analysis_cache() -> AnalysisCache:
     if _cache is None:
         ttl = int(os.environ.get("CACHE_INVALIDATION_HOURS", str(DEFAULT_TTL_HOURS)))
         enabled = os.environ.get("DISABLE_ANALYSIS_CACHE", "false").lower() != "true"
-        _cache = AnalysisCache(ttl_hours=ttl, enabled=enabled)
+        _cache = AnalysisCache(
+            ttl_hours=ttl,
+            enabled=enabled,
+            cache_dir=str(get_settings().paths.metadata_cache_dir),
+        )
     return _cache
 
 

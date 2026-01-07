@@ -11,23 +11,28 @@
 
 Free, open-source AI video editor: beat-sync montages, transcript editing, OTIO/EDL export. Local-first, privacy-first alternative to Descript. Professional post-production workflows for content creators, video editors, and AI enthusiasts.
 
+Looking for the website? Visit [mfahsold.github.io/montage-ai](https://mfahsold.github.io/montage-ai) for the live landing page and docs search.
+
 ## Quick Start
 
 **Three ways. Pick your workflow. [→ Full Setup Guide](docs/getting-started.md)**
 
 ### Web UI (Easiest)
+
 ```bash
 ./montage-ai.sh web
 # Open http://localhost:5001 in your browser
 ```
 
 ### Command Line (Fastest)
+
 ```bash
 cp your_videos/*.mp4 data/input/
 ./montage-ai.sh run dynamic --quality high
 ```
 
 ### Docker (Reproducible)
+
 ```bash
 docker-compose up -d
 # Same web UI, containerized

@@ -33,7 +33,7 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 
 from .logger import logger
-from .config import get_effective_cpu_count
+from .config import get_effective_cpu_count, get_settings
 
 if TYPE_CHECKING:
     from .ffmpeg_config import FFmpegConfig
@@ -187,11 +187,12 @@ class ResourceManager:
 
     def _detect_cgpu_serve(self) -> bool:
         """Check if cgpu serve (LLM endpoint) is available."""
-        if os.environ.get("CGPU_ENABLED", "false").lower() != "true":
+        llm = get_settings().llm
+        if not llm.cgpu_enabled:
             return False
 
-        host = os.environ.get("CGPU_HOST", "127.0.0.1")
-        port = os.environ.get("CGPU_PORT", "8080")
+        host = llm.cgpu_host
+        port = llm.cgpu_port
 
         try:
             import requests

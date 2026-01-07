@@ -4,6 +4,8 @@
 
 Free, open-source, privacy-first AI rough-cut tool for creators and professionals.
 
+**Live site:** [mfahsold.github.io/montage-ai](https://mfahsold.github.io/montage-ai) — SEO landing, docs, and quickstarts.
+
 ---
 
 ## 🚀 Start Here

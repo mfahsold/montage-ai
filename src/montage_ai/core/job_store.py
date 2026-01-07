@@ -8,10 +8,8 @@ from montage_ai.config import get_settings
 class JobStore:
     def __init__(self):
         settings = get_settings()
-        redis_host = os.getenv('REDIS_HOST', 'localhost')
-        # Note: Kubernetes sets REDIS_PORT as URL when service named 'redis' exists
-        _redis_port_env = os.getenv('REDIS_SERVICE_PORT', os.getenv('REDIS_PORT', '6379'))
-        redis_port = int(_redis_port_env) if _redis_port_env.isdigit() else 6379
+        redis_host = settings.session.redis_host or 'localhost'
+        redis_port = settings.session.redis_port
         self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
         self.prefix = "job:"
         self.ttl = 86400 * 7 # 7 days

@@ -510,9 +510,10 @@ class VideoAgentAdapter:
         self.caption_model = caption_model
         
         # cgpu configuration for VQA
-        self.cgpu_enabled = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
-        self.cgpu_host = os.environ.get("CGPU_HOST", "localhost")
-        self.cgpu_port = os.environ.get("CGPU_PORT", "5021")
+        llm = get_settings().llm
+        self.cgpu_enabled = llm.cgpu_enabled
+        self.cgpu_host = llm.cgpu_host
+        self.cgpu_port = llm.cgpu_port
     
     def analyze_video(
         self, 
@@ -907,5 +908,5 @@ class VideoAgentAdapter:
 def create_video_agent(db_path: Optional[str] = None) -> VideoAgentAdapter:
     """Create a VideoAgent adapter instance."""
     if db_path is None:
-        db_path = os.environ.get("VIDEO_AGENT_DB", str(get_settings().paths.temp_dir / "video_agent_memory.db"))
+        db_path = str(get_settings().paths.temp_dir / "video_agent_memory.db")
     return VideoAgentAdapter(db_path)

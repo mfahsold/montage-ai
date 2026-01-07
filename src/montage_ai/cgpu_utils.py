@@ -25,38 +25,43 @@ import threading
 from contextlib import contextmanager
 from typing import Tuple, Optional
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .logger import logger
 from .utils import file_size_mb
+from .config import get_settings
 
 
 # ============================================================================
 # Configuration (from environment)
 # ============================================================================
 
-# GPU-related cgpu settings
-CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
-CGPU_TIMEOUT = int(os.environ.get("CGPU_TIMEOUT", "1200"))  # 20 minutes default for video upscaling
+def _refresh_from_settings() -> None:
+    """Sync cgpu defaults from centralized settings."""
+    global CGPU_GPU_ENABLED, CGPU_TIMEOUT, CGPU_ENABLED, CGPU_HOST, CGPU_PORT, CGPU_MODEL, CGPU_MAX_CONCURRENCY
+    llm = get_settings().llm
+    CGPU_GPU_ENABLED = llm.cgpu_gpu_enabled
+    CGPU_TIMEOUT = llm.cgpu_timeout
+    CGPU_ENABLED = llm.cgpu_enabled
+    CGPU_HOST = llm.cgpu_host
+    CGPU_PORT = str(llm.cgpu_port)
+    CGPU_MODEL = llm.cgpu_model
+    CGPU_MAX_CONCURRENCY = max(1, llm.cgpu_max_concurrency)
 
-# LLM-related cgpu settings (for cgpu serve)
-CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
-CGPU_HOST = os.environ.get("CGPU_HOST", "127.0.0.1")
-CGPU_PORT = os.environ.get("CGPU_PORT", "8080")  # Default port for cgpu serve
-CGPU_MODEL = os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
-CGPU_MAX_CONCURRENCY = max(1, int(os.environ.get("CGPU_MAX_CONCURRENCY", "1")))
+
+_refresh_from_settings()
 
 
 @dataclass
 class CGPUConfig:
     """Configuration container for cgpu settings."""
-    gpu_enabled: bool = CGPU_GPU_ENABLED
-    timeout: int = CGPU_TIMEOUT
-    llm_enabled: bool = CGPU_ENABLED
-    host: str = CGPU_HOST
-    port: str = CGPU_PORT
-    model: str = CGPU_MODEL
-    max_concurrency: int = CGPU_MAX_CONCURRENCY
+    gpu_enabled: bool = field(default_factory=lambda: get_settings().llm.cgpu_gpu_enabled)
+    timeout: int = field(default_factory=lambda: get_settings().llm.cgpu_timeout)
+    llm_enabled: bool = field(default_factory=lambda: get_settings().llm.cgpu_enabled)
+    host: str = field(default_factory=lambda: get_settings().llm.cgpu_host)
+    port: str = field(default_factory=lambda: str(get_settings().llm.cgpu_port))
+    model: str = field(default_factory=lambda: get_settings().llm.cgpu_model)
+    max_concurrency: int = field(default_factory=lambda: max(1, get_settings().llm.cgpu_max_concurrency))
 
 
 # ============================================================================
@@ -109,11 +114,7 @@ def is_cgpu_available(require_gpu: bool = True) -> bool:
         if cached is not None and (now - _CGPU_AVAIL_CACHE["checked_at"]) < _CGPU_AVAIL_TTL:
             return cached
 
-    # Re-read env vars
-    global CGPU_GPU_ENABLED, CGPU_ENABLED
-    CGPU_GPU_ENABLED = os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true"
-    CGPU_ENABLED = os.environ.get("CGPU_ENABLED", "false").lower() == "true"
-    
+    _refresh_from_settings()
     logger.debug(f"DEBUG: CGPU_GPU_ENABLED={CGPU_GPU_ENABLED}, CGPU_ENABLED={CGPU_ENABLED}")
 
     # Check flags
@@ -186,7 +187,8 @@ def get_cgpu_metrics() -> Optional[str]:
     Returns string like "cgpu: util=45% mem=1234Mi/16384Mi (12.5%)" or None if failed.
     """
     # Fast check first
-    if os.environ.get("CGPU_GPU_ENABLED", "false").lower() != "true":
+    _refresh_from_settings()
+    if not CGPU_GPU_ENABLED:
         return None
 
     try:

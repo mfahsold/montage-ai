@@ -133,12 +133,10 @@ def _get_audio_filters() -> Dict[str, str]:
     Returns:
         Dict with audio filter definitions
     """
-    # Lazy import to avoid circular dependency
-    from .config_thresholds import ThresholdConfig
-    
-    # Get dynamic thresholds
-    core_threshold = ThresholdConfig.ducking_core_threshold()
-    soft_threshold = ThresholdConfig.ducking_soft_threshold()
+    # Read dynamic thresholds from centralized settings
+    _settings = get_settings()
+    core_threshold = _settings.thresholds.ducking_core_threshold
+    soft_threshold = _settings.thresholds.ducking_soft_threshold
     
     return {
         # Voice Polish: Rumble removal -> Denoise -> Compress -> EQ -> Limit
