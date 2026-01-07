@@ -9,18 +9,27 @@ resources:
   - namespace.yaml
   - network-policy.yaml
 
-# Patches for upstream integration (non-invasive fixes)
-# Allows external teams to maintain their own configs
-patchesStrategicMerge:
-  - patches/fix-registry-url.yaml
-
-# DRY: Map any registry URL to cluster standard
-# This handles both upstream variations and ensures consistency
+# Image standardization
+# Maps various upstream image references to cluster registry
+# Default: 192.168.1.12:5000 (configured via deploy/config.env)
 images:
-  - name: 192.168.1.16:30500/montage-ai  # Upstream uses wrong registry
-    newName: 192.168.1.12:5000/montage-ai  # Cluster standard
-    newTag: latest
-  - name: montage-ai  # Also handle bare image name
+  - name: ghcr.io/mfahsold/montage-ai
     newName: 192.168.1.12:5000/montage-ai
     newTag: latest
+  - name: 192.168.1.16:30500/montage-ai
+    newName: 192.168.1.12:5000/montage-ai
+    newTag: latest
+  - name: montage-ai
+    newName: 192.168.1.12:5000/montage-ai
+    newTag: latest
+
+# ConfigMap for deployment settings (overlays can patch)
+configMapGenerator:
+  - name: montage-ai-config
+    behavior: create
+    literals:
+      - CUT_STYLE=dynamic
+      - STABILIZE=false
+      - UPSCALE=false
+      - ENHANCE=false
 

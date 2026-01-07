@@ -1,0 +1,59 @@
+# Staging overlay for montage-ai
+# Mid-quality settings with balanced resources
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: montage-ai
+
+# Image configuration - uses local registry
+images:
+  - name: 192.168.1.12:5000/montage-ai
+    newTag: latest
+
+# Replicas for staging
+replicas:
+  - name: montage-ai-web
+    count: 1
+
+# Resource limits - moderate for staging
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: montage-ai-web
+        namespace: montage-ai
+      spec:
+        template:
+          spec:
+            containers:
+              - name: montage-ai
+                resources:
+                  requests:
+                    memory: "4Gi"
+                    cpu: "2"
+                  limits:
+                    memory: "8Gi"
+                    cpu: "4"
+                env:
+                  - name: FFMPEG_PRESET
+                    value: "medium"
+                  - name: UPSCALE
+                    value: "false"
+                  - name: ENHANCE
+                    value: "false"
+
+# Staging configuration
+configMapGenerator:
+  - name: montage-ai-config
+    behavior: merge
+    literals:
+      - CUT_STYLE=dynamic
+      - STABILIZE=true
+      - UPSCALE=false
+      - ENHANCE=false
+      - FFMPEG_PRESET=medium
+      - VERBOSE=false

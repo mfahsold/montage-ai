@@ -1,5 +1,5 @@
 # Production overlay for montage-ai
-# High-quality settings with AMD GPU support
+# High-quality settings with full GPU support and maximum resources
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -8,50 +8,67 @@ resources:
 
 namespace: montage-ai
 
-# Use a specific image tag for production
+# Use registry from config.env (via deploy.sh substitution)
 images:
-  - name: ghcr.io/mfahsold/montage-ai
+  - name: 192.168.1.12:5000/montage-ai
     newTag: latest
 
+# Production deployment configuration
 patches:
   # High-quality production settings
   - patch: |-
-      apiVersion: v1
-      kind: ConfigMap
+      apiVersion: apps/v1
+      kind: Deployment
       metadata:
-        name: montage-ai-config
-      data:
-        CUT_STYLE: "dynamic"
-        STABILIZE: "true"
-        UPSCALE: "true"
-        ENHANCE: "true"
-        FFMPEG_PRESET: "slow"
-        VERBOSE: "true"
-    target:
-      kind: ConfigMap
-      name: montage-ai-config
-
-  # Target AMD GPU node with increased resources
-  - patch: |-
-      apiVersion: batch/v1
-      kind: Job
-      metadata:
-        name: montage-ai-render
+        name: montage-ai-web
+        namespace: montage-ai
       spec:
         template:
           spec:
-            nodeSelector:
-              amd.com/gpu: present
+            affinity:
+              nodeAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  # Strongly prefer AMD GPU nodes
+                  - weight: 100
+                    preference:
+                      matchExpressions:
+                        - key: accelerator
+                          operator: In
+                          values: ["amd-gpu"]
+                  # Fallback to high-perf compute
+                  - weight: 50
+                    preference:
+                      matchExpressions:
+                        - key: tier
+                          operator: In
+                          values: ["compute", "render"]
             containers:
               - name: montage-ai
                 resources:
                   requests:
-                    cpu: "4"
-                    memory: "16Gi"
-                  limits:
                     cpu: "8"
                     memory: "32Gi"
-                    # amd.com/gpu: "1"  # Uncomment when ROCm support added to container
-    target:
-      kind: Job
-      name: montage-ai-render
+                  limits:
+                    cpu: "16"
+                    memory: "64Gi"
+                env:
+                  - name: FFMPEG_HWACCEL
+                    value: "auto"
+                  - name: FFMPEG_PRESET
+                    value: "slow"
+                  - name: UPSCALE
+                    value: "true"
+                  - name: ENHANCE
+                    value: "true"
+
+# Production config settings
+configMapGenerator:
+  - name: montage-ai-config
+    behavior: merge
+    literals:
+      - CUT_STYLE=dynamic
+      - STABILIZE=true
+      - UPSCALE=true
+      - ENHANCE=true
+      - FFMPEG_PRESET=slow
+      - VERBOSE=true

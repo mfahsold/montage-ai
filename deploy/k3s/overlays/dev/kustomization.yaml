@@ -4,71 +4,58 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Use local cluster registry
+# Use local cluster registry (development)
 images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newName: 192.168.1.37:5000/montage-ai
+  - name: 192.168.1.12:5000/montage-ai
     newTag: latest
 
+# Patches for development environment
 patches:
   - patch: |-
-      apiVersion: batch/v1
-      kind: Job
+      apiVersion: apps/v1
+      kind: Deployment
       metadata:
-        name: montage-ai-render
+        name: montage-ai-web
         namespace: montage-ai
       spec:
         template:
           spec:
-            # Remove hard nodeSelector, use affinity for flexible scheduling
-            # Priority: GPU nodes > high-perf CPU > any
             affinity:
               nodeAffinity:
                 preferredDuringSchedulingIgnoredDuringExecution:
-                  # Prefer AMD GPU nodes (VAAPI encoding)
                   - weight: 100
                     preference:
                       matchExpressions:
                         - key: accelerator
                           operator: In
                           values: ["amd-gpu"]
-                  # Prefer Jetson (NVENC encoding)
                   - weight: 90
                     preference:
                       matchExpressions:
                         - key: accelerator
                           operator: In
                           values: ["nvidia-jetson"]
-                  # Prefer render tier
                   - weight: 50
                     preference:
                       matchExpressions:
                         - key: tier
                           operator: In
                           values: ["render", "compute"]
-                requiredDuringSchedulingIgnoredDuringExecution:
-                  nodeSelectorTerms:
-                    # Must be amd64 for dev environment
-                    - matchExpressions:
-                        - key: kubernetes.io/arch
-                          operator: In
-                          values: ["amd64"]
             containers:
               - name: montage-ai
                 securityContext:
                   privileged: true
                   allowPrivilegeEscalation: true
                 env:
-                  # Enable GPU auto-detection via ResourceManager
                   - name: FFMPEG_HWACCEL
                     value: "auto"
                 resources:
                   requests:
-                    cpu: "2"
-                    memory: "8Gi"
+                    cpu: "500m"
+                    memory: "2Gi"
                   limits:
-                    cpu: "6"
-                    memory: "48Gi"
+                    cpu: "2"
+                    memory: "4Gi"
                 volumeMounts:
                   - name: dev-dri
                     mountPath: /dev/dri
@@ -78,3 +65,14 @@ patches:
                 hostPath:
                   path: /dev/dri
                   type: DirectoryOrCreate
+
+# Development configuration
+configMapGenerator:
+  - name: montage-ai-config
+    behavior: merge
+    literals:
+      - CUT_STYLE=dynamic
+      - STABILIZE=false
+      - UPSCALE=false
+      - FFMPEG_PRESET=ultrafast
+      - VERBOSE=true
