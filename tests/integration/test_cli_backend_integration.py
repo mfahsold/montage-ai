@@ -85,7 +85,15 @@ def test_cli():
 # TEST 2: Backend API Erreichbarkeit
 # =============================================================================
 
-def test_backend_health(base_url="http://localhost:5000"):
+def get_base_url() -> str:
+    """Get backend API URL from environment or use default."""
+    import os
+    return os.environ.get("BACKEND_API_URL", "http://localhost:5000")
+
+def test_backend_health(base_url=None):
+    if base_url is None:
+        base_url = get_base_url()
+    
     log_section("TEST 2: Backend API Erreichbarkeit")
     
     endpoints = [
@@ -232,7 +240,10 @@ def test_redis():
 # TEST 5: Job Creation End-to-End
 # =============================================================================
 
-def test_job_creation(base_url="http://localhost:5000"):
+def test_job_creation(base_url=None):
+    if base_url is None:
+        base_url = get_base_url()
+    
     log_section("TEST 5: Job Creation End-to-End")
     
     # Zuerst: Dateien aufgelisten
@@ -304,7 +315,10 @@ def test_job_creation(base_url="http://localhost:5000"):
 # TEST 6: Shorts API Integration
 # =============================================================================
 
-def test_shorts_api(base_url="http://localhost:5000"):
+def test_shorts_api(base_url=None):
+    if base_url is None:
+        base_url = get_base_url()
+    
     log_section("TEST 6: Shorts API Integration")
     
     endpoints = [
@@ -339,7 +353,10 @@ def test_shorts_api(base_url="http://localhost:5000"):
 # TEST 7: Session Management
 # =============================================================================
 
-def test_session_api(base_url="http://localhost:5000"):
+def test_session_api(base_url=None):
+    if base_url is None:
+        base_url = get_base_url()
+    
     log_section("TEST 7: Session Management")
     
     endpoints = [

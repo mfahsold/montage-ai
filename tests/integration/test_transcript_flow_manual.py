@@ -5,7 +5,10 @@ import sys
 import pytest
 
 # Configuration
-BASE_URL = "http://localhost:5001"  # Assuming port-forward or local access
+import os
+
+# Get base URL from environment or use default
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:5001")  # Backend API URL
 VIDEO_FILENAME = "short_london.mp4"
 TRANSCRIPT_FILENAME = "short_london.json"
 

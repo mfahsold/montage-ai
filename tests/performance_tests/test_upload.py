@@ -2,11 +2,14 @@
 import requests
 import os
 
+# Get upload URL from environment or use default
+UPLOAD_URL = os.environ.get("TEST_UPLOAD_URL", "http://localhost:5001/api/upload")
+
 # Create a dummy file
 with open('test_upload.txt', 'wb') as f:
     f.write(b'x' * 1024 * 1024)  # 1MB
 
-url = 'http://localhost:5001/api/upload'
+url = UPLOAD_URL
 data = {'type': 'video'}
 upload_file = open('test_upload.txt', 'rb')
 files = {'file': upload_file}
