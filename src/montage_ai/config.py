@@ -372,6 +372,38 @@ class CloudConfig:
 
 
 # =============================================================================
+# Motion Analysis & Performance Tuning
+# =============================================================================
+@dataclass
+class MotionAnalysisConfig:
+    """Optical flow and motion detection parameters for performance tuning."""
+    
+    # Optical flow (Farneback algorithm) parameters
+    optical_flow_pyr_scale: float = field(default_factory=lambda: float(os.environ.get("OPTICAL_FLOW_PYR_SCALE", "0.5")))
+    optical_flow_levels: int = field(default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_LEVELS", "3")))
+    optical_flow_winsize: int = field(default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_WINSIZE", "15")))
+    optical_flow_iterations: int = field(default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_ITERATIONS", "3")))
+    optical_flow_poly_n: int = field(default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_POLY_N", "5")))
+    optical_flow_poly_sigma: float = field(default_factory=lambda: float(os.environ.get("OPTICAL_FLOW_POLY_SIGMA", "1.2")))
+    
+    # Motion magnitude normalization (typical range 0-10)
+    motion_magnitude_scale: float = field(default_factory=lambda: float(os.environ.get("MOTION_MAGNITUDE_SCALE", "10.0")))
+    
+    # Optical flow direction threshold (determines if motion is static/left/right)
+    motion_direction_threshold: float = field(default_factory=lambda: float(os.environ.get("MOTION_DIRECTION_THRESHOLD", "0.5")))
+    
+    # Blur/focus detection: Laplacian variance threshold
+    # Higher = stricter quality threshold; typical range sharp ~1000, blurry ~100
+    blur_detection_variance_threshold: float = field(default_factory=lambda: float(os.environ.get("BLUR_DETECTION_VARIANCE_THRESHOLD", "1000.0")))
+    
+    # Histogram bins for color matching (higher = more precise but slower)
+    histogram_bins: int = field(default_factory=lambda: int(os.environ.get("HISTOGRAM_BINS", "64")))
+    
+    # Motion sampling strategy: "full" (all frames) or "adaptive" (skip low-motion scenes)
+    motion_sampling_mode: str = field(default_factory=lambda: os.environ.get("MOTION_SAMPLING_MODE", "adaptive"))
+
+
+# =============================================================================
 # Encoding Configuration
 # =============================================================================
 @dataclass

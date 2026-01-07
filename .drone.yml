@@ -1,0 +1,46 @@
+kind: pipeline
+type: docker
+name: Montage AI CI
+
+trigger:
+  branch:
+    - main
+    - develop
+  event:
+    - push
+    - pull_request
+
+steps:
+  - name: checkout
+    image: alpine/git
+    commands:
+      - git fetch origin
+      - git checkout ${DRONE_COMMIT}
+
+  - name: ci
+    image: python:3.10
+    commands:
+      - chmod +x scripts/ci.sh
+      - ./scripts/ci.sh
+    environment:
+      CI: "true"
+      PY_VER_MINOR: "3.10"
+
+  - name: upload-reports
+    image: alpine
+    commands:
+      - |
+        if [ -d benchmark_results ]; then
+          echo "Benchmark results available in logs"
+        fi
+    when:
+      status: [success, failure]
+
+notifications:
+  - kind: slack
+    webhook_url: ${SLACK_WEBHOOK}
+    on:
+      status: [failure]
+    when:
+      branch:
+        - main

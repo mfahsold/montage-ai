@@ -1,12 +1,11 @@
 # Video Processing
-moviepy>=2.1.1,<2.3  # 2.x uses .subclipped(); 2.2.x requires pillow<12
-opencv-python-headless>=4.10.0
+moviepy>=2.2.1,<2.3  # Align with pyproject; 2.2.x requires pillow<12
+opencv-python-headless>=4.12.0.88
 mediapipe>=0.10.0  # For Smart Reframing (Face Detection)
 soundfile>=0.12.0
 Pillow>=10.0.0,<12.0  # moviepy 2.2.x constraint
-proglog>=0.1.10
 tqdm>=4.66.0
-scenedetect[opencv]>=0.6.4
+scenedetect[opencv]>=0.6.7.1
 requests>=2.32.0
 numpy>=1.24.0,<2.0.0  # Python 3.10 compatible
 scipy>=1.10.0  # For mathematical path optimization (Smart Reframing)
@@ -24,8 +23,8 @@ openai>=1.55.0
 psutil>=6.0.0
 
 # Timeline Export (Professional NLE Integration)
-OpenTimelineIO>=0.17.0  # Academy Software Foundation standard
-jsonschema>=4.23.0  # JSON schema validation for Creative Director
+opentimelineio>=0.18.1  # Academy Software Foundation standard
+jsonschema>=4.25.1  # JSON schema validation for Creative Director
 
 # Web UI
 Flask>=3.0.0
@@ -38,9 +37,7 @@ redis>=5.0.0
 rq>=1.16.0
 
 # Audio Analysis
-# librosa/numba omitted to avoid numpy pinning; audio_analysis falls back to FFmpeg when unavailable.
-# If you need librosa features, install it separately with a compatible numpy/numba pair.
-opentimelineio>=0.15.0
+# librosa/numba omitted to avoid numpy pinning; audio_analysis is FFmpeg-first.
 
 # OPTIMIZATION Phase 3: msgpack for 22x faster cache serialization
 msgpack>=1.0.0

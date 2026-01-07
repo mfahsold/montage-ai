@@ -1,7 +1,7 @@
 # Montage AI - Development Makefile
 # Lightweight dev workflow for local and cluster deployments
 
-.PHONY: help build push deploy test clean logs shell
+.PHONY: help build push deploy test clean logs shell ci
 
 # Configuration
 IMAGE_NAME ?= ghcr.io/mfahsold/montage-ai
@@ -31,6 +31,9 @@ help: ## Show this help
 	@echo ""
 	@echo "$(GREEN)Cluster Deployment (2-15 min):$(RESET)"
 	@echo "  make cluster        Build + push + deploy (all-in-one)"
+	@echo ""
+	@echo "$(GREEN)CI / Validation:$(RESET)"
+	@echo "  make ci             Run vendor-agnostic CI checks locally"
 	@echo ""
 	@echo "$(GREEN)Maintenance:$(RESET)"
 	@echo "  make clean          Clean local caches"
@@ -262,6 +265,15 @@ validate: ## Validate all Kustomize manifests
 	@kubectl kustomize deploy/k3s/base/ > /dev/null && echo "$(GREEN)✓ base/$(RESET)"
 	@kubectl kustomize deploy/k3s/overlays/production/ > /dev/null && echo "$(GREEN)✓ overlays/production/$(RESET)"
 	@kubectl kustomize deploy/k3s/overlays/dev/ > /dev/null && echo "$(GREEN)✓ overlays/dev/$(RESET)"
+
+# ==========================================================================
+# CI (vendor-agnostic)
+# ==========================================================================
+
+ci: ## Run CI locally (no GitHub Actions required)
+	@echo "$(CYAN)Running vendor-agnostic CI pipeline...$(RESET)"
+	./scripts/ci.sh
+	@echo "$(GREEN)✓ CI checks completed$(RESET)"
 
 # ============================================================================
 # MAINTENANCE

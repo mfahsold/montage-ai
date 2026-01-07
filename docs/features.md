@@ -449,7 +449,7 @@ Export your AI rough cut to professional NLEs for finishing.
 
 ## Core Editing
 
-- Beat-synced cuts using `librosa` beat detection
+- Beat-synced cuts using FFmpeg (`astats`/tempo) — librosa optional
 - Style-aware pacing, transitions, and color looks
 - Story arc shaping (intro → build → climax → outro)
 - LLM-powered "Creative Director" (Ollama local or Gemini via cgpu)

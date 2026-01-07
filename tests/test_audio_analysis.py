@@ -198,29 +198,53 @@ class TestCalculateDynamicCutLength:
 class TestAnalyzeMusicEnergy:
     """Tests for analyze_music_energy function."""
 
-    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
-    @patch('src.montage_ai.audio_analysis.librosa')
-    def test_returns_energy_profile(self, mock_librosa):
+    @patch('src.montage_ai.audio_analysis.probe_duration')
+    @patch('src.montage_ai.audio_analysis._run_cloud_analysis')
+    @patch('src.montage_ai.audio_analysis._ffmpeg_analyze_energy_fast')
+    @patch('src.montage_ai.audio_analysis._settings')
+    def test_returns_energy_profile(self, mock_settings, mock_ffmpeg, mock_cloud, mock_probe):
         """analyze_music_energy returns EnergyProfile."""
-        # Setup mocks
-        mock_librosa.load.return_value = (np.zeros(22050), 22050)
-        mock_librosa.feature.rms.return_value = np.array([[0.1, 0.5, 0.9]])
-        mock_librosa.times_like.return_value = np.array([0.0, 0.5, 1.0])
+        # Cloud GPU returns None, fall back to FFmpeg
+        mock_cloud.return_value = None
+        mock_probe.return_value = 10.0  # 10 second audio
+        
+        # Setup mocks for FFmpeg path (now the primary)
+        mock_ffmpeg.return_value = (
+            np.array([0.0, 0.5, 1.0]),  # times
+            np.array([0.1, 0.5, 0.9])   # rms_normalized
+        )
+        
+        # Setup settings mock
+        mock_features = MagicMock()
+        mock_features.verbose = False
+        mock_settings.features = mock_features
 
         profile = analyze_music_energy("/fake/audio.mp3", verbose=False)
 
         assert isinstance(profile, EnergyProfile)
-        assert profile.sample_rate == 22050
+        assert profile.sample_rate == 44100  # FFmpeg assumed SR
         assert len(profile.rms) == 3
 
-    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
-    @patch('src.montage_ai.audio_analysis.librosa')
-    def test_normalizes_rms(self, mock_librosa):
+    @patch('src.montage_ai.audio_analysis.probe_duration')
+    @patch('src.montage_ai.audio_analysis._run_cloud_analysis')
+    @patch('src.montage_ai.audio_analysis._ffmpeg_analyze_energy_fast')
+    @patch('src.montage_ai.audio_analysis._settings')
+    def test_normalizes_rms(self, mock_settings, mock_ffmpeg, mock_cloud, mock_probe):
         """Energy values are normalized to 0-1."""
-        mock_librosa.load.return_value = (np.zeros(22050), 22050)
-        # RMS values not in 0-1 range
-        mock_librosa.feature.rms.return_value = np.array([[0.01, 0.05, 0.03]])
-        mock_librosa.times_like.return_value = np.array([0.0, 0.5, 1.0])
+        # Cloud GPU returns None, fall back to FFmpeg
+        mock_cloud.return_value = None
+        mock_probe.return_value = 10.0  # 10 second audio
+        
+        # FFmpeg already returns normalized values
+        mock_ffmpeg.return_value = (
+            np.array([0.0, 0.5, 1.0]),
+            np.array([0.1, 0.5, 0.9])  # Already normalized
+        )
+        
+        # Setup settings mock
+        mock_features = MagicMock()
+        mock_features.verbose = False
+        mock_settings.features = mock_features
 
         profile = analyze_music_energy("/fake/audio.mp3", verbose=False)
 
@@ -232,31 +256,54 @@ class TestAnalyzeMusicEnergy:
 class TestGetBeatTimes:
     """Tests for get_beat_times function."""
 
-    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
-    @patch('src.montage_ai.audio_analysis.librosa')
-    def test_returns_beat_info(self, mock_librosa):
+    @patch('src.montage_ai.audio_analysis.probe_duration')
+    @patch('src.montage_ai.audio_analysis._run_cloud_analysis')
+    @patch('src.montage_ai.audio_analysis._ffmpeg_estimate_tempo')
+    @patch('src.montage_ai.audio_analysis._settings')
+    def test_returns_beat_info(self, mock_settings, mock_ffmpeg, mock_cloud, mock_probe):
         """get_beat_times returns BeatInfo."""
-        mock_librosa.load.return_value = (np.zeros(22050), 22050)
-        mock_librosa.beat.beat_track.return_value = (120.0, np.array([10, 20, 30]))
-        mock_librosa.frames_to_time.return_value = np.array([0.5, 1.0, 1.5])
-        mock_librosa.get_duration.return_value = 4.0
+        # Cloud GPU returns None, fall back to FFmpeg
+        mock_cloud.return_value = None
+        mock_probe.return_value = 10.0  # 10 second audio
+        
+        # Setup FFmpeg mock
+        mock_ffmpeg.return_value = (
+            120.0,  # tempo
+            np.array([0.5, 1.0, 1.5])  # beat_times
+        )
+        
+        # Settings mock
+        mock_features = MagicMock()
+        mock_features.verbose = False
+        mock_settings.features = mock_features
 
         info = get_beat_times("/fake/audio.mp3", verbose=False)
 
         assert isinstance(info, BeatInfo)
         assert info.tempo == 120.0
         assert info.beat_count == 3
-        assert info.duration == 4.0
+        assert info.sample_rate == 44100  # FFmpeg assumed SR
 
-    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
-    @patch('src.montage_ai.audio_analysis.librosa')
-    def test_handles_array_tempo(self, mock_librosa):
-        """Handles tempo returned as numpy array (newer librosa)."""
-        mock_librosa.load.return_value = (np.zeros(22050), 22050)
-        # Tempo as array (newer librosa behavior)
-        mock_librosa.beat.beat_track.return_value = (np.array([120.0]), np.array([10]))
-        mock_librosa.frames_to_time.return_value = np.array([0.5])
-        mock_librosa.get_duration.return_value = 1.0
+    @patch('src.montage_ai.audio_analysis.probe_duration')
+    @patch('src.montage_ai.audio_analysis._run_cloud_analysis')
+    @patch('src.montage_ai.audio_analysis._ffmpeg_estimate_tempo')
+    @patch('src.montage_ai.audio_analysis._settings')
+    def test_handles_array_tempo(self, mock_settings, mock_ffmpeg, mock_cloud, mock_probe):
+        """Handles tempo returned as scalar (FFmpeg path)."""
+        # Cloud GPU returns None
+        mock_cloud.return_value = None
+        mock_probe.return_value = 10.0  # 10 second audio
+        
+        # FFmpeg returns scalar tempo
+        mock_ffmpeg.return_value = (
+            120.0,  # scalar tempo
+            np.array([0.5])
+        )
+        
+        # Settings mock
+        mock_features = MagicMock()
+        mock_features.verbose = False
+        mock_settings.features = mock_features
 
         info = get_beat_times("/fake/audio.mp3", verbose=False)
 
@@ -267,16 +314,31 @@ class TestGetBeatTimes:
 class TestAnalyzeAudio:
     """Tests for analyze_audio convenience function."""
 
-    @patch('src.montage_ai.audio_analysis.LIBROSA_AVAILABLE', True)
-    @patch('src.montage_ai.audio_analysis.librosa')
-    def test_returns_both_beat_and_energy(self, mock_librosa):
+    @patch('src.montage_ai.audio_analysis.probe_duration')
+    @patch('src.montage_ai.audio_analysis._run_cloud_analysis')
+    @patch('src.montage_ai.audio_analysis._ffmpeg_estimate_tempo')
+    @patch('src.montage_ai.audio_analysis._ffmpeg_analyze_energy_fast')
+    @patch('src.montage_ai.audio_analysis._settings')
+    def test_returns_both_beat_and_energy(self, mock_settings, mock_energy, mock_tempo, mock_cloud, mock_probe):
         """analyze_audio returns tuple of (BeatInfo, EnergyProfile)."""
-        mock_librosa.load.return_value = (np.zeros(22050), 22050)
-        mock_librosa.beat.beat_track.return_value = (120.0, np.array([10, 20]))
-        mock_librosa.frames_to_time.return_value = np.array([0.5, 1.0])
-        mock_librosa.get_duration.return_value = 2.0
-        mock_librosa.feature.rms.return_value = np.array([[0.3, 0.6, 0.9]])
-        mock_librosa.times_like.return_value = np.array([0.0, 0.5, 1.0])
+        # Cloud GPU returns None for both
+        mock_cloud.return_value = None
+        mock_probe.return_value = 10.0  # 10 second audio
+        
+        # Setup FFmpeg mocks
+        mock_tempo.return_value = (
+            120.0,  # tempo
+            np.array([0.5, 1.0])  # beat_times
+        )
+        mock_energy.return_value = (
+            np.array([0.0, 0.5, 1.0]),  # times
+            np.array([0.3, 0.6, 0.9])   # rms_normalized
+        )
+        
+        # Settings mock
+        mock_features = MagicMock()
+        mock_features.verbose = False
+        mock_settings.features = mock_features
 
         beat_info, energy_profile = analyze_audio("/fake/audio.mp3", verbose=False)
 

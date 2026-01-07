@@ -6,7 +6,9 @@ Technical documentation of analysis algorithms in Montage AI.
 
 ## Music Analysis
 
-### Beat Detection
+> Note: As of 2026-01, Montage AI uses an FFmpeg-first beat/tempo path (`astats`/tempo) for portability and startup speed. Librosa remains optional.
+
+### Beat Detection (Librosa - optional)
 
 **Library:** librosa
 **Algorithm:** Onset Strength Envelope + Dynamic Programming

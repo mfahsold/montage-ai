@@ -907,7 +907,8 @@ class SceneSimilarityIndex:
         threshold: float = 0.7
     ) -> List[Tuple[Scene, float]]:
         """
-        Find k most similar scenes to target frame.
+        Find k most similar scenes to target frame using K-D tree (O(log n)).
+        Falls back to linear search if K-D tree unavailable.
         
         Args:
             target_path: Path to target video
@@ -918,6 +919,52 @@ class SceneSimilarityIndex:
         Returns:
             List of (scene, similarity) tuples sorted by similarity descending
         """
+        if not self.scenes:
+            return []
+        
+        # Extract target histogram
+        target_hist = _get_histogram_as_array(target_path, target_time)
+        if target_hist is None:
+            return []
+        
+        target_vec = target_hist.flatten()
+        results = []
+        
+        # K-D tree path (O(log n) lookup)
+        if self.kdtree is not None:
+            # Query K-D tree for nearest neighbors
+            distances, indices = self.kdtree.query(target_vec, k=min(k, len(self.scenes)))
+            
+            # Convert distances to similarity scores (0-1, inverted)
+            for dist, idx in zip(distances, indices):
+                if idx < len(self.scenes):
+                    # Distance to similarity: similarity = 1 - normalized_distance
+                    similarity = 1.0 - (dist / 512.0)  # Normalize by max histogram distance
+                    similarity = max(0.0, similarity)  # Clamp to [0, 1]
+                    
+                    if similarity >= threshold:
+                        results.append((self.scenes[idx], similarity))
+            
+            logger.info(f"   ⚡ K-D tree query found {len(results)} similar scenes (fast path)")
+        else:
+            # Linear search fallback (O(n)) - only if K-D tree unavailable
+            for scene in self.scenes:
+                scene_hist = _get_histogram_as_array(scene.path, scene.midpoint)
+                if scene_hist is not None:
+                    scene_vec = scene_hist.flatten()
+                    # Euclidean distance
+                    dist = np.linalg.norm(target_vec - scene_vec)
+                    similarity = 1.0 - (dist / 512.0)
+                    similarity = max(0.0, similarity)
+                    
+                    if similarity >= threshold:
+                        results.append((scene, similarity))
+            
+            logger.warning(f"   ⚠️  K-D tree unavailable, using linear search O(n)")
+        
+        # Sort by similarity descending
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:k]
         if not self.scenes:
             return []
         

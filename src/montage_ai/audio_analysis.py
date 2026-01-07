@@ -29,21 +29,8 @@ from .video_metadata import probe_duration
 
 _settings = get_settings()
 
-# Try to import librosa (may fail with numba/Python 3.12 compatibility issues)
-LIBROSA_AVAILABLE = False
-librosa = None
-try:
-    import librosa as _librosa
-    # Test that librosa's numba-decorated functions actually work
-    # This catches the 'get_call_template' error at import time
-    _librosa.get_duration(y=np.zeros(22050, dtype=np.float32), sr=22050)
-    librosa = _librosa
-    LIBROSA_AVAILABLE = True
-except Exception as e:
-    # Known issue: librosa/numba incompatibility with Python 3.12
-    # Error: 'function' object has no attribute 'get_call_template'
-    logger.warning(f"librosa unavailable ({type(e).__name__}: {str(e)[:50]}), using FFmpeg fallback")
-    LIBROSA_AVAILABLE = False
+# Audio Analysis uses FFmpeg natively for maximum compatibility and performance
+# No Python audio libraries needed (librosa causes numba/Python 3.12 issues)
 
 from .config import get_settings
 
@@ -1144,36 +1131,19 @@ def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> Ene
 
         return profile
 
-    # Use librosa if available, otherwise FFmpeg fallback
-    if LIBROSA_AVAILABLE:
-        y, sr = librosa.load(audio_path)
-        hop_length = 512
-        rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
-        times = librosa.times_like(rms, sr=sr, hop_length=hop_length)
+    # OPTIMIZATION: FFmpeg astats is primary (20-50x faster than librosa)
+    # Uses bare-metal FFmpeg ebur128 + astats filters for professional audio analysis
+    duration = probe_duration(audio_path)
+    times, rms_normalized = _ffmpeg_analyze_energy_fast(audio_path, duration)
 
-        # Normalize energy 0-1
-        rms_min = np.min(rms)
-        rms_max = np.max(rms)
-        rms_normalized = (rms - rms_min) / (rms_max - rms_min + 1e-6)
-
-        profile = EnergyProfile(
-            times=times,
-            rms=rms_normalized,
-            sample_rate=sr,
-            hop_length=hop_length
-        )
-    else:
-        # FFmpeg fallback (bare-metal, no Python audio deps)
-        # OPTIMIZED: Use fast astats-based analysis (20-50x faster)
-        duration = probe_duration(audio_path)
-        times, rms_normalized = _ffmpeg_analyze_energy_fast(audio_path, duration)
-
-        profile = EnergyProfile(
-            times=times,
-            rms=rms_normalized,
-            sample_rate=44100,  # Assumed
-            hop_length=512
-        )
+    profile = EnergyProfile(
+        times=times,
+        rms=rms_normalized,
+        sample_rate=44100,  # Assumed
+        hop_length=512
+    )
+    if verbose:
+        logger.info("   ⚡ Using FFmpeg astats for audio analysis (fast path)")
 
     if verbose:
         print(f"   📊 Energy Stats: avg={profile.avg_energy:.2f}, max={profile.max_energy:.2f}, min={profile.min_energy:.2f}")
@@ -1184,7 +1154,10 @@ def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> Ene
 
 def get_beat_times(audio_path: str, verbose: Optional[bool] = None) -> BeatInfo:
     """
-    Detect beats and tempo in an audio file using librosa.
+    Detect beats and tempo in an audio file using FFmpeg.
+
+    Uses FFmpeg's built-in audio analysis filters for maximum compatibility
+    and performance (no Python audio library dependencies).
 
     Args:
         audio_path: Path to audio file
@@ -1220,26 +1193,13 @@ def get_beat_times(audio_path: str, verbose: Optional[bool] = None) -> BeatInfo:
             sample_rate=sr
         )
 
-    # Use librosa if available, otherwise FFmpeg fallback
-    if LIBROSA_AVAILABLE:
-        y, sr = librosa.load(audio_path)
-        tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+    # PRIMARY PATH: FFmpeg analysis (bare-metal, no Python audio deps)
+    # ⚡ OPTIMIZED: Fast, reliable, no compatibility issues
+    duration = probe_duration(audio_path)
+    tempo, beat_times = _ffmpeg_estimate_tempo(audio_path, duration)
+    sr = 44100  # Assumed
 
-        # Handle tempo being an array (newer librosa versions)
-        if isinstance(tempo, np.ndarray):
-            tempo = float(tempo.item())
-        else:
-            tempo = float(tempo)
-
-        beat_times = librosa.frames_to_time(beat_frames, sr=sr)
-        duration = librosa.get_duration(y=y, sr=sr)
-        sr = int(sr)
-    else:
-        # FFmpeg fallback (bare-metal, no Python audio deps)
-        duration = probe_duration(audio_path)
-        tempo, beat_times = _ffmpeg_estimate_tempo(audio_path, duration)
-        sr = 44100  # Assumed
-
+    print(f"   ⚡ Using FFmpeg for beat analysis (fast path)")
     print(f"   Tempo: {tempo:.1f} BPM, Detected {len(beat_times)} beats.")
 
     if verbose:

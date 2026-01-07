@@ -31,7 +31,7 @@ System design and component overview.
 │  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
 │  │   │ Beat     │  │ Scene    │  │ Clip     │  │ Video    │        │   │
 │  │   │ Detection│─▶│ Detection│─▶│ Assembly │─▶│ Rendering│        │   │
-│  │   │ (librosa)│  │(scenedet)│  │          │  │ (FFmpeg) │        │   │
+│  │   │(FFmpeg)  │  │(scenedet)│  │          │  │ (FFmpeg) │        │   │
 │  │   └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
 │  │                                                                   │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
@@ -95,7 +95,7 @@ The central orchestrator that executes the editing pipeline in phases:
 
 | Module | Purpose |
 |--------|---------|
-| `audio_analysis.py` | Beat detection, tempo extraction, energy profiling (librosa + FFmpeg fallback) |
+| `audio_analysis.py` | Beat detection, tempo extraction, energy profiling (FFmpeg astats/tempo; librosa optional) |
 | `scene_analysis.py` | Scene detection, content analysis, visual similarity with LRU cache |
 | `auto_reframe.py` | **Auto Reframe Engine**. 9:16 conversion using Convex Optimization (L2) for cinematic camera paths |
 | `video_metadata.py` | Technical metadata extraction (ffprobe wrapper) |
@@ -111,7 +111,7 @@ The central orchestrator that executes the editing pipeline in phases:
 | **Preview Pipeline** | Low-res (360p) + Ultrafast preset | 10x faster iteration loop |
 | **LRU Histogram Cache** | `@lru_cache` for frame extraction | 91% cache hit rate, 2-3x faster clip selection |
 | **Parallel Scene Detection** | `ThreadPoolExecutor(max_workers=4)` | 3-4x speedup on multi-core |
-| **FFmpeg Beat Detection** | `silencedetect` + `ebur128` filters | Works without librosa (Python 3.12 compat) |
+| **FFmpeg Beat Detection** | `astats` + `tempo` filters (primary path) | Portable, no heavy deps; librosa optional via try/except |
 | **Auto GPU Encoding** | NVENC > VAAPI > QSV > CPU | 2-6x encoding speedup |
 | **Hardware Nah (Web)** | Server-Sent Events (SSE) + `os.nice(10)` | Zero polling overhead, responsive UI under load |
 | **Lazy Loading (CLI)** | Import heavy libs only when needed | Instant CLI startup time |

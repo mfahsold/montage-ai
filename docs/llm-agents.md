@@ -15,7 +15,7 @@ Montage AI is a post-production assistant, not a generative video AI. We take ex
 **Flow:**
 1.  **Ingest**: `FootageManager` scans `/data/input`.
 2.  **Analyze**:
-    *   `AudioAnalyzer`: Beat detection (librosa/ffmpeg), energy levels.
+    *   `AudioAnalyzer`: Beat detection (ffmpeg; optional librosa), energy levels.
     *   `SceneAnalyzer`: Scene detection (scenedetect), visual quality.
     *   `AutoReframeEngine`: Face detection (MediaPipe) for 9:16 crops.
 3.  **Plan**: `MontageBuilder` selects clips based on `StyleTemplate` (e.g., "Hitchcock" = slow build, "MTV" = fast cuts).

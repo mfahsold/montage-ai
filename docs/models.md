@@ -4,18 +4,20 @@ Technical documentation of the AI components and external libraries used in Mont
 
 ## Overview
 
-| Component         | Library/Model                                         | Purpose                     | License    |
-| ----------------- | ----------------------------------------------------- | --------------------------- | ---------- |
-| Beat Detection    | [librosa](https://librosa.org/)                       | Music tempo & beat analysis | ISC        |
+| Component         | Library/Model                                    | Purpose                     | License    |
+| ----------------- | ------------------------------------------------ | --------------------------- | ---------- |
+| Beat Detection    | FFmpeg (astats/tempo); optional librosa          | Music tempo & beat analysis | LGPL-2.1 / ISC |
 | Scene Detection   | [PySceneDetect](https://scenedetect.com/)             | Cut point identification    | BSD-3      |
 | AI Upscaling      | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | Video super-resolution      | BSD-3      |
 | Creative Director | Llama 3.1 / Gemini 2.0                                | NLP → editing parameters    | Various    |
 | Video Composition | [MoviePy](https://zulko.github.io/moviepy/)           | Clip assembly & effects     | MIT        |
 | Frame Analysis    | [OpenCV](https://opencv.org/)                         | Motion & histogram analysis | Apache 2.0 |
 
+> Note: As of 2026-01, Montage AI defaults to FFmpeg-based beat/tempo. Librosa is optional.
+
 ---
 
-## Beat Detection: librosa
+## Beat Detection: librosa (optional)
 
 **Library:** [librosa](https://github.com/librosa/librosa) v0.10+  
 **Citation:** McFee et al., "librosa: Audio and music signal analysis in python", SciPy 2015

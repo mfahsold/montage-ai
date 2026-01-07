@@ -142,6 +142,7 @@ class MontageMedia:
     all_scenes_dicts: List[Dict[str, Any]] = field(default_factory=list)
     video_files: List[str] = field(default_factory=list)
     output_profile: Optional[OutputProfile] = None
+    similarity_index: Optional[Any] = None  # K-D Tree scene similarity index (for O(log n) lookups)
 
 
 @dataclass

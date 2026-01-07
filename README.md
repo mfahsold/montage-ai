@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![K3s](https://img.shields.io/badge/k3s-ready-green.svg)](https://k3s.io/)
-[![Tests](https://img.shields.io/badge/tests-513%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](docs/TEST_SUITE_STATUS.md)
 [![Code Quality](https://img.shields.io/badge/code%20quality-A-brightgreen.svg)]()
 
 > **We do not generate pixels. We polish them.**
@@ -21,7 +21,7 @@ Looking for the website? Visit [mfahsold.github.io/montage-ai](https://mfahsold.
 
 ```bash
 ./montage-ai.sh web
-# Open http://localhost:5001 in your browser
+# Open http://localhost:8080 in your browser (or set WEB_PORT)
 ```
 
 ### Command Line (Fastest)
@@ -38,11 +38,47 @@ docker-compose up -d
 # Same web UI, containerized
 ```
 
+## Installation
+
+### Minimal (Core Only)
+
+```bash
+pip install montage-ai
+```
+
+Includes video processing, FFmpeg integration, timeline export. No AI features, web UI, or cloud support.
+
+### With AI Enhancements
+
+```bash
+pip install montage-ai[ai]
+```
+
+Adds smart reframing, face detection, color matching, advanced audio analysis. ~420 MB.
+
+### With Web UI
+
+```bash
+pip install montage-ai[web]
+```
+
+Full web interface + REST API + background job queue. Requires Redis.
+
+### Everything (Development)
+
+```bash
+pip install montage-ai[all]
+```
+
+All features included. Same as `pip install -r requirements.txt`.
+
+**→ [See Optional Dependencies Guide](docs/OPTIONAL_DEPENDENCIES.md) for all installation options.**
+
 ## Key Features
 
 | Feature | What It Does |
 |---------|------------|
-| **Beat-Sync** | Cuts aligned to music rhythm via librosa |
+| **Beat-Sync** | Cuts aligned to music rhythm via FFmpeg (astats/tempo) |
 | **Transcript Editor** | Text-based video editing |
 | **Shorts Studio** | Auto-reframe to 9:16 vertical |
 | **Pro Export** | OTIO/EDL for DaVinci, Premiere, FCP |
@@ -100,7 +136,7 @@ Or natural language: `CREATIVE_PROMPT="90s skateboard" ./montage-ai.sh run`
 |---|---|---|---|---|---|
 | **Cost** | Free | $12/mo | Free | Free | $55+/mo |
 | **Local** | ✅ | ❌ | ✅ | ✅ | ❌ |
-| **Beat-Sync** | ✅ (librosa) | Limited | ❌ | Energy only | No |
+| **Beat-Sync** | ✅ (FFmpeg) | Limited | ❌ | Energy only | No |
 | **Story Arc** | ✅ | ❌ | ❌ | ❌ | No |
 | **Auto-Reframe** | ✅ | ❌ | ✅ | ❌ | Limited |
 | **OTIO/EDL** | ✅ | No | No | No | Limited |

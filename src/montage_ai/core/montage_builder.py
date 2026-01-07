@@ -377,6 +377,25 @@ class MontageBuilder:
         # Initialize footage pool
         self._footage_pool = self._selection_engine.init_footage_pool()
 
+        # OPTIMIZATION: Build Scene Similarity K-D Tree Index for fast O(log n) lookups
+        # This enables "match cut" detection (similar-looking scenes) in clip selection
+        logger.info("   🌳 Building scene similarity index (K-D tree)...")
+        try:
+            from ..scene_analysis import SceneSimilarityIndex
+            similarity_index = SceneSimilarityIndex()
+            similarity_index.build(self.ctx.media.all_scenes)
+            
+            # Store in context for clip selection engine to use
+            self.ctx.media.similarity_index = similarity_index
+            
+            if similarity_index.enabled:
+                logger.info(f"   ✅ K-D tree index built (O(log n) similarity queries enabled)")
+            else:
+                logger.info(f"   ⚠️ K-D tree unavailable, using O(n) linear search")
+        except Exception as e:
+            logger.warning(f"   ⚠️ Failed to build similarity index: {e}")
+            self.ctx.media.similarity_index = None
+
         # Wait for proxies
         if proxy_futures:
             logger.info("   ⏳ Waiting for proxy generation to complete...")
@@ -793,7 +812,15 @@ class MontageBuilder:
                 break
 
             # Score and select clip
-            similarity_fn = self._scene_provider.calculate_similarity if self._scene_provider else None
+            # OPTIMIZATION: Use K-D Tree similarity index if available (O(log n) lookup)
+            similarity_fn = None
+            if hasattr(self.ctx.media, 'similarity_index') and self.ctx.media.similarity_index:
+                # K-D tree wrapper: find similar scenes in O(log n) time
+                similarity_fn = lambda scene: self._find_similar_scenes_kdtree(scene)
+            elif self._scene_provider:
+                # Fallback to provider's method if K-D tree unavailable
+                similarity_fn = self._scene_provider.calculate_similarity
+            
             selected_scene, best_score = self._selection_engine.select_clip(
                 available_footage, current_energy, unique_videos, similarity_fn=similarity_fn
             )
@@ -1122,6 +1149,37 @@ class MontageBuilder:
 
         # Flush remaining futures to finalize segments
         self._flush_pending_futures()
+
+    def _find_similar_scenes_kdtree(self, target_scene: Dict[str, Any]) -> float:
+        """
+        Find similar scenes using K-D Tree index (O(log n) lookup).
+        
+        Returns a similarity score (0-1) for use in clip selection scoring.
+        """
+        if not hasattr(self.ctx.media, 'similarity_index') or not self.ctx.media.similarity_index:
+            return 0.0
+        
+        try:
+            similarity_index = self.ctx.media.similarity_index
+            target_path = target_scene.get('path', '')
+            target_time = target_scene.get('start', 0.0) + (target_scene.get('duration', 1.0) / 2)
+            
+            # Query K-D tree for similar scenes (O(log n) complexity)
+            similar_scenes = similarity_index.find_similar(
+                target_path, 
+                target_time, 
+                k=3,  # Get top 3 similar scenes
+                threshold=0.7
+            )
+            
+            # Return highest similarity score (clamped to match cutting preferences)
+            if similar_scenes:
+                best_similarity, _ = similar_scenes[0]
+                return best_similarity * 20.0  # Scale for clip selection scoring
+            return 0.0
+        except Exception as e:
+            logger.debug(f"K-D tree similarity lookup failed: {e}")
+            return 0.0
 
 
 # =============================================================================
