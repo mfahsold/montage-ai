@@ -606,6 +606,21 @@ class MontageBuilder:
         else:
             self.ctx.features.color_intensity = 1.0
 
+        # Parse audio_normalize (loudness normalization to -14 LUFS)
+        env_audio_normalize = os.environ.get('AUDIO_NORMALIZE', 'false').lower() == 'true'
+        if env_audio_normalize:
+            self.ctx.features.audio_normalize = True
+            logger.info("Audio normalization enabled (-14 LUFS target)")
+
+        # Parse number of variants to generate
+        env_variants = os.environ.get('NUM_VARIANTS', '1')
+        try:
+            self.ctx.settings.num_variants = int(env_variants)
+            if self.ctx.settings.num_variants > 1:
+                logger.info(f"Will generate {self.ctx.settings.num_variants} montage variants")
+        except ValueError:
+            self.ctx.settings.num_variants = 1
+
         # Extract semantic query for Phase 2: Semantic Storytelling
         # Priority: explicit semantic_query > content_focus > ENV
         env_semantic = os.environ.get('SEMANTIC_QUERY', '')

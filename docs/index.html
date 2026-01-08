@@ -288,14 +288,186 @@
             </div>
         </section>
 
+        <!-- CLI Features -->
+        <section class="voxel-card">
+            <h2>// Command Line Superpowers</h2>
+            <p style="color: #999; margin-bottom: 1.5rem;">27+ integrated features. One command. 100% local or hybrid cloud.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Video Enhancement</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Stabilization (optical flow)</li>
+                        <li>✓ 4K Upscaling (Real-ESRGAN)</li>
+                        <li>✓ AI Denoising (DeepFilterNet)</li>
+                        <li>✓ Sharpening (unsharp mask)</li>
+                        <li>✓ Color Grading (16+ presets)</li>
+                        <li>✓ Film Grain (35mm, 16mm, 8mm)</li>
+                    </ul>
+                </div>
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Audio & Storytelling</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Voice Isolation (htdemucs)</li>
+                        <li>✓ Dialogue Ducking (auto-mix)</li>
+                        <li>✓ Audio Normalization (−14 LUFS)</li>
+                        <li>✓ Captions (5 styles)</li>
+                        <li>✓ Story Engine (LLM narrative)</li>
+                        <li>✓ Export to OTIO/EDL/XML</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem;">
+                <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">CLI Syntax</h4>
+                <div class="code-block" style="background: #05070f; border-left: 3px solid #00ff88; padding: 0.75rem; font-size: 0.85rem; overflow-x: auto;">
+                    <p><span class="prompt">$</span> # Stabilized 1080p with captions</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh run dynamic --stabilize --captions tiktok</p>
+                    <p class="output success">[✓] montage.mp4 + montage.otio exported</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # Preview (fast, 360p)</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh preview hitchcock</p>
+                    <p class="output success">[✓] preview.mp4 (15 sec)</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # 4K with color grade + film grain</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh hq --color-grade teal_orange --film-grain 35mm</p>
+                    <p class="output success">[✓] 4K montage.mp4 (stabilized, upscaled)</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # Interview (voice isolated, normalized)</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh run documentary --isolate-voice --audio-normalize</p>
+                    <p class="output success">[✓] Clean dialogue, −14 LUFS broadcast standard</p>
+                </div>
+            </div>
+
+            <div class="cta-actions">
+                <a href="CLI_REFERENCE.md" class="voxel-btn primary">Full CLI Docs →</a>
+                <a href="getting-started.md" class="voxel-btn">Setup Guide</a>
+            </div>
+        </section>
+
+        <!-- Styles Section -->
+        <section class="voxel-card">
+            <h2>// 9 Professional Styles</h2>
+            <p style="color: #999; margin-bottom: 1.5rem;">Pacing & cutting templates for every narrative.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem;">
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">dynamic</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Smart pacing, position-aware cuts</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">hitchcock</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Slow build → explosive climax</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">mtv</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Fast 1–2 beat cuts, high energy</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">action</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Rapid rapid-fire cuts, intensity</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">documentary</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Natural pacing, observational</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">minimalist</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Long takes, breathing room</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">wes_anderson</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Symmetrical, whimsical timing</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">vlog</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Face-centric, personal storytelling</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">sport</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">High-energy action sequences</p>
+                </div>
+            </div>
+
+            <div class="cta-actions">
+                <a href="CLI_REFERENCE.md#styles" class="voxel-btn primary">Explore Styles →</a>
+            </div>
+        </section>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Stabilization (smooth camera shake)</li>
+                        <li>✓ AI Upscaling (4K generation)</li>
+                        <li>✓ Denoising (low-light rescue)</li>
+                        <li>✓ Sharpening (detail enhancement)</li>
+                    </ul>
+                </div>
+
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Audio Polish</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Voice Isolation (clean dialogue)</li>
+                        <li>✓ Auto Ducking (music under speech)</li>
+                        <li>✓ Normalization (-14 LUFS broadcast)</li>
+                        <li>✓ Captions (TikTok/YouTube/Karaoke)</li>
+                    </ul>
+                </div>
+
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Creative Control</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ 9 Cutting Styles (dynamic, hitchcock, MTV, action…)</li>
+                        <li>✓ Story Engine (AI-optimized arcs)</li>
+                        <li>✓ Color Grading (5+ presets)</li>
+                        <li>✓ Film Grain (8mm–35mm textures)</li>
+                    </ul>
+                </div>
+
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Workflow</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Vertical Shorts (9:16 auto-reframe)</li>
+                        <li>✓ OTIO/EDL Export (Resolve, Premiere, FCP)</li>
+                        <li>✓ Recipe Cards (audit trail)</li>
+                        <li>✓ Variants (A/B testing, parallel)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="terminal-window" style="margin-bottom: 1.5rem;">
+                <div class="terminal-header">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                    <span class="terminal-title">$ cli examples</span>
+                </div>
+                <div class="terminal-body" style="font-size: 0.85rem;">
+                    <p><span class="prompt">$</span> # TikTok shorts with captions</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh shorts mtv --isolate-voice --captions tiktok</p>
+                    <p class="output">[DONE] ✅ 9:16 vertical, 45s, ready to post</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # High-res trailer with effects</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh hq hitchcock --upscale --film-grain 35mm</p>
+                    <p class="output success">[DONE] ✅ 4K montage.mp4 + montage.otio</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # Interview with voice isolation</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh run documentary --isolate-voice --audio-normalize</p>
+                    <p class="output success">[DONE] ✅ Clean dialogue, -14 LUFS audio</p>
+                </div>
+            </div>
+
+            <div class="cta-actions">
+                <a href="CLI_REFERENCE.md" class="voxel-btn primary">Full CLI Docs →</a>
+                <a href="getting-started.md" class="voxel-btn">Setup Guide</a>
+            </div>
+        </section>
+
         <!-- CTA -->
         <section class="voxel-card cta">
             <h2>// Get Started</h2>
             <div class="cta-actions">
                 <a href="https://github.com/mfahsold/montage-ai" class="voxel-btn primary">GitHub</a>
                 <a href="features.md" class="voxel-btn">Features</a>
-                <a href="getting-started.md" class="voxel-btn">Docs</a>
-                <a href="COMPETITIVE_ANALYSIS.md" class="voxel-btn">Why Us?</a>
+                <a href="CLI_REFERENCE.md" class="voxel-btn">CLI Guide</a>
+                <a href="getting-started.md" class="voxel-btn">Setup</a>
             </div>
         </section>
 

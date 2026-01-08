@@ -1,24 +1,31 @@
-/* Montage AI - Poly-Chrome Archive Design System
+/* Montage AI - Voxel Dark Mode Design System
    Matching the webapp's Cyber-NLE aesthetic */
 
 :root {
-    --bg: #f5f4f1;
-    --fg: #1c1c1c;
-    --primary: #0d9488;
-    --primary-strong: #0f766e;
-    --accent: #f59e0b;
-    --muted: #c7cbd1;
-    --card-bg: #ffffff;
-    --border: #1c1c1c;
-    --border-soft: #e4e6eb;
-    --success: #16a34a;
-    --warning: #f97316;
-    --danger: #ef4444;
+    /* Color System (Neon Voxel - Dark Mode) */
+    --bg: #050505;
+    --fg: #e0e0e0;
+    --primary: #0055ff;              /* Electric Blue */
+    --primary-glow: rgba(0, 85, 255, 0.3);
+    --secondary: #ff5500;            /* Neon Orange */
+    --secondary-glow: rgba(255, 85, 0, 0.3);
+    --accent: #ff5500;
+    --muted: #1a1a1a;
+    --muted-fg: #888888;
+    --card-bg: #0d0d0d;
+    --border: #222222;
+    --border-bright: #444444;
+    --success: #00ff88;
+    --warning: #ffcc00;
+    --danger: #ff3333;
+    
+    /* Typography */
     --font-display: 'Inter', -apple-system, sans-serif;
-    --font-mono: 'Space Mono', 'Courier New', monospace;
-    --radius: 12px;
-    --shadow: 0 18px 40px rgba(0,0,0,0.08);
-    --border-width: 2px;
+    --font-mono: 'Share Tech Mono', 'Space Mono', 'Courier New', monospace;
+    --radius: 4px;
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.2);
+    --border-width: 1px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -28,8 +35,8 @@ body {
     color: var(--fg);
     font-family: var(--font-mono);
     background-image:
-        linear-gradient(to right, rgba(28,28,28,0.02) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(28,28,28,0.02) 1px, transparent 1px);
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
     background-size: 32px 32px;
     min-height: 100vh;
     line-height: 1.5;
@@ -52,10 +59,10 @@ h1, h2, h3, h4 {
     letter-spacing: -0.02em;
 }
 
-h1 { font-size: 2rem; line-height: 1; margin: 0; }
-h2 { font-size: 1.25rem; border-bottom: 2px solid var(--fg); padding-bottom: 0.5rem; margin-bottom: 1.25rem; }
+h1 { font-size: 2rem; line-height: 1; margin: 0; color: var(--fg); }
+h2 { font-size: 1.25rem; border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; margin-bottom: 1.25rem; color: var(--fg); }
 h3 { font-size: 1rem; color: var(--primary); margin-bottom: 0.5rem; }
-h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
+h4 { font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--fg); }
 
 /* Voxel Card */
 .voxel-card {
@@ -70,9 +77,8 @@ h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
 .voxel-btn {
     display: inline-block;
     background: var(--card-bg);
-    border: var(--border-width) solid var(--fg);
-    box-shadow: 4px 4px 0 0 var(--fg);
-    color: var(--fg);
+    border: var(--border-width) solid var(--primary);
+    color: var(--primary);
     padding: 0.6rem 1.25rem;
     font-family: var(--font-mono);
     font-weight: bold;
@@ -81,29 +87,30 @@ h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
     text-decoration: none;
     cursor: pointer;
     transition: all 0.12s ease;
-    border-radius: 8px;
+    border-radius: var(--radius);
 }
 
 .voxel-btn:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 0 var(--primary);
-    border-color: var(--primary);
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--bg);
+    box-shadow: 0 0 16px var(--primary-glow);
 }
 
 .voxel-btn:active {
-    transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0 0 var(--primary);
+    transform: translate(1px, 1px);
 }
 
 .voxel-btn.primary {
     background: var(--primary);
-    color: white;
+    color: var(--bg);
+    box-shadow: 0 0 12px var(--primary-glow);
 }
 
 .voxel-btn.primary:hover {
-    background: white;
-    color: var(--primary);
+    background: var(--secondary);
+    color: var(--bg);
+    border-color: var(--secondary);
+    box-shadow: 0 0 16px var(--secondary-glow);
 }
 
 .voxel-btn.small {
@@ -129,7 +136,7 @@ header {
 
 .logo-icon { font-size: 2rem; }
 
-.logo-ai { color: var(--primary-strong); }
+.logo-ai { color: var(--secondary); }
 
 .subtitle {
     font-size: 0.7rem;
@@ -492,7 +499,7 @@ footer {
 }
 
 .comparison-link {
-    color: #0ff;
+    color: var(--primary);
     text-decoration: underline;
 }
 
@@ -761,20 +768,21 @@ footer {
 }
 
 .oss-card.highlight {
-    border: 2px solid var(--accent);
-    background: linear-gradient(135deg, rgba(13, 148, 136, 0.1), rgba(13, 148, 136, 0.05));
+    border: 2px solid var(--secondary);
+    background: rgba(255, 85, 0, 0.1);
+    box-shadow: 0 0 16px var(--secondary-glow);
 }
 
 .oss-card h4 {
-    font-family: 'Space Mono', monospace;
+    font-family: 'Share Tech Mono', monospace;
     font-size: 1rem;
-    color: var(--text);
+    color: var(--fg);
     margin-bottom: 1rem;
     letter-spacing: 0.05em;
 }
 
 .oss-card.highlight h4 {
-    color: var(--accent);
+    color: var(--secondary);
 }
 
 .oss-features {
@@ -786,20 +794,21 @@ footer {
 .oss-features li {
     font-size: 0.85rem;
     padding: 0.3rem 0;
-    font-family: 'Space Mono', monospace;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--muted-fg);
 }
 
 .oss-features li.has {
-    color: var(--accent);
+    color: var(--success);
 }
 
 .oss-features li.missing {
-    color: #ef4444;
+    color: var(--danger);
     opacity: 0.8;
 }
 
 .oss-features li.partial {
-    color: var(--accent-secondary);
+    color: var(--warning);
 }
 
 .oss-badge {
