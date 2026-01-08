@@ -1,0 +1,255 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-web
+  namespace: montage-ai
+  labels:
+    app: montage-ai
+    component: web
+    app.kubernetes.io/part-of: fluxibri-v2
+    version: "hardened-v2"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: montage-ai
+      component: web
+  template:
+    metadata:
+      labels:
+        app: montage-ai
+        component: web
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        description: "Montage AI - Production-hardened deployment with graceful shutdown"
+    spec:
+      # ========================================================================
+      # GRACEFUL SHUTDOWN & LIFECYCLE
+      # ========================================================================
+      # Allow 60 seconds for graceful shutdown (FFmpeg cleanup, connection draining)
+      terminationGracePeriodSeconds: 60
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      
+      # ========================================================================
+      # SCHEDULING & AFFINITY
+      # ========================================================================
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      affinity:
+        # Prefer to schedule on primary storage node
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - codeai-worker-amd64
+      
+      # ========================================================================
+      # CONTAINERS
+      # ========================================================================
+      containers:
+      - name: montage-ai
+        image: 192.168.1.12:5000/montage-ai:latest
+        imagePullPolicy: Always
+        
+        # ====================================================================
+        # PORT & NETWORKING
+        # ====================================================================
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        
+        # ====================================================================
+        # ENVIRONMENT VARIABLES
+        # ====================================================================
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: QUALITY_PROFILE
+          value: "standard"
+        - name: CGPU_ENABLED
+          value: "false"
+        # Python buffering: unbuffered logs for real-time K3s log streaming
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        # Graceful shutdown: signal handling with 55s timeout (5s safety buffer)
+        - name: GRACEFUL_SHUTDOWN_TIMEOUT
+          value: "55"
+        # Logging
+        - name: LOG_DIR
+          value: "/tmp/logs"
+        - name: LOG_FORMAT
+          value: "json"
+        # Redis resilience: retry on connection failure
+        - name: REDIS_RETRY_BACKOFF
+          value: "1"
+        - name: REDIS_MAX_RETRIES
+          value: "3"
+        - name: REDIS_SOCKET_KEEPALIVE
+          value: "true"
+        # Memory management
+        - name: MALLOC_TRIM_THRESHOLD_
+          value: "131072"  # 128KB threshold for malloc trimming
+        - name: MALLOC_MMAP_THRESHOLD_
+          value: "131072"  # Use mmap for large allocations
+        
+        # ====================================================================
+        # VOLUME MOUNTS
+        # ====================================================================
+        volumeMounts:
+        - name: data-input
+          mountPath: /data/input
+          readOnly: false
+        - name: data-output
+          mountPath: /data/output
+          readOnly: false
+        - name: data-music
+          mountPath: /data/music
+          readOnly: false
+        - name: cache
+          mountPath: /data/cache
+          readOnly: false
+        - name: tmp-segments
+          mountPath: /tmp/segments
+          readOnly: false
+        - name: log-dir
+          mountPath: /tmp/logs
+          readOnly: false
+        
+        # ====================================================================
+        # RESOURCE LIMITS & REQUESTS
+        # ====================================================================
+        resources:
+          requests:
+            memory: "2.5Gi"          # Baseline memory guarantee
+            cpu: "1500m"             # Baseline CPU (1.5 cores)
+            ephemeral-storage: "10Gi" # Temp segment writing
+          limits:
+            memory: "5.5Gi"          # Hard memory limit (reduced for stability)
+            cpu: "3500m"             # CPU limit (leave room for kernel)
+            ephemeral-storage: "15Gi" # Prevent /tmp exhaustion
+        
+        # ====================================================================
+        # SECURITY CONTEXT (Container-level)
+        # ====================================================================
+        securityContext:
+          runAsNonRoot: false        # Flask needs root for port 8080
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # Needs /tmp/segments
+          capabilities:
+            drop:
+              - ALL
+            add:
+              - NET_BIND_SERVICE  # Only port binding capability
+        
+        # ====================================================================
+        # LIFECYCLE: GRACEFUL SHUTDOWN HOOK
+        # ====================================================================
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - sh
+                - -c
+                # Give active jobs 50 seconds to finish, then graceful exit
+                - |
+                  echo "🔄 Pre-stop: Signaling graceful shutdown..."
+                  curl -s -X POST http://localhost:8080/api/shutdown || echo "Graceful shutdown failed, continuing..."
+                  sleep 50
+                  echo "✅ Pre-stop complete, container terminating"
+          postStart:
+            exec:
+              command:
+                - sh
+                - -c
+                - mkdir -p /tmp/logs
+        
+        # ====================================================================
+        # PROBES: STARTUP -> READINESS -> LIVENESS
+        # ====================================================================
+        # Startup: gives container 150 seconds to boot (allow Flask startup + cgpu connect)
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30     # 5s × 30 = 150 seconds max
+          successThreshold: 1
+        
+        # Readiness: container is ready to accept traffic
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+            httpHeaders:
+            - name: X-Readiness-Check
+              value: "true"
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+          successThreshold: 1
+        
+        # Liveness: pod is still alive (loose detection to avoid thundering herd)
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 45  # More time for sustained operation
+          periodSeconds: 15        # Reduce frequency to avoid false positives
+          timeoutSeconds: 5
+          failureThreshold: 2      # Kill after 30s of failures (15s × 2)
+          successThreshold: 1
+      
+      # ====================================================================
+      # SECURITY CONTEXT (Pod-level)
+      # ====================================================================
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # ====================================================================
+      # VOLUMES
+      # ====================================================================
+      volumes:
+      - name: data-input
+        persistentVolumeClaim:
+          claimName: montage-input
+      - name: data-output
+        persistentVolumeClaim:
+          claimName: montage-output
+      - name: data-music
+        persistentVolumeClaim:
+          claimName: montage-music
+      - name: cache
+        persistentVolumeClaim:
+          claimName: montage-cache
+      - name: tmp-segments
+        emptyDir:
+          sizeLimit: 100Gi
+      - name: log-dir
+        emptyDir:
+          sizeLimit: 5Gi  # Prevent log explosion

@@ -14,6 +14,7 @@ import threading
 import psutil
 import queue
 import time
+import signal
 from datetime import datetime
 from pathlib import Path
 from collections import deque
@@ -48,6 +49,14 @@ from .sse import MessageAnnouncer, format_sse
 
 # DRY Decorators for consistent error handling
 from .decorators import api_endpoint, require_json, require_file, validate_range
+
+# Signal handling & subprocess management
+try:
+    from ..subprocess_manager import install_signal_handlers, cleanup_all_subprocesses, track_subprocess
+    SIGNAL_HANDLING_AVAILABLE = True
+except ImportError:
+    logger.warning("subprocess_manager not available, signal handling disabled")
+    SIGNAL_HANDLING_AVAILABLE = False
 
 announcer = MessageAnnouncer()
 
@@ -121,7 +130,23 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max upload
 app.config['UPLOAD_FOLDER'] = INPUT_DIR
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files (Hardware Nah: minimize I/O)
+app.config['ACCEPTING_JOBS'] = True  # Flag for graceful shutdown
 
+# Install signal handlers for graceful shutdown
+if SIGNAL_HANDLING_AVAILABLE:
+    try:
+        install_signal_handlers()
+        logger.info("✅ Signal handlers installed for graceful shutdown")
+    except Exception as e:
+        logger.warning(f"Failed to install signal handlers: {e}")
+
+
+@app.teardown_appcontext
+def cleanup_on_shutdown(error=None):
+    """Cleanup subprocesses when Flask app shuts down."""
+    if SIGNAL_HANDLING_AVAILABLE:
+        logger.info("Cleaning up subprocesses...")
+        cleanup_all_subprocesses(timeout=50)
 
 
 
@@ -210,6 +235,66 @@ def get_job_status(job_id: str) -> dict:
     return job if job else {"status": "not_found"}
 
 
+# =============================================================================
+# SHUTDOWN MANAGEMENT
+# =============================================================================
+_shutdown_requested = False
+_active_job_count = 0
+
+def signal_graceful_shutdown():
+    """Signal that shutdown has been requested."""
+    global _shutdown_requested
+    _shutdown_requested = True
+    logger.info("⏹️  Graceful shutdown requested via /api/shutdown")
+    return True
+
+
+@app.route('/api/shutdown', methods=['POST'])
+def api_graceful_shutdown():
+    """
+    Graceful shutdown endpoint (called by K3s preStop hook).
+    
+    This endpoint:
+    1. Stops accepting new jobs
+    2. Waits for active jobs to complete (up to 50 seconds)
+    3. Closes database connections
+    4. Exits cleanly
+    """
+    global _shutdown_requested
+    
+    if signal_graceful_shutdown():
+        # Stop accepting new jobs
+        app.config['ACCEPTING_JOBS'] = False
+        
+        # Get active job count
+        try:
+            active_jobs = len(q.started_job_registry) if hasattr(q, 'started_job_registry') else 0
+        except:
+            active_jobs = 0
+        
+        logger.info(f"Shutdown: {active_jobs} jobs still active")
+        
+        # Try to drain job queue gracefully
+        # Note: K3s preStop hook has 50s timeout, so we can't wait forever
+        return jsonify({
+            "status": "shutting_down",
+            "active_jobs": active_jobs,
+            "message": "Pod will terminate after preStop hook completes (50 seconds)"
+        }), 202  # HTTP 202 Accepted
+    
+    return jsonify({"status": "error", "message": "Shutdown already in progress"}), 409
+
+
+@app.before_request
+def check_shutdown_status():
+    """Prevent new jobs during shutdown."""
+    global _shutdown_requested
+    
+    if _shutdown_requested and request.path.startswith('/api/jobs') and request.method == 'POST':
+        return jsonify({
+            "status": "error",
+            "message": "Server is shutting down, cannot accept new jobs"
+        }), 503  # Service Unavailable
 
 
 

@@ -1,0 +1,44 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: montage-ai-log-cleanup
+  namespace: montage-ai
+spec:
+  schedule: "0 4 * * *"
+  suspend: false
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          serviceAccountName: montage-ai
+          containers:
+          - name: cleanup
+            image: alpine:3.19
+            command:
+            - sh
+            - -c
+            - |
+              POD=$(kubectl get pods -n montage-ai -l app=montage-ai,component=web -o jsonpath='{.items[0].metadata.name}')
+              [ -z "$POD" ] && exit 1
+              kubectl exec -n montage-ai $POD -- find /tmp/segments -mtime +7 -delete 2>/dev/null || true
+              kubectl exec -n montage-ai $POD -- find /tmp/logs -mtime +14 -delete 2>/dev/null || true
+          restartPolicy: OnFailure
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: montage-ai-resource-alerts
+  namespace: montage-ai
+spec:
+  groups:
+  - name: montage-ai.resource-alerts
+    interval: 30s
+    rules:
+    - alert: MontageAIMemoryPressure
+      expr: container_memory_usage_bytes{pod=~"montage-ai-.*"} > container_spec_memory_limit_bytes{pod=~"montage-ai-.*"} * 0.9
+      for: 1m
+      annotations:
+        summary: "Montage AI memory > 90%"
+        severity: "warning"
