@@ -1,32 +1,49 @@
 ---
+# Optional: GPU-Accelerated Deployment for Jetson Orin
+# Use this variant for upscaling jobs requiring GPU acceleration
+# Deploy as: kubectl apply -f deployment-gpu.yaml
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: montage-ai-web
+  name: montage-ai-gpu
   namespace: montage-ai
   labels:
     app: montage-ai
-    component: web
-    app.kubernetes.io/part-of: fluxibri-v2
+    component: web-gpu
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: montage-ai
-      component: web
+      component: web-gpu
   template:
     metadata:
       labels:
         app: montage-ai
-        component: web
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
-        prometheus.io/path: "/metrics"
+        component: web-gpu
     spec:
-      # Schedule only on amd64 nodes (image is amd64, ARM64 nodes will fail)
-      nodeSelector:
-        kubernetes.io/arch: amd64
+      # Pin to Jetson Orin for GPU acceleration
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - codeaijetson-desktop
+      
+      # NVIDIA GPU toleration
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      
+      restartPolicy: Always
+      serviceAccountName: montage-ai
+      
       containers:
       - name: montage-ai
         image: 192.168.1.12:5000/montage-ai:latest
@@ -41,9 +58,13 @@ spec:
         - name: LOG_LEVEL
           value: "INFO"
         - name: QUALITY_PROFILE
-          value: "standard"
+          value: "high"  # 4K support
         - name: CGPU_ENABLED
           value: "false"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "all"
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: "compute,utility"
         volumeMounts:
         - name: data-input
           mountPath: /data/input
@@ -57,11 +78,13 @@ spec:
           mountPath: /tmp/segments
         resources:
           requests:
-            memory: 2Gi
-            cpu: 1000m
+            memory: 4Gi
+            cpu: 2000m
+            nvidia.com/gpu: 1  # Request 1 GPU
           limits:
             memory: 8Gi
-            cpu: 4000m
+            cpu: 8000m
+            nvidia.com/gpu: 1
         livenessProbe:
           httpGet:
             path: /health
@@ -74,6 +97,7 @@ spec:
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 5
+      
       volumes:
       - name: data-input
         persistentVolumeClaim:
@@ -90,3 +114,27 @@ spec:
       - name: tmp-segments
         emptyDir:
           sizeLimit: 100Gi
+      
+      nodeSelector:
+        kubernetes.io/arch: arm64  # Jetson Orin is ARM64
+
+---
+# Service for GPU variant (optional, same as main)
+apiVersion: v1
+kind: Service
+metadata:
+  name: montage-ai-gpu
+  namespace: montage-ai
+  labels:
+    app: montage-ai
+    component: web-gpu
+spec:
+  selector:
+    app: montage-ai
+    component: web-gpu
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,181 @@
+---
+# Storage Setup for Montage-AI
+# Strategy: HostPath volumes with explicit node pinning
+# This avoids iSCSI/NFS complexity while maintaining data persistence
+
+# Create directories on primary worker node (codeai-worker-amd64)
+# These must exist before PV creation:
+# sudo mkdir -p /var/montage-ai/{input,output,music,cache}
+# sudo chmod 777 /var/montage-ai/{input,output,music,cache}
+
+---
+apiVersion: v1
+kind: StorageClass
+metadata:
+  name: montage-local
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+
+---
+# PersistentVolume: Input Videos
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-pv-input
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: montage-local
+  hostPath:
+    path: /var/montage-ai/input
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - codeai-worker-amd64  # Pin to primary rendering node
+
+---
+# PersistentVolume: Output Videos
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-pv-output
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: montage-local
+  hostPath:
+    path: /var/montage-ai/output
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - codeai-worker-amd64
+
+---
+# PersistentVolume: Music Library
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-pv-music
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: montage-local
+  hostPath:
+    path: /var/montage-ai/music
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - codeai-worker-amd64
+
+---
+# PersistentVolume: Cache (Beats, Scenes, Analysis)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-pv-cache
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: montage-local
+  hostPath:
+    path: /var/montage-ai/cache
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - codeai-worker-amd64
+
+---
+# PersistentVolumeClaim: Input
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-input
+  namespace: montage-ai
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: montage-local
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: montage-pv-input
+
+---
+# PersistentVolumeClaim: Output
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-output
+  namespace: montage-ai
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: montage-local
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: montage-pv-output
+
+---
+# PersistentVolumeClaim: Music
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-music
+  namespace: montage-ai
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: montage-local
+  resources:
+    requests:
+      storage: 50Gi
+  volumeName: montage-pv-music
+
+---
+# PersistentVolumeClaim: Cache
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-cache
+  namespace: montage-ai
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: montage-local
+  resources:
+    requests:
+      storage: 50Gi
+  volumeName: montage-pv-cache
