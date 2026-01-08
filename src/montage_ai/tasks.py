@@ -27,8 +27,10 @@ def run_montage(job_id: str, style: str, options: dict):
     # Ensure directories
     settings.paths.ensure_directories()
 
-    # Setup job logging
-    log_path = Path(OUTPUT_DIR) / f"render_{job_id}.log"
+    # Setup job logging - write to /tmp to avoid permission issues with /data/output PVC
+    log_dir = Path("/tmp/montage_logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / f"render_{job_id}.log"
     file_handler = logging.FileHandler(log_path, encoding='utf-8')
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(file_handler)

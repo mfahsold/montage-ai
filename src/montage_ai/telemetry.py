@@ -133,9 +133,13 @@ class TelemetryCollector:
     MAX_HISTORY = 1000  # Max jobs to keep in history
 
     def __init__(self, storage_path: Optional[Path] = None):
-        base_output = get_settings().paths.output_dir
-        default_storage = base_output / "telemetry"
-        self.storage_path = Path(storage_path) if storage_path else default_storage
+        # Use /tmp for telemetry to avoid permission issues with /data/output PVC
+        if storage_path:
+            default_storage = Path(storage_path)
+        else:
+            telemetry_base = Path("/tmp/montage_telemetry")
+            default_storage = telemetry_base
+        self.storage_path = default_storage
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         self._lock = threading.Lock()
