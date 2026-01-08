@@ -143,10 +143,16 @@ if SIGNAL_HANDLING_AVAILABLE:
 
 @app.teardown_appcontext
 def cleanup_on_shutdown(error=None):
-    """Cleanup subprocesses when Flask app shuts down."""
-    if SIGNAL_HANDLING_AVAILABLE:
-        logger.info("Cleaning up subprocesses...")
-        cleanup_all_subprocesses(timeout=50)
+    """Cleanup subprocesses when Flask app context closes.
+    
+    Note: teardown_appcontext runs after every request.
+    We intentionally skip cleanup here since Flask will handle process lifecycle.
+    Subprocesses are only forcefully cleaned on actual app termination via signal handlers.
+    """
+    # Only cleanup if there's an actual error in the request
+    if error and SIGNAL_HANDLING_AVAILABLE:
+        logger.debug(f"Error in request, cleaning up subprocesses: {error}")
+        cleanup_all_subprocesses(timeout=10)
 
 
 

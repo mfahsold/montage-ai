@@ -9,6 +9,7 @@ Provides shared infrastructure for all video workflows:
 SOTA Design Pattern: Template Method + Strategy Pattern
 """
 
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, List
@@ -195,6 +196,9 @@ class VideoWorkflow(ABC):
             self._update_phase(WorkflowPhase.FAILED)
             error_msg = f"{type(e).__name__}: {str(e)}"
             logger.error(f"[{self.workflow_name}] Failed: {error_msg}")
+            # Log full traceback for debugging
+            import traceback
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             
             self._result = WorkflowResult(
                 success=False,
