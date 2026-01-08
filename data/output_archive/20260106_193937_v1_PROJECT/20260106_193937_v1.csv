@@ -1,0 +1,5 @@
+Clip #,Source File,Source In (sec),Source Out (sec),Timeline In (sec),Timeline Out (sec),Duration (sec),Source In (TC),Source Out (TC),Timeline In (TC),Timeline Out (TC),Energy,Action,Shot Type,Notes
+1,/home/codeai/montage-ai/data/input/abstract_clouds.mp4,0.00,3.89,0.00,3.89,3.89,00:00:00:00,00:00:03:26,00:00:00:00,00:00:03:26,0.05,medium,medium,
+2,/home/codeai/montage-ai/data/input/GSFC_20190419_Earth_m13188_Orbit~medium.mp4,93.10,96.94,3.89,7.73,3.84,00:01:33:02,00:01:36:28,00:00:03:26,00:00:07:21,0.12,medium,medium,
+3,/home/codeai/montage-ai/data/input/GSFC_20140421_EarthOrbit_m11525~preview.mp4,46.17,50.03,7.73,11.59,3.86,00:00:46:04,00:00:50:00,00:00:07:21,00:00:11:17,0.15,medium,medium,
+4,/home/codeai/montage-ai/data/input/Seeing Earth as Only NASA Can~medium.mp4,38.47,41.88,11.59,15.00,3.41,00:00:38:14,00:00:41:26,00:00:11:17,00:00:15:00,0.12,medium,medium,

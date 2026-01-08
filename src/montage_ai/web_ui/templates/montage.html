@@ -7,7 +7,7 @@
 {% block extra_css %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/icons.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/montage.css') }}">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide@latest" />
+    <script src="https://unpkg.com/lucide@latest" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -83,8 +83,15 @@
         <!-- STEP 3: Processing Options -->
         <div class="mb-8">
             <div class="voxel-card">
-                <h3 class="mb-3 text-primary">STEP 3: PROCESSING OPTIONS</h3>
-                <p class="text-xs text-muted mb-4">Optional AI enhancements applied during rendering.</p>
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="step-number">3</div>
+                    <div class="flex-1">
+                        <h3 class="text-primary mb-1">PROCESSING OPTIONS</h3>
+                        <p class="text-xs text-muted">Optional enhancements — leave unchecked for faster preview renders</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
                 <!-- Video Enhancement -->
                 <div class="option-group">
@@ -326,6 +333,7 @@
                             <div class="option-label-desc">Export enhancement parameters as human-readable instructions.</div>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
         </div>

@@ -1,0 +1,97 @@
+{
+  "project_name": "20260106_112027_v1",
+  "duration_sec": 15.0,
+  "fps": 30.0,
+  "resolution": [
+    640,
+    360
+  ],
+  "audio_file": "/home/codeai/montage-ai/data/music/TestTrack1.mp3",
+  "clips": [
+    {
+      "index": 1,
+      "source_file": "/home/codeai/montage-ai/data/input/GSFC_20190419_Earth_m13188_Orbit~medium.mp4",
+      "proxy_file": null,
+      "source_in": 93.1,
+      "source_out": 96.96011215315086,
+      "timeline_in": 0.0,
+      "timeline_out": 3.8601121531508675,
+      "duration": 3.8601121531508675,
+      "metadata": {
+        "energy": 0.047947101294994354,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 89,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 2,
+      "source_file": "/home/codeai/montage-ai/data/input/Seeing Earth as Only NASA Can~medium.mp4",
+      "proxy_file": null,
+      "source_in": 10.633333333333333,
+      "source_out": 14.476940769128973,
+      "timeline_in": 3.8601121531508675,
+      "timeline_out": 7.703719588946507,
+      "duration": 3.843607435795639,
+      "metadata": {
+        "energy": 0.12163595855236053,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 51,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 3,
+      "source_file": "/home/codeai/montage-ai/data/input/GSFC_20140421_EarthOrbit_m11525~preview.mp4",
+      "proxy_file": null,
+      "source_in": 86.3,
+      "source_out": 90.13821537712595,
+      "timeline_in": 7.703719588946507,
+      "timeline_out": 11.541934966072455,
+      "duration": 3.8382153771259477,
+      "metadata": {
+        "energy": 0.147922545671463,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 53,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 4,
+      "source_file": "/home/codeai/montage-ai/data/input/short_london.mp4",
+      "proxy_file": null,
+      "source_in": 1.0,
+      "source_out": 4.458065033927545,
+      "timeline_in": 11.541934966072455,
+      "timeline_out": 15.0,
+      "duration": 3.4580650339275447,
+      "metadata": {
+        "energy": 0.1189177930355072,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 53,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    }
+  ],
+  "exporter_version": "0.1.0"
+}

@@ -1,0 +1,202 @@
+{
+  "project_name": "20260103_171339_v1",
+  "duration_sec": 30.088001287433777,
+  "fps": 24,
+  "resolution": [
+    3840,
+    2160
+  ],
+  "audio_file": "/data/music/CinematicTrack.mp3",
+  "clips": [
+    {
+      "index": 1,
+      "source_file": "/data/input/TearsOfSteel.mp4",
+      "proxy_file": null,
+      "source_in": 346.5416666666667,
+      "source_out": 349.97337367471596,
+      "timeline_in": 0.0,
+      "timeline_out": 3.4317070080492447,
+      "duration": 3.4317070080492447,
+      "metadata": {
+        "energy": 0.0,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 87.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 2,
+      "source_file": "/data/input/Sintel.mp4",
+      "proxy_file": null,
+      "source_in": 75.58324990615615,
+      "source_out": 79.09118638453542,
+      "timeline_in": 3.4317070080492447,
+      "timeline_out": 6.939643486428512,
+      "duration": 3.507936478379267,
+      "metadata": {
+        "energy": 0.15552250477349466,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 67.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 3,
+      "source_file": "/data/input/TearsOfSteel.mp4",
+      "proxy_file": null,
+      "source_in": 283.0833333333333,
+      "source_out": 286.6164556910991,
+      "timeline_in": 6.939643486428512,
+      "timeline_out": 10.472765844194292,
+      "duration": 3.533122357765781,
+      "metadata": {
+        "energy": 0.1609936079091174,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 51.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 4,
+      "source_file": "/data/input/Sintel.mp4",
+      "proxy_file": null,
+      "source_in": 289.87467412725226,
+      "source_out": 293.4180821633749,
+      "timeline_in": 10.472765844194292,
+      "timeline_out": 14.01617388031694,
+      "duration": 3.543408036122647,
+      "metadata": {
+        "energy": 0.10055115504899681,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 49.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 5,
+      "source_file": "/data/input/TearsOfSteel.mp4",
+      "proxy_file": null,
+      "source_in": 411.9583333333333,
+      "source_out": 415.4923462949677,
+      "timeline_in": 14.01617388031694,
+      "timeline_out": 17.55018684195135,
+      "duration": 3.5340129616344105,
+      "metadata": {
+        "energy": 0.10165397720902118,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 53.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 6,
+      "source_file": "/data/input/ElephantsDream.mp4",
+      "proxy_file": null,
+      "source_in": 251.29166666666666,
+      "source_out": 254.82500260051788,
+      "timeline_in": 17.55018684195135,
+      "timeline_out": 21.08352277580258,
+      "duration": 3.5333359338512302,
+      "metadata": {
+        "energy": 0.09082554417492383,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 53.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 7,
+      "source_file": "/data/input/TearsOfSteel.mp4",
+      "proxy_file": null,
+      "source_in": 122.45833333333333,
+      "source_out": 126.04179341104987,
+      "timeline_in": 21.08352277580258,
+      "timeline_out": 24.666982853519116,
+      "duration": 3.583460077716534,
+      "metadata": {
+        "energy": 0.09002578662327416,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 49.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 8,
+      "source_file": "/data/input/Sintel.mp4",
+      "proxy_file": null,
+      "source_in": 259.2497080518018,
+      "source_out": 262.8911684069798,
+      "timeline_in": 24.666982853519116,
+      "timeline_out": 28.30844320869707,
+      "duration": 3.6414603551779567,
+      "metadata": {
+        "energy": 0.34524581613170674,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 54.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    },
+    {
+      "index": 9,
+      "source_file": "/data/input/TearsOfSteel.mp4",
+      "proxy_file": null,
+      "source_in": 588.0833333333334,
+      "source_out": 589.8628914120701,
+      "timeline_in": 28.30844320869707,
+      "timeline_out": 30.088001287433777,
+      "duration": 1.779558078736706,
+      "metadata": {
+        "energy": 0.6830674278622905,
+        "action": "medium",
+        "shot": "medium",
+        "selection_score": 54.0,
+        "enhancements": {
+          "stabilized": false,
+          "upscaled": false,
+          "enhanced": false
+        }
+      }
+    }
+  ],
+  "exporter_version": "0.1.0"
+}

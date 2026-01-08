@@ -1,0 +1,92 @@
+/* Collapsible Accordion Styles for Montage Form */
+
+.option-accordion {
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    margin-bottom: 0.75rem;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.accordion-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--primary);
+    background: var(--muted);
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.accordion-header:hover {
+    background: rgba(0, 255, 136, 0.05);
+    border-bottom-color: var(--border);
+}
+
+.accordion-header .section-icon {
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+.accordion-icon {
+    margin-left: auto;
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+    flex-shrink: 0;
+}
+
+.option-accordion[open] .accordion-icon {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    padding: 1.25rem;
+    background: var(--bg);
+}
+
+/* Improved option items for better mobile */
+.option-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+    align-items: start;
+}
+
+.option-item:last-child {
+    border-bottom: none;
+}
+
+.option-item input[type="checkbox"] {
+    margin-top: 0.25rem;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    .accordion-header {
+        font-size: 0.8rem;
+        padding: 0.875rem;
+    }
+    
+    .option-item {
+        grid-template-columns: auto 1fr;
+        gap: 0.5rem;
+        padding: 0.625rem 0;
+    }
+    
+    .option-label-title {
+        font-size: 0.8rem !important;
+    }
+    
+    .option-label-desc {
+        font-size: 0.7rem !important;
+    }
+}

@@ -1,0 +1,39 @@
+{
+  "job_id": "20260106_125515",
+  "total_duration_s": 164.82889342308044,
+  "phase_times_ms": {
+    "initialization": 1293.945074081421,
+    "variant_1": 163529.73628044128
+  },
+  "kpis": {},
+  "feature_usage": {},
+  "decisions": [],
+  "metrics": {},
+  "events": [
+    {
+      "timestamp": "12:55:33.033",
+      "level": "DATA",
+      "category": "beat_analysis",
+      "message": "TestTrack1.mp3: 125 BPM, 777 beats",
+      "data": {
+        "bpm": 125.0,
+        "beat_count": 777,
+        "energy_profile": "mixed"
+      },
+      "duration_ms": null
+    },
+    {
+      "timestamp": "12:58:09.492",
+      "level": "METRIC",
+      "category": "resources",
+      "message": "Process: 0.4GB RAM, 0% CPU",
+      "data": {
+        "process_rss_gb": 0.3510475158691406,
+        "process_cpu_pct": 0.0,
+        "system_mem_pct": 66.4,
+        "system_available_gb": 5.169757843017578
+      },
+      "duration_ms": null
+    }
+  ]
+}

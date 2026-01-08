@@ -1,0 +1,15 @@
+TITLE: 20260106_194025_v1
+FCM: NON-DROP FRAME
+
+001  GSFC_201 V     C        00:03:24:26 00:03:28:21 00:00:00:00 00:00:03:25
+* FROM CLIP NAME: GSFC_20140421_EarthOrbit_m11525~preview.mp4
+* SOURCE FILE: /home/codeai/montage-ai/data/input/GSFC_20140421_EarthOrbit_m11525~preview.mp4
+
+002  GSFC_201 V     C        00:00:16:26 00:00:20:21 00:00:03:25 00:00:07:20
+* FROM CLIP NAME: GSFC_20190419_Earth_m13188_Orbit~medium.mp4
+* SOURCE FILE: /home/codeai/montage-ai/data/input/GSFC_20190419_Earth_m13188_Orbit~medium.mp4
+
+003  GSFC_201 V     C        00:03:07:18 00:03:09:28 00:00:07:20 00:00:10:00
+* FROM CLIP NAME: GSFC_20140421_EarthOrbit_m11525~preview.mp4
+* SOURCE FILE: /home/codeai/montage-ai/data/input/GSFC_20140421_EarthOrbit_m11525~preview.mp4
+

@@ -106,11 +106,9 @@
             <!-- Job List (Mock Data) -->
             <div class="voxel-card flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-center gap-4 flex-1">
-                    <!-- Thumbnail with Video Hover -->
+                    <!-- Thumbnail -->
                     <div class="job-preview-container">
                          <img src="{{ url_for('static', filename='img/thumb1.jpg') }}" alt="Thumbnail" class="job-thumbnail">
-                         <!-- Loop muted video on hover -->
-                         <video src="{{ url_for('static', filename='video/preview1.mp4') }}" class="job-video-preview" muted loop autoplay></video>
                     </div>
                     <div class="min-w-0">
                         <h4 class="truncate">PROJECT_ALPHA_V2</h4>
@@ -141,21 +139,6 @@
                     <span class="badge badge-secondary text-xs">PROCESSING</span>
                     <span class="text-xs text-muted">5m remaining</span>
                     <button class="voxel-btn text-xs" disabled>VIEW</button>
-                </div>
-            </div>
-        </div>
-    </div>
-{% endblock %}
-                        <div class="min-w-0">
-                            <h4 class="truncate">SKATE_TRIP_2025</h4>
-                            <span class="text-xs text-muted">MTV Style • 4K Upscale</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3 flex-wrap justify-between md:justify-end">
-                        <span class="badge badge-secondary text-xs">PROCESSING</span>
-                        <span class="text-xs text-muted">5m remaining</span>
-                        <button class="voxel-btn text-xs" disabled>VIEW</button>
-                    </div>
                 </div>
             </div>
         </div>

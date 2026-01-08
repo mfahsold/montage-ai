@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Montage AI{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
@@ -18,6 +19,7 @@
             <div class="nav-links nav-primary">
                 <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">DASHBOARD</a>
                 <a href="/montage" class="nav-link {% if request.path == '/montage' %}active{% endif %}">CREATOR</a>
+                <a href="/shorts" class="nav-link {% if request.path == '/shorts' %}active{% endif %}">SHORTS</a>
             </div>
         </div>
         
