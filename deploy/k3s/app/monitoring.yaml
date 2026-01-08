@@ -1,0 +1,151 @@
+---
+# Prometheus Service Monitor for Montage-AI metrics
+# Install: kubectl apply -f monitoring.yaml
+# Then access Prometheus: http://prometheus.fluxibri.lan
+# Query examples:
+#   - container_memory_usage_bytes{pod="montage-ai-web-*"}
+#   - container_cpu_usage_seconds_total{pod="montage-ai-web-*"}
+#   - kubelet_pvc_usage_bytes{persistentvolumeclaim=~"montage-.*"}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: montage-ai-metrics
+  namespace: montage-ai
+  labels:
+    app: montage-ai
+spec:
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  selector:
+    app: montage-ai
+    component: web
+
+---
+# PrometheusRule: Alerting rules for Montage-AI
+# Requires: prometheus-operator installed
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: montage-ai-alerts
+  namespace: montage-ai
+spec:
+  groups:
+  - name: montage-ai
+    interval: 30s
+    rules:
+    # Pod not running
+    - alert: MontageAIPodNotRunning
+      expr: count(kube_pod_status_phase{namespace="montage-ai", pod=~"montage-ai-web-.*", phase="Running"}) == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: montage-ai
+      annotations:
+        summary: "Montage-AI pod is not running"
+        description: "Pod has been down for 5+ minutes"
+    
+    # High memory usage (>5GB)
+    - alert: MontageAIHighMemory
+      expr: container_memory_usage_bytes{pod=~"montage-ai-web-.*"} > 5368709120
+      for: 2m
+      labels:
+        severity: warning
+        component: montage-ai
+      annotations:
+        summary: "Montage-AI memory usage is high"
+        description: "Memory: {{ humanize $value }}B"
+    
+    # Low disk space (<20GB free)
+    - alert: MontageAILowDiskSpace
+      expr: node_filesystem_avail_bytes{mountpoint="/var/montage-ai"} < 21474836480
+      for: 5m
+      labels:
+        severity: warning
+        component: montage-ai
+      annotations:
+        summary: "Montage-AI storage running low"
+        description: "Free space: {{ humanize $value }}B"
+    
+    # PVC almost full (>80%)
+    - alert: MontageAIPVCAlmostFull
+      expr: kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"montage-.*"} / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"montage-.*"} > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        component: montage-ai
+      annotations:
+        summary: "Montage-AI PVC {{ $labels.persistentvolumeclaim }} is almost full"
+        description: "Usage: {{ humanizePercentage $value }}"
+    
+    # Health check failing
+    - alert: MontageAIHealthCheckFailing
+      expr: up{job="montage-ai-metrics"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        component: montage-ai
+      annotations:
+        summary: "Montage-AI health check is failing"
+        description: "Pod may be unhealthy or unresponsive"
+
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: montage-ai-dashboard
+  namespace: monitoring
+data:
+  montage-ai-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "Montage-AI Monitoring",
+        "tags": ["montage-ai", "video-processing"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Pod Status",
+            "targets": [
+              {
+                "expr": "kube_pod_status_phase{namespace=\"montage-ai\", phase=\"Running\"}"
+              }
+            ]
+          },
+          {
+            "title": "Memory Usage",
+            "targets": [
+              {
+                "expr": "container_memory_usage_bytes{pod=~\"montage-ai-web-.*\"} / 1024 / 1024 / 1024"
+              }
+            ]
+          },
+          {
+            "title": "CPU Usage",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{pod=~\"montage-ai-web-.*\"}[5m])"
+              }
+            ]
+          },
+          {
+            "title": "Disk Space (codeai-worker-amd64)",
+            "targets": [
+              {
+                "expr": "node_filesystem_avail_bytes{mountpoint=\"/var/montage-ai\"} / 1024 / 1024 / 1024"
+              }
+            ]
+          },
+          {
+            "title": "PVC Usage",
+            "targets": [
+              {
+                "expr": "kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"montage-.*\"} / 1024 / 1024 / 1024"
+              }
+            ]
+          }
+        ]
+      }
+    }

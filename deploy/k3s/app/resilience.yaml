@@ -1,0 +1,101 @@
+---
+# Pod Disruption Budget: Ensure montage-ai pod is never evicted during cluster operations
+# This prevents data loss and ensures continuous availability during node maintenance
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: montage-ai-pdb
+  namespace: montage-ai
+spec:
+  minAvailable: 1  # At least 1 pod must be available (no evictions)
+  selector:
+    matchLabels:
+      app: montage-ai
+      component: web
+
+---
+# ResourceQuota: Prevent namespace from consuming excessive cluster resources
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: montage-ai-quota
+  namespace: montage-ai
+spec:
+  hard:
+    requests.cpu: "8"        # Max 8 CPU cores requested
+    requests.memory: "16Gi"  # Max 16 GB memory requested
+    limits.cpu: "16"         # Max 16 CPU cores in limits
+    limits.memory: "32Gi"    # Max 32 GB memory in limits
+    pods: "10"               # Max 10 pods in namespace
+    persistentvolumeclaims: "5"  # Max 5 PVCs
+
+---
+# NetworkPolicy: Restrict traffic (optional, can be enabled later)
+# Allows ingress from Traefik/default namespace only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: montage-ai-network-policy
+  namespace: montage-ai
+spec:
+  podSelector:
+    matchLabels:
+      app: montage-ai
+      component: web
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Traefik (ingress controller)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector: {}  # Allow from same namespace
+  # Allow from monitoring (if Prometheus exists)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow external HTTPS (for cgpu/Gemini API)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow to Kubernetes API
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# ServiceMonitor: For Prometheus metrics (optional, requires prometheus-operator)
+# Uncomment after Prometheus is installed
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#   name: montage-ai
+#   namespace: montage-ai
+#   labels:
+#     app: montage-ai
+# spec:
+#   selector:
+#     matchLabels:
+#       app: montage-ai
+#       component: web
+#   endpoints:
+#   - port: http
+#     interval: 30s
+#     path: /metrics

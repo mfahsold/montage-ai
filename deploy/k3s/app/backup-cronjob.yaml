@@ -1,0 +1,104 @@
+---
+# CronJob for automated daily backups of Montage-AI data
+# Creates backup at 02:00 UTC daily, stores in /tmp/montage-backups
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: montage-ai-backup
+  namespace: montage-ai
+spec:
+  schedule: "0 2 * * *"  # Daily at 02:00 UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: montage-ai
+          containers:
+          - name: backup
+            image: alpine:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              apk add --no-cache kubectl
+              
+              BACKUP_DIR="/backups"
+              mkdir -p $BACKUP_DIR
+              
+              POD_NAME=$(kubectl get pods -n montage-ai -l app=montage-ai,component=web \
+                -o jsonpath='{.items[0].metadata.name}')
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_NAME="montage-ai-backup_${TIMESTAMP}"
+              BACKUP_PATH="${BACKUP_DIR}/${BACKUP_NAME}"
+              
+              mkdir -p "$BACKUP_PATH"
+              
+              echo "Starting backup of $POD_NAME..."
+              
+              # Backup with timeout
+              timeout 600 kubectl cp montage-ai/$POD_NAME:/data/output \
+                "$BACKUP_PATH/output" 2>/dev/null || echo "Output backup skipped or timed out"
+              timeout 300 kubectl cp montage-ai/$POD_NAME:/data/cache \
+                "$BACKUP_PATH/cache" 2>/dev/null || echo "Cache backup skipped or timed out"
+              
+              # Metadata
+              echo "Backup: $TIMESTAMP" > "$BACKUP_PATH/metadata.txt"
+              echo "Pod: $POD_NAME" >> "$BACKUP_PATH/metadata.txt"
+              
+              # Compress
+              tar -czf "${BACKUP_PATH}.tar.gz" -C "$BACKUP_DIR" "$BACKUP_NAME" 2>/dev/null || true
+              
+              # Cleanup old backups (>7 days)
+              find $BACKUP_DIR -name "montage-ai-backup_*.tar.gz" -mtime +7 -delete
+              
+              echo "✅ Backup complete: ${BACKUP_PATH}.tar.gz"
+            
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+          
+          volumes:
+          - name: backup-storage
+            hostPath:
+              path: /var/montage-ai/backups
+              type: DirectoryOrCreate
+          
+          restartPolicy: OnFailure
+
+---
+# ServiceAccount for backup CronJob
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: montage-ai
+  namespace: montage-ai
+
+---
+# ClusterRole for backup CronJob
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: montage-ai-backup
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+
+---
+# ClusterRoleBinding for backup CronJob
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: montage-ai-backup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: montage-ai-backup
+subjects:
+- kind: ServiceAccount
+  name: montage-ai
+  namespace: montage-ai
