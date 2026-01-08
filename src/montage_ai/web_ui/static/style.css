@@ -1,6 +1,12 @@
 /* Montage AI - Cyber-NLE Design System (v2: Artsy & Responsive) */
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/*
+ * Font Stack: 3 Fonts Only (2026 Trends)
+ * - Space Grotesk: Display/Headlines (fancy, tech-forward)
+ * - Inter: Body/UI (gold-standard readability)
+ * - JetBrains Mono: Code/Technical (best code legibility)
+ */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
     /* Palette (Dark Mode / Cyber-NLE) */
@@ -19,10 +25,10 @@
     --danger: #E74C3C;        /* Record Red */
     --success: #2ECC71;       /* Success Green */
 
-    /* Typography - Artsy & Modern */
-    --font-display: 'Space Grotesk', 'Inter', sans-serif;  /* Geometric, artsy headings */
-    --font-body: 'Inter', sans-serif;                       /* Clean, readable body */
-    --font-mono: 'JetBrains Mono', 'Space Mono', monospace; /* Modern tech monospace */
+    /* Typography - 3 Font Stack (2026) */
+    --font-display: 'Space Grotesk', sans-serif;   /* Headlines: fancy, tech-forward */
+    --font-body: 'Inter', sans-serif;               /* Body: gold-standard readability */
+    --font-mono: 'JetBrains Mono', monospace;       /* Code: best legibility */
 
     /* Dimensions */
     --radius: 6px;
@@ -569,7 +575,7 @@ input[type=range]::-webkit-slider-runnable-track {
 }
 
 .step-number {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-body);
     font-weight: 900;
     font-size: 2rem;
     color: var(--muted);

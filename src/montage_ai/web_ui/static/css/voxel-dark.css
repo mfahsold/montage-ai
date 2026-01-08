@@ -3,7 +3,7 @@
  * Focus: Technical Readability, Fluid Typography, Mobile-First Responsiveness
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+/* Fonts loaded from main style.css - using unified 3-font stack */
 
 :root {
   /* --- COLOR SYSTEM (Neon Voxel) --- */
@@ -24,10 +24,12 @@
   
   --success: #00ff88;
   --warning: #ffcc00;
-  --error: #ff3333;
+  --danger: #ff3333;  /* Consistent with docs */
 
-  /* --- TYPOGRAPHY (Fluid & Technical) --- */
-  --font-main: 'Share Tech Mono', monospace;
+  /* --- TYPOGRAPHY (Fluid & Technical - 2026 Stack) --- */
+  --font-display: 'Space Grotesk', sans-serif;  /* Headlines */
+  --font-body: 'Inter', sans-serif;              /* Body text */
+  --font-mono: 'JetBrains Mono', monospace;      /* Code/Technical */
   
   /* SOTA: Fluid typography using clamp() */
   --fs-xs: clamp(0.7rem, 0.6rem + 0.5vw, 0.8rem);
@@ -100,7 +102,7 @@ html {
 body {
   background-color: var(--bg);
   color: var(--fg);
-  font-family: var(--font-main);
+  font-family: var(--font-body);  /* Inter for readability */
   line-height: var(--lh-base);
   overflow-x: hidden;
   min-height: 100vh;
@@ -399,6 +401,55 @@ h3 { font-size: var(--fs-base); }
 
 @media (max-width: 640px) {
   .nav-primary { display: none; }
+  .navbar.nav-open .nav-primary {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg);
+    border-bottom: 2px solid var(--primary);
+    padding: 1rem;
+    gap: 0.5rem;
+    z-index: 1000;
+  }
+  .navbar.nav-open .nav-primary .nav-link {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+  }
+}
+
+/* Hamburger Button (Mobile) */
+.nav-hamburger {
+  display: none;
+  background: transparent;
+  border: 2px solid var(--border);
+  padding: 0.5rem;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: auto;
+}
+.nav-hamburger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--fg);
+  transition: all 0.2s ease;
+}
+@media (max-width: 640px) {
+  .nav-hamburger { display: flex; }
+}
+/* Hamburger Animation */
+.navbar.nav-open .nav-hamburger span:nth-child(1) {
+  transform: rotate(45deg) translate(4px, 4px);
+}
+.navbar.nav-open .nav-hamburger span:nth-child(2) {
+  opacity: 0;
+}
+.navbar.nav-open .nav-hamburger span:nth-child(3) {
+  transform: rotate(-45deg) translate(4px, -4px);
 }
 
 /* Secondary Navigation (Line 2) - Dropdowns */
@@ -541,7 +592,7 @@ h3 { font-size: var(--fs-base); }
   align-items: center;
   justify-content: center;
   padding: 0.6rem 1.2rem;
-  font-family: var(--font-main);
+  font-family: var(--font-mono);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: var(--ls-wide);
@@ -612,7 +663,7 @@ h3 { font-size: var(--fs-base); }
   color: var(--fg);
   border: 2px solid var(--border);
   padding: 0.75rem;
-  font-family: var(--font-main);
+  font-family: var(--font-mono);
   font-size: var(--fs-sm);
   outline: none;
   box-shadow: var(--shd-sm);
@@ -829,7 +880,7 @@ img, video, canvas {
 }
 
 .tech-value {
-  font-family: var(--font-main);
+  font-family: var(--font-mono);
   font-weight: 900;
   color: var(--primary);
 }
@@ -1185,8 +1236,8 @@ body::after {
 }
 
 .status-dot.offline {
-  background: var(--error);
-  border-color: var(--error);
+  background: var(--danger);
+  border-color: var(--danger);
 }
 
 /* Ribbon Label */
@@ -1678,7 +1729,7 @@ input[type=range].scrubber::-webkit-slider-thumb {
 
 /* --- FOOTER SLOGAN --- */
 .footer-slogan {
-    font-family: var(--font-main);
+    font-family: var(--font-mono);
     font-weight: 700;
     font-size: var(--fs-lg);
     color: var(--muted-fg);

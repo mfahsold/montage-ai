@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker
+  namespace: montage-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: montage-ai-worker
+  template:
+    metadata:
+      labels:
+        app: montage-ai-worker
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      initContainers:
+      - name: fix-permissions
+        image: busybox:latest
+        command: ['sh', '-c', 'chown -R 1000:1000 /data/output /data/cache /data/input && chmod -R 775 /data/output /data/cache /data/input']
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /data/input
+          name: data-input
+        - mountPath: /data/output
+          name: data-output
+        - mountPath: /data/cache
+          name: cache
+      containers:
+      - name: montage-ai
+        image: 192.168.1.12:5000/montage-ai:latest
+        imagePullPolicy: Always
+        command: ["/bin/bash"]
+        args: ["/scripts/start_rq_worker.sh"]
+        env:
+        - name: REDIS_HOST
+          value: redis
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: PYTHONPATH
+          value: /app/src
+        - name: ASSETS_DIR
+          value: /tmp/montage_assets
+        - name: METADATA_CACHE_DIR
+          value: /tmp/montage_cache
+        - name: TENSION_METADATA_DIR
+          value: /tmp/montage_cache/tension
+        - name: OUTPUT_DIR
+          value: /data/output
+        - name: HWACCEL
+          value: auto
+        - name: FFMPEG_PRESET
+          value: fast
+        - name: FFMPEG_CRF
+          value: "18"
+        resources:
+          requests:
+            cpu: "2"
+            memory: 6Gi
+            ephemeral-storage: 10Gi
+          limits:
+            cpu: "6"
+            memory: 12Gi
+            ephemeral-storage: 30Gi
+        volumeMounts:
+        - mountPath: /data/input
+          name: data-input
+        - mountPath: /data/output
+          name: data-output
+        - mountPath: /data/music
+          name: data-music
+        - mountPath: /data/cache
+          name: cache
+        - mountPath: /tmp/segments
+          name: tmp-segments
+        - mountPath: /scripts
+          name: scripts
+      volumes:
+      - name: data-input
+        persistentVolumeClaim:
+          claimName: montage-input
+      - name: data-output
+        persistentVolumeClaim:
+          claimName: montage-output
+      - name: data-music
+        persistentVolumeClaim:
+          claimName: montage-music
+      - name: cache
+        persistentVolumeClaim:
+          claimName: montage-cache
+      - name: tmp-segments
+        emptyDir:
+          sizeLimit: 100Gi
+      - name: scripts
+        configMap:
+          name: rq-worker-script
+          defaultMode: 0755

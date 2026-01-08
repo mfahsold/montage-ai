@@ -1,6 +1,14 @@
 /* Montage AI - Voxel Dark Mode Design System
    Matching the webapp's Cyber-NLE aesthetic */
 
+/*
+ * Font Stack: 3 Fonts Only (2026 Trends)
+ * - Space Grotesk: Display/Headlines (fancy, tech-forward)
+ * - Inter: Body/UI (gold-standard readability)
+ * - JetBrains Mono: Code/Technical (best code legibility)
+ */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 :root {
     /* Color System (Neon Voxel - Dark Mode) */
     --bg: #050505;
@@ -18,10 +26,20 @@
     --success: #00ff88;
     --warning: #ffcc00;
     --danger: #ff3333;
-    
-    /* Typography */
-    --font-display: 'Inter', -apple-system, sans-serif;
-    --font-mono: 'Share Tech Mono', 'Space Mono', 'Courier New', monospace;
+
+    /* Typography - 3 Font Stack (2026) */
+    --font-display: 'Space Grotesk', sans-serif;   /* Headlines: fancy, tech-forward */
+    --font-body: 'Inter', sans-serif;               /* Body: gold-standard readability */
+    --font-mono: 'JetBrains Mono', monospace;       /* Code: best legibility */
+
+    /* Fluid Typography (consistent with web-app) */
+    --fs-xs: clamp(0.7rem, 0.6rem + 0.5vw, 0.8rem);
+    --fs-sm: clamp(0.8rem, 0.7rem + 0.5vw, 0.9rem);
+    --fs-base: clamp(0.9rem, 0.8rem + 0.5vw, 1rem);
+    --fs-lg: clamp(1.1rem, 1rem + 1vw, 1.3rem);
+    --fs-xl: clamp(1.4rem, 1.2rem + 2vw, 1.8rem);
+    --fs-2xl: clamp(1.8rem, 1.5rem + 3vw, 2.5rem);
+
     --radius: 4px;
     --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.2);
@@ -33,7 +51,7 @@
 body {
     background: var(--bg);
     color: var(--fg);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     background-image:
         linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
@@ -100,20 +118,20 @@ h4 { font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--fg); }
     transform: translate(1px, 1px);
 }
 
-.voxel-btn.primary {
+.voxel-btn-primary {
     background: var(--primary);
     color: var(--bg);
     box-shadow: 0 0 12px var(--primary-glow);
 }
 
-.voxel-btn.primary:hover {
+.voxel-btn-primary:hover {
     background: var(--secondary);
     color: var(--bg);
     border-color: var(--secondary);
     box-shadow: 0 0 16px var(--secondary-glow);
 }
 
-.voxel-btn.small {
+.voxel-btn-small {
     padding: 0.4rem 0.8rem;
     font-size: 0.7rem;
     box-shadow: 3px 3px 0 0 var(--fg);
@@ -720,7 +738,7 @@ footer {
 }
 
 .feature-box h4 {
-    font-family: 'Space Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 0.85rem;
     color: var(--accent);
     margin: 0 0 0.5rem 0;
@@ -774,7 +792,7 @@ footer {
 }
 
 .oss-card h4 {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 1rem;
     color: var(--fg);
     margin-bottom: 1rem;
@@ -794,7 +812,7 @@ footer {
 .oss-features li {
     font-size: 0.85rem;
     padding: 0.3rem 0;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: var(--font-mono);
     color: var(--muted-fg);
 }
 
@@ -821,7 +839,7 @@ footer {
     font-weight: 700;
     padding: 0.25rem 0.75rem;
     border-radius: 4px;
-    font-family: 'Space Mono', monospace;
+    font-family: var(--font-mono);
     letter-spacing: 0.05em;
 }
 
@@ -830,7 +848,7 @@ footer {
     margin-top: 1rem;
     font-size: 0.75rem;
     color: var(--muted);
-    font-family: 'Space Mono', monospace;
+    font-family: var(--font-mono);
     text-decoration: none;
 }
 
@@ -850,7 +868,7 @@ a.oss-link:hover {
     font-style: italic;
     color: var(--accent);
     margin: 0 0 1rem 0;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-body);
 }
 
 .oss-philosophy p {

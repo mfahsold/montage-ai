@@ -81,7 +81,7 @@
 .terminal-window {
     background: #1a1a1a;
     color: #0f0;
-    font-family: 'Space Mono', monospace;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
     font-size: 0.8rem;
     padding: 1rem;
     border-radius: 8px;

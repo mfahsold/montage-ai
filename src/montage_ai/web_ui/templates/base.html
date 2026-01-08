@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Montage AI{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <!-- Font Stack: Space Grotesk (display), Inter (body), JetBrains Mono (code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/voxel-dark.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
@@ -16,6 +20,10 @@
             <a href="/" class="nav-brand">
                 <span>●</span> MONTAGE AI
             </a>
+            <!-- Mobile Hamburger -->
+            <button type="button" class="nav-hamburger" onclick="document.querySelector('.navbar').classList.toggle('nav-open')" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
             <div class="nav-links nav-primary">
                 <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">DASHBOARD</a>
                 <a href="/montage" class="nav-link {% if request.path == '/montage' %}active{% endif %}">CREATOR</a>
@@ -58,7 +66,7 @@
                 <p class="footer-tagline">// Polish, don't generate.</p>
             </div>
             <div class="footer-section footer-links">
-                <a href="https://github.com/mfahsold/montage-ai" target="_blank">GITHUB</a>
+                <a href="https://github.com/mfahsold/montage-ai" target="_blank" rel="noopener noreferrer">GITHUB</a>
                 <a href="/" class="text-muted">v0.1.0</a>
             </div>
         </div>

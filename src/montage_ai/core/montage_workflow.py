@@ -98,7 +98,7 @@ class MontageWorkflow(VideoWorkflow):
         
         if 'color_grading' in extras:
             feats.color_grade = extras['color_grading']
-        if 'color_intensity' in extras:
+        if 'color_intensity' in extras and extras['color_intensity'] is not None:
             feats.color_intensity = float(extras['color_intensity'])
         if 'denoise' in extras:
             feats.denoise = extras['denoise']

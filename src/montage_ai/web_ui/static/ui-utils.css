@@ -60,7 +60,7 @@
 }
 
 .text-mono-faint {
-    font-family: 'Space Mono', monospace;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
     opacity: 0.7;
 }
 

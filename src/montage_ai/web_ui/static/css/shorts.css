@@ -367,7 +367,7 @@
         }
 
         .progress-terminal-msg {
-            font-family: 'Share Tech Mono', monospace;
+            font-family: var(--font-mono, 'JetBrains Mono', monospace);
             color: var(--primary);
             background: rgba(0, 85, 255, 0.05); /* Very subtle bg */
             padding: 0.4rem 0.6rem;

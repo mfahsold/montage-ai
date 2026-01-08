@@ -1,0 +1,169 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "8"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"montage-ai-worker","namespace":"montage-ai"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"montage-ai-worker"}},"template":{"metadata":{"labels":{"app":"montage-ai-worker"}},"spec":{"containers":[{"args":["/scripts/start_rq_worker.sh"],"command":["/bin/bash"],"env":[{"name":"REDIS_HOST","value":"redis"},{"name":"PYTHONUNBUFFERED","value":"1"},{"name":"PYTHONPATH","value":"/app/src"},{"name":"ASSETS_DIR","value":"/tmp/montage_assets"},{"name":"METADATA_CACHE_DIR","value":"/tmp/montage_cache"},{"name":"TENSION_METADATA_DIR","value":"/tmp/montage_cache/tension"},{"name":"OUTPUT_DIR","value":"/data/output"},{"name":"HWACCEL","value":"auto"},{"name":"FFMPEG_PRESET","value":"fast"},{"name":"FFMPEG_CRF","value":"18"}],"image":"192.168.1.12:5000/montage-ai:latest","imagePullPolicy":"Always","name":"montage-ai","resources":{"limits":{"cpu":"3","ephemeral-storage":"20Gi","memory":"8Gi"},"requests":{"cpu":"1","ephemeral-storage":"5Gi","memory":"4Gi"}},"volumeMounts":[{"mountPath":"/data/input","name":"data-input"},{"mountPath":"/data/output","name":"data-output"},{"mountPath":"/data/music","name":"data-music"},{"mountPath":"/data/cache","name":"cache"},{"mountPath":"/tmp/segments","name":"tmp-segments"},{"mountPath":"/data","name":"data-root"},{"mountPath":"/scripts","name":"scripts"}]}],"initContainers":[{"command":["sh","-c","chown -R 1000:1000 /data/output /data/cache \u0026\u0026 chmod -R 775 /data/output /data/cache"],"image":"busybox:latest","name":"fix-permissions","volumeMounts":[{"mountPath":"/data/output","name":"data-output"},{"mountPath":"/data/cache","name":"cache"}]}],"nodeSelector":{"kubernetes.io/arch":"amd64"},"volumes":[{"name":"data-input","persistentVolumeClaim":{"claimName":"montage-input"}},{"name":"data-output","persistentVolumeClaim":{"claimName":"montage-output"}},{"name":"data-music","persistentVolumeClaim":{"claimName":"montage-music"}},{"name":"cache","persistentVolumeClaim":{"claimName":"montage-cache"}},{"emptyDir":{"sizeLimit":"100Gi"},"name":"tmp-segments"},{"emptyDir":{},"name":"data-root"},{"configMap":{"defaultMode":493,"name":"rq-worker-script"},"name":"scripts"}]}}}}
+  creationTimestamp: "2026-01-08T17:32:21Z"
+  generation: 14
+  name: montage-ai-worker
+  namespace: montage-ai
+  resourceVersion: "109499"
+  uid: 84b71700-8344-4ba6-93e6-6149741158dd
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: montage-ai-worker
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-01-08T18:48:38+01:00"
+      labels:
+        app: montage-ai-worker
+    spec:
+      containers:
+      - args:
+        - /scripts/start_rq_worker.sh
+        command:
+        - /bin/bash
+        env:
+        - name: REDIS_HOST
+          value: redis
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: PYTHONPATH
+          value: /app/src
+        - name: ASSETS_DIR
+          value: /tmp/montage_assets
+        - name: METADATA_CACHE_DIR
+          value: /tmp/montage_cache
+        - name: TENSION_METADATA_DIR
+          value: /tmp/montage_cache/tension
+        - name: OUTPUT_DIR
+          value: /data/output
+        - name: HWACCEL
+          value: auto
+        - name: FFMPEG_PRESET
+          value: fast
+        - name: FFMPEG_CRF
+          value: "18"
+        image: 192.168.1.12:5000/montage-ai:latest
+        imagePullPolicy: Always
+        name: montage-ai
+        resources:
+          limits:
+            cpu: "6"
+            ephemeral-storage: 30Gi
+            memory: 12Gi
+          requests:
+            cpu: "2"
+            ephemeral-storage: 10Gi
+            memory: 6Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data/input
+          name: data-input
+        - mountPath: /data/output
+          name: data-output
+        - mountPath: /data/music
+          name: data-music
+        - mountPath: /data/cache
+          name: cache
+        - mountPath: /tmp/segments
+          name: tmp-segments
+        - mountPath: /data
+          name: data-root
+        - mountPath: /scripts
+          name: scripts
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - chown -R 1000:1000 /data/output /data/cache && chmod -R 775 /data/output
+          /data/cache
+        image: busybox:latest
+        imagePullPolicy: Always
+        name: fix-permissions
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data/input
+          name: data-input
+        - mountPath: /data/output
+          name: data-output
+        - mountPath: /data/music
+          name: data-music
+        - mountPath: /data/cache
+          name: cache
+        - mountPath: /tmp/segments
+          name: tmp-segments
+        - mountPath: /scripts
+          name: scripts
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: data-input
+        persistentVolumeClaim:
+          claimName: montage-input
+      - name: data-output
+        persistentVolumeClaim:
+          claimName: montage-output
+      - name: data-music
+        persistentVolumeClaim:
+          claimName: montage-music
+      - name: cache
+        persistentVolumeClaim:
+          claimName: montage-cache
+      - emptyDir:
+          sizeLimit: 100Gi
+        name: tmp-segments
+      - emptyDir: {}
+        name: data-root
+      - configMap:
+          defaultMode: 493
+          name: rq-worker-script
+        name: scripts
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-01-08T17:51:37Z"
+    lastUpdateTime: "2026-01-08T17:51:37Z"
+    message: 'pods "montage-ai-worker-69c7b44fbf-lt6lm" is forbidden: failed quota:
+      montage-ai-quota: must specify limits.cpu for: fix-permissions; limits.memory
+      for: fix-permissions; requests.cpu for: fix-permissions; requests.memory for:
+      fix-permissions'
+    reason: FailedCreate
+    status: "True"
+    type: ReplicaFailure
+  - lastTransitionTime: "2026-01-08T17:59:18Z"
+    lastUpdateTime: "2026-01-08T17:59:18Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-01-08T17:32:21Z"
+    lastUpdateTime: "2026-01-08T17:59:18Z"
+    message: ReplicaSet "montage-ai-worker-69c7b44fbf" is progressing.
+    reason: ReplicaSetUpdated
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  unavailableReplicas: 1
