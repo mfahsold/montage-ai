@@ -3,7 +3,7 @@
 ## Status
 
 ✅ **K3s Cluster**: 7 nodes ready (AMD GPU, Jetson, Raspberry Pi, ThinkPad, etc.)  
-✅ **Registry**: 192.168.1.12:5000 (contains montage-ai:latest + many other images)  
+✅ **Registry**: YOUR_REGISTRY:5000 (contains montage-ai:latest + many other images)  
 ✅ **Kustomize Overlays**: dev/staging/prod configured  
 ⚠️ **Image Pull**: HTTP registry not yet configured for K3s  
 
@@ -11,17 +11,17 @@
 
 ### 1. Configure K3s for Insecure HTTP Registry
 
-The registry at `192.168.1.12:5000` is HTTP-only (not HTTPS). K3s needs configuration to allow this.
+The registry at `YOUR_REGISTRY:5000` is HTTP-only (not HTTPS). K3s needs configuration to allow this.
 
 Add to `/etc/rancher/k3s/registries.yaml`:
 
 ```yaml
 mirrors:
-  "192.168.1.12:5000":
+  "YOUR_REGISTRY:5000":
     endpoint:
-      - "http://192.168.1.12:5000"
+      - "http://YOUR_REGISTRY:5000"
 configs:
-  "192.168.1.12:5000":
+  "YOUR_REGISTRY:5000":
     tls:
       insecure_skip_verify: true
 ```
@@ -67,7 +67,7 @@ kubectl port-forward -n montage-ai svc/montage-ai-web 5000:80
 
 | Environment | Registry | Resources | Preferences |
 |---|---|---|---|
-| dev | 192.168.1.12:5000 | 2Gi/500m requests | Any node (local-path OK) |
+| dev | YOUR_REGISTRY:5000 | 2Gi/500m requests | Any node (local-path OK) |
 | staging | TBD | 8Gi/2 CPU requests | Prefer GPU nodes |
 | prod | TBD | 16Gi/4 CPU requests | Require GPU nodes |
 

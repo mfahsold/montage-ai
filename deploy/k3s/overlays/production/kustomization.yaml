@@ -10,7 +10,7 @@ namespace: montage-ai
 
 # Use registry from config.env (via deploy.sh substitution)
 images:
-  - name: 192.168.1.12:5000/montage-ai
+  - name: ghcr.io/mfahsold/montage-ai
     newTag: latest
 
 # Production deployment configuration

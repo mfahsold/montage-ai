@@ -46,7 +46,8 @@ spec:
     - protocol: TCP
       port: 53
 ---
-# Allow egress to private registry (192.168.1.16:30500)
+# Allow egress to private registry
+# UPDATE: Replace REGISTRY_IP with your registry server IP
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -58,11 +59,12 @@ spec:
   - Egress
   egress:
   - to:
+    # UPDATE: Your registry IP (e.g., 10.0.0.10/32)
     - ipBlock:
-        cidr: 192.168.1.16/32
+        cidr: 0.0.0.0/0  # Allow all - restrict in production
     ports:
     - protocol: TCP
-      port: 30500
+      port: 5000  # Standard registry port
 ---
 # Allow egress to GitHub for Kaniko builds
 apiVersion: networking.k8s.io/v1

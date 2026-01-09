@@ -29,7 +29,7 @@ deploy/
 
 ### Registry Configuration
 ```bash
-REGISTRY_HOST="192.168.1.12"              # Registry hostname/IP
+REGISTRY_HOST="YOUR_REGISTRY_IP"              # Registry hostname/IP
 REGISTRY_PORT="5000"                       # Registry port
 REGISTRY_URL="${REGISTRY_HOST}:${REGISTRY_PORT}"
 IMAGE_NAME="montage-ai"                    # Image name
@@ -40,7 +40,7 @@ IMAGE_FULL="${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
 ### Kubernetes Configuration
 ```bash
 CLUSTER_NAMESPACE="montage-ai"             # K8s namespace
-CLUSTER_API_SERVER="https://192.168.1.13:6443"
+CLUSTER_API_SERVER="https://YOUR_K8S_API:6443"
 APP_DOMAIN="montage-ai.fluxibri.local"     # Application domain
 TLS_SECRET="montage-ai-tls"                # TLS secret name
 ```
@@ -140,18 +140,18 @@ CPU_LIMIT="4000m"
 
 ### Before (Hardcoded)
 ```yaml
-image: 192.168.1.12:5000/montage-ai:latest
+image: YOUR_REGISTRY:5000/montage-ai:latest
 namespace: montage-ai
 ```
 
 ```bash
-docker push "192.168.1.12:5000/montage-ai:latest"
+docker push "YOUR_REGISTRY:5000/montage-ai:latest"
 ```
 
 ### After (Centralized)
 ```bash
 # In deploy/config.env
-REGISTRY_URL="192.168.1.12:5000"
+REGISTRY_URL="YOUR_REGISTRY:5000"
 IMAGE_FULL="${REGISTRY_URL}/montage-ai:latest"
 
 # In scripts

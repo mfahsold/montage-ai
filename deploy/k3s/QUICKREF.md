@@ -17,7 +17,7 @@ kubectl port-forward -n montage-ai svc/montage-ai 5000:5000
 # Open http://localhost:5000
 
 # Option 2: Ingress (permanent)
-# Add to /etc/hosts: 192.168.1.12  montage.local
+# Add to /etc/hosts: YOUR_IP  montage.local
 # Open https://montage.local
 ```
 
@@ -78,6 +78,6 @@ curl http://localhost:8000/v1/models
 ## Integration Points
 
 - **LLM**: `http://exo-api.default.svc.cluster.local:8000`
-- **Registry**: `192.168.1.12:5000`
+- **Registry**: `YOUR_REGISTRY:5000`
 - **Storage**: `local-path` PVC (100Gi)
 - **Source**: `/home/codeai/montage-ai/src` (hostPath)

@@ -24,7 +24,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: montage-ai
-          image: 192.168.1.12:5000/montage-ai:latest
+          image: ghcr.io/mfahsold/montage-ai:latest
           imagePullPolicy: Always
           resources:
             requests:

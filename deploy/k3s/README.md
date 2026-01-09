@@ -83,8 +83,8 @@ docker buildx build --platform linux/amd64 \
 docker push ghcr.io/mfahsold/montage-ai:latest
 
 # Or push to cluster registry
-docker tag ghcr.io/mfahsold/montage-ai:latest 192.168.1.16:30500/montage-ai:latest
-docker push 192.168.1.16:30500/montage-ai:latest
+docker tag ghcr.io/mfahsold/montage-ai:latest YOUR_REGISTRY:30500/montage-ai:latest
+docker push YOUR_REGISTRY:30500/montage-ai:latest
 ```
 
 ### Option B: Manual Import
@@ -345,7 +345,7 @@ sudo exportfs -a
 
 ```yaml
 nfs:
-  server: 192.168.1.16  # Your NFS server IP
+  server: YOUR_NFS_SERVER  # Your NFS server IP
   path: /mnt/nfs-montage/input
 ```
 

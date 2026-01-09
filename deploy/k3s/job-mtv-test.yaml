@@ -20,7 +20,7 @@ spec:
         supplementalGroups: [44,992]
       initContainers:
         - name: cgpu-credentials-init
-          image: 192.168.1.12:5000/montage-ai:latest
+          image: ghcr.io/mfahsold/montage-ai:latest
           command:
             - bash
             - -c
@@ -41,7 +41,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: 192.168.1.12:5000/montage-ai:latest
+          image: ghcr.io/mfahsold/montage-ai:latest
           imagePullPolicy: Always
           env:
             - name: CUT_STYLE

@@ -16,7 +16,9 @@ service: montage-ai
 version: "0.5.0"
 
 # Registry configuration
-registry: 192.168.1.12:5000
+# Default: GitHub Container Registry (public)
+# Override with REGISTRY env var for self-hosted registries
+registry: ghcr.io/mfahsold
 image: montage-ai
 
 # Build settings
@@ -26,10 +28,12 @@ platforms:
   - linux/arm64
 
 # Buildx configuration
-builder: simple-builder
+# For distributed builds, create a builder with:
+#   docker buildx create --name multi-builder --use
+builder: default
 cache:
   enabled: true
-  ref: "192.168.1.12:5000/montage-ai:buildcache"
+  ref: "ghcr.io/mfahsold/montage-ai:buildcache"
   mode: max
 
 # Build arguments

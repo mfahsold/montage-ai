@@ -27,10 +27,12 @@ spec:
           args:
             - "--dockerfile=/workspace/Dockerfile"
             - "--context=/workspace"
-            - "--destination=192.168.1.12:5000/montage-ai:latest"
-            - "--insecure"
+            # Update destination for your registry:
+            - "--destination=ghcr.io/mfahsold/montage-ai:latest"
+            # For insecure registries, uncomment: --insecure
+            # - "--insecure"
             - "--cache=true"
-            - "--cache-repo=192.168.1.12:5000/montage-ai/cache"
+            - "--cache-repo=ghcr.io/mfahsold/montage-ai/cache"
             - "--snapshot-mode=redo"
             - "--use-new-run"
             # Speed optimizations

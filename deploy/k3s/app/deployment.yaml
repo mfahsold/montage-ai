@@ -41,7 +41,7 @@ spec:
         kubernetes.io/arch: amd64
       containers:
       - name: montage-ai
-        image: 192.168.1.12:5000/montage-ai:latest
+        image: ghcr.io/mfahsold/montage-ai:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

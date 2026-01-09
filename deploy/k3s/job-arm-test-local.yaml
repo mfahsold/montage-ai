@@ -10,7 +10,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: 192.168.1.12:5000/montage-ai:v2-arm64
+          image: ghcr.io/mfahsold/montage-ai:v2-arm64
           imagePullPolicy: Always
           command: ["/bin/sh", "-c"]
           args: ["python3 -c \"import platform; print(f'Running on {platform.machine()}'); import montage_ai; print('Montage AI imported successfully')\""]

@@ -10,35 +10,24 @@ resources:
   - network-policy.yaml
 
 # =============================================================================
-# Image Configuration (fluxibri_core pattern)
+# Image Configuration
 # =============================================================================
-# Registry: 192.168.1.12:5000 (cluster standard)
-# Tagging: Git SHA for production, :latest for development
+# Default: ghcr.io/mfahsold/montage-ai (GitHub Container Registry)
+# For self-hosted registries, use an overlay or edit this file.
 #
 # Update tag after build:
-#   # Option 1: Edit this file
-#   newTag: abc1234  # Git SHA from build
+#   kustomize edit set image ghcr.io/mfahsold/montage-ai=ghcr.io/mfahsold/montage-ai:v1.0.0
 #
-#   # Option 2: Kustomize CLI override
-#   kustomize edit set image montage-ai=192.168.1.12:5000/montage-ai:abc1234
-#
-#   # Option 3: kubectl patch (GitOps/Flux)
-#   kubectl kustomize . | kubectl apply -f -
+# For local/private registries, create an overlay:
+#   overlays/local/kustomization.yaml:
+#     images:
+#       - name: ghcr.io/mfahsold/montage-ai
+#         newName: your-registry:5000/montage-ai
+#         newTag: latest
 # =============================================================================
 images:
-  # Primary image (matches deployment.yaml)
-  - name: 192.168.1.12:5000/montage-ai
-    newTag: 9810dd3  # {"$imagepolicy": "montage-ai:montage-ai"}
-  # Legacy/alternate registry mappings
   - name: ghcr.io/mfahsold/montage-ai
-    newName: 192.168.1.12:5000/montage-ai
-    newTag: 9810dd3
-  - name: 192.168.1.16:30500/montage-ai
-    newName: 192.168.1.12:5000/montage-ai
-    newTag: 9810dd3
-  - name: montage-ai
-    newName: 192.168.1.12:5000/montage-ai
-    newTag: 9810dd3
+    newTag: latest
 
 # ConfigMap for deployment settings (overlays can patch)
 configMapGenerator:

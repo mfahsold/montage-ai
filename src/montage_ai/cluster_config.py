@@ -1,15 +1,27 @@
 """
 Cluster Configuration - Defines encoding nodes for distributed processing.
 
-This file contains the actual cluster hardware configuration based on
-the K3s cluster at Fluxibri.
+Configure your cluster nodes via environment variable or config file.
 
-Nodes:
-- fluxibri: AMD RX 7900 XT/XTX (21GB VRAM) - Primary heavy encode
-- jetson: NVIDIA Jetson (8GB) - Edge video processing
-- t14s: Qualcomm Snapdragon X Elite (Adreno) - ARM64 encode
-- esprimo: Intel CPU - Light tasks
-- workers: Raspberry Pi / AMD64 - CPU fallback
+Environment Variable (JSON):
+    export MONTAGE_CLUSTER_NODES='[
+        {"name": "gpu-node", "hostname": "10.0.0.10", "encoder_type": "nvenc", "priority": 100},
+        {"name": "cpu-node", "hostname": "10.0.0.11", "encoder_type": "cpu", "priority": 10}
+    ]'
+
+Or create a config file at ~/.config/montage-ai/cluster.json
+
+Example node configuration:
+    {
+        "name": "my-gpu",           # Unique node name
+        "hostname": "10.0.0.10",    # IP or hostname
+        "encoder_type": "nvenc",    # nvenc, nvmpi, vaapi, rocm, qsv, cpu
+        "max_concurrent": 2,        # Max parallel encode jobs
+        "priority": 100,            # Higher = preferred (0-100)
+        "ssh_user": "user",         # SSH username for remote nodes
+        "vram_mb": 8000,            # GPU VRAM in MB (0 for CPU)
+        "capabilities": ["h264_nvenc", "hevc_nvenc"]
+    }
 
 Usage:
     from montage_ai.cluster_config import get_cluster_nodes, create_cluster_router
@@ -20,7 +32,9 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 from typing import List, Optional
 
 from .encoder_router import EncoderNode, EncoderRouter
@@ -28,73 +42,59 @@ from .logger import logger
 
 
 # =============================================================================
-# Cluster Node Definitions
+# Cluster Node Loading
 # =============================================================================
 
-CLUSTER_NODES = [
-    # === ENERGY-EFFICIENT GPU NODES (Priority) ===
+def _load_nodes_from_env() -> List[EncoderNode]:
+    """Load cluster nodes from MONTAGE_CLUSTER_NODES environment variable."""
+    nodes_json = os.environ.get("MONTAGE_CLUSTER_NODES", "")
+    if not nodes_json:
+        return []
 
-    # NVIDIA Jetson - Edge processing, low power (~15W)
-    EncoderNode(
-        name="jetson",
-        hostname="192.168.1.15",
-        encoder_type="nvmpi",
-        max_concurrent=2,
-        priority=100,  # Highest - energy efficient dedicated GPU
-        ssh_user="codeai",
-        vram_mb=8000,  # ~8GB shared memory
-        capabilities=["h264_nvmpi", "hevc_nvmpi"],
-    ),
-    # Qualcomm Snapdragon X Elite - ARM64, ultra low power (~8W)
-    EncoderNode(
-        name="t14s",
-        hostname="192.168.1.237",
-        encoder_type="adreno",
-        max_concurrent=2,
-        priority=90,  # High - most energy efficient
-        ssh_user="codeai",
-        vram_mb=0,  # Shared memory
-        capabilities=["h264_v4l2m2m"],
-    ),
+    try:
+        nodes_data = json.loads(nodes_json)
+        return [EncoderNode(**node) for node in nodes_data]
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.warning(f"Failed to parse MONTAGE_CLUSTER_NODES: {e}")
+        return []
 
-    # === POWER-HUNGRY GPU (Last Resort for Local) ===
 
-    # AMD RX 7900 XT/XTX - High power (~300W), but massive VRAM
-    # Use for: 4K, long renders, batch jobs when efficiency doesn't matter
-    EncoderNode(
-        name="fluxibri",
-        hostname="192.168.1.16",
-        encoder_type="rocm",
-        max_concurrent=4,  # Large VRAM allows multiple streams
-        priority=50,  # Lower priority - only when needed
-        ssh_user="codeai",
-        vram_mb=21458,  # 21GB VRAM
-        capabilities=["h264_vaapi", "hevc_vaapi", "av1_vaapi"],
-    ),
+def _load_nodes_from_config() -> List[EncoderNode]:
+    """Load cluster nodes from config file."""
+    config_paths = [
+        Path.home() / ".config" / "montage-ai" / "cluster.json",
+        Path("/etc/montage-ai/cluster.json"),
+    ]
 
-    # === CPU FALLBACK NODES ===
+    for config_path in config_paths:
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    nodes_data = json.load(f)
+                logger.info(f"Loaded cluster config from {config_path}")
+                return [EncoderNode(**node) for node in nodes_data]
+            except (json.JSONDecodeError, TypeError, OSError) as e:
+                logger.warning(f"Failed to load {config_path}: {e}")
 
-    # Intel Esprimo - CPU encoding
-    EncoderNode(
-        name="esprimo",
-        hostname="192.168.1.157",
-        encoder_type="cpu",
-        max_concurrent=4,
-        priority=20,  # Low priority - CPU only
-        ssh_user="codeai",
-        capabilities=["libx264", "libx265"],
-    ),
-    # AMD64 Worker - CPU encoding
-    EncoderNode(
-        name="worker-amd64",
-        hostname="192.168.1.37",
-        encoder_type="cpu",
-        max_concurrent=8,
-        priority=15,
-        ssh_user="codeai",
-        capabilities=["libx264", "libx265"],
-    ),
-]
+    return []
+
+
+def _get_default_nodes() -> List[EncoderNode]:
+    """Return empty list - users must configure their own cluster."""
+    return []
+
+
+# Load nodes: env var takes precedence, then config file, then empty default
+CLUSTER_NODES: List[EncoderNode] = (
+    _load_nodes_from_env() or
+    _load_nodes_from_config() or
+    _get_default_nodes()
+)
+
+if CLUSTER_NODES:
+    logger.info(f"Loaded {len(CLUSTER_NODES)} cluster nodes")
+else:
+    logger.debug("No cluster nodes configured (local-only mode)")
 
 
 # =============================================================================

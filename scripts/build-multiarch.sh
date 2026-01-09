@@ -1,10 +1,11 @@
 #!/bin/bash
 # Multi-Arch Docker Build Script (Optimized)
+# Usage: REGISTRY=your-registry:5000 ./scripts/build-multiarch.sh
 set -e
 
-REGISTRY="192.168.1.12:5000"
-IMAGE_NAME="montage-ai"
-TAG="latest"
+REGISTRY="${REGISTRY:-ghcr.io/mfahsold}"
+IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
+TAG="${TAG:-latest}"
 
 echo "🔨 Multi-Arch Build (AMD64 + ARM64)"
 echo "⏳ Building... (parallel, with cache)"

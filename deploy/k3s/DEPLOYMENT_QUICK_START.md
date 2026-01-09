@@ -5,7 +5,7 @@
 ### 1. Configure Registry
 Edit `deploy/config.env` and set your registry:
 ```bash
-REGISTRY_HOST="192.168.1.12"     # Your registry IP
+REGISTRY_HOST="YOUR_REGISTRY_IP"     # Your registry IP
 REGISTRY_PORT="5000"              # Registry port
 ```
 
@@ -22,7 +22,7 @@ chmod +x build-and-push.sh deploy.sh undeploy.sh
 ```bash
 ./deploy.sh dev
 ```
-- Uses local registry: `192.168.1.12:5000`
+- Uses local registry: `YOUR_REGISTRY:5000`
 - Fast FFmpeg preset
 - Minimal quality
 - Good for testing changes
@@ -67,7 +67,7 @@ The `build-and-push.sh` script uses `deploy/config.env`:
 
 ```bash
 # From config.env
-REGISTRY_HOST="192.168.1.12"
+REGISTRY_HOST="YOUR_REGISTRY_IP"
 REGISTRY_PORT="5000"
 IMAGE_FULL="${REGISTRY_HOST}:${REGISTRY_PORT}/montage-ai:latest"
 ```
@@ -75,7 +75,7 @@ IMAGE_FULL="${REGISTRY_HOST}:${REGISTRY_PORT}/montage-ai:latest"
 **Make sure registry is running:**
 ```bash
 # Check if accessible
-curl http://192.168.1.12:5000/v2/
+curl http://YOUR_REGISTRY:5000/v2/
 
 # Start local registry (if needed)
 docker run -d -p 5000:5000 --name registry registry:2
@@ -98,14 +98,14 @@ ls -la Dockerfile
 ### Push Fails
 ```bash
 # 1. Check registry is accessible
-curl http://192.168.1.12:5000/v2/
+curl http://YOUR_REGISTRY:5000/v2/
 
 # 2. Check image was built
 docker images | grep montage-ai
 
 # 3. Check Docker can reach registry
-docker tag test/app:latest 192.168.1.12:5000/test:latest
-docker push 192.168.1.12:5000/test:latest
+docker tag test/app:latest YOUR_REGISTRY:5000/test:latest
+docker push YOUR_REGISTRY:5000/test:latest
 ```
 
 ### Deployment Fails
@@ -132,10 +132,10 @@ kubectl describe pod <pod-name> -n montage-ai
 docker ps | grep registry
 
 # Check registry is responding
-curl -v http://192.168.1.12:5000/v2/
+curl -v http://YOUR_REGISTRY:5000/v2/
 
 # If not accessible, check network
-ping 192.168.1.12
+ping YOUR_REGISTRY_IP
 netstat -tupln | grep 5000
 
 # Start fresh registry
@@ -194,7 +194,7 @@ kubectl delete namespace montage-ai
 
 # Delete local images (if needed)
 docker rmi montage-ai:latest
-docker rmi 192.168.1.12:5000/montage-ai:latest
+docker rmi YOUR_REGISTRY:5000/montage-ai:latest
 ```
 
 ## Environment Variables
@@ -203,12 +203,12 @@ Override in `deploy/config.env`:
 
 ```bash
 # Registry
-REGISTRY_HOST="192.168.1.12"
+REGISTRY_HOST="YOUR_REGISTRY_IP"
 REGISTRY_PORT="5000"
 
 # Kubernetes
 CLUSTER_NAMESPACE="montage-ai"
-CLUSTER_API_SERVER="https://192.168.1.13:6443"
+CLUSTER_API_SERVER="https://YOUR_K8S_API:6443"
 
 # Application
 APP_NAME="montage-ai"

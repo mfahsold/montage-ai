@@ -1,3 +1,20 @@
-[registry."192.168.1.12:5000"]
-  http = true
-  insecure = true
+# =============================================================================
+# BuildKit Daemon Configuration
+# =============================================================================
+# Configure your local container registry here.
+# Copy this file and modify for your environment.
+#
+# For insecure (HTTP) registries, add:
+#   [registry."your-registry:5000"]
+#     http = true
+#     insecure = true
+# =============================================================================
+
+# Example: Local insecure registry (uncomment and modify)
+# [registry."localhost:5000"]
+#   http = true
+#   insecure = true
+
+# Example: Private registry with self-signed cert
+# [registry."registry.example.com"]
+#   insecure = true

@@ -13,25 +13,25 @@
 #   ./scripts/build-distributed.sh latest       # Build with specific tag
 #   TAG=v1.0.0 ./scripts/build-distributed.sh   # Override via env
 #
-# Environment Variables (fluxibri_core canonical):
-#   FLUXIBRI_REGISTRY   - Registry host (default: 192.168.1.12:5000)
-#   FLUXIBRI_CACHE_REF  - Cache reference (default: $REGISTRY/montage-ai:buildcache)
-#   BUILDER             - Buildx builder name (default: simple-builder)
+# Environment Variables:
+#   REGISTRY            - Registry host (default: ghcr.io/mfahsold)
+#   CACHE_REF           - Cache reference (default: $REGISTRY/montage-ai:buildcache)
+#   BUILDER             - Buildx builder name (default: default)
 #   PLATFORMS           - Target platforms (default: linux/amd64,linux/arm64)
 #   TAG                 - Image tag (default: git SHA)
 #   PUSH                - Push to registry (default: true)
+#
+# For self-hosted registries:
+#   REGISTRY=your-registry:5000 ./scripts/build-distributed.sh
 # =============================================================================
 
 set -euo pipefail
 
-# Canonical fluxibri_core environment variables
-export FLUXIBRI_REGISTRY="${FLUXIBRI_REGISTRY:-192.168.1.12:5000}"
-export FLUXIBRI_CACHE_REF="${FLUXIBRI_CACHE_REF:-${FLUXIBRI_REGISTRY}/montage-ai:buildcache}"
-
-# Build configuration
-REGISTRY="${REGISTRY:-$FLUXIBRI_REGISTRY}"
+# Build configuration - ghcr.io as default for public builds
+REGISTRY="${REGISTRY:-ghcr.io/mfahsold}"
+CACHE_REF="${CACHE_REF:-${REGISTRY}/montage-ai:buildcache}"
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
-BUILDER="${BUILDER:-simple-builder}"
+BUILDER="${BUILDER:-default}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 PUSH="${PUSH:-true}"
 
@@ -56,7 +56,7 @@ echo -e "Image:      ${GREEN}$IMAGE_NAME:$TAG${NC}"
 echo -e "Git SHA:    ${GREEN}$GIT_SHA${NC}"
 echo -e "Platforms:  ${GREEN}$PLATFORMS${NC}"
 echo -e "Builder:    ${GREEN}$BUILDER${NC}"
-echo -e "Cache:      ${GREEN}$FLUXIBRI_CACHE_REF${NC}"
+echo -e "Cache:      ${GREEN}$CACHE_REF${NC}"
 echo ""
 
 # Preflight checks
@@ -89,8 +89,8 @@ BUILD_ARGS=(
     "build"
     "--builder" "$BUILDER"
     "--platform" "$PLATFORMS"
-    "--cache-from" "type=registry,ref=${FLUXIBRI_CACHE_REF}"
-    "--cache-to" "type=registry,ref=${FLUXIBRI_CACHE_REF},mode=max"
+    "--cache-from" "type=registry,ref=${CACHE_REF}"
+    "--cache-to" "type=registry,ref=${CACHE_REF},mode=max"
     "--build-arg" "BUILDKIT_INLINE_CACHE=1"
     "--build-arg" "GIT_COMMIT=$GIT_SHA_FULL"
     "--build-arg" "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -142,7 +142,7 @@ if [ "$TAG" = "$GIT_SHA" ]; then
     echo "Also:      ${REGISTRY}/${IMAGE_NAME}:latest"
 fi
 echo "Git SHA:   $GIT_SHA_FULL"
-echo "Cache:     $FLUXIBRI_CACHE_REF"
+echo "Cache:     $CACHE_REF"
 echo ""
 echo "Next steps:"
 echo "  # Verify image"

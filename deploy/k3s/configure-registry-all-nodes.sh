@@ -1,22 +1,53 @@
 #!/bin/bash
-# Configure K3s nodes to allow HTTP registry (canonical way from fluxibri_core DX guide)
-# Deploys registries.yaml to all cluster nodes and restarts K3s services
+# =============================================================================
+# Configure K3s nodes to allow HTTP registry
+# =============================================================================
+# Deploys registries.yaml to all cluster nodes and restarts K3s services.
+#
+# Usage:
+#   # Set your nodes via environment variables:
+#   CONTROL_PLANE=user@10.0.0.1 WORKERS="user@10.0.0.2 user@10.0.0.3" ./configure-registry-all-nodes.sh 10.0.0.1 5000
+#
+#   # Or edit the CONTROL_PLANE and WORKERS variables below
+# =============================================================================
 
 set -e
 
-REGISTRY_HOST="${1:-192.168.1.12}"
+REGISTRY_HOST="${1:-your-registry}"
 REGISTRY_PORT="${2:-5000}"
 
-# Node definitions (from fluxibri_core DX_Quick_Reference.md)
-CONTROL_PLANE="codeai@192.168.1.12"
-WORKERS=(
-  "codeai@192.168.1.16"
-  "codeai@192.168.1.17"
-  "codeai@192.168.1.37"
-  "codeai@192.168.1.157"
-  "codeai@192.168.1.237"
-  "codeaijetson@192.168.1.15"
-)
+# =============================================================================
+# NODE CONFIGURATION - Edit for your cluster
+# =============================================================================
+# Control plane: user@ip
+CONTROL_PLANE="${CONTROL_PLANE:-user@control-plane}"
+
+# Workers: space-separated list of user@ip
+WORKERS_STR="${WORKERS:-}"
+if [ -n "$WORKERS_STR" ]; then
+  read -ra WORKERS <<< "$WORKERS_STR"
+else
+  WORKERS=(
+    # Add your worker nodes here:
+    # "user@10.0.0.2"
+    # "user@10.0.0.3"
+  )
+fi
+
+# Validate configuration
+if [ "$CONTROL_PLANE" = "user@control-plane" ]; then
+  echo "ERROR: CONTROL_PLANE not configured!"
+  echo ""
+  echo "Usage: CONTROL_PLANE=user@10.0.0.1 WORKERS=\"user@10.0.0.2 user@10.0.0.3\" $0 <registry-ip> <registry-port>"
+  exit 1
+fi
+
+if [ "$REGISTRY_HOST" = "your-registry" ]; then
+  echo "ERROR: Registry host not specified!"
+  echo ""
+  echo "Usage: $0 <registry-ip> <registry-port>"
+  exit 1
+fi
 
 # registries.yaml template for HTTP-only registry with insecure skip
 REGISTRIES_YAML=$(cat <<EOF
@@ -40,20 +71,20 @@ configure_node() {
   local NODE=$1
   local SERVICE=$2
   echo "📝 Configuring ${NODE}..."
-  
+
   # Create/update registries.yaml
   ssh "${NODE}" "cat > /tmp/registries.yaml" <<< "${REGISTRIES_YAML}"
-  
+
   # Move to K3s config directory
   ssh "${NODE}" "sudo mv /tmp/registries.yaml /etc/rancher/k3s/registries.yaml"
-  
+
   # Restart K3s service
   echo "  🔄 Restarting ${SERVICE}..."
   ssh "${NODE}" "sudo systemctl restart ${SERVICE}"
-  
+
   # Wait for service to be ready
   sleep 3
-  
+
   echo "  ✅ ${NODE} configured"
 }
 
@@ -63,11 +94,13 @@ configure_node "${CONTROL_PLANE}" "k3s"
 echo ""
 
 # Configure all worker nodes
-echo "🔧 Worker Nodes:"
-for WORKER in "${WORKERS[@]}"; do
-  configure_node "${WORKER}" "k3s-agent"
-done
-echo ""
+if [ ${#WORKERS[@]} -gt 0 ]; then
+  echo "🔧 Worker Nodes:"
+  for WORKER in "${WORKERS[@]}"; do
+    configure_node "${WORKER}" "k3s-agent"
+  done
+  echo ""
+fi
 
 # Wait for cluster to stabilize
 echo "⏳ Waiting for cluster to stabilize..."

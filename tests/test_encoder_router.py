@@ -18,15 +18,15 @@ class TestEncoderNodeConfig:
         from montage_ai.encoder_router import EncoderNode
 
         node = EncoderNode(
-            name="fluxibri",
-            hostname="192.168.1.12",
+            name="gpu-node",
+            hostname="10.0.0.10",
             encoder_type="vaapi",
             max_concurrent=2,
             priority=10,
         )
 
-        assert node.name == "fluxibri"
-        assert node.hostname == "192.168.1.12"
+        assert node.name == "gpu-node"
+        assert node.hostname == "10.0.0.10"
         assert node.encoder_type == "vaapi"
         assert node.max_concurrent == 2
         assert node.priority == 10
@@ -37,21 +37,21 @@ class TestEncoderNodeConfig:
 
         node = EncoderNode(
             name="jetson",
-            hostname="192.168.1.100",
+            hostname="10.0.0.20",
             encoder_type="nvmpi",
-            ssh_user="codeai",
-            ssh_key_path="/home/codeai/.ssh/id_rsa",
+            ssh_user="user",
+            ssh_key_path="/home/user/.ssh/id_rsa",
         )
 
-        assert node.ssh_user == "codeai"
-        assert node.ssh_key_path == "/home/codeai/.ssh/id_rsa"
+        assert node.ssh_user == "user"
+        assert node.ssh_key_path == "/home/user/.ssh/id_rsa"
 
     def test_encoder_node_local_flag(self):
         """EncoderNode should detect local vs remote."""
         from montage_ai.encoder_router import EncoderNode
 
         local_node = EncoderNode(name="local", hostname="localhost", encoder_type="vaapi")
-        remote_node = EncoderNode(name="remote", hostname="192.168.1.100", encoder_type="nvmpi")
+        remote_node = EncoderNode(name="remote", hostname="10.0.0.10", encoder_type="nvmpi")
 
         assert local_node.is_local is True
         assert remote_node.is_local is False
@@ -82,7 +82,7 @@ class TestEncoderRouter:
             router = EncoderRouter()
             jetson_node = EncoderNode(
                 name="jetson",
-                hostname="192.168.1.100",
+                hostname="10.0.0.20",
                 encoder_type="nvmpi",
                 ssh_user="codeai",
             )
@@ -206,7 +206,7 @@ class TestEncoderRouterDistributedTasks:
 
             jetson = EncoderNode(
                 name="jetson",
-                hostname="192.168.1.100",
+                hostname="10.0.0.20",
                 encoder_type="nvmpi",
                 ssh_user="codeai",
                 priority=10,
@@ -401,9 +401,9 @@ class TestClusterDiscovery:
             # Simulate kubectl output (wide format with 6+ columns)
             mock_run.return_value = MagicMock(
                 returncode=0,
-                stdout="""codeai-fluxibriserver   Ready    worker    45d   v1.34.3   192.168.1.16   <none>
-codeaijetson-desktop    Ready    worker    45d   v1.34.3   192.168.1.15   <none>
-codeai-thinkpad-t14s    Ready    <none>    29h   v1.34.3   192.168.1.237  <none>
+                stdout="""node-gpu-1       Ready    worker    45d   v1.34.3   10.0.0.10   <none>
+node-jetson      Ready    worker    45d   v1.34.3   10.0.0.20   <none>
+node-arm64       Ready    <none>    29h   v1.34.3   10.0.0.30   <none>
 """
             )
 
@@ -426,7 +426,7 @@ codeai-thinkpad-t14s    Ready    <none>    29h   v1.34.3   192.168.1.237  <none>
             mock_proc.returncode = 0
             mock_exec.return_value = mock_proc
 
-            caps = asyncio.run(probe_node_capabilities("192.168.1.100", "codeai"))
+            caps = asyncio.run(probe_node_capabilities("10.0.0.20", "codeai"))
 
             assert "nvmpi" in caps["encoders"]
 
@@ -447,7 +447,7 @@ class TestEncoderRouterE2E:
 
             # Add two GPU nodes
             router.add_node(EncoderNode(name="amd", hostname="localhost", encoder_type="vaapi", max_concurrent=2))
-            router.add_node(EncoderNode(name="jetson", hostname="192.168.1.100", encoder_type="nvmpi", max_concurrent=1, ssh_user="codeai"))
+            router.add_node(EncoderNode(name="jetson", hostname="10.0.0.20", encoder_type="nvmpi", max_concurrent=1, ssh_user="codeai"))
 
             segments = [
                 {"input": "/in/seg1.mp4", "output": "/out/seg1.mp4"},

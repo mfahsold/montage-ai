@@ -5,7 +5,7 @@ Deploy montage-ai video editor to K3s cluster with Exo LLM integration.
 ## Prerequisites
 
 - K3s cluster running (control plane + workers)
-- Local Docker registry at `192.168.1.12:5000`
+- Local Docker registry at `YOUR_REGISTRY:5000`
 - Exo deployed and running in `default` namespace
 - kubectl configured for cluster access
 
@@ -73,7 +73,7 @@ OPENAI_MODEL: "llama-3.2-1b"
 
 Add to `/etc/hosts`:
 ```
-192.168.1.12  montage.local
+YOUR_REGISTRY_IP  montage.local
 ```
 
 Access: https://montage.local

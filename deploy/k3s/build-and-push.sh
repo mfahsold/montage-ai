@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build and push montage-ai Docker image to registry
 # Sources centralized configuration from deploy/config.env
-# Supports local registry (192.168.1.12:5000) or remote registries
+# Supports local registry (ghcr.io/mfahsold) or remote registries
 
 set -e
 
@@ -34,7 +34,7 @@ if ! docker info &> /dev/null; then
 fi
 
 # Check if registry is accessible (for local registries)
-if [[ ${REGISTRY_URL} == "192.168.1.12:5000" ]]; then
+if [[ ${REGISTRY_URL} == "ghcr.io/mfahsold" ]]; then
   echo "🔍 Checking registry connectivity..."
   if ! curl -s http://${REGISTRY_URL}/v2/ > /dev/null 2>&1; then
     echo "⚠️  WARNING: Registry ${REGISTRY_URL} may not be accessible"

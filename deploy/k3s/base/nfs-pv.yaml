@@ -1,17 +1,21 @@
 ---
+# =============================================================================
 # NFS Persistent Volumes for Montage AI
-# Enables multi-node GPU access for distributed rendering
+# =============================================================================
+# Enables multi-node GPU access for distributed rendering.
+# UPDATE the NFS server address below for your environment.
 #
 # Prerequisites:
-#   - NFS server at 192.168.1.16 (codeai-fluxibriserver)
+#   - NFS server (update NFS_SERVER below)
 #   - Exported paths: /mnt/nfs-montage/{input,music,output,assets}
 #
 # To create exports on NFS server:
 #   sudo mkdir -p /mnt/nfs-montage/{input,music,output,assets}
 #   sudo chown -R nobody:nogroup /mnt/nfs-montage
 #   Add to /etc/exports:
-#     /mnt/nfs-montage 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash)
+#     /mnt/nfs-montage YOUR_NETWORK/24(rw,sync,no_subtree_check,no_root_squash)
 #   sudo exportfs -ra
+# =============================================================================
 
 apiVersion: v1
 kind: PersistentVolume
@@ -26,7 +30,7 @@ spec:
   accessModes:
     - ReadWriteMany
   nfs:
-    server: 192.168.1.16
+    server: NFS_SERVER_IP  # UPDATE: Your NFS server IP
     path: /mnt/nfs-montage/input
   mountOptions:
     - nfsvers=4.1
@@ -51,7 +55,7 @@ spec:
   accessModes:
     - ReadWriteMany
   nfs:
-    server: 192.168.1.16
+    server: NFS_SERVER_IP  # UPDATE: Your NFS server IP
     path: /mnt/nfs-montage/music
   mountOptions:
     - nfsvers=4.1
@@ -76,7 +80,7 @@ spec:
   accessModes:
     - ReadWriteMany
   nfs:
-    server: 192.168.1.16
+    server: NFS_SERVER_IP  # UPDATE: Your NFS server IP
     path: /mnt/nfs-montage/output
   mountOptions:
     - nfsvers=4.1
@@ -101,7 +105,7 @@ spec:
   accessModes:
     - ReadWriteMany
   nfs:
-    server: 192.168.1.16
+    server: NFS_SERVER_IP  # UPDATE: Your NFS server IP
     path: /mnt/nfs-montage/assets
   mountOptions:
     - nfsvers=4.1

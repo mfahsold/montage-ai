@@ -13,7 +13,7 @@ Usage:
     from montage_ai.encoder_router import EncoderRouter, encode_segment
 
     router = EncoderRouter(enable_cgpu=True)
-    router.add_node(EncoderNode(name="jetson", hostname="192.168.1.100", ...))
+    router.add_node(EncoderNode(name="gpu-node", hostname="10.0.0.10", ...))
 
     # Single segment
     result = await encode_segment(router, "/in/raw.mp4", "/out/encoded.mp4")
