@@ -27,6 +27,7 @@ from .editing_parameters import (
     StabilizationParameters,
     COLOR_GRADING_PRESETS,
 )
+from .color_grading import PRESET_FILTERS
 from .logger import logger
 
 
@@ -248,33 +249,33 @@ Guidelines:
         """Format available presets for prompt."""
         # Group presets by category for better LLM understanding
         preset_descriptions = {
-            "teal_orange": "Modern blockbuster look with teal shadows, orange highlights",
-            "cinematic": "Classic cinema grade with rich colors and contrast",
-            "blockbuster": "High-contrast Hollywood action film look",
-            "vintage": "Retro film look with muted colors and grain",
-            "noir": "Black & white high-contrast dramatic look",
-            "warm": "Warm golden tones throughout",
-            "cool": "Cool blue tones throughout",
-            "vibrant": "Saturated vivid colors",
-            "desaturated": "Muted, washed-out colors",
+            "none": "No grading applied",
+            "neutral": "Broadcast safe levels only",
+            "natural": "Minimal processing, true to source",
+            "warm": "Warm golden tones",
+            "cool": "Cool blue tones",
+            "golden_hour": "Sunset warmth with lifted shadows",
+            "blue_hour": "Dawn/dusk cool tones",
+            "teal_orange": "Modern blockbuster teal/orange",
+            "cinematic": "Teal/Orange with S-curve contrast",
+            "blockbuster": "High-contrast Hollywood action look",
+            "vibrant": "Punchy, saturated colors",
+            "desaturated": "Muted, filmic look",
             "high_contrast": "Strong blacks and whites",
-            "filmic_warm": "Film emulation with warm cast",
-            "filmic_cool": "Film emulation with cool cast",
-            "bleach_bypass": "Desaturated with retained highlights",
-            "sepia": "Classic brown-toned photograph look",
-            "cross_process": "Shifted color curves for surreal look",
-            "technicolor": "Vibrant classic Hollywood colors",
-            "moonlight": "Cool blue night scene",
-            "golden_hour": "Warm sunset/sunrise tones",
-            "flat_log": "Log-style flat profile for manual grading",
-            "rec709": "Standard broadcast color space",
+            "vintage": "Faded film with lifted blacks",
+            "filmic_warm": "Classic warm film look",
+            "noir": "Desaturated, high-contrast drama",
+            "documentary": "Natural with slight sharpening",
         }
-        
+
         lines = []
         for preset in COLOR_GRADING_PRESETS:
+            if preset not in PRESET_FILTERS:
+                # Skip if not supported by filter chains
+                continue
             desc = preset_descriptions.get(preset, "")
             lines.append(f"- {preset}: {desc}")
-        
+
         return "\n".join(lines)
     
     def _parse_llm_response(self, response: str) -> ParameterSuggestion:

@@ -33,6 +33,11 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then         echo "Downloading Real-ESRGAN f
 # Copy application code
 COPY . .
 
+# Clean Python cache files to ensure fresh imports
+RUN find /app -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    find /app -type f -name "*.pyc" -delete 2>/dev/null || true && \
+    find /app -type f -name "*.pyo" -delete 2>/dev/null || true
+
 # Create non-root user for security and correct file permissions
 ARG UID=1000
 ARG GID=1000

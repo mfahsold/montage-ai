@@ -987,12 +987,19 @@ class MontageBuilder:
 
     def export_timeline(self):
         """
-        Phase 6: Export timeline to NLE formats (EDL, XML, OTIO).
+        Phase 6: Export timeline to NLE formats (EDL, XML, OTIO, AAF).
+        
+        Exports to:
+        - OTIO (canonical format with full metadata)
+        - EDL (CMX 3600 for compatibility)
+        - Premiere XML (Adobe Premiere)
+        - AAF (Avid Media Composer)
+        - EditingParameters JSON (roundtrip import)
         """
         if not self.settings.features.export_timeline:
             return
 
-        logger.info("\n   📝 Exporting timeline...")
+        logger.info("\n   📝 Exporting timeline to NLE formats...")
         
         # Convert ClipMetadata to format expected by exporter
         clips_data = []

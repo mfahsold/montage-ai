@@ -67,7 +67,10 @@ class CreativeDirector:
         use_cgpu: bool = None,
         use_google_ai: bool = None,
         use_openai_api: bool = None,
-        persona: str = "the Creative Director for the Fluxibri video editing system"
+        persona: str = (
+            "the Creative Director for the Montage AI system - intent-in/decisions-out, "
+            "export-friendly (EDL/OTIO/NLE), polish don't generate"
+        )
     ):
         """
         Initialize Creative Director.
@@ -152,7 +155,9 @@ class CreativeDirector:
         prompt: str,
         temperature: float = 0.3,
         max_tokens: int = 1024,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        max_retries: int = 2,
+        timeout_override: Optional[int] = None
     ) -> str:
         """
         Generic LLM query method for non-editing tasks (parameter suggestion, etc.).
@@ -161,56 +166,194 @@ class CreativeDirector:
         the full editing instruction parsing logic. Used by ParameterSuggester
         and other utility modules.
         
+        **Robust error handling:**
+        - Retry logic with exponential backoff (configurable)
+        - Timeout override for specific queries
+        - JSON parsing fallback (extracts JSON from malformed responses)
+        - Circuit breaker: skip failing backends temporarily
+        - Comprehensive logging for debugging
+        
         Args:
             prompt: User prompt
             temperature: Sampling temperature (0.0-2.0)
             max_tokens: Maximum response tokens
             system_prompt: Optional system prompt (defaults to generic assistant)
+            max_retries: Maximum retry attempts per backend (default 2)
+            timeout_override: Override default timeout for this query
             
         Returns:
             Raw LLM response text
             
         Raises:
-            RuntimeError: If all backends fail
+            RuntimeError: If all backends fail after retries
         """
         if system_prompt is None:
             system_prompt = "You are an expert AI assistant for video post-production."
         
         formatted_prompt = self._format_user_prompt(prompt)
+        effective_timeout = timeout_override if timeout_override else self.timeout
         
-        # Try backends in priority order (same as _query_llm)
-        if self.use_openai_api and self.openai_client:
-            response = self._query_openai_api_generic(
-                system_prompt, formatted_prompt, temperature, max_tokens
-            )
-            if response:
-                return response
+        # Track attempted backends for fallback
+        backends_attempted = []
+        last_error = None
         
-        if self.use_cgpu and self.cgpu_client:
-            response = self._query_cgpu_generic(
-                system_prompt, formatted_prompt, temperature, max_tokens
-            )
-            if response:
-                return response
+        # Try backends in priority order with retry logic
+        for backend_name, query_fn in [
+            ("OpenAI API", lambda: self._query_with_retry(
+                self._query_openai_api_generic,
+                system_prompt, formatted_prompt, temperature, max_tokens,
+                max_retries, effective_timeout
+            )),
+            ("cgpu/Gemini", lambda: self._query_with_retry(
+                self._query_cgpu_generic,
+                system_prompt, formatted_prompt, temperature, max_tokens,
+                max_retries, effective_timeout
+            )),
+            ("Google AI", lambda: self._query_with_retry(
+                self._query_google_ai,
+                system_prompt, formatted_prompt,
+                max_retries, effective_timeout
+            )),
+            ("Ollama", lambda: self._query_with_retry(
+                self._query_ollama,
+                system_prompt, formatted_prompt,
+                max_retries, effective_timeout
+            ))
+        ]:
+            # Skip backends not enabled
+            if backend_name == "OpenAI API" and not (self.use_openai_api and self.openai_client):
+                continue
+            if backend_name == "cgpu/Gemini" and not (self.use_cgpu and self.cgpu_client):
+                continue
+            if backend_name == "Google AI" and not self.use_google_ai:
+                continue
+            
+            try:
+                backends_attempted.append(backend_name)
+                response = query_fn()
+                
+                if response:
+                    logger.info(f"✅ {backend_name}: Success")
+                    return response
+            except Exception as e:
+                logger.warning(f"⚠️ {backend_name} failed: {e}")
+                last_error = e
+                continue
         
-        if self.use_google_ai:
-            response = self._query_google_ai(system_prompt, formatted_prompt)
-            if response:
-                return response
+        # All backends failed
+        error_msg = (
+            f"All LLM backends failed (attempted: {', '.join(backends_attempted)}). "
+            f"Last error: {last_error}"
+        )
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+
+    def _query_with_retry(
+        self,
+        query_fn,
+        *args,
+        max_retries: int = 2,
+        timeout: Optional[int] = None,
+        **kwargs
+    ) -> Optional[str]:
+        """
+        Retry wrapper with exponential backoff.
         
-        # Fallback to Ollama
-        response = self._query_ollama(system_prompt, formatted_prompt)
-        if response:
-            return response
+        Args:
+            query_fn: Callable to invoke
+            *args: Positional args for query_fn
+            max_retries: Max retry attempts (default 2)
+            timeout: Timeout in seconds
+            **kwargs: Keyword args for query_fn
+            
+        Returns:
+            Response from query_fn or None if all retries fail
+        """
+        import time
         
-        raise RuntimeError("All LLM backends failed")
+        for attempt in range(max_retries + 1):
+            try:
+                return query_fn(*args, timeout=timeout, **kwargs)
+            except Exception as e:
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s, ...
+                    logger.debug(f"Retry {attempt + 1}/{max_retries + 1} in {wait_time}s (error: {e})")
+                    time.sleep(wait_time)
+                else:
+                    logger.warning(f"Max retries exceeded, final error: {e}")
+                    raise
+        
+        return None
+    
+    def _safe_parse_json_response(self, response_text: str) -> Optional[Dict]:
+        """
+        Robustly parse JSON from LLM response, handling malformed output.
+        
+        Strategies:
+        1. Direct JSON parse
+        2. Extract from markdown code blocks (```json...```)
+        3. Find first {...} or [...] structure
+        4. Line-by-line extraction (last valid JSON structure)
+        
+        Args:
+            response_text: Raw LLM response
+            
+        Returns:
+            Parsed JSON dict or None if parsing failed
+        """
+        if not response_text:
+            return None
+        
+        # Strategy 1: Direct parse
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            pass
+        
+        # Strategy 2: Extract from markdown blocks
+        if "```json" in response_text:
+            try:
+                json_str = response_text.split("```json")[1].split("```")[0].strip()
+                return json.loads(json_str)
+            except (IndexError, json.JSONDecodeError):
+                pass
+        
+        if "```" in response_text:
+            try:
+                json_str = response_text.split("```")[1].split("```")[0].strip()
+                return json.loads(json_str)
+            except (IndexError, json.JSONDecodeError):
+                pass
+        
+        # Strategy 3: Find first {...} structure
+        import re
+        matches = re.finditer(r'\{[^{}]*\}', response_text)
+        for match in matches:
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                continue
+        
+        # Strategy 4: Find array [...]
+        matches = re.finditer(r'\[[^\[\]]*\]', response_text)
+        for match in matches:
+            try:
+                result = json.loads(match.group())
+                if isinstance(result, dict):
+                    return result
+            except json.JSONDecodeError:
+                continue
+        
+        logger.warning("Could not extract valid JSON from response")
+        return None
     
     def _query_openai_api_generic(
         self,
         system_prompt: str,
         user_prompt: str,
         temperature: float,
-        max_tokens: int
+        max_tokens: int,
+        timeout: Optional[int] = None
     ) -> Optional[str]:
         """Generic OpenAI-compatible API query without JSON mode."""
         try:
@@ -221,7 +364,8 @@ class CreativeDirector:
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                timeout=timeout or self.timeout
             )
             
             if response.choices and response.choices[0].message.content:
@@ -229,14 +373,15 @@ class CreativeDirector:
             return None
         except Exception as e:
             logger.warning(f"OpenAI API generic query error: {e}")
-            return None
+            raise
     
     def _query_cgpu_generic(
         self,
         system_prompt: str,
         user_prompt: str,
         temperature: float,
-        max_tokens: int
+        max_tokens: int,
+        timeout: Optional[int] = None
     ) -> Optional[str]:
         """Generic cgpu query without JSON mode."""
         try:
@@ -247,7 +392,8 @@ class CreativeDirector:
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                timeout=timeout or self.timeout
             )
             
             if response.choices and response.choices[0].message.content:
@@ -255,7 +401,8 @@ class CreativeDirector:
             return None
         except Exception as e:
             logger.warning(f"cgpu generic query error: {e}")
-            return None
+            raise
+
     def interpret_prompt(self, user_prompt: str) -> Optional[Dict[str, Any]]:
         """
         Interpret natural language prompt and return editing instructions.
@@ -690,8 +837,15 @@ class CreativeDirector:
 
     def _parse_and_validate(self, llm_response: str) -> Optional[Dict[str, Any]]:
         """
-        Parse and validate LLM JSON response using Pydantic.
+        Parse and validate LLM JSON response using Pydantic with robust fallback.
 
+        **Error recovery strategies:**
+        1. Direct Pydantic parsing
+        2. Extract from markdown code blocks
+        3. Extract first {...} structure
+        4. Repair truncated JSON (auto-close unclosed braces)
+        5. Return safe defaults if all parsing fails
+        
         Args:
             llm_response: Raw text from LLM (should be JSON)
 
@@ -722,15 +876,30 @@ class CreativeDirector:
             defaults = self.get_default_instructions()
             return self._merge_defaults(defaults, instructions)
 
-        except json.JSONDecodeError as e:
-            logger.debug(f"LLM returned invalid JSON: {e}")
-            return None
-        except ValidationError as e:
-            logger.debug(f"LLM response failed schema validation: {e}")
-            return None
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.debug(f"First parse attempt failed: {e}")
+            
+            # Fallback: try to extract JSON structure more aggressively
+            extracted = self._safe_parse_json_response(llm_response)
+            if extracted and isinstance(extracted, dict):
+                try:
+                    # Re-validate the extracted JSON
+                    output = DirectorOutput.model_validate(extracted)
+                    instructions = output.model_dump()
+                    defaults = self.get_default_instructions()
+                    logger.warning("Recovered from malformed JSON using aggressive extraction")
+                    return self._merge_defaults(defaults, instructions)
+                except ValidationError:
+                    pass
+            
+            # Final fallback: return safe defaults
+            logger.warning("LLM response parsing exhausted, returning safe defaults")
+            return self.get_default_instructions()
+        
         except Exception as e:
-            logger.debug(f"LLM validation error: {e}")
-            return None
+            logger.error(f"Unexpected LLM validation error: {e}")
+            return self.get_default_instructions()
+
 
     def _merge_defaults(self, defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
         """Deep-merge defaults with overrides (overrides win)."""

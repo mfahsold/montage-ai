@@ -36,6 +36,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}finalize${NC}        Finalize render (high quality, 1080p, stabilized)
   ${GREEN}hq${NC}              High quality render (1080p/4K)
   ${GREEN}retrieve${NC}        Retrieve results from cluster
+  ${GREEN}export-to-nle${NC}   Export timeline to NLE formats (OTIO/EDL/Premiere/AAF)
   ${GREEN}list${NC}            List available styles
   ${GREEN}build${NC}           Build Docker image
   ${GREEN}cgpu-start${NC}      Start cgpu serve (Gemini LLM API)
@@ -93,6 +94,12 @@ ${YELLOW}Examples:${NC}
   ./montage-ai.sh run --cgpu --cgpu-gpu  # Use cloud GPU for upscaling
   ./montage-ai.sh run --captions tiktok  # With TikTok-style captions
   ./montage-ai.sh hq --isolate-voice     # HQ with voice isolation
+  
+  ${YELLOW}Export to NLE:${NC}
+  ./montage-ai.sh export-to-nle --manifest /data/output/manifest.json
+  ./montage-ai.sh export-to-nle --manifest /data/output/manifest.json --formats otio edl premiere
+  ./montage-ai.sh export-to-nle --manifest /data/output/manifest.json \\
+    --params /data/output/parameters.json --project-name "My Project"
 EOF
 }
 
@@ -411,6 +418,12 @@ case "${1:-run}" in
     retrieve)
         python3 scripts/retrieve_results.py
         exit 0
+        ;;
+    export-to-nle)
+        shift
+        echo -e "${GREEN}📤 Exporting timeline to NLE formats...${NC}"
+        python3 -m montage_ai.export.cli "$@"
+        exit $?
         ;;
     help|--help|-h)
         show_help

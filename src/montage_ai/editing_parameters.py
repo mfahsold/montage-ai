@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Literal
 from enum import Enum
 
+# Reuse color grading presets from the single source of truth
+from .color_grading import PRESET_FILTERS, ColorGradeConfig
+
 
 # ============================================================================
 # STABILIZATION PARAMETERS
@@ -70,14 +73,8 @@ class StabilizationParameters:
 # COLOR GRADING PARAMETERS
 # ============================================================================
 
-# Available presets from color_grading.py
-COLOR_GRADING_PRESETS = [
-    "teal_orange", "cinematic", "blockbuster", "vintage", "noir",
-    "warm", "cool", "vibrant", "desaturated", "high_contrast",
-    "filmic_warm", "filmic_cool", "bleach_bypass", "sepia",
-    "cross_process", "technicolor", "moonlight", "golden_hour",
-    "flat_log", "rec709"
-]
+# Available presets (single source of truth)
+COLOR_GRADING_PRESETS = sorted(PRESET_FILTERS.keys())
 
 
 @dataclass
@@ -116,6 +113,15 @@ class ColorGradingParameters:
         assert 0.0 <= self.saturation <= 2.0, f"saturation must be 0-2, got {self.saturation}"
         assert 0.0 <= self.contrast <= 2.0, f"contrast must be 0-2, got {self.contrast}"
         assert -1.0 <= self.brightness <= 1.0, f"brightness must be -1 to 1, got {self.brightness}"
+
+    def to_config(self) -> ColorGradeConfig:
+        """Convert to ColorGradeConfig for the color_grading module."""
+        return ColorGradeConfig(
+            preset=self.preset or "cinematic",
+            intensity=self.intensity,
+            lut_path=self.lut_path,
+            normalize_first=self.normalize_first,
+        )
 
 
 # ============================================================================

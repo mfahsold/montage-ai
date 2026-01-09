@@ -30,13 +30,16 @@ import numpy as np
 from datetime import datetime
 from pathlib import Path
 
-from .config import settings
+from .config import get_settings
 from .logger import logger
 from .ffmpeg_utils import build_ffmpeg_cmd
 
+# Get settings instance (fresh instantiation, avoids cached dataclass issue)
+_settings = get_settings()
+
 # Disable TQDM progress bars globally - they create chaotic output when mixed with logs
 # This affects librosa, moviepy, and any other library using tqdm
-if not settings.features.verbose:
+if not _settings.features.verbose:
     os.environ["TQDM_DISABLE"] = "true"
 
 import subprocess

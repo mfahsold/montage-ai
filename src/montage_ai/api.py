@@ -27,7 +27,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from .config import settings
+from .config import get_settings
+
+# Get settings instance (fresh instantiation, avoids cached dataclass issue)
+settings = get_settings()
 
 # Directories (from centralized config)
 INPUT_DIR = str(settings.paths.input_dir)
