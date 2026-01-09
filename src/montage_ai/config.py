@@ -404,6 +404,53 @@ class MotionAnalysisConfig:
 
 
 # =============================================================================
+# Proxy & Analysis Configuration
+# =============================================================================
+@dataclass
+class ProxyConfig:
+    """Proxy video generation for analysis acceleration.
+    
+    For large/long videos, proxy mode generates a lightweight version
+    for feature extraction and analysis, then applies results to full-res render.
+    """
+    
+    # Enable proxy mode for analysis (auto-enabled for large videos)
+    enable_proxy_analysis: bool = field(default_factory=lambda: os.environ.get("ENABLE_PROXY_ANALYSIS", "true").lower() == "true")
+    
+    # Proxy resolution (height, maintains aspect ratio)
+    # 720p = Good balance; maintains features while 2-3x speedup
+    # Options: 360, 540, 720, 1080
+    proxy_height: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT", "720")))
+    
+    # Auto-enable threshold: if video is larger than this duration, use proxy
+    # (in seconds: 600s = 10 minutes)
+    auto_proxy_duration_threshold: float = field(default_factory=lambda: float(os.environ.get("AUTO_PROXY_DURATION_THRESHOLD", "600.0")))
+    
+    # Auto-enable threshold: if video is larger than this pixel count, use proxy
+    # (pixels: 1920*1080 = 2.07M; YouTube raw ~1920*1440 = 2.76M)
+    auto_proxy_resolution_threshold: int = field(default_factory=lambda: int(os.environ.get("AUTO_PROXY_RESOLUTION_THRESHOLD", "2000000")))
+    
+    # Reuse proxy for multiple analysis passes (e.g. scene detection + metadata)
+    cache_proxies: bool = field(default_factory=lambda: os.environ.get("CACHE_PROXIES", "true").lower() == "true")
+    
+    def should_use_proxy(self, duration_seconds: float, width: int, height: int) -> bool:
+        """Determine if proxy should be used based on input characteristics."""
+        if not self.enable_proxy_analysis:
+            return False
+        
+        # Check duration threshold
+        if duration_seconds > self.auto_proxy_duration_threshold:
+            return True
+        
+        # Check resolution threshold
+        pixel_count = width * height
+        if pixel_count > self.auto_proxy_resolution_threshold:
+            return True
+        
+        return False
+
+
+# =============================================================================
 # Encoding Configuration
 # =============================================================================
 @dataclass
@@ -648,6 +695,8 @@ class SessionConfig:
     redis_host: Optional[str] = field(default_factory=lambda: os.environ.get("REDIS_HOST"))
     # Prefer REDIS_SERVICE_PORT when provided by Kubernetes service env
     _redis_port_raw: str = field(default_factory=lambda: os.environ.get("REDIS_SERVICE_PORT", os.environ.get("REDIS_PORT", "6379")))
+    queue_fast_name: str = field(default_factory=lambda: os.environ.get("QUEUE_FAST_NAME", "default"))
+    queue_heavy_name: str = field(default_factory=lambda: os.environ.get("QUEUE_HEAVY_NAME", "heavy"))
     
     @property
     def redis_port(self) -> int:
@@ -734,7 +783,7 @@ class PreviewConfig:
 class FileTypeConfig:
     """Allowed file extensions for uploads and processing."""
 
-    video_extensions: Set[str] = field(default_factory=lambda: {'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'})
+    video_extensions: Set[str] = field(default_factory=lambda: {'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'mxf', 'mts', 'm2ts', 'ts'})
     audio_extensions: Set[str] = field(default_factory=lambda: {'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg'})
     image_extensions: Set[str] = field(default_factory=lambda: {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'})
 
@@ -809,6 +858,7 @@ class Settings:
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
+    proxy: ProxyConfig = field(default_factory=ProxyConfig)
 
     # Job ID (generated per run)
     job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", ""))

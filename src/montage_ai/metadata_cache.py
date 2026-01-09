@@ -327,17 +327,55 @@ class MetadataCache:
         Returns:
             Complete scene metadata dictionary
         """
+        from .video_metadata import probe_metadata
+        from .proxy_generator import ProxyGenerator
+        
         duration = scene_end - scene_start
         mid_point = scene_start + (duration / 2.0)
+        
+        # Determine if we should use proxy for analysis
+        analysis_video_path = video_path
+        try:
+            settings = get_settings()
+            metadata = probe_metadata(video_path)
+            
+            if settings.proxy.should_use_proxy(metadata.duration, metadata.width, metadata.height):
+                logger.info(f"🎬 Using proxy analysis for optical flow (large video: {metadata.duration:.0f}s)")
+                # Generate analysis proxy
+                import tempfile
+                ext = os.path.splitext(video_path)[1]
+                proxy_fd, proxy_path = tempfile.mkstemp(suffix=f"_of_proxy{ext}", prefix="optical_flow_")
+                try:
+                    os.close(proxy_fd)
+                except OSError:
+                    pass
+                
+                try:
+                    ProxyGenerator.generate_analysis_proxy(
+                        source_path=video_path,
+                        output_path=proxy_path,
+                        height=settings.proxy.proxy_height
+                    )
+                    analysis_video_path = proxy_path
+                    logger.debug(f"✓ Using proxy for optical flow analysis: {proxy_path}")
+                except Exception as e:
+                    logger.warning(f"Proxy generation failed for optical flow: {e}. Using original.")
+                    if os.path.exists(proxy_path):
+                        try:
+                            os.unlink(proxy_path)
+                        except:
+                            pass
+        except Exception as e:
+            logger.debug(f"Could not determine if proxy needed: {e}. Using original video.")
 
-        # Compute visual features
-        visual_histogram = self.compute_visual_histogram(video_path, mid_point)
-        brightness = self.compute_brightness(video_path, mid_point)
-        motion_blur = self.compute_motion_blur_score(video_path, mid_point)
+        # Compute visual features (can use proxy)
+        visual_histogram = self.compute_visual_histogram(analysis_video_path, mid_point)
+        brightness = self.compute_brightness(analysis_video_path, mid_point)
+        motion_blur = self.compute_motion_blur_score(analysis_video_path, mid_point)
 
-        # Compute motion features
+        # Compute motion features (optical flow - benefit from proxy!)
         flow_magnitude, flow_direction = self.compute_optical_flow_magnitude(
-            video_path, scene_start, scene_end
+            analysis_video_path, scene_start, scene_end
         )
 
         metadata = {
@@ -359,6 +397,14 @@ class MetadataCache:
             'shot': scene_meta.get('shot', 'medium') if scene_meta else 'medium',
             'energy': scene_meta.get('energy', 0.5) if scene_meta else 0.5,
         }
+        
+        # Cleanup proxy if we created one
+        if analysis_video_path != video_path:
+            try:
+                os.unlink(analysis_video_path)
+                logger.debug(f"Cleaned up optical flow proxy: {analysis_video_path}")
+            except Exception as e:
+                logger.debug(f"Could not cleanup proxy {analysis_video_path}: {e}")
 
         return metadata
 
@@ -435,7 +481,7 @@ def precompute_all_metadata(input_dir: str, cache_dir: Optional[str] = None,
     cache_manager = MetadataCache(cache_dir=cache_dir)
 
     # Find all video files
-    video_extensions = ('.mp4', '.mov', '.avi', '.mkv')
+    video_extensions = ('.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v', '.mxf', '.mts', '.m2ts', '.ts')
     video_files = []
 
     for root, dirs, files in os.walk(input_dir):

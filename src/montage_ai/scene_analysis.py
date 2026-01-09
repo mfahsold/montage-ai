@@ -266,19 +266,37 @@ class SceneDetector:
         # Scene detection analyzes frame differences, not fine details.
         # Downsampling 6K→1080p maintains accuracy while achieving 4-9x speedup.
         effective_path = video_path
+        use_proxy = False
+        
         if max_resolution is None:
             max_resolution = 1080  # Default: downsample anything above 1080p
         
-        # Check if downsampling is needed
+        # Check if proxy mode should be enabled (auto-detect for large videos)
         try:
-            # Use module-level probe_metadata to allow test patching
             metadata = probe_metadata(video_path)
-            if metadata.height > max_resolution:
+            
+            # Auto-enable proxy mode for large/long videos
+            if _settings.proxy.should_use_proxy(metadata.duration, metadata.width, metadata.height):
+                logger.info(f"🎬 Large input detected (duration={metadata.duration:.0f}s, "
+                           f"resolution={metadata.width}x{metadata.height}). "
+                           f"Enabling proxy analysis mode ({_settings.proxy.proxy_height}p)...")
+                
+                # Generate proxy video for analysis
+                proxy_path = self._generate_analysis_proxy(video_path)
+                if proxy_path and os.path.exists(proxy_path):
+                    effective_path = proxy_path
+                    use_proxy = True
+                    logger.info(f"✓ Using proxy for analysis: {os.path.basename(proxy_path)}")
+                else:
+                    logger.warning(f"Proxy generation failed. Falling back to downsampling.")
+            
+            # Also check for high resolution (even if video is short)
+            elif metadata.height > max_resolution:
                 logger.info(f"⚡ High-res input detected ({metadata.width}x{metadata.height}). "
                            f"Downsampling to {max_resolution}p for scene analysis (4-9x faster).")
                 effective_path = self._create_downsampled_proxy(video_path, max_resolution)
         except Exception as e:
-            logger.warning(f"Could not check resolution for downsampling: {e}. Using original.")
+            logger.warning(f"Could not check resolution for proxy/downsampling: {e}. Using original.")
 
         video = open_video(effective_path)
         scene_manager = SceneManager()
@@ -318,7 +336,63 @@ class SceneDetector:
                 logger.error(f"Could not read video duration: {e}")
                 return []
 
+        # Cleanup proxy if we created one
+        if use_proxy and effective_path != video_path:
+            try:
+                os.unlink(effective_path)
+                logger.debug(f"Cleaned up analysis proxy: {effective_path}")
+            except Exception as e:
+                logger.debug(f"Could not cleanup proxy {effective_path}: {e}")
+
         return scenes
+    
+    def _generate_analysis_proxy(self, video_path: str) -> Optional[str]:
+        """
+        Generate a lightweight proxy video (720p by default) for fast analysis.
+        
+        This enables analysis of large/long videos (10+ minutes) without 
+        timeout issues from Optical Flow and other heavy processing.
+        
+        Args:
+            video_path: Original video path
+        
+        Returns:
+            Path to analysis proxy file, or None on failure
+        """
+        import subprocess
+        
+        try:
+            from .proxy_generator import ProxyGenerator
+            
+            # Create temp file for proxy
+            ext = os.path.splitext(video_path)[1]
+            proxy_fd, proxy_path = tempfile.mkstemp(
+                suffix=f"_analysis_proxy{ext}", 
+                prefix="scene_detect_"
+            )
+            try:
+                os.close(proxy_fd)
+            except OSError:
+                pass
+            
+            # Get proxy height from config
+            proxy_height = _settings.proxy.proxy_height
+            
+            logger.info(f"📹 Generating analysis proxy ({proxy_height}p) for large video...")
+            
+            # Use the static method from ProxyGenerator
+            ProxyGenerator.generate_analysis_proxy(
+                source_path=video_path,
+                output_path=proxy_path,
+                height=proxy_height
+            )
+            
+            logger.info(f"✓ Analysis proxy created: {proxy_path}")
+            return proxy_path
+            
+        except Exception as e:
+            logger.warning(f"Proxy generation failed: {e}. Falling back to downsampling.")
+            return None
     
     def _create_downsampled_proxy(self, video_path: str, max_height: int) -> str:
         """

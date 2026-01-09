@@ -190,3 +190,68 @@ class ProxyGenerator:
 
         return output
 
+    @staticmethod
+    def generate_analysis_proxy(source_path: str, output_path: str, height: int = 720) -> bool:
+        """
+        Generate a lightweight proxy for fast analysis (scene detection, feature extraction).
+        
+        Args:
+            source_path: Input video file
+            output_path: Output proxy file (h264 mp4)
+            height: Proxy height in pixels (default 720p); maintains aspect ratio
+        
+        Returns:
+            True if successful, raises on failure
+        
+        Example:
+            ProxyGenerator.generate_analysis_proxy(
+                source_path="/data/input/long_raw_video.mp4",
+                output_path="/tmp/proxy_long_raw_video.mp4",
+                height=720
+            )
+        """
+        import subprocess
+        
+        # Build FFmpeg command
+        # Use hardware acceleration if available (auto-detect)
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-hwaccel", "auto",
+            "-i", str(source_path),
+            # Scale to target height (maintains aspect ratio)
+            "-vf", f"scale=-1:{height}",
+            # Fast H.264 encoding (CRF 28 = acceptable quality for analysis)
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-crf", "28",
+            # Copy audio as-is (we don't analyze it)
+            "-c:a", "aac",
+            "-b:a", "128k",
+            # Output
+            str(output_path)
+        ]
+        
+        logger.info(f"Generating analysis proxy: {height}p ({source_path} → {output_path})")
+        
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=3600  # 1 hour max for proxy generation
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"Proxy generation failed: {result.stderr}")
+                raise RuntimeError(f"FFmpeg failed: {result.stderr}")
+            
+            logger.info(f"✓ Analysis proxy created: {output_path}")
+            return True
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"Proxy generation timeout after 3600 seconds")
+            raise
+        except Exception as e:
+            logger.error(f"Proxy generation error: {e}")
+            raise

@@ -135,8 +135,8 @@ class ResilientQueue(Queue):
 
 
 def create_resilient_redis_connection(
-    host: str = 'localhost',
-    port: int = 6379,
+    host: str = None,
+    port: int = None,
     retry_backoff: int = 1,
     max_retries: int = 3,
     socket_keepalive: bool = True
@@ -145,8 +145,8 @@ def create_resilient_redis_connection(
     Create a resilient Redis connection.
     
     Args:
-        host: Redis host
-        port: Redis port
+        host: Redis host (default: env REDIS_HOST or 'localhost')
+        port: Redis port (default: env REDIS_PORT or 6379)
         retry_backoff: Exponential backoff multiplier
         max_retries: Max retry attempts
         socket_keepalive: Enable TCP keepalive
@@ -154,6 +154,14 @@ def create_resilient_redis_connection(
     Returns:
         ResilientRedis connection instance
     """
+    import os
+    
+    # Allow environment variable override
+    if host is None:
+        host = os.environ.get('REDIS_HOST', 'localhost')
+    if port is None:
+        port = int(os.environ.get('REDIS_PORT', '6379'))
+    
     conn = ResilientRedis(
         host=host,
         port=port,
