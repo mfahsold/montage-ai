@@ -121,6 +121,9 @@ spec:
         - name: data-music
           mountPath: /data/music
           readOnly: false
+        - name: data-assets
+          mountPath: /data/assets
+          readOnly: false
         - name: cache
           mountPath: /data/cache
           readOnly: false
@@ -244,6 +247,9 @@ spec:
       - name: data-music
         persistentVolumeClaim:
           claimName: montage-music
+      - name: data-assets
+        persistentVolumeClaim:
+          claimName: montage-assets
       - name: cache
         persistentVolumeClaim:
           claimName: montage-cache

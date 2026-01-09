@@ -6,6 +6,7 @@ namespace: montage-ai
 resources:
   - deployment.yaml
   - service-ingress.yaml
+  - pvc.yaml
   - namespace.yaml
   - network-policy.yaml
 
@@ -38,4 +39,3 @@ configMapGenerator:
       - STABILIZE=false
       - UPSCALE=false
       - ENHANCE=false
-

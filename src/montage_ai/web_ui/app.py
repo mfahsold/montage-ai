@@ -33,6 +33,7 @@ from ..transcriber import Transcriber
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
 from ..logger import logger
+from ..media_files import list_media_files, parse_inventory_descriptions, read_sidecar_description
 from .job_options import normalize_options, apply_preview_preset, apply_finalize_overrides
 
 # Job phase tracking models
@@ -94,6 +95,10 @@ VERSION = get_version()
 # CONFIGURATION (from centralized config module)
 # =============================================================================
 _settings = get_settings()
+try:
+    _settings.paths.ensure_directories()
+except OSError as exc:
+    logger.warning("Failed to prepare data directories: %s", exc)
 
 # Path aliases for backward compatibility
 INPUT_DIR = _settings.paths.input_dir
@@ -531,14 +536,58 @@ def api_transparency():
 @app.route('/api/files', methods=['GET'])
 def api_list_files():
     """List uploaded files."""
-    videos = [f.name for f in INPUT_DIR.glob('*.mp4')] + [f.name for f in INPUT_DIR.glob('*.mov')]
-    music = [f.name for f in MUSIC_DIR.glob('*.mp3')] + [f.name for f in MUSIC_DIR.glob('*.wav')]
+    include_meta = request.args.get("details") == "1"
+
+    video_paths = list_media_files(INPUT_DIR, _settings.file_types.video_extensions)
+    music_paths = list_media_files(MUSIC_DIR, _settings.file_types.audio_extensions)
+
+    inventory = parse_inventory_descriptions(INPUT_DIR / "FOOTAGE_INVENTORY.md")
+
+    video_items = []
+    if include_meta:
+        from ..video_metadata import probe_metadata
+
+    for path in video_paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        item = {
+            "name": path.name,
+            "size_bytes": stat.st_size,
+            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        }
+        description = read_sidecar_description(path) or inventory.get(path.name)
+        if description:
+            item["description"] = description
+        if include_meta:
+            meta = probe_metadata(str(path))
+            item["duration_seconds"] = meta.duration if meta else None
+            item["width"] = meta.width if meta else None
+            item["height"] = meta.height if meta else None
+            item["codec"] = meta.codec if meta else None
+            item["supported"] = bool(meta and meta.width > 0 and meta.height > 0)
+        video_items.append(item)
+
+    music_items = []
+    for path in music_paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        music_items.append({
+            "name": path.name,
+            "size_bytes": stat.st_size,
+            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        })
 
     return jsonify({
-        "videos": sorted(videos),
-        "music": sorted(music),
-        "video_count": len(videos),
-        "music_count": len(music)
+        "videos": [p.name for p in video_paths],
+        "music": [p.name for p in music_paths],
+        "video_items": video_items,
+        "music_items": music_items,
+        "video_count": len(video_paths),
+        "music_count": len(music_paths),
     })
 
 
@@ -701,6 +750,12 @@ def api_upload():
         target_dir = MUSIC_DIR
     else:
         return jsonify({"error": "Invalid file type"}), 400
+
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        logger.error("Upload directory unavailable (%s): %s", target_dir, exc)
+        return jsonify({"error": "Upload directory not available"}), 500
 
     # Save file with path traversal protection
     filename = secure_filename(file.filename)
@@ -1062,10 +1117,19 @@ def api_analyze_footage():
         agent = create_video_agent()
 
         # Find all video files
-        video_files = list(INPUT_DIR.glob('*.mp4')) + list(INPUT_DIR.glob('*.mov'))
+        video_files = list_media_files(INPUT_DIR, _settings.file_types.video_extensions)
+        supported_files = []
+        skipped = []
+        from ..video_metadata import probe_metadata
+        for path in video_files:
+            meta = probe_metadata(str(path))
+            if meta and meta.width > 0 and meta.height > 0:
+                supported_files.append(path)
+            else:
+                skipped.append(path.name)
 
         results = []
-        for video_path in video_files:
+        for video_path in supported_files:
             result = agent.analyze_video(str(video_path))
             results.append({
                 "file": video_path.name,
@@ -1076,7 +1140,8 @@ def api_analyze_footage():
         return jsonify({
             "analyzed": len(results),
             "results": results,
-            "memory_stats": agent.get_memory_stats()
+            "memory_stats": agent.get_memory_stats(),
+            "skipped": skipped,
         })
 
     except Exception as e:

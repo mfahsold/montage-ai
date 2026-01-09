@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: montage-ai-input
+  name: montage-input
   namespace: montage-ai
   labels:
     app.kubernetes.io/name: montage-ai
@@ -20,7 +20,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: montage-ai-music
+  name: montage-music
   namespace: montage-ai
   labels:
     app.kubernetes.io/name: montage-ai
@@ -37,7 +37,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: montage-ai-assets
+  name: montage-assets
   namespace: montage-ai
   labels:
     app.kubernetes.io/name: montage-ai
@@ -55,7 +55,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: montage-ai-output
+  name: montage-output
   namespace: montage-ai
   labels:
     app.kubernetes.io/name: montage-ai

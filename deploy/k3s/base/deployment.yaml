@@ -69,8 +69,14 @@ spec:
         - name: REDIS_PORT
           value: "6379"
         volumeMounts:
-        - name: data
-          mountPath: /data
+        - name: data-input
+          mountPath: /data/input
+        - name: data-output
+          mountPath: /data/output
+        - name: data-music
+          mountPath: /data/music
+        - name: data-assets
+          mountPath: /data/assets
         - name: dev-dri
           mountPath: /dev/dri
           readOnly: true
@@ -96,25 +102,19 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 5
       volumes:
-      - name: data
+      - name: data-input
         persistentVolumeClaim:
-          claimName: montage-ai-data
+          claimName: montage-input
+      - name: data-output
+        persistentVolumeClaim:
+          claimName: montage-output
+      - name: data-music
+        persistentVolumeClaim:
+          claimName: montage-music
+      - name: data-assets
+        persistentVolumeClaim:
+          claimName: montage-assets
       - name: dev-dri
         hostPath:
           path: /dev/dri
           type: DirectoryOrCreate
-
----
-# Single unified data PVC (RWO) for all data
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: montage-ai-data
-  namespace: montage-ai
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path
-  resources:
-    requests:
-      storage: 500Gi

@@ -7,8 +7,8 @@ Handles Audio Analysis (Beats, Energy, Voice Isolation) and Video Scene Detectio
 
 import os
 import random
-import numpy as np
-from typing import List, Optional, Tuple, Any, Dict
+from pathlib import Path
+from typing import List, Optional, Tuple, Any, Dict, Iterable
 # OPTIMIZATION Phase 3: ProcessPoolExecutor for CPU-bound tasks (bypasses GIL)
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
@@ -16,6 +16,7 @@ from ..logger import logger
 from ..config import Settings
 from .context import AudioAnalysisResult, SceneInfo, MontageContext
 from ..utils import file_exists_and_valid
+from ..media_files import list_media_files
 from .analysis_cache import get_analysis_cache
 
 
@@ -285,10 +286,16 @@ class AssetAnalyzer:
         # Clear histogram cache from previous runs
         clear_histogram_cache()
 
-        # Get video files
-        video_files = self._get_files(self.ctx.paths.input_dir, ('.mp4', '.mov'))
+        # Get video files (allow pre-selected list from upstream)
+        video_files = self.ctx.media.video_files or []
+        if not video_files:
+            video_files = self._get_files(self.ctx.paths.input_dir, self.settings.file_types.video_extensions)
         if not video_files:
             raise ValueError("No videos found in input directory")
+
+        video_files = self._filter_supported_videos(video_files)
+        if not video_files:
+            raise ValueError("No supported videos found in input directory")
 
         self.ctx.media.video_files = video_files
         self.ctx.media.all_scenes = []
@@ -404,14 +411,44 @@ class AssetAnalyzer:
 
         logger.info(f"   📹 Found {len(self.ctx.media.all_scenes)} scenes in {len(video_files)} videos")
 
-    def _get_files(self, directory: str, extensions: Tuple[str, ...]) -> List[str]:
+    def _get_files(self, directory: str, extensions: Iterable[str]) -> List[str]:
         """Get valid files from directory."""
-        if not os.path.exists(directory):
+        root = Path(directory)
+        if not root.exists():
             return []
-        
-        files = []
-        for root, _, filenames in os.walk(directory):
-            for filename in filenames:
-                if filename.lower().endswith(extensions) and not filename.startswith('._'):
-                     files.append(os.path.join(root, filename))
-        return sorted(files)
+        return [str(path) for path in list_media_files(root, extensions, recursive=True)]
+
+    def _filter_supported_videos(self, video_files: List[str]) -> List[str]:
+        """Drop missing or unsupported video files before analysis."""
+        from ..video_metadata import probe_metadata
+
+        existing: List[str] = []
+        missing: List[str] = []
+        for path in video_files:
+            if file_exists_and_valid(path):
+                existing.append(path)
+            else:
+                missing.append(path)
+
+        if missing:
+            logger.warning(
+                "Skipping missing inputs: %s",
+                ", ".join(os.path.basename(p) for p in missing),
+            )
+
+        supported: List[str] = []
+        skipped: List[str] = []
+        for path in existing:
+            meta = probe_metadata(path)
+            if meta and meta.width > 0 and meta.height > 0:
+                supported.append(path)
+            else:
+                skipped.append(path)
+
+        if skipped:
+            logger.warning(
+                "Skipping unsupported inputs: %s",
+                ", ".join(os.path.basename(p) for p in skipped),
+            )
+
+        return supported

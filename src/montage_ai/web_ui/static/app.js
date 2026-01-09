@@ -84,7 +84,7 @@ const QUALITY_PROFILES = [
 // File validation config
 const FILE_VALIDATION = {
     video: {
-        extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'mts', 'm2ts'],
+        extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'mxf', 'mts', 'm2ts', 'ts'],
         maxSizeMB: 2000,
         warnSizeMB: 500
     },
@@ -414,6 +414,16 @@ function formatFileSize(bytes) {
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[ch]));
+}
+
 document.getElementById('videoUpload')?.addEventListener('change', async (e) => {
     const files = Array.from(e.target.files);
     for (const file of files) {
@@ -504,21 +514,44 @@ async function uploadFile(file, type) {
 
 async function refreshFiles() {
     try {
-        const response = await fetch(`${API_BASE}/files`);
+        const response = await fetch(`${API_BASE}/files?details=1`);
         const data = await response.json();
 
         const videoList = document.getElementById('videoList');
         const musicList = document.getElementById('musicList');
 
         if (videoList) {
-            videoList.innerHTML = data.videos.length 
-                ? data.videos.map(f => `<div class="file-item"><span>✓ ${f}</span></div>`).join('')
+            const videoItems = (data.video_items && data.video_items.length)
+                ? data.video_items
+                : (data.videos || []).map(name => ({ name }));
+
+            videoList.innerHTML = videoItems.length 
+                ? videoItems.map(item => {
+                    const name = escapeHtml(item.name || '');
+                    const desc = item.description ? escapeHtml(item.description) : '';
+                    const size = item.size_bytes ? formatFileSize(item.size_bytes) : '';
+                    const supported = item.supported !== false;
+                    const warnClass = supported ? '' : 'warning';
+                    const statusPrefix = supported ? '✓' : '⚠';
+                    const title = desc ? ` title="${desc}"` : '';
+                    const sizeHtml = size ? `<span class="file-size">${size}</span>` : '';
+                    return `<div class="file-item ${warnClass}"><span${title}>${statusPrefix} ${name}</span>${sizeHtml}</div>`;
+                }).join('')
                 : '<div class="file-item" style="opacity:0.5">[ NO_INPUT_STREAMS ]</div>';
         }
 
         if (musicList) {
-            musicList.innerHTML = data.music.length 
-                ? data.music.map(f => `<div class="file-item"><span>✓ ${f}</span></div>`).join('')
+            const musicItems = (data.music_items && data.music_items.length)
+                ? data.music_items
+                : (data.music || []).map(name => ({ name }));
+
+            musicList.innerHTML = musicItems.length 
+                ? musicItems.map(item => {
+                    const name = escapeHtml(item.name || '');
+                    const size = item.size_bytes ? formatFileSize(item.size_bytes) : '';
+                    const sizeHtml = size ? `<span class="file-size">${size}</span>` : '';
+                    return `<div class="file-item"><span>✓ ${name}</span>${sizeHtml}</div>`;
+                }).join('')
                 : '<div class="file-item" style="opacity:0.5">[ NO_AUDIO_TRACK ]</div>';
         }
     } catch (error) {

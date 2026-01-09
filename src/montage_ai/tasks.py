@@ -22,6 +22,26 @@ MUSIC_DIR = settings.paths.music_dir
 OUTPUT_DIR = settings.paths.output_dir
 ASSETS_DIR = settings.paths.assets_dir
 
+def _resolve_input_files(input_dir: Path, filenames: list[str]) -> list[str]:
+    """Resolve user-selected filenames to safe absolute paths."""
+    resolved: list[str] = []
+    input_root = input_dir.resolve()
+
+    for name in filenames:
+        safe_name = os.path.basename(str(name))
+        if not safe_name:
+            continue
+        candidate = (input_root / safe_name).resolve()
+        if not str(candidate).startswith(str(input_root)):
+            logger.warning("Ignoring unsafe input path: %s", name)
+            continue
+        if not candidate.exists():
+            logger.warning("Input file not found: %s", safe_name)
+            continue
+        resolved.append(str(candidate))
+
+    return resolved
+
 def run_montage(job_id: str, style: str, options: dict):
     """Run montage creation in background (RQ worker)."""
     # Ensure directories
@@ -52,6 +72,8 @@ def run_montage(job_id: str, style: str, options: dict):
                     logger.warning(f"Failed to interpret prompt: {e}")
             t.phase_end("setup")
 
+            selected_files = _resolve_input_files(INPUT_DIR, options.get("video_files") or [])
+
             workflow_options = WorkflowOptions(
                 input_path=str(INPUT_DIR),
                 output_dir=str(OUTPUT_DIR),
@@ -77,7 +99,8 @@ def run_montage(job_id: str, style: str, options: dict):
                     "sharpen": options.get('sharpen', False),
                     "film_grain": options.get('film_grain'),
                     # Misc
-                    "target_duration": options.get('target_duration')
+                    "target_duration": options.get('target_duration'),
+                    "video_files": selected_files,
                 }
             )
 
@@ -162,5 +185,4 @@ def run_shorts_reframe(job_id: str, options: dict):
             # Teardown logging
             logger.removeHandler(file_handler)
             file_handler.close()
-
 

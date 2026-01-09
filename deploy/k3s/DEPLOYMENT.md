@@ -61,8 +61,12 @@ OPENAI_MODEL: "llama-3.2-1b"
 
 ### Storage
 
-- **PVC**: 100Gi local-path storage
-- **HostPath**: Source code from control plane
+- **Shared storage is required** between Web UI and worker pods:
+  - Web uploads land in `/data/input`
+  - Workers read from `/data/input` and write to `/data/output`
+- **Single-node (local-path)**: pin web + worker to the same node or they will not see the same files.
+- **Multi-node**: use RWX storage (NFS) so uploads are visible to all nodes.
+  - See `deploy/k3s/base/nfs-pv.yaml` for reference PVs.
 
 ### Resources
 

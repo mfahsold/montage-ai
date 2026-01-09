@@ -24,7 +24,9 @@ COPY requirements.txt .
 # Install python dependencies
 # Use --no-cache-dir to keep image small
 # Use --prefer-binary to avoid compiling from source when possible
-RUN pip install --default-timeout=100 --no-cache-dir --prefer-binary -r requirements.txt
+# Increased timeout to 600s for large packages (opencv-python-headless ~54MB)
+# Added retries=5 for network resilience
+RUN pip install --default-timeout=600 --retries 5 --no-cache-dir --prefer-binary -r requirements.txt
 
 # Conditional download of Real-ESRGAN based on architecture
 ARG TARGETARCH

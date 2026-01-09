@@ -71,6 +71,8 @@ spec:
           mountPath: /data/output
         - name: data-music
           mountPath: /data/music
+        - name: data-assets
+          mountPath: /data/assets
         - name: cache
           mountPath: /data/cache
         - name: tmp-segments
@@ -133,6 +135,9 @@ spec:
       - name: data-music
         persistentVolumeClaim:
           claimName: montage-music
+      - name: data-assets
+        persistentVolumeClaim:
+          claimName: montage-assets
       - name: cache
         persistentVolumeClaim:
           claimName: montage-cache

@@ -5,11 +5,11 @@
 
 # Create directories on primary worker node (codeai-worker-amd64)
 # These must exist before PV creation:
-# sudo mkdir -p /var/montage-ai/{input,output,music,cache}
-# sudo chmod 777 /var/montage-ai/{input,output,music,cache}
+# sudo mkdir -p /var/montage-ai/{input,output,music,assets,cache}
+# sudo chmod 777 /var/montage-ai/{input,output,music,assets,cache}
 
 ---
-apiVersion: v1
+apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: montage-local
@@ -92,6 +92,31 @@ spec:
           - codeai-worker-amd64
 
 ---
+# PersistentVolume: Assets (Logos, overlays)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: montage-pv-assets
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: montage-local
+  hostPath:
+    path: /var/montage-ai/assets
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - codeai-worker-amd64
+
+---
 # PersistentVolume: Cache (Beats, Scenes, Analysis)
 apiVersion: v1
 kind: PersistentVolume
@@ -163,6 +188,22 @@ spec:
     requests:
       storage: 50Gi
   volumeName: montage-pv-music
+
+---
+# PersistentVolumeClaim: Assets
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-assets
+  namespace: montage-ai
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: montage-local
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: montage-pv-assets
 
 ---
 # PersistentVolumeClaim: Cache

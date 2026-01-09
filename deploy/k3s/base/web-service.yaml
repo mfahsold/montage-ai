@@ -68,6 +68,8 @@ spec:
           mountPath: /data/music
         - name: output
           mountPath: /data/output
+        - name: assets
+          mountPath: /data/assets
         resources:
           requests:
             cpu: 1000m      # Guarantee 1 core minimum
@@ -106,10 +108,13 @@ spec:
       volumes:
       - name: input
         persistentVolumeClaim:
-          claimName: montage-ai-input
+          claimName: montage-input
       - name: music
         persistentVolumeClaim:
-          claimName: montage-ai-music
+          claimName: montage-music
       - name: output
         persistentVolumeClaim:
-          claimName: montage-ai-output
+          claimName: montage-output
+      - name: assets
+        persistentVolumeClaim:
+          claimName: montage-assets

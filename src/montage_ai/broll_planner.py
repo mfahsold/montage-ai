@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from .logger import logger
 from .config import get_settings
 from .creative_director import CreativeDirector
+from .media_files import list_media_files
 
 # Reuse video_agent for semantic search (DRY)
 try:
@@ -112,9 +113,20 @@ def plan_broll(
     if analyze_first and stats.get("temporal_entries", 0) == 0:
         # Auto-analyze all videos in input_dir
         from pathlib import Path
-        video_files = list(Path(input_dir).glob("*.mp4")) + list(Path(input_dir).glob("*.mov"))
-        logger.info(f"Analyzing {len(video_files)} videos for B-roll planning...")
+        video_files = list_media_files(Path(input_dir), get_settings().file_types.video_extensions)
+        from .video_metadata import probe_metadata
+        supported_files = []
+        skipped = []
         for vf in video_files:
+            meta = probe_metadata(str(vf))
+            if meta and meta.width > 0 and meta.height > 0:
+                supported_files.append(vf)
+            else:
+                skipped.append(vf.name)
+        logger.info(f"Analyzing {len(supported_files)} videos for B-roll planning...")
+        if skipped:
+            logger.warning("Skipping unsupported inputs: %s", ", ".join(skipped))
+        for vf in supported_files:
             agent.analyze_video(str(vf))
 
     # 1. Parse script into segments (LLM or Regex)

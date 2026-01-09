@@ -51,16 +51,16 @@ spec:
       volumes:
         - name: input
           persistentVolumeClaim:
-            claimName: montage-ai-input
+            claimName: montage-input
         - name: music
           persistentVolumeClaim:
-            claimName: montage-ai-music
+            claimName: montage-music
         - name: assets
           persistentVolumeClaim:
-            claimName: montage-ai-assets
+            claimName: montage-assets
         - name: output
           persistentVolumeClaim:
-            claimName: montage-ai-output
+            claimName: montage-output
       # Generic - works on any amd64 node
       # Override in overlays for GPU targeting
       nodeSelector:

@@ -1,0 +1,97 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker
+  namespace: montage-ai
+  labels:
+    app: montage-ai
+    component: worker
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: montage-ai
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: montage-ai
+        component: worker
+    spec:
+      terminationGracePeriodSeconds: 120  # Allow time for job completion
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+      - name: worker
+        image: ghcr.io/mfahsold/montage-ai:latest
+        imagePullPolicy: Always
+        command: ["python", "-m", "montage_ai.worker"]
+        env:
+        - name: QUALITY_PROFILE
+          value: "standard"
+        - name: CGPU_ENABLED
+          value: "false"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
+        volumeMounts:
+        - name: data-input
+          mountPath: /data/input
+        - name: data-output
+          mountPath: /data/output
+        - name: data-music
+          mountPath: /data/music
+        - name: data-assets
+          mountPath: /data/assets
+        - name: cache
+          mountPath: /data/cache
+        - name: tmp-segments
+          mountPath: /tmp/segments
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+            ephemeral-storage: "20Gi"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            ephemeral-storage: "30Gi"
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  # Signal worker to finish current job
+                  sleep 110
+      volumes:
+      - name: data-input
+        persistentVolumeClaim:
+          claimName: montage-input
+      - name: data-output
+        persistentVolumeClaim:
+          claimName: montage-output
+      - name: data-music
+        persistentVolumeClaim:
+          claimName: montage-music
+      - name: data-assets
+        persistentVolumeClaim:
+          claimName: montage-assets
+      - name: cache
+        persistentVolumeClaim:
+          claimName: montage-cache
+      - name: tmp-segments
+        emptyDir:
+          sizeLimit: 20Gi

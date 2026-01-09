@@ -108,7 +108,11 @@ class MontageWorkflow(VideoWorkflow):
             feats.film_grain = extras['film_grain']
         if 'dialogue_duck' in extras:
             feats.dialogue_duck = extras['dialogue_duck']
-            
+
+        selected_files = extras.get("video_files") or []
+        if selected_files:
+            self.builder.ctx.media.video_files = [str(Path(p)) for p in selected_files if p]
+
         # Phase 1: Setup
         self.builder.setup_workspace()
     

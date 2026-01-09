@@ -17,7 +17,7 @@ import time
 import random
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Iterable
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +27,7 @@ from ..logger import logger
 from ..resource_manager import get_resource_manager, ResourceManager
 from ..style_templates import get_style_template
 from ..utils import file_exists_and_valid, coerce_float
+from ..media_files import list_media_files
 from ..ffmpeg_utils import build_ffmpeg_cmd
 from ..job_progress import JobProgress
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
@@ -345,7 +346,7 @@ class MontageBuilder:
 
         if self.settings.features.voice_isolation:
             # Replicate music selection logic to start async job
-            music_files = self._get_files(self.ctx.paths.music_dir, ('.mp3', '.wav'))
+            music_files = self._get_files(self.ctx.paths.music_dir, self.settings.file_types.audio_extensions)
             if music_files:
                 music_index = (self.variant_id - 1) % len(music_files)
                 music_path = music_files[music_index]
@@ -438,7 +439,7 @@ class MontageBuilder:
         )
 
         # Check for logo
-        logo_files = self._get_files(self.ctx.paths.assets_dir, ('.png', '.jpg'))
+        logo_files = self._get_files(self.ctx.paths.assets_dir, self.settings.file_types.image_extensions)
         self.ctx.render.logo_path = logo_files[0] if logo_files else None
 
     def plan_montage(self):
@@ -731,15 +732,9 @@ class MontageBuilder:
         )
 
 
-    def _get_files(self, directory: Path, extensions: Tuple[str, ...]) -> List[str]:
+    def _get_files(self, directory: Path, extensions: Iterable[str]) -> List[str]:
         """Get files with given extensions from directory."""
-        files = []
-        dir_str = str(directory)
-        if os.path.isdir(dir_str):
-            for f in os.listdir(dir_str):
-                if f.lower().endswith(extensions):
-                    files.append(os.path.join(dir_str, f))
-        return sorted(files)
+        return [str(path) for path in list_media_files(directory, extensions)]
 
     def _get_output_file_size(self) -> float:
         """Get output file size in MB."""
@@ -1104,7 +1099,7 @@ class MontageBuilder:
             scene.setdefault('usage_count', 0)
 
         # Ensure we have scenes for all input clips even if detection failed
-        input_clips = self.ctx.media.video_files or self._get_files(self.ctx.paths.input_dir, ('.mp4', '.mov', '.mkv'))
+        input_clips = self.ctx.media.video_files or self._get_files(self.ctx.paths.input_dir, self.settings.file_types.video_extensions)
         if input_clips:
             from ..video_metadata import probe_duration
             for clip_path in input_clips:

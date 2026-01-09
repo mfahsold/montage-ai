@@ -99,6 +99,15 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
     if music_track.lower() == "auto":
         music_track = ""  # Let AI Auto-Select
 
+    # Optional: user-selected input files
+    raw_video_files = opts.get("video_files", data.get("video_files"))
+    video_files = []
+    if raw_video_files:
+        if isinstance(raw_video_files, str):
+            video_files = [v.strip() for v in raw_video_files.split(",") if v.strip()]
+        elif isinstance(raw_video_files, list):
+            video_files = [str(v).strip() for v in raw_video_files if str(v).strip()]
+
     def get_bool(key: str) -> bool:
         val = opts.get(key, data.get(key))
         if val is None:
@@ -128,6 +137,7 @@ def normalize_options(data: Dict[str, Any], defaults: Dict[str, Any], settings: 
         "music_start": music_start,
         "music_end": music_end,
         "music_track": music_track,
+        "video_files": video_files,
         "preview": data.get("preset") == "fast" or quality_profile == "preview",
         "quality_profile": quality_profile,
         "cloud_acceleration": cloud_acceleration,
