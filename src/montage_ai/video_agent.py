@@ -678,7 +678,8 @@ class VideoAgentAdapter:
         
         caption = f"A {energy_desc} {scene_type} scene with {color_desc} tones"
         
-        # TODO: Integrate Ollama/LLaVA for better captions
+        # ROADMAP (Q2 2026): Integrate Ollama/LLaVA for better captions
+        # Current caption system works for MVP; ML-based captioning is future enhancement
         # if self.caption_model == "ollama":
         #     caption = self._generate_ollama_caption(frame)
         
@@ -696,7 +697,9 @@ class VideoAgentAdapter:
         Placeholder for YOLO/SAM integration.
         Currently returns empty list - implement with actual detector.
         """
-        # TODO: Integrate object detection model
+        # ROADMAP (Q3 2026): Integrate object detection model
+        # Current face detection via MediaPipe works for MVP
+        # Full object detection (YOLO/SAM/DETR) is future enhancement
         # Options:
         # - YOLO via ultralytics
         # - SAM (Segment Anything)

@@ -21,6 +21,8 @@ from pathlib import Path
 from typing import Optional, Set, Tuple, List
 from dataclasses import dataclass, field
 
+from montage_ai.config_parser import ConfigParser
+
 
 # =============================================================================
 # Path Configuration
@@ -153,66 +155,65 @@ def get_effective_cpu_count() -> int:
 class FeatureConfig:
     """Feature toggles for enhancement pipeline."""
 
-    stabilize: bool = field(default_factory=lambda: os.environ.get("STABILIZE", "false").lower() == "true")
-    upscale: bool = field(default_factory=lambda: os.environ.get("UPSCALE", "false").lower() == "true")
-    enhance: bool = field(default_factory=lambda: os.environ.get("ENHANCE", "true").lower() == "true")
-    preserve_aspect: bool = field(default_factory=lambda: os.environ.get("PRESERVE_ASPECT", "false").lower() == "true")
-    export_timeline: bool = field(default_factory=lambda: os.environ.get("EXPORT_TIMELINE", "false").lower() == "true")
-    generate_proxies: bool = field(default_factory=lambda: os.environ.get("GENERATE_PROXIES", "false").lower() == "true")
-    llm_clip_selection: bool = field(default_factory=lambda: os.environ.get("LLM_CLIP_SELECTION", "true").lower() == "true")
-    deep_analysis: bool = field(default_factory=lambda: os.environ.get("DEEP_ANALYSIS", "false").lower() == "true")
-    verbose: bool = field(default_factory=lambda: os.environ.get("VERBOSE", "true").lower() == "true")
-    enable_ai_filter: bool = field(default_factory=lambda: os.environ.get("ENABLE_AI_FILTER", "false").lower() == "true")
+    stabilize: bool = field(default_factory=ConfigParser.make_bool_parser("STABILIZE", False))
+    upscale: bool = field(default_factory=ConfigParser.make_bool_parser("UPSCALE", False))
+    enhance: bool = field(default_factory=ConfigParser.make_bool_parser("ENHANCE", True))
+    preserve_aspect: bool = field(default_factory=ConfigParser.make_bool_parser("PRESERVE_ASPECT", False))
+    export_timeline: bool = field(default_factory=ConfigParser.make_bool_parser("EXPORT_TIMELINE", False))
+    generate_proxies: bool = field(default_factory=ConfigParser.make_bool_parser("GENERATE_PROXIES", False))
+    llm_clip_selection: bool = field(default_factory=ConfigParser.make_bool_parser("LLM_CLIP_SELECTION", True))
+    deep_analysis: bool = field(default_factory=ConfigParser.make_bool_parser("DEEP_ANALYSIS", False))
+    verbose: bool = field(default_factory=ConfigParser.make_bool_parser("VERBOSE", True))
+    enable_ai_filter: bool = field(default_factory=ConfigParser.make_bool_parser("ENABLE_AI_FILTER", False))
     # Phase 4: Agentic Creative Loop - LLM evaluates and refines cuts iteratively
-    creative_loop: bool = field(default_factory=lambda: os.environ.get("CREATIVE_LOOP", "false").lower() == "true")
-    creative_loop_max_iterations: int = field(default_factory=lambda: int(os.environ.get("CREATIVE_LOOP_MAX_ITERATIONS", "3")))
+    creative_loop: bool = field(default_factory=ConfigParser.make_bool_parser("CREATIVE_LOOP", False))
+    creative_loop_max_iterations: int = field(default_factory=ConfigParser.make_int_parser("CREATIVE_LOOP_MAX_ITERATIONS", 3))
 
     # Episodic memory for analysis caching (experimental)
-    episodic_memory: bool = field(default_factory=lambda: os.environ.get("EPISODIC_MEMORY", "false").lower() == "true")
+    episodic_memory: bool = field(default_factory=ConfigParser.make_bool_parser("EPISODIC_MEMORY", False))
 
     # Storytelling Engine (Phase 1 scaffolding)
-    story_engine: bool = field(default_factory=lambda: os.environ.get("ENABLE_STORY_ENGINE", "false").lower() == "true")
-    strict_cloud_compute: bool = field(default_factory=lambda: os.environ.get("STRICT_CLOUD_COMPUTE", "false").lower() == "true")
+    story_engine: bool = field(default_factory=ConfigParser.make_bool_parser("ENABLE_STORY_ENGINE", False))
+    strict_cloud_compute: bool = field(default_factory=ConfigParser.make_bool_parser("STRICT_CLOUD_COMPUTE", False))
 
     # Shorts Workflow (Vertical Video + Smart Reframing)
-    shorts_mode: bool = field(default_factory=lambda: os.environ.get("SHORTS_MODE", "false").lower() == "true")
-    reframe_mode: str = field(default_factory=lambda: os.environ.get("REFRAME_MODE", "auto"))  # auto, speaker, center, custom
+    shorts_mode: bool = field(default_factory=ConfigParser.make_bool_parser("SHORTS_MODE", False))
+    reframe_mode: str = field(default_factory=ConfigParser.make_str_parser("REFRAME_MODE", "auto"))  # auto, speaker, center, custom
 
     # 2025 P0/P1: Burn-in captions and voice isolation
-    captions: bool = field(default_factory=lambda: os.environ.get("CAPTIONS", "false").lower() == "true")
-    captions_style: str = field(default_factory=lambda: os.environ.get("CAPTIONS_STYLE", "tiktok"))  # tiktok, minimal, bold, karaoke
-    transcription_model: str = field(default_factory=lambda: os.environ.get("TRANSCRIPTION_MODEL", "medium"))
+    captions: bool = field(default_factory=ConfigParser.make_bool_parser("CAPTIONS", False))
+    captions_style: str = field(default_factory=ConfigParser.make_str_parser("CAPTIONS_STYLE", "tiktok"))  # tiktok, minimal, bold, karaoke
+    transcription_model: str = field(default_factory=ConfigParser.make_str_parser("TRANSCRIPTION_MODEL", "medium"))
     
     # Audio Polish: Clean Audio = Voice Isolation + Denoise (single toggle)
     # CLEAN_AUDIO is the new consolidated toggle, VOICE_ISOLATION is legacy
     voice_isolation: bool = field(default_factory=lambda: (
-        os.environ.get("CLEAN_AUDIO", "false").lower() == "true" or
-        os.environ.get("VOICE_ISOLATION", "false").lower() == "true"
+        ConfigParser.parse_bool("CLEAN_AUDIO", False) or ConfigParser.parse_bool("VOICE_ISOLATION", False)
     ))
-    voice_isolation_model: str = field(default_factory=lambda: os.environ.get("VOICE_ISOLATION_MODEL", "htdemucs"))
+    voice_isolation_model: str = field(default_factory=ConfigParser.make_str_parser("VOICE_ISOLATION_MODEL", "htdemucs"))
 
     # Noise Reduction: DeepFilterNet for lightweight noise removal (faster than voice_isolation)
     # Use for podcasts, interviews, vlogs with background noise
-    noise_reduction: bool = field(default_factory=lambda: os.environ.get("NOISE_REDUCTION", "false").lower() == "true")
-    noise_reduction_strength: int = field(default_factory=lambda: int(os.environ.get("NOISE_REDUCTION_STRENGTH", "100")))
+    noise_reduction: bool = field(default_factory=ConfigParser.make_bool_parser("NOISE_REDUCTION", False))
+    noise_reduction_strength: int = field(default_factory=ConfigParser.make_int_parser("NOISE_REDUCTION_STRENGTH", 100))
 
     # Video Enhancement (per-clip)
-    denoise: bool = field(default_factory=lambda: os.environ.get("DENOISE", "false").lower() == "true")
-    sharpen: bool = field(default_factory=lambda: os.environ.get("SHARPEN", "false").lower() == "true")
+    denoise: bool = field(default_factory=ConfigParser.make_bool_parser("DENOISE", False))
+    sharpen: bool = field(default_factory=ConfigParser.make_bool_parser("SHARPEN", False))
 
     # Film Grain Simulation: none, 35mm, 16mm, 8mm, digital
-    film_grain: str = field(default_factory=lambda: os.environ.get("FILM_GRAIN", "none"))
+    film_grain: str = field(default_factory=ConfigParser.make_str_parser("FILM_GRAIN", "none"))
 
     # Dialogue Ducking: Auto-duck music during speech
-    dialogue_duck: bool = field(default_factory=lambda: os.environ.get("DIALOGUE_DUCK", "false").lower() == "true")
-    dialogue_duck_level: float = field(default_factory=lambda: float(os.environ.get("DIALOGUE_DUCK_LEVEL", "-12")))
+    dialogue_duck: bool = field(default_factory=ConfigParser.make_bool_parser("DIALOGUE_DUCK", False))
+    dialogue_duck_level: float = field(default_factory=ConfigParser.make_float_parser("DIALOGUE_DUCK_LEVEL", -12.0))
 
     # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)
-    low_memory_mode: bool = field(default_factory=lambda: os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true")
+    low_memory_mode: bool = field(default_factory=ConfigParser.make_bool_parser("LOW_MEMORY_MODE", False))
 
     # Color/levels normalization controls (can be disabled for clean footage)
-    colorlevels: bool = field(default_factory=lambda: os.environ.get("COLORLEVELS", "true").lower() == "true")
-    luma_normalize: bool = field(default_factory=lambda: os.environ.get("LUMA_NORMALIZE", "true").lower() == "true")
+    colorlevels: bool = field(default_factory=ConfigParser.make_bool_parser("COLORLEVELS", True))
+    luma_normalize: bool = field(default_factory=ConfigParser.make_bool_parser("LUMA_NORMALIZE", True))
 
 
 # =============================================================================
@@ -411,19 +412,19 @@ class AnalysisConstants:
     """Centralized constants for scene analysis and feature extraction."""
     
     # Scene Detection (PySceneDetect)
-    scene_min_length_frames: int = field(default_factory=lambda: int(os.environ.get("SCENE_MIN_LENGTH_FRAMES", "15")))  # ~0.5s @ 30fps
+    scene_min_length_frames: int = field(default_factory=ConfigParser.make_int_parser("SCENE_MIN_LENGTH_FRAMES", 15))  # ~0.5s @ 30fps
     
     # Optical Flow (Farneback algorithm)
-    optical_flow_pyr_scale: float = field(default_factory=lambda: float(os.environ.get("OF_PYR_SCALE", "0.5")))
-    optical_flow_levels: int = field(default_factory=lambda: int(os.environ.get("OF_LEVELS", "3")))
-    optical_flow_winsize: int = field(default_factory=lambda: int(os.environ.get("OF_WINSIZE", "15")))
+    optical_flow_pyr_scale: float = field(default_factory=ConfigParser.make_float_parser("OF_PYR_SCALE", 0.5))
+    optical_flow_levels: int = field(default_factory=ConfigParser.make_int_parser("OF_LEVELS", 3))
+    optical_flow_winsize: int = field(default_factory=ConfigParser.make_int_parser("OF_WINSIZE", 15))
     
     # Downsampling & Proxy
-    default_downsampling_height: int = field(default_factory=lambda: int(os.environ.get("DEFAULT_DOWNSAMPLE_HEIGHT", "1080")))
-    proxy_generation_timeout_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_GEN_TIMEOUT", "3600")))  # 1 hour
+    default_downsampling_height: int = field(default_factory=ConfigParser.make_int_parser("DEFAULT_DOWNSAMPLE_HEIGHT", 1080))
+    proxy_generation_timeout_seconds: int = field(default_factory=ConfigParser.make_int_parser("PROXY_GEN_TIMEOUT", 3600))  # 1 hour
     
     # Preview Resolution (for web UI thumbnails)
-    preview_height: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_HEIGHT", "360")))
+    preview_height: int = field(default_factory=ConfigParser.make_int_parser("PREVIEW_HEIGHT", 360))
 
 
 # =============================================================================
@@ -564,38 +565,38 @@ class UpscaleConfig:
 class ProcessingConfig:
     """Batch processing and performance settings."""
 
-    batch_size: int = field(default_factory=lambda: int(os.environ.get("BATCH_SIZE", "25")))
-    max_scene_workers: int = field(default_factory=lambda: int(os.environ.get("MAX_SCENE_WORKERS", str(os.cpu_count() or 2))))
-    force_gc: bool = field(default_factory=lambda: os.environ.get("FORCE_GC", "true").lower() == "true")
-    parallel_enhance: bool = field(default_factory=lambda: os.environ.get("PARALLEL_ENHANCE", "true").lower() == "true")
-    skip_existing_outputs: bool = field(default_factory=lambda: os.environ.get("SKIP_EXISTING_OUTPUTS", "true").lower() == "true")
-    force_reprocess: bool = field(default_factory=lambda: os.environ.get("FORCE_REPROCESS", "false").lower() == "true")
-    min_output_bytes: int = field(default_factory=lambda: int(os.environ.get("MIN_OUTPUT_BYTES", "1024")))
-    job_id_strategy: str = field(default_factory=lambda: os.environ.get("JOB_ID_STRATEGY", "timestamp").lower())
-    max_parallel_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_PARALLEL_JOBS", str(max(1, get_effective_cpu_count() - 2)))))
-    max_concurrent_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_CONCURRENT_JOBS", "2")))
-    max_scene_reuse: int = field(default_factory=lambda: int(os.environ.get("MAX_SCENE_REUSE", "3")))
+    batch_size: int = field(default_factory=ConfigParser.make_int_parser("BATCH_SIZE", 25))
+    max_scene_workers: int = field(default_factory=lambda: ConfigParser.parse_int("MAX_SCENE_WORKERS", os.cpu_count() or 2))
+    force_gc: bool = field(default_factory=ConfigParser.make_bool_parser("FORCE_GC", True))
+    parallel_enhance: bool = field(default_factory=ConfigParser.make_bool_parser("PARALLEL_ENHANCE", True))
+    skip_existing_outputs: bool = field(default_factory=ConfigParser.make_bool_parser("SKIP_EXISTING_OUTPUTS", True))
+    force_reprocess: bool = field(default_factory=ConfigParser.make_bool_parser("FORCE_REPROCESS", False))
+    min_output_bytes: int = field(default_factory=ConfigParser.make_int_parser("MIN_OUTPUT_BYTES", 1024))
+    job_id_strategy: str = field(default_factory=lambda: ConfigParser.parse_str("JOB_ID_STRATEGY", "timestamp").lower())
+    max_parallel_jobs: int = field(default_factory=lambda: ConfigParser.parse_int("MAX_PARALLEL_JOBS", max(1, get_effective_cpu_count() - 2)))
+    max_concurrent_jobs: int = field(default_factory=ConfigParser.make_int_parser("MAX_CONCURRENT_JOBS", 2))
+    max_scene_reuse: int = field(default_factory=ConfigParser.make_int_parser("MAX_SCENE_REUSE", 3))
     cluster_shard_index: int = field(default_factory=get_cluster_shard_index)
     cluster_shard_count: int = field(default_factory=get_cluster_shard_count)
 
     # Adaptive settings for low-resource hardware
-    clip_prefetch_count: int = field(default_factory=lambda: int(os.environ.get("CLIP_PREFETCH_COUNT", "3")))
-    analysis_timeout: int = field(default_factory=lambda: int(os.environ.get("ANALYSIS_TIMEOUT", "120")))  # seconds
-    ffprobe_timeout: int = field(default_factory=lambda: int(os.environ.get("FFPROBE_TIMEOUT", "10")))
-    ffmpeg_short_timeout: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_SHORT_TIMEOUT", "30")))
-    ffmpeg_timeout: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_TIMEOUT", "120")))
-    ffmpeg_long_timeout: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_LONG_TIMEOUT", "600")))
-    render_timeout: int = field(default_factory=lambda: int(os.environ.get("RENDER_TIMEOUT", "3600")))  # 1 hour default
+    clip_prefetch_count: int = field(default_factory=ConfigParser.make_int_parser("CLIP_PREFETCH_COUNT", 3))
+    analysis_timeout: int = field(default_factory=ConfigParser.make_int_parser("ANALYSIS_TIMEOUT", 120))  # seconds
+    ffprobe_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFPROBE_TIMEOUT", 10))
+    ffmpeg_short_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_SHORT_TIMEOUT", 30))
+    ffmpeg_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_TIMEOUT", 120))
+    ffmpeg_long_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_LONG_TIMEOUT", 600))
+    render_timeout: int = field(default_factory=ConfigParser.make_int_parser("RENDER_TIMEOUT", 3600))  # 1 hour default
 
     def get_adaptive_batch_size(self, low_memory: bool = False) -> int:
         """Get batch size adjusted for memory constraints."""
-        if low_memory or os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true":
+        if low_memory or ConfigParser.parse_bool("LOW_MEMORY_MODE", False):
             return max(1, self.batch_size // 4)  # Quarter batch size in low memory mode
         return self.batch_size
 
     def get_adaptive_parallel_jobs(self, low_memory: bool = False) -> int:
         """Get parallel job count adjusted for memory constraints."""
-        if low_memory or os.environ.get("LOW_MEMORY_MODE", "false").lower() == "true":
+        if low_memory or ConfigParser.parse_bool("LOW_MEMORY_MODE", False):
             return 1  # Sequential processing in low memory mode
         return self.max_parallel_jobs
 
@@ -685,27 +686,27 @@ class ThresholdsConfig:
     """
 
     # Scene detection (PySceneDetect ContentDetector)
-    scene_threshold: float = field(default_factory=lambda: float(os.environ.get("SCENE_THRESHOLD", "30.0")))
+    scene_threshold: float = field(default_factory=ConfigParser.make_float_parser("SCENE_THRESHOLD", 30.0))
 
     # Speech/VAD (silero/pyannote style)
-    speech_threshold: float = field(default_factory=lambda: float(os.environ.get("SPEECH_THRESHOLD", "0.5")))
-    speech_min_duration_ms: int = field(default_factory=lambda: int(os.environ.get("SPEECH_MIN_DURATION", "250")))
-    speech_min_silence_ms: int = field(default_factory=lambda: int(os.environ.get("SPEECH_MIN_SILENCE", "100")))
+    speech_threshold: float = field(default_factory=ConfigParser.make_float_parser("SPEECH_THRESHOLD", 0.5))
+    speech_min_duration_ms: int = field(default_factory=ConfigParser.make_int_parser("SPEECH_MIN_DURATION", 250))
+    speech_min_silence_ms: int = field(default_factory=ConfigParser.make_int_parser("SPEECH_MIN_SILENCE", 100))
 
     # Silence detection for FFmpeg silencedetect
     # Stored without unit; append 'dB' at call sites when needed
-    silence_level_db: str = field(default_factory=lambda: os.environ.get("SILENCE_THRESHOLD", "-35"))
-    silence_duration_s: float = field(default_factory=lambda: float(os.environ.get("SILENCE_DURATION", "0.5")))
+    silence_level_db: str = field(default_factory=ConfigParser.make_str_parser("SILENCE_THRESHOLD", "-35"))
+    silence_duration_s: float = field(default_factory=ConfigParser.make_float_parser("SILENCE_DURATION", 0.5))
 
     # Face detection (MediaPipe)
-    face_confidence: float = field(default_factory=lambda: float(os.environ.get("FACE_CONFIDENCE", "0.6")))
+    face_confidence: float = field(default_factory=ConfigParser.make_float_parser("FACE_CONFIDENCE", 0.6))
 
     # Audio ducking thresholds (sidechaincompress)
-    ducking_core_threshold: float = field(default_factory=lambda: float(os.environ.get("DUCKING_CORE_THRESHOLD", "0.1")))
-    ducking_soft_threshold: float = field(default_factory=lambda: float(os.environ.get("DUCKING_SOFT_THRESHOLD", "0.03")))
+    ducking_core_threshold: float = field(default_factory=ConfigParser.make_float_parser("DUCKING_CORE_THRESHOLD", 0.1))
+    ducking_soft_threshold: float = field(default_factory=ConfigParser.make_float_parser("DUCKING_SOFT_THRESHOLD", 0.03))
 
     # Music analysis
-    music_min_duration_s: float = field(default_factory=lambda: float(os.environ.get("MUSIC_MIN_DURATION", "5.0")))
+    music_min_duration_s: float = field(default_factory=ConfigParser.make_float_parser("MUSIC_MIN_DURATION", 5.0))
 
 
 # =============================================================================
@@ -715,11 +716,11 @@ class ThresholdsConfig:
 class SessionConfig:
     """Session/backing store configuration (Redis optional)."""
 
-    redis_host: Optional[str] = field(default_factory=lambda: os.environ.get("REDIS_HOST"))
+    redis_host: Optional[str] = field(default_factory=ConfigParser.make_str_parser("REDIS_HOST", ""))
     # Prefer REDIS_SERVICE_PORT when provided by Kubernetes service env
-    _redis_port_raw: str = field(default_factory=lambda: os.environ.get("REDIS_SERVICE_PORT", os.environ.get("REDIS_PORT", "6379")))
-    queue_fast_name: str = field(default_factory=lambda: os.environ.get("QUEUE_FAST_NAME", "default"))
-    queue_heavy_name: str = field(default_factory=lambda: os.environ.get("QUEUE_HEAVY_NAME", "heavy"))
+    _redis_port_raw: str = field(default_factory=lambda: ConfigParser.parse_str("REDIS_SERVICE_PORT", ConfigParser.parse_str("REDIS_PORT", "6379")))
+    queue_fast_name: str = field(default_factory=ConfigParser.make_str_parser("QUEUE_FAST_NAME", "default"))
+    queue_heavy_name: str = field(default_factory=ConfigParser.make_str_parser("QUEUE_HEAVY_NAME", "heavy"))
     
     @property
     def redis_port(self) -> int:
@@ -741,14 +742,14 @@ class CacheConfig:
     """
 
     # Unify default TTL via legacy env var; allow independent overrides later if needed
-    analysis_ttl_hours: int = field(default_factory=lambda: int(os.environ.get("CACHE_INVALIDATION_HOURS", "24")))
-    metadata_ttl_hours: int = field(default_factory=lambda: int(os.environ.get("CACHE_INVALIDATION_HOURS", "24")))
+    analysis_ttl_hours: int = field(default_factory=ConfigParser.make_int_parser("CACHE_INVALIDATION_HOURS", 24))
+    metadata_ttl_hours: int = field(default_factory=ConfigParser.make_int_parser("CACHE_INVALIDATION_HOURS", 24))
 
     # Legacy toggle only existed for analysis cache; keep semantics
-    analysis_enabled: bool = field(default_factory=lambda: os.environ.get("DISABLE_ANALYSIS_CACHE", "false").lower() != "true")
+    analysis_enabled: bool = field(default_factory=lambda: not ConfigParser.parse_bool("DISABLE_ANALYSIS_CACHE", False))
 
     # Unified cache version across subsystems
-    version: str = field(default_factory=lambda: os.environ.get("CACHE_VERSION", "1.0"))
+    version: str = field(default_factory=ConfigParser.make_str_parser("CACHE_VERSION", "1.0"))
 
 
 # =============================================================================

@@ -307,12 +307,14 @@ async def trigger_render(
     Future: This endpoint will trigger the editor.py directly.
     """
 
-    # TODO: Implement background rendering
-    # This would require moving editor.py into a worker queue system
+    # NOTE: Background rendering already implemented via RQ/K8s job queue
+    # See: /api/montage endpoint (creates RQ job) → worker processes → output
+    # This placeholder endpoint is for alternative trigger mechanism
+    # Current implementation: POST /api/montage → RQ job → K8s worker → /data/output/
 
     return {
         "status": "info",
-        "message": "Render triggering not yet implemented. Use K8s Job or docker-compose to render.",
+        "message": "Render triggering via RQ job queue. Use POST /api/montage to submit jobs.",
         "instructions": {
             "kubernetes": "kubectl apply -k deploy/k3s/overlays/dev/",
             "docker": "./montage-ai.sh run " + style

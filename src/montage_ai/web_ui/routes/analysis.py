@@ -50,13 +50,13 @@ def api_audio_analyze():
             if 'mean_volume' in line:
                 try:
                     mean_volume = float(line.split(':')[1].strip().replace(' dB', ''))
-                except:
-                    pass
+                except (ValueError, IndexError):
+                    pass  # Skip malformed line
             if 'max_volume' in line:
                 try:
                     max_volume = float(line.split(':')[1].strip().replace(' dB', ''))
-                except:
-                    pass
+                except (ValueError, IndexError):
+                    pass  # Skip malformed line
         
         # Estimate quality and recommendations
         quality = "good"

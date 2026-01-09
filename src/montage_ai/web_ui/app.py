@@ -286,7 +286,7 @@ def api_graceful_shutdown():
         # Get active job count
         try:
             active_jobs = len(q.started_job_registry) if hasattr(q, 'started_job_registry') else 0
-        except:
+        except (AttributeError, TypeError):
             active_jobs = 0
         
         logger.info(f"Shutdown: {active_jobs} jobs still active")
@@ -397,7 +397,7 @@ def api_status():
     try:
         active_jobs = len(q.started_job_registry)
         queued_jobs = len(q)
-    except:
+    except (AttributeError, TypeError):
         active_jobs = 0
         queued_jobs = 0
     
@@ -702,9 +702,20 @@ def api_upload():
     else:
         return jsonify({"error": "Invalid file type"}), 400
 
-    # Save file
+    # Save file with path traversal protection
     filename = secure_filename(file.filename)
-    filepath = target_dir / filename
+    if not filename:
+        return jsonify({"error": "Invalid filename after sanitization"}), 400
+    
+    # Resolve paths and validate
+    target_dir_resolved = target_dir.resolve()
+    filepath = (target_dir_resolved / filename).resolve()
+    
+    # Prevent path traversal attacks
+    if not str(filepath).startswith(str(target_dir_resolved)):
+        logger.warning(f"Path traversal attempt detected: {filepath}")
+        return jsonify({"error": "Invalid upload path"}), 400
+    
     file.save(filepath)
 
     return jsonify({
@@ -1341,9 +1352,20 @@ def api_session_add_asset(session_id):
         target_dir = INPUT_DIR
         
     filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename after sanitization"}), 400
+    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_filename = f"{timestamp}_{filename}"
-    filepath = target_dir / unique_filename
+    
+    # Resolve paths and validate
+    target_dir_resolved = target_dir.resolve()
+    filepath = (target_dir_resolved / unique_filename).resolve()
+    
+    # Prevent path traversal attacks
+    if not str(filepath).startswith(str(target_dir_resolved)):
+        logger.warning(f"Path traversal attempt detected: {filepath}")
+        return jsonify({"error": "Invalid upload path"}), 400
     
     file.save(filepath)
     
@@ -1653,9 +1675,20 @@ def api_transcript_upload():
         return jsonify({"error": "Invalid file type"}), 400
     
     filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename after sanitization"}), 400
+    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_filename = f"{timestamp}_{filename}"
-    filepath = TRANSCRIPT_UPLOAD_DIR / unique_filename
+    
+    # Resolve paths and validate
+    upload_dir_resolved = TRANSCRIPT_UPLOAD_DIR.resolve()
+    filepath = (upload_dir_resolved / unique_filename).resolve()
+    
+    # Prevent path traversal attacks
+    if not str(filepath).startswith(str(upload_dir_resolved)):
+        logger.warning(f"Path traversal attempt detected: {filepath}")
+        return jsonify({"error": "Invalid upload path"}), 400
     
     file.save(filepath)
     
@@ -1924,9 +1957,20 @@ def api_shorts_upload():
         return jsonify({"error": "Invalid file type"}), 400
     
     filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename after sanitization"}), 400
+    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_filename = f"{timestamp}_{filename}"
-    filepath = SHORTS_UPLOAD_DIR / unique_filename
+    
+    # Resolve paths and validate
+    upload_dir_resolved = SHORTS_UPLOAD_DIR.resolve()
+    filepath = (upload_dir_resolved / unique_filename).resolve()
+    
+    # Prevent path traversal attacks
+    if not str(filepath).startswith(str(upload_dir_resolved)):
+        logger.warning(f"Path traversal attempt detected: {filepath}")
+        return jsonify({"error": "Invalid upload path"}), 400
     
     file.save(filepath)
     
@@ -2483,13 +2527,13 @@ def api_audio_analyze():
             if 'mean_volume' in line:
                 try:
                     mean_volume = float(line.split(':')[1].strip().replace(' dB', ''))
-                except:
-                    pass
+                except (ValueError, IndexError):
+                    pass  # Skip malformed line
             if 'max_volume' in line:
                 try:
                     max_volume = float(line.split(':')[1].strip().replace(' dB', ''))
-                except:
-                    pass
+                except (ValueError, IndexError):
+                    pass  # Skip malformed line
         
         # Use proper SNR estimation from audio_analysis module
         from ..audio_analysis import estimate_audio_snr
@@ -2661,8 +2705,8 @@ def _build_timeline_from_session(session, main_video) -> Optional[Timeline]:
                     words = session.state['transcript'].get('words', [])
                     if words:
                         duration = words[-1]['end']
-             except:
-                 pass
+             except (KeyError, IndexError, TypeError):
+                 pass  # Could not determine duration
     
     # 2. Determine kept segments
     kept_segments = [] # list of (start, end) tuples
@@ -2769,8 +2813,10 @@ def api_session_export(session_id):
                  return jsonify({"error": "OpenTimelineIO not installed"}), 501
             output_path = exporter._export_otio(timeline)
         elif export_format == 'video':
-             # TODO: Implement video render
-             return jsonify({"error": "Video export not yet implemented via this API"}), 501
+             # NOTE: Video render via transcript editor not implemented
+             # Workflow: Export to EDL/OTIO → Import to NLE → Render video
+             # Direct video render would require full montage render pipeline (see MontageBuilder)
+             return jsonify({"error": "Video export not available via this API. Use EDL/OTIO export."}), 501
         else:
             return jsonify({"error": f"Unknown format: {export_format}"}), 400
             

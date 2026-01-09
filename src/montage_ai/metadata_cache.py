@@ -372,8 +372,8 @@ class MetadataCache:
                     if os.path.exists(proxy_path):
                         try:
                             os.unlink(proxy_path)
-                        except:
-                            pass
+                        except (OSError, PermissionError) as cleanup_error:
+                            logger.debug(f"Could not cleanup proxy {proxy_path}: {cleanup_error}")
         except Exception as e:
             logger.debug(f"Could not determine if proxy needed: {e}. Using original video.")
 
