@@ -7,6 +7,8 @@ Handles Audio Analysis (Beats, Energy, Voice Isolation) and Video Scene Detectio
 
 import os
 import random
+import psutil
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple, Any, Dict, Iterable
 # OPTIMIZATION Phase 3: ProcessPoolExecutor for CPU-bound tasks (bypasses GIL)
@@ -34,6 +36,35 @@ def _detect_video_scenes_worker(v_path: str, threshold: float) -> Tuple[str, Lis
         # Use print since logger may not work across process boundaries
         print(f"   ⚠️ Scene detection failed for {v_path}: {e}")
         return v_path, []
+
+
+# =============================================================================
+# Resource Monitoring Utility
+# =============================================================================
+
+def _log_resource_usage(phase: str, progress_pct: int = 0) -> None:
+    """
+    Log CPU, memory, and disk usage for progress visibility.
+    Call periodically during long-running tasks.
+    """
+    try:
+        process = psutil.Process(os.getpid())
+        
+        # CPU and Memory for this process
+        cpu_pct = process.cpu_percent(interval=0.1)
+        mem_info = process.memory_info()
+        mem_mb = mem_info.rss / 1024 / 1024
+        
+        # System-wide resource usage
+        sys_cpu = psutil.cpu_percent(interval=0.05)
+        sys_mem = psutil.virtual_memory()
+        sys_mem_pct = sys_mem.percent
+        
+        # Log in compact format
+        progress_str = f" [{progress_pct}%]" if progress_pct > 0 else ""
+        logger.info(f"   📊 {phase}{progress_str}: CPU process={cpu_pct:.1f}% sys={sys_cpu:.1f}% | Memory process={mem_mb:.0f}MB sys={sys_mem_pct:.1f}%")
+    except Exception as e:
+        logger.debug(f"Resource logging failed: {e}")
 
 
 class AssetAnalyzer:
@@ -335,6 +366,7 @@ class AssetAnalyzer:
             # Progress tracking setup
             total_tasks = len(uncached_videos)
             completed_tasks = 0
+            last_log_time = time.time()
 
             try:
                 # ProcessPoolExecutor for true parallelism (bypasses GIL)
@@ -349,10 +381,17 @@ class AssetAnalyzer:
                         
                         # Update progress
                         completed_tasks += 1
+                        progress_pct = int((completed_tasks / total_tasks) * 100)
+                        
                         if progress_callback:
-                            local_pct = int((completed_tasks / total_tasks) * 100)
                             msg = f"Detecting scenes in {os.path.basename(v_path)} ({completed_tasks}/{total_tasks})"
-                            progress_callback(local_pct, msg)
+                            progress_callback(progress_pct, msg)
+                        
+                        # Log resource usage every 5 seconds
+                        now = time.time()
+                        if now - last_log_time >= 5.0:
+                            _log_resource_usage(f"Scene Detection", progress_pct)
+                            last_log_time = now
             except Exception as e:
                 # Fallback to ThreadPool if ProcessPool fails (e.g., pickle issues)
                 logger.warning(f"   ⚠️ ProcessPool failed ({e}), falling back to ThreadPool")
@@ -360,8 +399,20 @@ class AssetAnalyzer:
                 thread_workers = PoolConfig.thread_workers()
                 with ThreadPoolExecutor(max_workers=thread_workers) as executor:
                     futures = {executor.submit(_detect_video_scenes_worker, v, threshold): v for v in uncached_videos}
+                    completed_tasks = 0
+                    last_log_time = time.time()
                     for future in as_completed(futures):
                         v_path, scenes = future.result()
+                        detected_scenes[v_path] = scenes
+                        cache.save_scenes(v_path, threshold, scenes)
+                        completed_tasks += 1
+                        progress_pct = int((completed_tasks / total_tasks) * 100)
+                        
+                        # Log resource usage every 5 seconds
+                        now = time.time()
+                        if now - last_log_time >= 5.0:
+                            _log_resource_usage(f"Scene Detection (ThreadPool)", progress_pct)
+                            last_log_time = now
                         detected_scenes[v_path] = scenes
                         cache.save_scenes(v_path, threshold, scenes)
 
