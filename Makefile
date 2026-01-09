@@ -7,7 +7,9 @@
 IMAGE_NAME ?= ghcr.io/mfahsold/montage-ai
 IMAGE_TAG ?= latest
 REGISTRY ?= ghcr.io/mfahsold
-CLUSTER_REGISTRY ?= $(REGISTRY)
+# For cluster deployments: Use local k3s registry (192.168.1.12:5000) instead of GHCR
+# Override with: make cluster CLUSTER_REGISTRY=192.168.1.12:5000
+CLUSTER_REGISTRY ?= 192.168.1.12:5000
 NAMESPACE ?= montage-ai
 PLATFORM ?= linux/amd64
 PLATFORMS ?= linux/amd64,linux/arm64
