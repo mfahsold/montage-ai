@@ -141,13 +141,13 @@ class ConstraintsConfig(BaseModel):
 class DirectorOutput(BaseModel):
     """Structured output for the Creative Director agent."""
     director_commentary: str = Field(..., description="Brief explanation of creative choices (Chain of Thought)")
-    style: StyleConfig
-    story_arc: StoryArcConfig
-    pacing: PacingConfig
-    cinematography: CinematographyConfig
-    transitions: TransitionsConfig
+    style: Optional[StyleConfig] = None
+    story_arc: Optional[StoryArcConfig] = None
+    pacing: Optional[PacingConfig] = None
+    cinematography: Optional[CinematographyConfig] = None
+    transitions: Optional[TransitionsConfig] = None
     energy_mapping: Optional[EnergyMappingConfig] = None
-    effects: EffectsConfig
+    effects: Optional[EffectsConfig] = None
     constraints: Optional[ConstraintsConfig] = None
 
     @model_validator(mode='before')
