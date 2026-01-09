@@ -125,6 +125,7 @@ class MontageFeatures:
     sharpen: bool = False  # Unsharp mask sharpening
     film_grain: str = "none"  # Film grain preset: none, 35mm, 16mm, 8mm, digital
     dialogue_duck: bool = False  # Auto-duck music during speech
+    detected_scenes: list = field(default_factory=list)  # Scene detection results
 
 
 @dataclass

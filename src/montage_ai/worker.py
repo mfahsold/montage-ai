@@ -5,7 +5,7 @@ import redis
 import json
 from rq import Worker, Queue
 from montage_ai.config import get_settings
-from montage_ai import logger
+from montage_ai.logger import logger
 
 listen = ['default']
 
@@ -50,9 +50,12 @@ def start_worker():
                 logger.error(f"❌ Failed to connect to Redis after {max_retries} attempts")
                 sys.exit(1)
     
+    # Create queues with connection
+    queues = [Queue(name, connection=conn) for name in listen]
+    
     # Create worker with connection
     worker = Worker(
-        list(map(Queue, listen)),
+        queues,
         connection=conn,
         name=f"montage-worker-{os.getpid()}"
     )

@@ -23,23 +23,27 @@ make cluster   # Cluster deployment (2-15 min)
 ## 📚 Documentation Index
 
 ### For Users
+
 - **[Getting Started](getting-started.md)** - Installation & first montage
 - **[Features](features.md)** - What Montage AI can do
 - **[Configuration](configuration.md)** - Environment variables
 
 ### For Developers
+
 - **[DX Guide](DX.md)** - Development workflow ⭐ Start here!
 - **[Architecture](architecture.md)** - System design
 - **[LLM Agents](llm-agents.md)** - AI coding guidelines
 - **[Descript Alternative (Offline)](blog/descript-alternative.md)** - SEO landing & positioning
 
 ### For Operators
-- **[Cluster Workflow](../deploy/CLUSTER_WORKFLOW.md)** - Kubernetes
+
+- **[Kubernetes Runbook](KUBERNETES_RUNBOOK.md)** - Failure recovery & on-call actions
+- **[Cluster Workflow](../deploy/CLUSTER_WORKFLOW.md)** - Deployment steps
 - **[Troubleshooting](troubleshooting.md)** - Common issues
 
-### Strategy
+### Strategy (Public)
+
 - **[Competitive Analysis](COMPETITIVE_ANALYSIS.md)** - Market position
-- **[Strategy](STRATEGY.md)** - Product vision
 - **[Marketing Playbook](MARKETING_PLAYBOOK.md)** - GTM strategy
 
 ---
@@ -47,10 +51,10 @@ make cluster   # Cluster deployment (2-15 min)
 ## 🎯 Quick Navigation
 
 | I want to... | Read this |
-|--------------|-----------|
+| --- | --- |
 | **Get started** | [Getting Started](getting-started.md) |
 | **Develop locally** | [DX Guide](DX.md) |
-| **Deploy to cluster** | [DX Guide](DX.md) |
+| **Deploy to cluster** | [DX Guide](DX.md) + [Kubernetes Runbook](KUBERNETES_RUNBOOK.md) |
 | **Understand internals** | [Architecture](architecture.md) |
 | **See all features** | [Features](features.md) |
 | **Fix an error** | [Troubleshooting](troubleshooting.md) |
@@ -60,6 +64,7 @@ make cluster   # Cluster deployment (2-15 min)
 **Archive:** [archive/](archive/) - Historical docs
 
 **Principles:**
+
 1. DX.md is the starting point
 2. Each doc has one clear purpose
 3. Examples over theory
@@ -76,7 +81,7 @@ make cluster   # Cluster deployment (2-15 min)
 ## Cloud & Infrastructure
 
 | Doc | Description |
-|-----|-------------|
+| --- | --- |
 | [Hybrid Workflow](hybrid-workflow.md) | Local + Cloud GPU setup for limited hardware |
 | [cgpu Setup](cgpu-setup.md) | Google Cloud credentials for cgpu |
 | [Cloud Offloading](cloud_offloading_implementation.md) | cgpu job types and implementation |
@@ -88,8 +93,7 @@ make cluster   # Cluster deployment (2-15 min)
 ## Roadmap & Strategy
 
 | Doc | Description |
-|-----|-------------|
-| [Q1 2026 Strategy](STRATEGY.md) | Current focus: Transcript Editor, Shorts Studio 2.0, Pro Handoff |
+| --- | --- |
 | [Business Plan](BUSINESS_PLAN.md) | Market, financials, hiring, investor brief |
 | [Competitive Analysis](COMPETITIVE_ANALYSIS.md) | Deep comparison with Descript, Adobe, Opus, auto-editor |
 | [Strategic Backlog](STRATEGIC_BACKLOG.md) | Future features and research areas |
@@ -102,7 +106,7 @@ make cluster   # Cluster deployment (2-15 min)
 Historical documents for reference:
 
 | Doc | Description |
-|-----|-------------|
+| --- | --- |
 | [Decisions](archive/decisions.md) | Architecture Decision Records (ADRs) |
 | [Post-Production Pivot](archive/post_production_pivot.md) | Original pivot from generation to editing |
 | [Editor Decomposition](archive/editor_decomposition_plan.md) | Monolithic→modular refactoring (completed) |

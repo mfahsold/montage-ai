@@ -271,6 +271,8 @@ class SceneDetector:
         if max_resolution is None:
             max_resolution = 1080  # Default: downsample anything above 1080p
         
+        metadata = None
+
         # Check if proxy mode should be enabled (auto-detect for large videos)
         try:
             metadata = probe_metadata(video_path)
@@ -288,7 +290,11 @@ class SceneDetector:
                     use_proxy = True
                     logger.info(f"✓ Using proxy for analysis: {os.path.basename(proxy_path)}")
                 else:
-                    logger.warning(f"Proxy generation failed. Falling back to downsampling.")
+                    logger.warning("Proxy generation failed. Falling back to downsampling.")
+                    if metadata and metadata.height > max_resolution:
+                        effective_path = self._create_downsampled_proxy(video_path, max_resolution)
+                    else:
+                        effective_path = video_path
             
             # Also check for high resolution (even if video is short)
             elif metadata.height > max_resolution:

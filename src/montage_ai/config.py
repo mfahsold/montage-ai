@@ -1272,6 +1272,12 @@ class MontageSettingsSpec:
     
     style: StyleConfig
     """Selected montage style."""
+
+    paths: PathConfig = field(default_factory=PathConfig)
+    """Filesystem paths used across the pipeline."""
+
+    job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S")))
+    """Optional job identifier for builder compatibility."""
     
     quality: str = QualityProfile.STANDARD
     """Output quality profile."""

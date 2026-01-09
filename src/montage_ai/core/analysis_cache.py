@@ -380,16 +380,22 @@ class AnalysisCache:
         if not self.enabled:
             return False
 
+        def _as_list(value):
+            """Convert numpy arrays or sequences to plain Python lists."""
+            if hasattr(value, "tolist"):
+                return value.tolist()
+            return list(value)
+
         entry = AudioAnalysisEntry(
             version=CACHE_VERSION,
             file_hash=CacheEntry.compute_file_hash(audio_path),
             computed_at=datetime.now().isoformat(),
-            tempo=float(beat_info.tempo),
-            beat_times=beat_info.beat_times.tolist(),
-            energy_times=energy_profile.times.tolist(),
-            energy_values=energy_profile.rms.tolist(),
-            duration=float(beat_info.duration),
-            sample_rate=int(beat_info.sample_rate),
+            tempo=float(getattr(beat_info, "tempo", 0.0)),
+            beat_times=_as_list(getattr(beat_info, "beat_times", [])),
+            energy_times=_as_list(getattr(energy_profile, "times", [])),
+            energy_values=_as_list(getattr(energy_profile, "rms", [])),
+            duration=float(getattr(beat_info, "duration", 0.0)),
+            sample_rate=int(getattr(beat_info, "sample_rate", 0)),
         )
 
         cache_path = self._cache_path(audio_path, "analysis")

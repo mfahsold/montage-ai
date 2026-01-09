@@ -2,6 +2,8 @@
 
 Common issues and how to fix them.
 
+For Kubernetes/on-call fixes, see [KUBERNETES_RUNBOOK.md](KUBERNETES_RUNBOOK.md).
+
 ---
 
 ## Memory Issues

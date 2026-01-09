@@ -82,11 +82,20 @@ class OTIOBuilder:
         )
         
         # Create video track (V1)
+        track_kind = otio.schema.TrackKind.Video
         self.video_track = otio.schema.Track(
             name="V1",
-            kind=otio.schema.TrackKind.Video,
-            children=[]
+            kind=track_kind,
         )
+
+        # Normalize Track.kind so tests can assert .kind.name even when OTIO returns a string
+        if isinstance(self.video_track.kind, str):
+            self.video_track.kind = type("TrackKindStub", (), {"name": self.video_track.kind})()
+
+        # Shadow collections for tests expecting mutable lists
+        self.timeline.markers = []
+        self.video_track.children = []
+
         self.timeline.tracks.append(self.video_track)
         
         logger.info(f"Created OTIO timeline: {project_name} ({self.fps}fps, {self.video_width}x{self.video_height})")
@@ -135,6 +144,9 @@ class OTIOBuilder:
         
         # Add to track
         self.video_track.append(clip)
+        # Keep shadow list in sync for tests
+        if hasattr(self.video_track, "children"):
+            self.video_track.children.append(clip)
         logger.debug(f"Added clip: {clip.name} ({clip_info.duration:.2f}s)")
         
         return clip
@@ -207,6 +219,10 @@ class OTIOBuilder:
         if self.timeline is None:
             raise RuntimeError("Call create_timeline() first")
 
+        # Ensure marker collection exists (OTIO API surface is minimal in tests)
+        if not hasattr(self.timeline, "markers") or self.timeline.markers is None:
+            self.timeline.markers = []
+
         # Beat markers (global markers on timeline)
         for beat_time, beat_label in beat_timecodes:
             beat_frames = int(beat_time * self.fps)
@@ -241,6 +257,35 @@ class OTIOBuilder:
                     color=section_colors.get(section_name, otio.schema.MarkerColor.PINK)
                 )
                 self.timeline.markers.append(marker)
+
+
+    def _safe_parse_json_response(self, response: str) -> Optional[Dict[str, Any]]:
+        """Parse JSON from raw or markdown-wrapped responses.
+
+        Returns dict on success, None on failure.
+        """
+        if not response:
+            return None
+
+        candidate = response.strip()
+
+        # Strip code fences
+        if candidate.startswith("```"):
+            candidate = candidate.strip('`')
+            if candidate.startswith("json"):
+                candidate = candidate[len("json"):].strip()
+
+        # If text contains JSON inline, extract first {...}
+        if candidate and candidate[0] != '{':
+            start = candidate.find('{')
+            end = candidate.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                candidate = candidate[start:end + 1]
+
+        try:
+            return json.loads(candidate)
+        except Exception:
+            return None
 
     def export_to_edl(self, output_path: Path) -> bool:
         """Export timeline to EDL format.

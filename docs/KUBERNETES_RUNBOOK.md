@@ -10,39 +10,44 @@ kubectl describe deployment montage-ai-web -n montage-ai
 kubectl logs -f -n montage-ai -l app=montage-ai,component=web
 ```
 
+**Tip:** Use `kubectl get pods -n montage-ai` to pick `POD_NAME` placeholders used below.
+
 ---
 
 ## Common Failure Scenarios & Fixes
 
-### 1. Pod Stuck in CrashLoopBackOff
+### 1. Pod Stuck in CrashLoopBackOff (Web)
 
 **Symptoms:**
-```
+
+```text
 montage-ai-web-xxx   0/1   CrashLoopBackOff   5   2m
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check pod logs
-kubectl logs -n montage-ai <pod-name>
+kubectl logs -n montage-ai POD_NAME
 
 # Check events
-kubectl describe pod -n montage-ai <pod-name>
+kubectl describe pod -n montage-ai POD_NAME
 
 # Check startup probe details
-kubectl get pod -n montage-ai <pod-name> -o yaml | grep -A 20 "startupProbe"
+kubectl get pod -n montage-ai POD_NAME -o yaml | grep -A 20 "startupProbe"
 ```
 
 **Common Causes & Fixes:**
 
 | Cause | Error Log | Fix |
-|-------|-----------|-----|
-| Image pull failure | `ImagePullBackOff` | `kubectl describe pod -n montage-ai <pod-name>` → check registry URL |
-| Invalid mount | `no such file or directory /data/input` | `kubectl get pvc -n montage-ai` → all must be Bound |
-| Memory OOM | `OOMKilled` | Increase `.spec.containers[0].resources.limits.memory` |
-| Port conflict | `Address already in use` | Check if port 8080 is available on node |
+| ----- | --------- | --- |
+| Image pull failure | ImagePullBackOff | kubectl describe pod -n montage-ai POD_NAME -> check registry URL |
+| Invalid mount | no such file or directory /data/input | kubectl get pvc -n montage-ai -> all must be Bound |
+| Memory OOM | OOMKilled | Increase .spec.containers[0].resources.limits.memory |
+| Port conflict | Address already in use | Check if port 8080 is available on node |
 
 **Recovery:**
+
 ```bash
 # Force restart pod
 kubectl rollout restart deployment montage-ai-web -n montage-ai
@@ -53,28 +58,78 @@ kubectl delete pod -n montage-ai -l app=montage-ai,component=web
 
 ---
 
-### 2. Pod Pending (Not Scheduling)
+### 2. Worker CrashLoop (Registry Drift / Redis Connect Errors)
 
 **Symptoms:**
+
+```text
+montage-ai-worker-xxx   0/1   CrashLoopBackOff   5   2m
 ```
+
+Logs may show missing imports (montage_ai.logger) or Redis connection errors if an outdated image is pulled from ghcr.io instead of the local registry.
+
+**Diagnosis:**
+
+```bash
+# Check which image is running (must be local registry)
+kubectl get deploy montage-ai-worker -n montage-ai -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Ensure ReplicaSets do not reference ghcr
+kubectl get rs -n montage-ai -l app=montage-ai,component=worker -o wide
+```
+
+**Fix:**
+
+```bash
+# Build and push the corrected worker image to the local registry
+docker build -t 192.168.1.12:5000/montage-ai:final .
+docker push 192.168.1.12:5000/montage-ai:final
+
+# Point deployment to the local image and force a fresh pull
+kubectl set image deployment/montage-ai-worker -n montage-ai \
+  montage-ai-worker=192.168.1.12:5000/montage-ai:final
+kubectl rollout restart deployment/montage-ai-worker -n montage-ai
+
+# Optional: remove old ReplicaSets that still reference ghcr
+kubectl delete rs -n montage-ai -l app=montage-ai,component=worker
+```
+
+**Verify:**
+
+```bash
+kubectl get pods -n montage-ai -l component=worker
+kubectl logs -n montage-ai -l component=worker --tail=50
+```
+
+**Prevent Recurrence:** Keep imagePullPolicy: Always on the worker deployment and use registry-specific tags (192.168.1.12:5000/montage-ai:TAG) so new nodes never pull from ghcr.io by accident.
+
+---
+
+### 3. Pod Pending (Not Scheduling)
+
+**Symptoms:**
+
+```text
 montage-ai-web-xxx   0/1   Pending   0   5m
 ```
 
 **Diagnosis:**
+
 ```bash
-kubectl describe pod -n montage-ai <pod-name> | grep -A 10 "Events"
+kubectl describe pod -n montage-ai POD_NAME | grep -A 10 "Events"
 ```
 
 **Common Causes:**
 
 | Cause | Fix |
-|-------|-----|
-| PVC not Bound | `kubectl get pvc -n montage-ai` → check all STATUS=Bound |
-| No node with matching nodeSelector | `kubectl get nodes --show-labels \| grep amd64` |
-| Insufficient resources | `kubectl top nodes` → check CPU/memory available |
-| Node disk pressure | SSH to node: `df -h` → free up space if <20GB available |
+| ----- | --- |
+| PVC not Bound | kubectl get pvc -n montage-ai -> check all STATUS=Bound |
+| No node with matching nodeSelector | kubectl get nodes --show-labels \| grep amd64 |
+| Insufficient resources | kubectl top nodes -> check CPU/memory available |
+| Node disk pressure | SSH to node: df -h -> free up space if <20GB available |
 
 **Recovery:**
+
 ```bash
 # If nodeSelector problem:
 kubectl patch deployment montage-ai-web -n montage-ai -p \
@@ -86,15 +141,17 @@ kubectl patch pvc montage-input -n montage-ai -p '{"spec":{"volumeName":"montage
 
 ---
 
-### 3. Web UI Returns 503 / Health Check Failing
+### 4. Web UI Returns 503 / Health Check Failing
 
 **Symptoms:**
+
 ```bash
 curl http://montage-ai.fluxibri.lan/health
-# → Connection refused or timeout
+# -> Connection refused or timeout
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check if pod is running
 kubectl get pods -n montage-ai -l app=montage-ai,component=web
@@ -114,13 +171,14 @@ curl http://$POD_IP:8080/health
 **Common Causes & Fixes:**
 
 | Cause | Fix |
-|-------|-----|
-| Pod not running | Check logs: `kubectl logs -n montage-ai <pod-name>` |
-| Service has no endpoints | `kubectl get endpoints montage-ai-web -n montage-ai` should have IPs |
-| Service selector wrong | Verify pod labels: `kubectl get pods -n montage-ai --show-labels` |
-| Ingress not routing | Check Traefik: `kubectl logs -n kube-system -l app=traefik` |
+| ----- | --- |
+| Pod not running | Check logs: kubectl logs -n montage-ai POD_NAME |
+| Service has no endpoints | kubectl get endpoints montage-ai-web -n montage-ai should have IPs |
+| Service selector wrong | Verify pod labels: kubectl get pods -n montage-ai --show-labels |
+| Ingress not routing | Check Traefik: kubectl logs -n kube-system -l app=traefik |
 
 **Recovery:**
+
 ```bash
 # Recreate service (fix selector)
 kubectl delete svc montage-ai-web -n montage-ai
@@ -133,35 +191,38 @@ kubectl apply -f deploy/k3s/app/ingress.yaml
 
 ---
 
-### 4. Storage Full / PVC Usage High
+### 5. Storage Full / PVC Usage High
 
 **Symptoms:**
+
 ```bash
 # Pod running but /data/output is unreachable or slow
-kubectl exec -n montage-ai <pod> -- df -h /data/
-# → 100% usage
+kubectl exec -n montage-ai POD_NAME -- df -h /data/
+# -> 100% usage
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check PVC usage
-kubectl exec -n montage-ai <pod> -- du -sh /data/*/
+kubectl exec -n montage-ai POD_NAME -- du -sh /data/*/
 
 # Check node disk
-kubectl exec -n montage-ai <pod> -- df -h /
+kubectl exec -n montage-ai POD_NAME -- df -h /
 
 # Monitor in real-time
-watch 'kubectl exec -n montage-ai <pod> -- du -sh /data/*/'
+watch 'kubectl exec -n montage-ai POD_NAME -- du -sh /data/*/'
 ```
 
 **Recovery:**
+
 ```bash
 # Option 1: Delete old rendered videos
-kubectl exec -n montage-ai <pod> -- bash -c 'rm -rf /data/output/*.mp4'
+kubectl exec -n montage-ai POD_NAME -- bash -c 'rm -rf /data/output/*.mp4'
 
 # Option 2: Create backup and cleanup
 ./scripts/backup-montage-data.sh /tmp/montage-backup
-kubectl exec -n montage-ai <pod> -- rm -rf /data/output /data/cache
+kubectl exec -n montage-ai POD_NAME -- rm -rf /data/output /data/cache
 
 # Option 3: Expand PVC (requires provisioner support)
 kubectl patch pvc montage-output -n montage-ai -p '{"spec":{"resources":{"requests":{"storage":"200Gi"}}}}'
@@ -169,14 +230,16 @@ kubectl patch pvc montage-output -n montage-ai -p '{"spec":{"resources":{"reques
 
 ---
 
-### 5. Node Goes Down (Hardware Failure)
+### 6. Node Goes Down (Hardware Failure)
 
 **Symptoms:**
-```
+
+```text
 codeai-worker-amd64   NotReady   <none>   18h   v1.34.3+k3s1
 ```
 
 **Impact:**
+
 - Pod is stuck on failed node
 - Data is inaccessible (HostPath on that node)
 - Pod cannot reschedule (due to nodeAffinity)
@@ -184,6 +247,7 @@ codeai-worker-amd64   NotReady   <none>   18h   v1.34.3+k3s1
 **Recovery:**
 
 **If node is recoverable:**
+
 ```bash
 # Wait for node to come back online
 kubectl get nodes -w | grep codeai-worker-amd64
@@ -193,6 +257,7 @@ kubectl get pods -n montage-ai -w
 ```
 
 **If node is permanently lost:**
+
 ```bash
 # 1. Remove node from cluster
 kubectl delete node codeai-worker-amd64
@@ -215,16 +280,18 @@ kubectl rollout restart deployment montage-ai-web -n montage-ai
 
 ---
 
-### 6. Memory Leak / Growing Memory Usage
+### 7. Memory Leak / Growing Memory Usage
 
 **Symptoms:**
-```
+
+```bash
 # Memory keeps increasing over time
 watch 'kubectl top pod -n montage-ai'
-# Memory: 2GB → 3GB → 4GB → 5GB → OOMKilled
+# Memory: 2GB -> 3GB -> 4GB -> 5GB -> OOMKilled
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check top processes in pod
 kubectl exec -n montage-ai <pod> -- ps aux | sort -k6 -nr | head -5
@@ -237,6 +304,7 @@ kubectl exec -n montage-ai <pod> -- free -h
 ```
 
 **Recovery:**
+
 ```bash
 # Kill hanging processes
 kubectl exec -n montage-ai <pod> -- killall ffmpeg
@@ -251,31 +319,34 @@ kubectl set resources deployment montage-ai-web -n montage-ai \
 
 ---
 
-### 7. Network Connectivity Issues
+### 8. Network Connectivity Issues
 
 **Symptoms:**
-```
-# Pod can't reach external APIs (Gemini, cgpu)
-kubectl logs -n montage-ai <pod>
-# → Connection refused, timeout, DNS errors
+
+```bash
+# Pod cannot reach external APIs (Gemini, cgpu)
+kubectl logs -n montage-ai POD_NAME
+# -> Connection refused, timeout, DNS errors
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check pod DNS
-kubectl exec -n montage-ai <pod> -- cat /etc/resolv.conf
+kubectl exec -n montage-ai POD_NAME -- cat /etc/resolv.conf
 
 # Test DNS resolution
-kubectl exec -n montage-ai <pod> -- nslookup api.gemini.google.com
+kubectl exec -n montage-ai POD_NAME -- nslookup api.gemini.google.com
 
 # Test connectivity
-kubectl exec -n montage-ai <pod> -- curl -v https://api.gemini.google.com
+kubectl exec -n montage-ai POD_NAME -- curl -v https://api.gemini.google.com
 
 # Check network policy
 kubectl get networkpolicy -n montage-ai
 ```
 
 **Recovery:**
+
 ```bash
 # Check if NetworkPolicy is too restrictive
 kubectl describe networkpolicy montage-ai-network-policy -n montage-ai
@@ -292,6 +363,7 @@ kubectl apply -f deploy/k3s/app/resilience.yaml
 ## Preventive Maintenance
 
 ### Daily
+
 ```bash
 # Monitor pod health
 kubectl get pods -n montage-ai -w
@@ -302,6 +374,7 @@ kubectl top nodes
 ```
 
 ### Weekly
+
 ```bash
 # Check PVC usage
 kubectl exec -n montage-ai <pod> -- du -sh /data/*/
@@ -315,6 +388,7 @@ ls -lh /tmp/test-backup
 ```
 
 ### Monthly
+
 ```bash
 # Full backup
 ./scripts/backup-montage-data.sh /backups/monthly
@@ -334,7 +408,7 @@ kubectl debug node/<node-name> -it --image=busybox -- \
 ## Emergency Contacts & Escalation
 
 | Issue | Owner | Slack Channel |
-|-------|-------|---------------|
+| ----- | ----- | ------------- |
 | Pod/Deployment | @montage-devops | #montage-ai |
 | Storage | @storage-team | #infrastructure |
 | Network/Traefik | @network-team | #infrastructure |
@@ -377,6 +451,6 @@ kubectl run -it --rm debug --image=busybox --restart=Never -- \
 
 ---
 
-**Last Updated:** 2026-01-08  
-**Runbook Version:** 1.0  
+**Last Updated:** 2026-01-09  
+**Runbook Version:** 1.1  
 **Maintained By:** DevOps Team

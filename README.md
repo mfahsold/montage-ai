@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 [![K3s](https://img.shields.io/badge/k3s-ready-green.svg)](https://k3s.io/)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](docs/TEST_SUITE_STATUS.md)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](docs/ci.md)
 [![Code Quality](https://img.shields.io/badge/code%20quality-A-brightgreen.svg)]()
 
 > **We do not generate pixels. We polish them.**
