@@ -19,6 +19,12 @@ from redis.exceptions import ConnectionError, TimeoutError as RedisTimeoutError
 from rq import Queue
 from functools import wraps
 
+from .redis_exceptions import (
+    RedisConnectionError,
+    RedisTimeoutError as RedisTimeoutErrorCustom,
+    RedisMemoryError
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -79,6 +85,14 @@ class ResilientRedis(Redis):
         """Ping Redis with retry."""
         try:
             return super().ping()
+        except RedisTimeoutError as e:
+            logger.error(f"Redis ping timeout: {e}")
+            raise RedisTimeoutErrorCustom(operation="ping", timeout_seconds=self.socket_timeout or 5)
+        except ConnectionError as e:
+            logger.error(f"Redis ping connection failed: {e}")
+            raise RedisConnectionError(host=self.connection_pool.connection_kwargs.get('host', 'unknown'),
+                                      port=self.connection_pool.connection_kwargs.get('port', 6379),
+                                      original_error=str(e))
         except Exception as e:
             logger.error(f"Redis ping failed: {e}")
             return False
@@ -100,12 +114,16 @@ class ResilientRedis(Redis):
                 return False, f"Unexpected role: {info.get('role')}"
             
             # Check memory usage
-            memory_percent = info.get('used_memory', 0) / info.get('maxmemory', 1)
+            memory_percent = info.get('used_memory', 0) / info.get('maxmemory', 1) if info.get('maxmemory') else 0
             if memory_percent > 0.9:
-                return False, f"Memory usage > 90% ({memory_percent:.0%})"
+                logger.warning(f"Redis memory critical: {memory_percent:.0%}")
+                raise RedisMemoryError(used_percent=memory_percent * 100)
             
             return True, None
             
+        except (RedisConnectionError, RedisTimeoutErrorCustom, RedisMemoryError):
+            # Re-raise our custom exceptions
+            raise
         except Exception as e:
             return False, str(e)
 

@@ -54,16 +54,24 @@ def add_asset(session_id):
         return jsonify({"error": "No selected file"}), 400
         
     # Save file
-    # TODO: Use a proper upload manager/path sanitizer
     from werkzeug.utils import secure_filename
+    from pathlib import Path
+    
     filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename"}), 400
     
     # Ensure input dir exists
-    input_dir = settings.paths.input_dir
-    os.makedirs(input_dir, exist_ok=True)
+    input_dir = Path(settings.paths.input_dir).resolve()
+    input_dir.mkdir(parents=True, exist_ok=True)
     
-    file_path = os.path.join(input_dir, filename)
-    file.save(file_path)
+    # Validate path to prevent traversal attacks
+    file_path = (input_dir / filename).resolve()
+    if not str(file_path).startswith(str(input_dir)):
+        return jsonify({"error": "Invalid upload path (traversal detected)"}), 400
+    
+    # Save to validated path
+    file.save(str(file_path))
     
     # Get metadata (duration, etc)
     # For now, simple stub or use existing helpers if imported

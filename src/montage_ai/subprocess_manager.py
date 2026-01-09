@@ -16,8 +16,9 @@ import os
 import time
 import psutil
 import logging
+import subprocess
 from typing import List, Optional
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, TimeoutExpired
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ def cleanup_subprocess(proc: Popen, timeout: int = 10) -> bool:
             proc.wait(timeout=timeout)
             logger.info(f"Process {proc.pid} terminated gracefully")
             return True
-        except:
+        except TimeoutExpired:
             # Force kill
             logger.warning(f"Process {proc.pid} did not terminate, force killing")
             proc.kill()
@@ -176,7 +177,8 @@ def get_process_memory_usage() -> int:
             if proc.poll() is None:
                 p = psutil.Process(proc.pid)
                 total_memory += p.memory_info().rss
-        except:
-            pass
+        except (OSError, psutil.NoSuchProcess):
+            # Process already terminated or no longer accessible
+            logger.debug(f"Could not get memory for process {proc.pid}")
     
     return total_memory
