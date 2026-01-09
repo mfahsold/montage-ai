@@ -42,16 +42,13 @@ class ResilientRedis(Redis):
         """
         self.retry_backoff = kwargs.pop('retry_backoff', 1)
         self.max_retries = kwargs.pop('max_retries', 3)
-        self.socket_keepalive = kwargs.pop('socket_keepalive', True)
-        
-        # Set socket keepalive
+        # Disable socket_keepalive by default - causes EINVAL on some kernels/containers
+        self.socket_keepalive = kwargs.pop('socket_keepalive', False)
+
+        # Only set socket keepalive if explicitly enabled and options not provided
         if self.socket_keepalive:
             kwargs.setdefault('socket_keepalive', True)
-            kwargs.setdefault('socket_keepalive_options', {
-                1: 1,  # TCP_KEEPIDLE: start after 1 second
-                2: 1,  # TCP_KEEPINTVL: interval 1 second
-                3: 3,  # TCP_KEEPCNT: 3 probes
-            })
+            # Don't set socket_keepalive_options - causes EINVAL on containers without kernel support
         
         super().__init__(*args, **kwargs)
     

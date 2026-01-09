@@ -395,9 +395,9 @@ def api_status():
 
     # Get queue stats (RQ)
     try:
-        active_jobs = len(q.started_job_registry)
-        queued_jobs = len(q)
-    except (AttributeError, TypeError):
+        active_jobs = len(queue_fast.started_job_registry) + len(queue_heavy.started_job_registry)
+        queued_jobs = len(queue_fast) + len(queue_heavy)
+    except (AttributeError, TypeError, NameError):
         active_jobs = 0
         queued_jobs = 0
     

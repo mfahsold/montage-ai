@@ -28,14 +28,14 @@ resources:
 images:
   - name: montage-ai
     newName: 192.168.1.12:5000/montage-ai
-    newTag: latest  # {"$imagepolicy": "montage-ai:montage-ai"}
+    newTag: 03fed83  # {"$imagepolicy": "montage-ai:montage-ai"}
   # Legacy mappings (for compatibility)
   - name: ghcr.io/mfahsold/montage-ai
     newName: 192.168.1.12:5000/montage-ai
-    newTag: latest
+    newTag: 03fed83
   - name: 192.168.1.16:30500/montage-ai
     newName: 192.168.1.12:5000/montage-ai
-    newTag: latest
+    newTag: 03fed83
 
 # ConfigMap for deployment settings (overlays can patch)
 configMapGenerator:

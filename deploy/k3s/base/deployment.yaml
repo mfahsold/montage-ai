@@ -64,6 +64,10 @@ spec:
           value: "4"
         - name: CUT_STYLE
           value: "dynamic"
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
         volumeMounts:
         - name: data
           mountPath: /data
@@ -72,11 +76,11 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "8Gi"
-            cpu: "2"
+            memory: "4Gi"
+            cpu: "1"
           limits:
-            memory: "48Gi"
-            cpu: "6"
+            memory: "16Gi"
+            cpu: "4"
         livenessProbe:
           httpGet:
             path: /api/status
