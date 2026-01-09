@@ -39,7 +39,7 @@ OUTPUT_DIR = str(settings.paths.output_dir)
 settings.paths.ensure_directories()
 
 # Allowed file extensions
-VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".mxf", ".mts", ".m2ts", ".ts"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg"}
 

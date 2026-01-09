@@ -19,6 +19,23 @@ Complete reference for all environment variables and settings.
 
 ---
 
+## Supported Media Formats
+
+- **Video (containers/codecs via FFmpeg):** mp4, mov, avi, mkv, webm, m4v, mxf, mts, m2ts, ts
+- **Audio:** mp3, wav, flac, aac, m4a, ogg
+- **Images:** png, jpg, jpeg, gif, webp, bmp
+- **Notes:** ProRes/DNxHR/DNxHD typically arrive in mov/mxf; AVCHD/HDV arrive as mts/m2ts/ts. Formats rely on the FFmpeg build shipped with the container; verify with `ffprobe sample.mxf` if in doubt. Upload validation uses these lists in both the Flask UI and FastAPI uploader.
+
+---
+
+## Queue Routing
+
+- `QUEUE_FAST_NAME` (default: `default`) – short/preview + transcript jobs
+- `QUEUE_HEAVY_NAME` (default: `heavy`) – volle Renders, Upscale/Enhance, Nicht-Preview
+- Preview-Jobs werden automatisch in die Fast-Queue geleitet; Standard/High landet in Heavy.
+
+---
+
 ## Creative Loop (Agentic Refinement)
 
 The Creative Loop enables iterative LLM-powered refinement of montage quality.

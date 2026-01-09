@@ -158,23 +158,34 @@ def cleanup_on_shutdown(error=None):
 
 
 # Job queue and management
-from rq import Queue
-from redis import Redis
+from ..redis_resilience import ResilientQueue, create_resilient_redis_connection
 from ..core.job_store import JobStore
 from ..tasks import run_montage, run_transcript_render
 
 # Redis connection (centralized via settings)
 redis_host = _settings.session.redis_host or 'localhost'
 redis_port = _settings.session.redis_port
-redis_conn = Redis(host=redis_host, port=redis_port)
-q = Queue(connection=redis_conn)
+redis_conn = create_resilient_redis_connection(host=redis_host, port=redis_port)
+queue_fast = ResilientQueue(name=_settings.session.queue_fast_name, connection=redis_conn)
+queue_heavy = ResilientQueue(name=_settings.session.queue_heavy_name, connection=redis_conn)
 job_store = JobStore()
+
+
+def get_montage_queue(options: dict) -> ResilientQueue:
+    """Select queue based on workload class (preview vs heavy)."""
+    quality = (options or {}).get("quality_profile", "standard")
+    return queue_fast if quality == "preview" else queue_heavy
+
+
+def enqueue_montage(job_id: str, style: str, options: dict):
+    queue = get_montage_queue(options)
+    return queue.enqueue(run_montage, job_id, style, options)
 
 def redis_listener():
     """Listen for updates from Redis and broadcast to SSE clients."""
     try:
         # Create a dedicated connection for pubsub to avoid conflicts
-        pubsub_conn = Redis(host=redis_host, port=redis_port, decode_responses=True)
+        pubsub_conn = create_resilient_redis_connection(host=redis_host, port=redis_port)
         pubsub = pubsub_conn.pubsub()
         pubsub.subscribe('job_updates')
 
@@ -597,8 +608,8 @@ def api_render_transcript_edit():
     # Store in Redis
     job_store.create_job(job_id, job_data)
     
-    # Enqueue with RQ
-    q.enqueue(run_transcript_render, job_id, str(video_path), str(transcript_path), edits)
+    # Enqueue with RQ (fast queue)
+    queue_fast.enqueue(run_transcript_render, job_id, str(video_path), str(transcript_path), edits)
         
     return jsonify({"job_id": job_id, "status": "queued"})
 
@@ -743,7 +754,7 @@ def api_create_job():
     job_store.create_job(job_id, job)
 
     # Enqueue
-    q.enqueue(run_montage, job_id, data['style'], job['options'])
+    enqueue_montage(job_id, data['style'], job['options'])
 
     return jsonify(job)
 
@@ -813,7 +824,7 @@ def api_finalize_job(job_id):
     job_store.create_job(new_job_id, job)
 
     # Enqueue
-    q.enqueue(run_montage, new_job_id, style, new_options)
+    enqueue_montage(new_job_id, style, new_options)
 
     return jsonify(job)
 
@@ -2227,7 +2238,7 @@ def api_shorts_render():
         }
         job_store.create_job(job_id, job)
         from ..tasks import run_montage
-        q.enqueue(run_montage, job_id, style, job['options'])
+        enqueue_montage(job_id, style, job['options'])
     else:
         # REFRAME WORKFLOW (Default)
         job = {
@@ -2251,7 +2262,7 @@ def api_shorts_render():
         }
         job_store.create_job(job_id, job)
         from ..tasks import run_shorts_reframe
-        q.enqueue(run_shorts_reframe, job_id, job['options'])
+        queue_heavy.enqueue(run_shorts_reframe, job_id, job['options'])
     
     return jsonify({
         "success": True,
