@@ -906,14 +906,15 @@ class CreativeDirector:
         merged: Dict[str, Any] = {}
         for key, value in defaults.items():
             override = overrides.get(key)
-            if isinstance(value, dict) and isinstance(override, dict):
-                merged[key] = self._merge_defaults(value, override)
-            elif key in overrides:
-                merged[key] = override
-            else:
+            # Skip None overrides; use defaults
+            if override is None:
                 merged[key] = value
+            elif isinstance(value, dict) and isinstance(override, dict):
+                merged[key] = self._merge_defaults(value, override)
+            else:
+                merged[key] = override
         for key, value in overrides.items():
-            if key not in merged:
+            if key not in merged and value is not None:
                 merged[key] = value
         return merged
 
