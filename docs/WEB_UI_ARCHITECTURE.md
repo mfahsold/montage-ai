@@ -1,5 +1,35 @@
 # Web UI Architecture Guide
 
+## Design System (2026)
+
+### Typography (3-Font Stack)
+```css
+--font-display: 'Space Grotesk', sans-serif;  /* Headlines: fancy, tech-forward */
+--font-body: 'Inter', sans-serif;              /* Body: gold-standard readability */
+--font-mono: 'JetBrains Mono', monospace;      /* Code: best legibility */
+```
+
+### Color System (Neon Voxel)
+```css
+--bg: #050505;           /* Void Black */
+--fg: #e0e0e0;           /* Primary Text */
+--primary: #0055ff;      /* Electric Blue */
+--secondary: #ff5500;    /* Neon Orange */
+--success: #00ff88;      /* Success Green */
+--warning: #ffcc00;      /* Warning Yellow */
+--danger: #ff3333;       /* Error Red */
+```
+
+### Responsive Breakpoints
+| Breakpoint | Width | Purpose |
+|------------|-------|---------|
+| Mobile | < 640px | Single column, hamburger nav |
+| Tablet | 640-1024px | 2 columns |
+| Desktop | 1024-1280px | 3 columns |
+| Large | > 1280px | 4 columns |
+
+---
+
 ## Structure
 
 ```
@@ -259,3 +289,58 @@ python src/montage_ai/web_ui/app.py
 - [ ] `settings.html` (in progress)
 
 **Current Status:** `index.html` ✅, `gallery.html` ✅
+
+---
+
+## API Endpoints
+
+The Web UI communicates with the backend via REST API endpoints. All endpoints are prefixed with `/api/`.
+
+### Core Job Management
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/jobs` | POST | Create new montage job |
+| `/api/jobs` | GET | List all jobs |
+| `/api/jobs/<id>` | GET | Get job status |
+| `/api/jobs/<id>/download` | GET | Download job output |
+| `/api/jobs/<id>/cancel` | POST | Cancel running job |
+| `/api/jobs/<id>/logs` | GET | Get job logs |
+
+### Real-time Updates (SSE)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/stream` | GET | Server-Sent Events for all jobs |
+| `/api/progress/<id>` | GET | SSE filtered for specific job |
+
+### File Management
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/files` | GET | List uploaded files |
+| `/api/upload` | POST | Upload video/music files |
+| `/api/download/<filename>` | GET | Download output file |
+
+### Session-Based Workflows
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/session/create` | POST | Create editing session |
+| `/api/session/<id>` | GET | Get session state |
+| `/api/session/<id>/asset` | POST | Add asset to session |
+| `/api/session/<id>/analyze` | POST | Run analysis on assets |
+| `/api/session/<id>/render_preview` | POST | Generate preview |
+| `/api/session/<id>/export` | POST | Export to EDL/OTIO/Video |
+
+### Shorts Studio
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/shorts/upload` | POST | Upload for shorts processing |
+| `/api/shorts/analyze` | POST | Smart reframing analysis |
+| `/api/shorts/render` | POST | Render vertical video |
+| `/api/shorts/highlights` | POST | Detect highlight moments |
+
+### Audio Processing
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/audio/clean` | POST | One-click audio polish |
+| `/api/audio/analyze` | POST | Analyze audio quality |
+
+For the complete API reference, see the backend source: `src/montage_ai/web_ui/app.py`

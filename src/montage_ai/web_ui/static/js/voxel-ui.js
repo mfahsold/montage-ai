@@ -210,7 +210,7 @@ const VoxelUI = {
             onPhase = () => {}
         } = callbacks;
 
-        const eventSource = new EventSource('/api/events');
+        const eventSource = new EventSource('/api/stream');
 
         eventSource.onmessage = (event) => {
             try {

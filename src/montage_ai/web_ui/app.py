@@ -867,6 +867,31 @@ def api_list_jobs():
     return jsonify({"jobs": sorted(job_list, key=lambda x: x['created_at'], reverse=True)})
 
 
+@app.route('/api/jobs/<job_id>/download', methods=['GET'])
+def api_job_download(job_id):
+    """Download output file for a specific job.
+
+    Convenience endpoint that looks up the job's output file and redirects
+    to the /api/download/<filename> endpoint.
+    """
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+
+    # Check various possible output field names
+    output_file = job.get("output_file") or job.get("output") or job.get("result", {}).get("output_path")
+
+    if not output_file:
+        return jsonify({"error": "No output file available for this job"}), 404
+
+    # Extract just the filename if it's a full path
+    from pathlib import Path
+    filename = Path(output_file).name
+
+    # Redirect to the download endpoint
+    return redirect(url_for('api_download', filename=filename))
+
+
 @app.route('/api/download/<filename>', methods=['GET'])
 def api_download(filename):
     """Download output file with proper MIME type."""
