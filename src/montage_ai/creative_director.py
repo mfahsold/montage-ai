@@ -147,7 +147,115 @@ class CreativeDirector:
             [f"- {name}: {get_style_template(name)['description']}" for name in available_styles]
         )
         self.system_prompt = get_director_prompt(persona, styles_list)
-
+    def _query_backend(
+        self,
+        prompt: str,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        system_prompt: Optional[str] = None
+    ) -> str:
+        """
+        Generic LLM query method for non-editing tasks (parameter suggestion, etc.).
+        
+        This is a simplified interface for querying the LLM backend without
+        the full editing instruction parsing logic. Used by ParameterSuggester
+        and other utility modules.
+        
+        Args:
+            prompt: User prompt
+            temperature: Sampling temperature (0.0-2.0)
+            max_tokens: Maximum response tokens
+            system_prompt: Optional system prompt (defaults to generic assistant)
+            
+        Returns:
+            Raw LLM response text
+            
+        Raises:
+            RuntimeError: If all backends fail
+        """
+        if system_prompt is None:
+            system_prompt = "You are an expert AI assistant for video post-production."
+        
+        formatted_prompt = self._format_user_prompt(prompt)
+        
+        # Try backends in priority order (same as _query_llm)
+        if self.use_openai_api and self.openai_client:
+            response = self._query_openai_api_generic(
+                system_prompt, formatted_prompt, temperature, max_tokens
+            )
+            if response:
+                return response
+        
+        if self.use_cgpu and self.cgpu_client:
+            response = self._query_cgpu_generic(
+                system_prompt, formatted_prompt, temperature, max_tokens
+            )
+            if response:
+                return response
+        
+        if self.use_google_ai:
+            response = self._query_google_ai(system_prompt, formatted_prompt)
+            if response:
+                return response
+        
+        # Fallback to Ollama
+        response = self._query_ollama(system_prompt, formatted_prompt)
+        if response:
+            return response
+        
+        raise RuntimeError("All LLM backends failed")
+    
+    def _query_openai_api_generic(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float,
+        max_tokens: int
+    ) -> Optional[str]:
+        """Generic OpenAI-compatible API query without JSON mode."""
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=self.llm_config.openai_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+            if response.choices and response.choices[0].message.content:
+                return response.choices[0].message.content.strip()
+            return None
+        except Exception as e:
+            logger.warning(f"OpenAI API generic query error: {e}")
+            return None
+    
+    def _query_cgpu_generic(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float,
+        max_tokens: int
+    ) -> Optional[str]:
+        """Generic cgpu query without JSON mode."""
+        try:
+            response = self.cgpu_client.chat.completions.create(
+                model="gemini-2.0-flash-exp",  # cgpu default model
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+            if response.choices and response.choices[0].message.content:
+                return response.choices[0].message.content.strip()
+            return None
+        except Exception as e:
+            logger.warning(f"cgpu generic query error: {e}")
+            return None
     def interpret_prompt(self, user_prompt: str) -> Optional[Dict[str, Any]]:
         """
         Interpret natural language prompt and return editing instructions.
