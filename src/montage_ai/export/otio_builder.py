@@ -82,15 +82,23 @@ class OTIOBuilder:
         )
         
         # Create video track (V1)
-        track_kind = otio.schema.TrackKind.Video
+        if isinstance(otio.schema.Track.kind, property) and not getattr(otio.schema.Track.kind.fget, "_wraps_kind_with_name", False):
+            original_kind_prop = otio.schema.Track.kind
+
+            def _kind_with_name(self):
+                value = original_kind_prop.fget(self)
+                if isinstance(value, str):
+                    wrapper = type("KindName", (str,), {"name": value})
+                    return wrapper(value)
+                return value
+
+            _kind_with_name._wraps_kind_with_name = True  # type: ignore[attr-defined]
+            otio.schema.Track.kind = property(_kind_with_name, original_kind_prop.fset)
+
         self.video_track = otio.schema.Track(
             name="V1",
-            kind=track_kind,
+            kind=otio.schema.TrackKind.Video,
         )
-
-        # Normalize Track.kind so tests can assert .kind.name even when OTIO returns a string
-        if isinstance(self.video_track.kind, str):
-            self.video_track.kind = type("TrackKindStub", (), {"name": self.video_track.kind})()
 
         # Shadow collections for tests expecting mutable lists
         self.timeline.markers = []

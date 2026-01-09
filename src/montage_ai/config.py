@@ -1276,6 +1276,9 @@ class MontageSettingsSpec:
     paths: PathConfig = field(default_factory=PathConfig)
     """Filesystem paths used across the pipeline."""
 
+    features: FeatureConfig = field(default_factory=FeatureConfig)
+    """Feature toggles and runtime flags."""
+
     job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S")))
     """Optional job identifier for builder compatibility."""
     
