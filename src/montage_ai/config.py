@@ -404,6 +404,29 @@ class MotionAnalysisConfig:
 
 
 # =============================================================================
+# Analysis & Scene Detection Constants
+# =============================================================================
+@dataclass
+class AnalysisConstants:
+    """Centralized constants for scene analysis and feature extraction."""
+    
+    # Scene Detection (PySceneDetect)
+    scene_min_length_frames: int = field(default_factory=lambda: int(os.environ.get("SCENE_MIN_LENGTH_FRAMES", "15")))  # ~0.5s @ 30fps
+    
+    # Optical Flow (Farneback algorithm)
+    optical_flow_pyr_scale: float = field(default_factory=lambda: float(os.environ.get("OF_PYR_SCALE", "0.5")))
+    optical_flow_levels: int = field(default_factory=lambda: int(os.environ.get("OF_LEVELS", "3")))
+    optical_flow_winsize: int = field(default_factory=lambda: int(os.environ.get("OF_WINSIZE", "15")))
+    
+    # Downsampling & Proxy
+    default_downsampling_height: int = field(default_factory=lambda: int(os.environ.get("DEFAULT_DOWNSAMPLE_HEIGHT", "1080")))
+    proxy_generation_timeout_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_GEN_TIMEOUT", "3600")))  # 1 hour
+    
+    # Preview Resolution (for web UI thumbnails)
+    preview_height: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_HEIGHT", "360")))
+
+
+# =============================================================================
 # Proxy & Analysis Configuration
 # =============================================================================
 @dataclass
@@ -859,6 +882,7 @@ class Settings:
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
+    analysis: AnalysisConstants = field(default_factory=AnalysisConstants)
 
     # Job ID (generated per run)
     job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", ""))
@@ -1084,5 +1108,6 @@ def reload_settings() -> Settings:
     return _settings
 
 
-# Convenience alias
-settings = get_settings()
+# Note: Do NOT create module-level instance here!
+# This causes cached dataclass definition when module is imported.
+# Always use get_settings() to ensure fresh Settings with updated dataclass.

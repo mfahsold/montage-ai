@@ -28,6 +28,7 @@ from ..resource_manager import get_resource_manager, ResourceManager
 from ..style_templates import get_style_template
 from ..utils import file_exists_and_valid, coerce_float
 from ..ffmpeg_utils import build_ffmpeg_cmd
+from ..job_progress import JobProgress
 from .analysis_cache import get_analysis_cache, EpisodicMemoryEntry
 from ..timeline_exporter import export_timeline_from_montage
 from ..storytelling import StoryArc, TensionProvider, StorySolver
@@ -126,6 +127,9 @@ class MontageBuilder:
         self._executor: Optional[ThreadPoolExecutor] = None
         self._pending_futures: List[Future] = []
         
+        # Progress tracking
+        self.progress = JobProgress(job_id or self.settings.job_id, total_scenes=0)
+        
         # New Engines
         from .analysis_engine import AssetAnalyzer
         from .render_engine import RenderEngine
@@ -197,6 +201,7 @@ class MontageBuilder:
         """
         try:
             logger.info(f"\n🎬 Starting Montage Variant #{self.variant_id}")
+            self.progress.finalization_start()  # Initialize progress tracker
 
             # Phase 1: Setup
             self.setup_workspace()
@@ -224,9 +229,13 @@ class MontageBuilder:
             self.cleanup()
 
             # Build result
+            output_path = self.ctx.render.output_filename
+            self.progress.finalization_complete(output_path)
+            logger.info(self.progress.summary())
+            
             return MontageResult(
                 success=True,
-                output_path=self.ctx.render.output_filename,
+                output_path=output_path,
                 duration=self.ctx.timeline.current_time,
                 cut_count=self.ctx.timeline.cut_number,
                 render_time=self.ctx.render.render_duration,
@@ -237,6 +246,7 @@ class MontageBuilder:
 
         except Exception as e:
             logger.error(f"❌ Montage build failed: {e}")
+            self.progress.log_error(error_msg=str(e))
             self.cleanup()
             return MontageResult(
                 success=False,
@@ -307,6 +317,7 @@ class MontageBuilder:
         to maximize utilization of both cloud GPU and local CPU.
         """
         logger.info("\n   🎵 Analyzing assets Checkpoint...")
+        self.progress.scene_detection_start()
 
         # Story Engine Analysis Trigger (Phase 1)
         if self.settings.features.story_engine:
@@ -355,6 +366,11 @@ class MontageBuilder:
 
         # Detect scenes using AnalysisEngine (blocking call that runs parallel internally)
         self._analyzer.detect_scenes(progress_callback=self.progress_callback)
+        
+        # Log scene detection completion
+        scene_count = len(self.ctx.features.detected_scenes) if self.ctx.features.detected_scenes else 0
+        self.progress.scene_detection_complete(scenes=scene_count)
+        self.progress.metadata_extraction_start(total_scenes=scene_count)
 
         # Wait for voice isolation to complete
         if voice_isolation_future is not None:
@@ -501,9 +517,13 @@ class MontageBuilder:
         """
         Phase 5: Render final output.
         """
+        self.progress.rendering_start()
+        
         # Pass renderer to engine (if not already managed there in future)
         self._render_engine.set_renderer(self._progressive_renderer)
         self._render_engine.render_output()
+        
+        self.progress.rendering_complete()
 
     def cleanup(self):
         """

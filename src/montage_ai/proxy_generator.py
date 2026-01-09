@@ -235,11 +235,14 @@ class ProxyGenerator:
         logger.info(f"Generating analysis proxy: {height}p ({source_path} → {output_path})")
         
         try:
+            from .config import get_settings
+            timeout = get_settings().analysis.proxy_generation_timeout_seconds
+            
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=3600  # 1 hour max for proxy generation
+                timeout=timeout
             )
             
             if result.returncode != 0:
@@ -250,7 +253,8 @@ class ProxyGenerator:
             return True
             
         except subprocess.TimeoutExpired:
-            logger.error(f"Proxy generation timeout after 3600 seconds")
+            timeout = get_settings().analysis.proxy_generation_timeout_seconds
+            logger.error(f"Proxy generation timeout after {timeout} seconds")
             raise
         except Exception as e:
             logger.error(f"Proxy generation error: {e}")

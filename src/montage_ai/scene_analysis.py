@@ -305,7 +305,7 @@ class SceneDetector:
         scene_manager.add_detector(
             ContentDetector(
                 threshold=self.threshold,
-                min_scene_len=15  # Minimum 0.5s at 30fps
+                min_scene_len=_settings.analysis.scene_min_length_frames  # From config
             )
         )
         # Downscale factor reduces memory and processing time

@@ -251,6 +251,9 @@ class MetadataCache:
 
         Returns:
             Tuple of (magnitude 0-1, dominant_direction "left"/"right"/"static")
+            
+        Raises:
+            OpticalFlowTimeout: If analysis takes too long (proxy mode should prevent this)
         """
         try:
             cap = cv2.VideoCapture(video_path)
@@ -277,11 +280,17 @@ class MetadataCache:
                 gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
                 gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
 
-                # Compute optical flow
+                # Compute optical flow using centralized config
+                settings = get_settings()
                 flow = cv2.calcOpticalFlowFarneback(
                     gray1, gray2, None,
-                    pyr_scale=0.5, levels=3, winsize=15,
-                    iterations=3, poly_n=5, poly_sigma=1.2, flags=0
+                    pyr_scale=settings.analysis.optical_flow_pyr_scale,
+                    levels=settings.analysis.optical_flow_levels,
+                    winsize=settings.analysis.optical_flow_winsize,
+                    iterations=settings.motion_analysis.optical_flow_iterations,
+                    poly_n=settings.motion_analysis.optical_flow_poly_n,
+                    poly_sigma=settings.motion_analysis.optical_flow_poly_sigma,
+                    flags=0
                 )
 
                 # Compute magnitude and direction
