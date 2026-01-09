@@ -1112,3 +1112,223 @@ def reload_settings() -> Settings:
 # Note: Do NOT create module-level instance here!
 # This causes cached dataclass definition when module is imported.
 # Always use get_settings() to ensure fresh Settings with updated dataclass.
+
+# =============================================================================
+# Style and Effect Configurations
+# =============================================================================
+
+class QualityProfile:
+    """Video quality profile enumeration."""
+    PREVIEW = "preview"  # 360p, fast
+    STANDARD = "standard"  # 1080p
+    HIGH = "high"  # 4K
+    CUSTOM = "custom"
+
+
+@dataclass
+class StyleConfig:
+    """Configuration for a specific montage style."""
+    
+    name: str
+    """Style name (e.g., 'dynamic', 'hitchcock')."""
+    
+    weights: dict = field(default_factory=dict)
+    """Scoring weights for selection."""
+    
+    preferred_shots: List[str] = field(default_factory=list)
+    """Preferred shot types (e.g., 'close', 'wide')."""
+    
+    transition_style: str = "cut"
+    """Transition type: 'cut', 'fade', 'dissolve'."""
+    
+    cut_frequency: float = 1.0
+    """Relative cut frequency (1.0 = normal, 2.0 = fast)."""
+    
+    color_grading: Optional[str] = None
+    """Color grading preset name."""
+    
+    description: str = ""
+    """Style description."""
+    
+    def get_weight(self, key: str, default: float = 1.0) -> float:
+        """Get weight for scoring factor with fallback."""
+        return self.weights.get(key, default)
+    
+    def has_shot_preference(self) -> bool:
+        """Check if style has shot type preferences."""
+        return len(self.preferred_shots) > 0
+    
+    def is_high_energy(self) -> bool:
+        """Check if style favors high-energy content."""
+        return self.cut_frequency > 1.0
+
+
+@dataclass
+class EffectConfig:
+    """Video effects configuration."""
+    
+    stabilize: bool = False
+    """Enable video stabilization."""
+    
+    upscale: bool = False
+    """Enable AI upscaling."""
+    
+    denoise: bool = True
+    """Enable denoising."""
+    
+    color_grade: bool = True
+    """Enable color grading."""
+    
+    audio_enhancement: bool = True
+    """Enable audio enhancement."""
+    
+    motion_blur: float = 0.0
+    """Motion blur amount [0.0, 1.0]."""
+    
+    sharpen: float = 0.0
+    """Sharpening amount [0.0, 1.0]."""
+    
+    def count_enabled_effects(self) -> int:
+        """Count enabled boolean effects."""
+        return sum([
+            self.stabilize,
+            self.upscale,
+            self.denoise,
+            self.color_grade,
+            self.audio_enhancement,
+        ])
+
+
+@dataclass
+class VideoConfigSpec:
+    """Video format specification (distinct from processing settings)."""
+    
+    width: int = 1920
+    """Output video width in pixels."""
+    
+    height: int = 1080
+    """Output video height in pixels."""
+    
+    fps: float = 24.0
+    """Frames per second."""
+    
+    duration: float = 60.0
+    """Target duration in seconds."""
+    
+    bitrate: str = "5000k"
+    """Output bitrate."""
+    
+    codec: str = "libx264"
+    """Video codec."""
+    
+    preset: str = "medium"
+    """Encoding preset (ultrafast, fast, medium, slow, etc)."""
+    
+    @property
+    def aspect_ratio(self) -> float:
+        """Get aspect ratio (width/height)."""
+        return self.width / self.height if self.height > 0 else 16/9
+    
+    @property
+    def is_portrait(self) -> bool:
+        """Check if output is portrait orientation."""
+        return self.height > self.width
+    
+    @property
+    def is_landscape(self) -> bool:
+        """Check if output is landscape orientation."""
+        return self.width > self.height
+
+
+@dataclass
+class AudioConfigSpec:
+    """Audio format specification."""
+    
+    codec: str = "aac"
+    """Audio codec."""
+    
+    bitrate: str = "128k"
+    """Audio bitrate."""
+    
+    sample_rate: int = 48000
+    """Sample rate in Hz."""
+    
+    channels: int = 2
+    """Number of channels (1 = mono, 2 = stereo)."""
+    
+    normalize: bool = True
+    """Normalize loudness."""
+    
+    target_loudness: float = -20.0
+    """Target loudness in dB (LUFS)."""
+    
+    ducking_strength: float = 0.5
+    """Music ducking when speech present [0.0, 1.0]."""
+
+
+@dataclass
+class MontageSettingsSpec:
+    """Complete montage settings - integrates style, effects, video, audio."""
+    
+    style: StyleConfig
+    """Selected montage style."""
+    
+    quality: str = QualityProfile.STANDARD
+    """Output quality profile."""
+    
+    video: VideoConfigSpec = field(default_factory=VideoConfigSpec)
+    """Video format settings."""
+    
+    audio: AudioConfigSpec = field(default_factory=AudioConfigSpec)
+    """Audio settings."""
+    
+    effects: EffectConfig = field(default_factory=EffectConfig)
+    """Effects configuration."""
+    
+    max_transitions: int = 20
+    """Maximum number of transitions."""
+    
+    cache_enabled: bool = True
+    """Enable analysis caching."""
+    
+    @staticmethod
+    def create_default(style_name: str = "dynamic") -> "MontageSettingsSpec":
+        """Create settings with defaults."""
+        style = StyleConfig(name=style_name, weights={"energy": 1.0})
+        return MontageSettingsSpec(style=style)
+    
+    @staticmethod
+    def create_preview() -> "MontageSettingsSpec":
+        """Create fast preview settings (360p, ultrafast)."""
+        style = StyleConfig(name="dynamic", weights={"energy": 1.0})
+        video = VideoConfigSpec(width=640, height=360, fps=24.0, preset="ultrafast")
+        return MontageSettingsSpec(style=style, quality=QualityProfile.PREVIEW, video=video)
+    
+    @staticmethod
+    def create_hires() -> "MontageSettingsSpec":
+        """Create high-resolution 4K settings."""
+        style = StyleConfig(name="dynamic", weights={"energy": 1.0})
+        video = VideoConfigSpec(width=3840, height=2160, bitrate="15000k", preset="slow")
+        return MontageSettingsSpec(style=style, quality=QualityProfile.HIGH, video=video)
+    
+    def validate(self) -> List[str]:
+        """Validate settings, return list of errors."""
+        errors = []
+        
+        if self.video.width <= 0 or self.video.height <= 0:
+            errors.append("Invalid video dimensions")
+        
+        if self.video.fps <= 0:
+            errors.append("Invalid FPS")
+        
+        if self.audio.channels not in [1, 2]:
+            errors.append("Invalid audio channels")
+        
+        if self.max_transitions < 0:
+            errors.append("Invalid max transitions")
+        
+        return errors
+    
+    def is_valid(self) -> bool:
+        """Check if settings are valid."""
+        return len(self.validate()) == 0

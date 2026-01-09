@@ -9,17 +9,31 @@ resources:
   - namespace.yaml
   - network-policy.yaml
 
-# Image standardization
-# Maps various upstream image references to cluster registry
-# Default: 192.168.1.12:5000 (configured via deploy/config.env)
+# =============================================================================
+# Image Configuration (fluxibri_core pattern)
+# =============================================================================
+# Registry: 192.168.1.12:5000 (cluster standard)
+# Tagging: Git SHA for production, :latest for development
+#
+# Update tag after build:
+#   # Option 1: Edit this file
+#   newTag: abc1234  # Git SHA from build
+#
+#   # Option 2: Kustomize CLI override
+#   kustomize edit set image montage-ai=192.168.1.12:5000/montage-ai:abc1234
+#
+#   # Option 3: kubectl patch (GitOps/Flux)
+#   kubectl kustomize . | kubectl apply -f -
+# =============================================================================
 images:
+  - name: montage-ai
+    newName: 192.168.1.12:5000/montage-ai
+    newTag: latest  # {"$imagepolicy": "montage-ai:montage-ai"}
+  # Legacy mappings (for compatibility)
   - name: ghcr.io/mfahsold/montage-ai
     newName: 192.168.1.12:5000/montage-ai
     newTag: latest
   - name: 192.168.1.16:30500/montage-ai
-    newName: 192.168.1.12:5000/montage-ai
-    newTag: latest
-  - name: montage-ai
     newName: 192.168.1.12:5000/montage-ai
     newTag: latest
 

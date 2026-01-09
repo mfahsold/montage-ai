@@ -1,0 +1,62 @@
+# =============================================================================
+# Montage-AI Build Manifest (fluxibri_core pattern)
+# =============================================================================
+# This file defines the canonical build configuration for montage-ai.
+# Used by: scripts/build-distributed.sh, CI/CD pipelines, Tekton
+#
+# Usage:
+#   # Direct build
+#   ./scripts/build-distributed.sh
+#
+#   # With fluxibri_core build wrapper (if available)
+#   ../../fluxibri_core/scripts/build.sh --manifest service.build.yaml
+# =============================================================================
+
+service: montage-ai
+version: "0.5.0"
+
+# Registry configuration
+registry: 192.168.1.12:5000
+image: montage-ai
+
+# Build settings
+dockerfile: Dockerfile
+platforms:
+  - linux/amd64
+  - linux/arm64
+
+# Buildx configuration
+builder: simple-builder
+cache:
+  enabled: true
+  ref: "192.168.1.12:5000/montage-ai:buildcache"
+  mode: max
+
+# Build arguments
+buildArgs:
+  BUILDKIT_INLINE_CACHE: "1"
+  # GIT_COMMIT and BUILD_DATE are set dynamically
+
+# Image metadata
+labels:
+  org.opencontainers.image.source: "https://github.com/mfahsold/montage-ai"
+  org.opencontainers.image.description: "AI-powered video montage creation"
+  org.opencontainers.image.licenses: "AGPL-3.0"
+  app.kubernetes.io/name: "montage-ai"
+  app.kubernetes.io/part-of: "fluxibri"
+
+# Provenance and SBOM (disabled for faster builds)
+provenance: false
+sbom: false
+
+# Tagging strategy
+tagging:
+  strategy: git-sha  # git-sha | semver | latest
+  additionalTags:
+    - latest         # Always tag as latest when using git-sha
+
+# Deployment targets
+deploy:
+  namespace: montage-ai
+  deployment: montage-ai-web
+  kustomization: deploy/k3s/base/kustomization.yaml

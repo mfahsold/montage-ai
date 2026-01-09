@@ -4,6 +4,8 @@ Test Utilities - Centralized Test Fixtures and Helpers
 Provides reusable test data generators, assertion helpers, and fixtures
 for consistent testing across the Montage AI codebase.
 
+Uses real objects from config.py and audio_analysis_objects.py where applicable.
+
 Usage:
     from montage_ai.test_utils import (
         create_test_scene,
@@ -19,6 +21,15 @@ from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 import tempfile
 from dataclasses import dataclass, field
+
+# Import real objects where available
+from montage_ai.audio_analysis_objects import (
+    BeatInfo, EnergyProfile, SceneDetectionResult, ColorAnalysisResult
+)
+from montage_ai.config import (
+    StyleConfig, EffectConfig, VideoConfigSpec, AudioConfigSpec, 
+    MontageSettingsSpec, QualityProfile
+)
 
 
 # ============================================================================
@@ -323,7 +334,16 @@ class TempFileFixture:
 
 @dataclass
 class MockClip:
-    """Mock clip for testing."""
+    """Simple test helper for clip objects - for tests only.
+    
+    NOT a real production clip. Use create_test_clip() for most testing.
+    This exists for minimal dataclass-based test scenarios where full
+    fixture generation is overkill. Avoids unittest.mock dependency.
+    
+    Example:
+        mock = MockClip(id="c1", score=0.9)
+        assert mock.to_dict()["score"] == 0.9
+    """
     
     id: str = "mock_clip"
     source_path: str = "/test/mock.mp4"
@@ -346,7 +366,16 @@ class MockClip:
 
 @dataclass
 class MockScene:
-    """Mock scene for testing."""
+    """Simple test helper for scene objects - for tests only.
+    
+    NOT a real production scene. Use create_test_scene() for most testing.
+    This exists for minimal dataclass-based test scenarios where full
+    fixture generation is overkill. Avoids unittest.mock dependency.
+    
+    Example:
+        mock = MockScene(id="s1", start_time=0, end_time=10)
+        assert mock.to_dict()["end_time"] == 10
+    """
     
     id: str = "mock_scene"
     start_time: float = 0.0
@@ -450,4 +479,16 @@ __all__ = [
     # Comparisons
     "compare_clips",
     "compare_scenes",
+    # Real Config Objects (re-exported from config.py)
+    "StyleConfig",
+    "EffectConfig",
+    "VideoConfigSpec",
+    "AudioConfigSpec",
+    "MontageSettingsSpec",
+    "QualityProfile",
+    # Real Audio Analysis Objects (re-exported from audio_analysis_objects.py)
+    "BeatInfo",
+    "EnergyProfile",
+    "SceneDetectionResult",
+    "ColorAnalysisResult",
 ]

@@ -6,7 +6,9 @@ from montage_ai.core.selection_engine import SelectionEngine
 @patch("montage_ai.core.montage_builder.get_settings")
 def test_apply_style_scoring(mock_get_settings):
     """Test the abstracted scoring logic."""
-    mock_settings = MagicMock()
+    # Use real MontageSettingsSpec instead of MagicMock
+    from src.montage_ai.config import MontageSettingsSpec
+    mock_settings = MontageSettingsSpec.create_default()
     mock_get_settings.return_value = mock_settings
     
     builder = MontageBuilder()

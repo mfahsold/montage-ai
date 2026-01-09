@@ -14,6 +14,8 @@ from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 import numpy as np
 
+from src.montage_ai.audio_analysis_objects import BeatInfo, EnergyProfile
+
 from src.montage_ai.core.analysis_cache import (
     AnalysisCache,
     AudioAnalysisEntry,
@@ -133,16 +135,21 @@ class TestAnalysisCache:
 
     def test_save_and_load_audio(self, cache, audio_file):
         """Audio analysis can be saved and loaded."""
-        # Create mock beat_info and energy_profile
-        beat_info = MagicMock()
-        beat_info.tempo = 120.0
-        beat_info.beat_times.tolist.return_value = [0.5, 1.0, 1.5]
-        beat_info.duration = 60.0
-        beat_info.sample_rate = 22050
+        # Create real beat_info and energy_profile
+        beat_info = BeatInfo(
+            tempo=120.0,
+            beat_times=np.array([0.5, 1.0, 1.5]),
+            duration=60.0,
+            sample_rate=22050,
+            confidence=0.95
+        )
 
-        energy_profile = MagicMock()
-        energy_profile.times.tolist.return_value = [0.0, 0.5, 1.0]
-        energy_profile.rms.tolist.return_value = [0.2, 0.8, 0.5]
+        energy_profile = EnergyProfile(
+            times=np.array([0.0, 0.5, 1.0]),
+            rms=np.array([0.2, 0.8, 0.5]),
+            duration=60.0,
+            peaks=np.array([1.0, 1.5])
+        )
 
         # Save
         success = cache.save_audio(audio_file, beat_info, energy_profile)
@@ -168,15 +175,20 @@ class TestAnalysisCache:
     def test_audio_cache_invalidation_on_file_change(self, cache, audio_file):
         """Cache is invalidated when source file changes."""
         # Create and save cache
-        beat_info = MagicMock()
-        beat_info.tempo = 120.0
-        beat_info.beat_times = np.array([0.5])
-        beat_info.duration = 30.0
-        beat_info.sample_rate = 22050
+        beat_info = BeatInfo(
+            tempo=120.0,
+            beat_times=np.array([0.5]),
+            duration=30.0,
+            sample_rate=22050,
+            confidence=0.95
+        )
 
-        energy_profile = MagicMock()
-        energy_profile.times = np.array([0.0])
-        energy_profile.rms = np.array([0.5])
+        energy_profile = EnergyProfile(
+            times=np.array([0.0]),
+            rms=np.array([0.5]),
+            duration=30.0,
+            peaks=np.array([])
+        )
 
         assert cache.save_audio(audio_file, beat_info, energy_profile) is True
 
@@ -321,15 +333,20 @@ class TestAnalysisCache:
 
     def test_clear_audio_cache(self, cache, audio_file):
         """clear_audio_cache removes cache file."""
-        beat_info = MagicMock()
-        beat_info.tempo = 120.0
-        beat_info.beat_times.tolist.return_value = [0.5]
-        beat_info.duration = 30.0
-        beat_info.sample_rate = 22050
+        beat_info = BeatInfo(
+            tempo=120.0,
+            beat_times=np.array([0.5]),
+            duration=30.0,
+            sample_rate=22050,
+            confidence=0.95
+        )
 
-        energy_profile = MagicMock()
-        energy_profile.times.tolist.return_value = [0.0]
-        energy_profile.rms.tolist.return_value = [0.5]
+        energy_profile = EnergyProfile(
+            times=np.array([0.0]),
+            rms=np.array([0.5]),
+            duration=30.0,
+            peaks=np.array([])
+        )
 
         cache.save_audio(audio_file, beat_info, energy_profile)
         assert cache.load_audio(audio_file) is not None
@@ -361,15 +378,20 @@ class TestAnalysisCache:
 
     def test_disabled_cache_never_saves(self, disabled_cache, audio_file):
         """Disabled cache never saves data."""
-        beat_info = MagicMock()
-        beat_info.tempo = 120.0
-        beat_info.beat_times = np.array([])
-        beat_info.duration = 30.0
-        beat_info.sample_rate = 22050
+        beat_info = BeatInfo(
+            tempo=120.0,
+            beat_times=np.array([]),
+            duration=30.0,
+            sample_rate=22050,
+            confidence=0.95
+        )
 
-        energy_profile = MagicMock()
-        energy_profile.times = np.array([])
-        energy_profile.rms = np.array([])
+        energy_profile = EnergyProfile(
+            times=np.array([]),
+            rms=np.array([]),
+            duration=30.0,
+            peaks=np.array([])
+        )
 
         result = disabled_cache.save_audio(audio_file, beat_info, energy_profile)
         assert result is False
@@ -461,15 +483,20 @@ class TestCacheRobustness:
         audio_file = tmp_path / "test.mp3"
         audio_file.write_bytes(b"audio")
 
-        beat_info = MagicMock()
-        beat_info.tempo = 120.0
-        beat_info.beat_times = np.array([])
-        beat_info.duration = 30.0
-        beat_info.sample_rate = 22050
+        beat_info = BeatInfo(
+            tempo=120.0,
+            beat_times=np.array([]),
+            duration=30.0,
+            sample_rate=22050,
+            confidence=0.95
+        )
 
-        energy_profile = MagicMock()
-        energy_profile.times = np.array([])
-        energy_profile.rms = np.array([])
+        energy_profile = EnergyProfile(
+            times=np.array([]),
+            rms=np.array([]),
+            duration=30.0,
+            peaks=np.array([])
+        )
 
         # Mock write to fail
         with patch("builtins.open", side_effect=PermissionError("denied")):
