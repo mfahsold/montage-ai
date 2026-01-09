@@ -538,6 +538,11 @@ def interpret_creative_prompt():
                 effects = EDITING_INSTRUCTIONS.get('effects', {})
                 transitions = EDITING_INSTRUCTIONS.get('transitions', {})
 
+                style = style or {}
+                pacing = pacing or {}
+                transitions = transitions or {}
+                effects = effects or {}
+                
                 logger.info(f"   Style Name:       {style.get('name') or 'unknown'}")
                 desc = style.get('description') or 'N/A'
                 logger.info(f"   Description:      {desc[:60]}...")
