@@ -59,6 +59,22 @@ class JobProgressDisplay {
                         <span class="info-label">Remaining:</span>
                         <span class="info-value" id="remaining-${this.jobId}">Calculating...</span>
                     </div>
+                    <div class="info-row" id="item-row-${this.jobId}" style="display: none;">
+                        <span class="info-label">Processing:</span>
+                        <span class="info-value" id="current-item-${this.jobId}">-</span>
+                    </div>
+                    <div class="info-row" id="resource-row-${this.jobId}" style="display: none;">
+                        <span class="info-label">Resources:</span>
+                        <span class="info-value">
+                            CPU: <span id="cpu-${this.jobId}">-</span> |
+                            RAM: <span id="memory-${this.jobId}">-</span>
+                            <span id="pressure-${this.jobId}" class="pressure-badge" style="display: none;"></span>
+                        </span>
+                    </div>
+                    <div class="info-row" id="gpu-row-${this.jobId}" style="display: none;">
+                        <span class="info-label">GPU:</span>
+                        <span class="info-value" id="gpu-${this.jobId}">-</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -117,10 +133,51 @@ class JobProgressDisplay {
         if (data.time_remaining !== null && data.time_remaining !== undefined) {
             const remainingRow = document.getElementById(`remaining-row-${this.jobId}`);
             remainingRow.style.display = 'flex';
-            document.getElementById(`remaining-${this.jobId}`).textContent = 
+            document.getElementById(`remaining-${this.jobId}`).textContent =
                 this.formatTime(data.time_remaining);
         }
-        
+
+        // Update current item (if available)
+        if (data.current_item) {
+            const itemRow = document.getElementById(`item-row-${this.jobId}`);
+            if (itemRow) {
+                itemRow.style.display = 'flex';
+                document.getElementById(`current-item-${this.jobId}`).textContent = data.current_item;
+            }
+        }
+
+        // Update resource metrics (if available)
+        if (data.cpu_percent != null || data.memory_mb != null) {
+            const resourceRow = document.getElementById(`resource-row-${this.jobId}`);
+            if (resourceRow) {
+                resourceRow.style.display = 'flex';
+                if (data.cpu_percent != null) {
+                    document.getElementById(`cpu-${this.jobId}`).textContent = `${data.cpu_percent.toFixed(0)}%`;
+                }
+                if (data.memory_mb != null) {
+                    document.getElementById(`memory-${this.jobId}`).textContent = `${data.memory_mb.toFixed(0)} MB`;
+                }
+                // Memory pressure badge
+                if (data.memory_pressure && data.memory_pressure !== 'normal') {
+                    const pressureBadge = document.getElementById(`pressure-${this.jobId}`);
+                    if (pressureBadge) {
+                        pressureBadge.style.display = 'inline';
+                        pressureBadge.textContent = data.memory_pressure.toUpperCase();
+                        pressureBadge.className = `pressure-badge pressure-${data.memory_pressure}`;
+                    }
+                }
+            }
+        }
+
+        // Update GPU info (if available)
+        if (data.gpu_util) {
+            const gpuRow = document.getElementById(`gpu-row-${this.jobId}`);
+            if (gpuRow) {
+                gpuRow.style.display = 'flex';
+                document.getElementById(`gpu-${this.jobId}`).textContent = data.gpu_util;
+            }
+        }
+
         // Check if complete
         if (data.phase === 'complete') {
             this.onComplete();
@@ -358,6 +415,36 @@ const progressStyles = `
 .progress-cancelled {
     border-color: var(--muted);
     opacity: 0.7;
+}
+
+/* Memory pressure badges */
+.pressure-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+    margin-left: 0.5rem;
+}
+
+.pressure-elevated {
+    background: var(--warning, #f59e0b);
+    color: #000;
+}
+
+.pressure-high {
+    background: var(--error, #ef4444);
+    color: #fff;
+}
+
+.pressure-critical {
+    background: #7f1d1d;
+    color: #fff;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }
 `;
 

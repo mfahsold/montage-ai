@@ -358,18 +358,42 @@ class VideoWorkflow(ABC):
         
         self.job_store.update_job(self.options.job_id, updates)
     
-    def _update_progress(self, percent: int, message: Optional[str] = None) -> None:
+    def _update_progress(
+        self,
+        percent: int,
+        message: Optional[str] = None,
+        current_item: Optional[str] = None,
+        cpu_percent: Optional[float] = None,
+        memory_mb: Optional[float] = None,
+        gpu_util: Optional[str] = None,
+        memory_pressure: Optional[str] = None,
+    ) -> None:
         """
-        Update progress percentage.
-        
+        Update progress percentage with optional resource metrics.
+
         Args:
             percent: Progress percentage (0-100)
             message: Optional status message
+            current_item: Current file/clip being processed
+            cpu_percent: Process CPU usage %
+            memory_mb: Process memory (RSS) in MB
+            gpu_util: GPU utilization string
+            memory_pressure: Memory pressure level
         """
-        updates = {"progress_percent": percent}
+        updates: Dict[str, Any] = {"progress_percent": percent}
         if message:
             updates["message"] = message
-        
+        if current_item:
+            updates["current_item"] = current_item
+        if cpu_percent is not None:
+            updates["cpu_percent"] = cpu_percent
+        if memory_mb is not None:
+            updates["memory_mb"] = memory_mb
+        if gpu_util:
+            updates["gpu_util"] = gpu_util
+        if memory_pressure:
+            updates["memory_pressure"] = memory_pressure
+
         self.job_store.update_job(self.options.job_id, updates)
 
 

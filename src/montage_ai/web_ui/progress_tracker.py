@@ -37,6 +37,13 @@ class ProgressInfo:
     current_step: Optional[str] = None
     total_steps: Optional[int] = None
     current_step_num: Optional[int] = None
+
+    # Hardware resource metrics (for real-time visibility)
+    current_item: Optional[str] = None   # e.g., "video_001.mp4", "clip_12"
+    cpu_percent: Optional[float] = None  # Process CPU usage %
+    memory_mb: Optional[float] = None    # Process memory (RSS) in MB
+    gpu_util: Optional[str] = None       # GPU utilization string from cgpu_utils
+    memory_pressure: Optional[str] = None  # "normal", "elevated", "high", "critical"
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -90,18 +97,28 @@ class ProgressTracker:
         
         return self._create_progress_info(message or self.PHASE_NAMES[phase])
     
-    def update_progress(self, progress: float, message: str = "", 
+    def update_progress(self, progress: float, message: str = "",
                        current_step: Optional[str] = None,
                        current_step_num: Optional[int] = None,
-                       total_steps: Optional[int] = None) -> ProgressInfo:
+                       total_steps: Optional[int] = None,
+                       current_item: Optional[str] = None,
+                       cpu_percent: Optional[float] = None,
+                       memory_mb: Optional[float] = None,
+                       gpu_util: Optional[str] = None,
+                       memory_pressure: Optional[str] = None) -> ProgressInfo:
         """Update progress within current phase"""
         self.phase_progress = max(0.0, min(1.0, progress))
-        
+
         return self._create_progress_info(
             message or self.PHASE_NAMES[self.current_phase],
             current_step=current_step,
             current_step_num=current_step_num,
-            total_steps=total_steps
+            total_steps=total_steps,
+            current_item=current_item,
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
+            gpu_util=gpu_util,
+            memory_pressure=memory_pressure,
         )
     
     def cancel(self) -> ProgressInfo:
@@ -142,8 +159,13 @@ class ProgressTracker:
     def _create_progress_info(self, message: str,
                              current_step: Optional[str] = None,
                              current_step_num: Optional[int] = None,
-                             total_steps: Optional[int] = None) -> ProgressInfo:
-        """Create ProgressInfo object"""
+                             total_steps: Optional[int] = None,
+                             current_item: Optional[str] = None,
+                             cpu_percent: Optional[float] = None,
+                             memory_mb: Optional[float] = None,
+                             gpu_util: Optional[str] = None,
+                             memory_pressure: Optional[str] = None) -> ProgressInfo:
+        """Create ProgressInfo object with optional resource metrics"""
         return ProgressInfo(
             job_id=self.job_id,
             phase=self.current_phase,
@@ -154,7 +176,12 @@ class ProgressTracker:
             time_remaining=self._estimate_time_remaining(),
             current_step=current_step,
             current_step_num=current_step_num,
-            total_steps=total_steps
+            total_steps=total_steps,
+            current_item=current_item,
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
+            gpu_util=gpu_util,
+            memory_pressure=memory_pressure,
         )
 
 class ProgressManager:

@@ -33,6 +33,7 @@ from pathlib import Path
 from .config import get_settings
 from .logger import logger
 from .ffmpeg_utils import build_ffmpeg_cmd
+from .environment_setup import initialize_environment
 
 # Get settings instance (fresh instantiation, avoids cached dataclass issue)
 _settings = get_settings()
@@ -213,6 +214,11 @@ ASSETS_DIR = str(_settings.paths.assets_dir)
 OUTPUT_DIR = str(_settings.paths.output_dir)
 TEMP_DIR = str(_settings.paths.temp_dir)
 
+# Run idempotent environment setup once at import to prep directories and sanity checks.
+_ENVIRONMENT_READY = initialize_environment(OUTPUT_DIR, INPUT_DIR)
+if not _ENVIRONMENT_READY:
+    logger.warning("Environment initialization reported issues; continuing anyway")
+
 # Job Identification (for parallel runs)
 JOB_ID = _settings.job_id
 
@@ -294,6 +300,24 @@ PARALLEL_ENHANCE = _settings.processing.parallel_enhance
 # Low-memory mode: use adaptive values for constrained hardware
 _LOW_MEMORY_MODE = _settings.features.low_memory_mode
 MAX_PARALLEL_JOBS = _settings.processing.get_adaptive_parallel_jobs(_LOW_MEMORY_MODE)
+MAX_CONCURRENT_JOBS = _settings.processing.max_concurrent_jobs
+
+
+def _log_effective_parallelism() -> None:
+    """Log the parallelism knobs so users see env overrides at startup."""
+    env_overrides = []
+    if "MAX_PARALLEL_JOBS" in os.environ:
+        env_overrides.append("MAX_PARALLEL_JOBS")
+    if "MAX_CONCURRENT_JOBS" in os.environ:
+        env_overrides.append("MAX_CONCURRENT_JOBS")
+    override_note = f" env={','.join(env_overrides)}" if env_overrides else ""
+    logger.info(
+        f"⚙️ Parallelism: max_parallel_jobs={MAX_PARALLEL_JOBS}, "
+        f"max_concurrent_jobs={MAX_CONCURRENT_JOBS}, low_memory_mode={_LOW_MEMORY_MODE}{override_note}"
+    )
+
+# Emit parallelism summary after settings are computed
+_log_effective_parallelism()
 
 # Quality: CRF for final encoding (18 = visually lossless, 23 = good balance for tests)
 FINAL_CRF = _settings.encoding.crf
@@ -800,6 +824,28 @@ def _export_timeline_for_nle(builder, result, settings) -> None:
         logger.info(f"   ✅ {fmt.upper()}: {path}")
 
 
+def _get_cli_progress_callback():
+    """
+    Get CLI progress callback using the unified progress system.
+
+    Returns a callback that handles both old (int, str) and new (dict) signatures
+    for backward compatibility during migration.
+    """
+    from .progress import CLIProgress, ProgressUpdate
+
+    cli_progress = CLIProgress()
+
+    def callback(update_or_percent, message: str = None):
+        """Adapter for legacy and new callback signatures."""
+        if isinstance(update_or_percent, dict):
+            update = ProgressUpdate.from_dict(update_or_percent)
+        else:
+            update = ProgressUpdate(percent=update_or_percent, message=message or "")
+        cli_progress(update)
+
+    return callback
+
+
 def create_montage(variant_id: int = 1) -> Optional[str]:
     """
     Create a video montage from input footage and music.
@@ -836,6 +882,7 @@ def create_montage(variant_id: int = 1) -> Optional[str]:
                 variant_id=variant_id,
                 settings=_settings,
                 editing_instructions=EDITING_INSTRUCTIONS,
+                progress_callback=_get_cli_progress_callback(),
             )
             result = builder.build()
 

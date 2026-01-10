@@ -62,21 +62,52 @@ class MontageWorkflow(VideoWorkflow):
         if self.options.extras.get('music_end'):
             editing_instructions['music_end'] = self.options.extras.get('music_end')
             
-        # Define progress callback wrapper
-        def builder_progress_callback(percent: int, message: str):
+        # Define progress callback wrapper (supports both old and new signatures)
+        def builder_progress_callback(percent_or_update, message: str = None):
+            """
+            Progress callback that supports:
+            - Old signature: (percent: int, message: str)
+            - New signature: (update: dict) with keys: percent, message, current_item, etc.
+            """
+            # Handle dict-based update (new signature with resources)
+            if isinstance(percent_or_update, dict):
+                update = percent_or_update
+                percent = update.get("percent", 0)
+                message = update.get("message", "")
+                current_item = update.get("current_item")
+                cpu_percent = update.get("cpu_percent")
+                memory_mb = update.get("memory_mb")
+                gpu_util = update.get("gpu_util")
+                memory_pressure = update.get("memory_pressure")
+            else:
+                # Old signature (int, str)
+                percent = percent_or_update
+                current_item = None
+                cpu_percent = None
+                memory_mb = None
+                gpu_util = None
+                memory_pressure = None
+
             # Map builder progress (0-100 of a specific phase) to global workflow progress
-            # This is a simplification; ideally we map phases more accurately
             if self.current_phase == WorkflowPhase.ANALYZING:
                 # Analyzing is 10-40% of standard workflow
                 global_percent = 10 + int(percent * 0.3)
-                self._update_progress(global_percent, message)
             elif self.current_phase == WorkflowPhase.RENDERING:
                 # Rendering is 60-90% of standard workflow
                 global_percent = 60 + int(percent * 0.3)
-                self._update_progress(global_percent, message)
             else:
                 # Default pass-through
-                self._update_progress(percent, message)
+                global_percent = percent
+
+            self._update_progress(
+                global_percent,
+                message,
+                current_item=current_item,
+                cpu_percent=cpu_percent,
+                memory_mb=memory_mb,
+                gpu_util=gpu_util,
+                memory_pressure=memory_pressure,
+            )
 
         # Initialize builder
         self.builder = MontageBuilder(

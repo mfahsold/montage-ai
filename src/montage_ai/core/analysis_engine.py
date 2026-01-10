@@ -42,29 +42,71 @@ def _detect_video_scenes_worker(v_path: str, threshold: float) -> Tuple[str, Lis
 # Resource Monitoring Utility
 # =============================================================================
 
-def _log_resource_usage(phase: str, progress_pct: int = 0) -> None:
+def get_resource_snapshot() -> Dict[str, Any]:
+    """
+    Get current resource usage as a dict for progress updates.
+    Can be spread into progress callback payloads for SSE broadcast.
+
+    Returns:
+        Dict with cpu_percent, memory_mb, memory_pressure, gpu_util keys.
+        Values may be None if collection fails.
+    """
+    result: Dict[str, Any] = {
+        "cpu_percent": None,
+        "memory_mb": None,
+        "memory_pressure": None,
+        "gpu_util": None,
+    }
+
+    try:
+        process = psutil.Process(os.getpid())
+        result["cpu_percent"] = process.cpu_percent(interval=0.1)
+        result["memory_mb"] = process.memory_info().rss / 1024 / 1024
+    except Exception:
+        pass
+
+    try:
+        from ..memory_monitor import get_memory_manager
+        mem_manager = get_memory_manager()
+        result["memory_pressure"] = mem_manager.get_memory_pressure_level()
+    except Exception:
+        pass
+
+    try:
+        from ..cgpu_utils import get_cgpu_metrics
+        result["gpu_util"] = get_cgpu_metrics()
+    except Exception:
+        pass
+
+    return result
+
+
+def _log_resource_usage(phase: str, progress_pct: int = 0) -> Dict[str, Any]:
     """
     Log CPU, memory, and disk usage for progress visibility.
     Call periodically during long-running tasks.
+
+    Returns:
+        Resource snapshot dict (same as get_resource_snapshot).
     """
+    snapshot = get_resource_snapshot()
+
     try:
-        process = psutil.Process(os.getpid())
-        
-        # CPU and Memory for this process
-        cpu_pct = process.cpu_percent(interval=0.1)
-        mem_info = process.memory_info()
-        mem_mb = mem_info.rss / 1024 / 1024
-        
-        # System-wide resource usage
+        cpu_pct = snapshot.get("cpu_percent") or 0
+        mem_mb = snapshot.get("memory_mb") or 0
+
+        # System-wide resource usage for CLI logging
         sys_cpu = psutil.cpu_percent(interval=0.05)
-        sys_mem = psutil.virtual_memory()
-        sys_mem_pct = sys_mem.percent
-        
+        sys_mem_pct = psutil.virtual_memory().percent
+
         # Log in compact format
         progress_str = f" [{progress_pct}%]" if progress_pct > 0 else ""
-        logger.info(f"   📊 {phase}{progress_str}: CPU process={cpu_pct:.1f}% sys={sys_cpu:.1f}% | Memory process={mem_mb:.0f}MB sys={sys_mem_pct:.1f}%")
+        gpu_str = f" | GPU: {snapshot['gpu_util']}" if snapshot.get("gpu_util") else ""
+        logger.info(f"   📊 {phase}{progress_str}: CPU process={cpu_pct:.1f}% sys={sys_cpu:.1f}% | Memory process={mem_mb:.0f}MB sys={sys_mem_pct:.1f}%{gpu_str}")
     except Exception as e:
         logger.debug(f"Resource logging failed: {e}")
+
+    return snapshot
 
 
 class AssetAnalyzer:
@@ -175,7 +217,7 @@ class AssetAnalyzer:
         Load and analyze music file with caching support.
         Populates self.ctx.media.audio_result.
         """
-        from ..audio_analysis import get_beat_times, analyze_music_energy, detect_music_sections
+        from ..audio_analysis import analyze_audio_parallel, detect_music_sections
 
         # Get music files
         music_files = self._get_files(self.ctx.paths.music_dir, ('.mp3', '.wav'))
@@ -240,9 +282,10 @@ class AssetAnalyzer:
                 sections=sections
             )
         else:
-            # Cache miss - analyze and cache
-            beat_info = get_beat_times(music_path, verbose=self.settings.features.verbose)
-            energy_profile = analyze_music_energy(music_path, verbose=self.settings.features.verbose)
+            # Cache miss - analyze and cache (PARALLEL for ~2x speedup)
+            beat_info, energy_profile = analyze_audio_parallel(
+                music_path, verbose=self.settings.features.verbose
+            )
             sections = detect_music_sections(energy_profile)
 
             # Store in context
@@ -382,16 +425,24 @@ class AssetAnalyzer:
                         # Update progress
                         completed_tasks += 1
                         progress_pct = int((completed_tasks / total_tasks) * 100)
-                        
-                        if progress_callback:
-                            msg = f"Detecting scenes in {os.path.basename(v_path)} ({completed_tasks}/{total_tasks})"
-                            progress_callback(progress_pct, msg)
-                        
-                        # Log resource usage every 5 seconds
+                        basename = os.path.basename(v_path)
+
+                        # Log + collect resource snapshot every 5 seconds (rate-limited)
                         now = time.time()
+                        snapshot = {}
                         if now - last_log_time >= 5.0:
-                            _log_resource_usage(f"Scene Detection", progress_pct)
+                            snapshot = _log_resource_usage("Scene Detection", progress_pct)
                             last_log_time = now
+
+                        if progress_callback:
+                            msg = f"Detecting scenes in {basename} ({completed_tasks}/{total_tasks})"
+                            # New dict-based callback with resources
+                            progress_callback({
+                                "percent": progress_pct,
+                                "message": msg,
+                                "current_item": basename,
+                                **snapshot,
+                            })
             except Exception as e:
                 # Fallback to ThreadPool if ProcessPool fails (e.g., pickle issues)
                 logger.warning(f"   ⚠️ ProcessPool failed ({e}), falling back to ThreadPool")
@@ -407,14 +458,23 @@ class AssetAnalyzer:
                         cache.save_scenes(v_path, threshold, scenes)
                         completed_tasks += 1
                         progress_pct = int((completed_tasks / total_tasks) * 100)
-                        
-                        # Log resource usage every 5 seconds
+                        basename = os.path.basename(v_path)
+
+                        # Log + collect resource snapshot every 5 seconds
                         now = time.time()
+                        snapshot = {}
                         if now - last_log_time >= 5.0:
-                            _log_resource_usage(f"Scene Detection (ThreadPool)", progress_pct)
+                            snapshot = _log_resource_usage("Scene Detection (ThreadPool)", progress_pct)
                             last_log_time = now
-                        detected_scenes[v_path] = scenes
-                        cache.save_scenes(v_path, threshold, scenes)
+
+                        if progress_callback:
+                            msg = f"Detecting scenes in {basename} ({completed_tasks}/{total_tasks})"
+                            progress_callback({
+                                "percent": progress_pct,
+                                "message": msg,
+                                "current_item": basename,
+                                **snapshot,
+                            })
 
         # Combine cached and detected scenes
         all_video_scenes = {**cached_scenes, **detected_scenes}

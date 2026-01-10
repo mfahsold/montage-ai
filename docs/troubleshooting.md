@@ -25,25 +25,17 @@ Or offload processing to cloud GPU:
 ```bash
 CGPU_GPU_ENABLED=true ./montage-ai.sh run --upscale
 ```
-
 ---
 
 ## Slow Performance
-
 **Symptom:** Rendering takes forever
 
 **Fix:**
-
-```bash
 # Speed over quality
-FFMPEG_PRESET=ultrafast \
 PARALLEL_ENHANCE=true \
-STABILIZE=false \
 UPSCALE=false \
-./montage-ai.sh run
 ```
 
-Or just use preview mode:
 
 ```bash
 ./montage-ai.sh preview hitchcock
@@ -74,7 +66,6 @@ Or just use preview mode:
 
 **Common CUDA errors:**
 
-| Error                | Cause              | Solution                               |
 | -------------------- | ------------------ | -------------------------------------- |
 | `CUDA out of memory` | Video too large    | Use smaller clips or reduce resolution |
 | `session expired`    | Colab disconnected | Runs auto-retry (2 attempts)           |
@@ -90,7 +81,6 @@ Or just use preview mode:
 ls data/input/   # Should see your .mp4 files
 ```
 
-**"No music found"**
 
 ```bash
 ls data/music/   # Should see your .mp3 file
@@ -106,7 +96,6 @@ ls data/music/   # Should see your .mp3 file
 
 ```bash
 # Enable auto-cleanup (default in recent versions)
-AUTO_CLEANUP=true ./montage-ai.sh run
 
 # Manual cleanup
 docker exec montage-ai rm -rf /tmp/*.mp4
@@ -123,7 +112,6 @@ docker exec montage-ai rm -rf /tmp/*.mp4
 docker ps | grep web-ui
 
 # Check logs
-docker compose -f docker-compose.web.yml logs
 
 # Port in use? Try different port
 docker compose -f docker-compose.web.yml up -d -e PORT=5002
@@ -139,7 +127,6 @@ FFmpeg is included in the Docker image. If running locally:
 
 ```bash
 # Ubuntu/Debian
-sudo apt install ffmpeg
 
 # macOS
 brew install ffmpeg
