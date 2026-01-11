@@ -7,9 +7,9 @@
 IMAGE_NAME ?= ghcr.io/mfahsold/montage-ai
 IMAGE_TAG ?= latest
 REGISTRY ?= ghcr.io/mfahsold
-# For cluster deployments: Use local k3s registry (192.168.1.12:5000) instead of GHCR
-# Override with: make cluster CLUSTER_REGISTRY=192.168.1.12:5000
-CLUSTER_REGISTRY ?= 192.168.1.12:5000
+# Default: GHCR for reliable public registry (multi-arch)
+# For cluster-only deployments, override with CLUSTER_REGISTRY=192.168.1.12:30500
+CLUSTER_REGISTRY ?= ghcr.io/mfahsold
 NAMESPACE ?= montage-ai
 PLATFORM ?= linux/amd64
 PLATFORMS ?= linux/amd64,linux/arm64
@@ -32,10 +32,19 @@ help: ## Show this help
 	@echo "  make dev-shell      Interactive shell for debugging"
 	@echo ""
 	@echo "$(GREEN)Cluster Deployment (2-15 min):$(RESET)"
-	@echo "  make cluster        Build + push + deploy (all-in-one)"
+	@echo "  make cluster           Build + push + deploy (all-in-one)"
+	@echo "  make cluster-build     Multi-arch build (ARM64+AMD64)"
+	@echo "  make cluster-build-fast Single-arch quick build"
+	@echo ""
+	@echo "$(GREEN)Builder Management:$(RESET)"
+	@echo "  make builder-setup  Setup distributed builder"
+	@echo "  make builder-status Show builder status"
 	@echo ""
 	@echo "$(GREEN)CI / Validation:$(RESET)"
 	@echo "  make ci             Run vendor-agnostic CI checks locally"
+	@echo ""
+	@echo "$(GREEN)Releases:$(RESET)"
+	@echo "  make release-ghcr   Build + push to GitHub Container Registry"
 	@echo ""
 	@echo "$(GREEN)Maintenance:$(RESET)"
 	@echo "  make clean          Clean local caches"
@@ -105,10 +114,15 @@ dev-shell: ## Interactive shell for debugging
 
 cluster: cluster-build cluster-deploy ## Build + deploy to cluster (all-in-one)
 
-cluster-build: ## Build multi-arch with registry cache
-	@echo "$(CYAN)Building for cluster (multi-arch)...$(RESET)"
+cluster-build: ## Build multi-arch with distributed builder + registry cache
+	@echo "$(CYAN)Building for cluster (multi-arch, distributed)...$(RESET)"
 	@echo "$(YELLOW)First build: 15-20 min | Incremental: ~2 min$(RESET)"
-	REGISTRY=$(CLUSTER_REGISTRY) TAG=$(IMAGE_TAG) PUSH=true ./scripts/build_with_cache.sh
+	REGISTRY=$(CLUSTER_REGISTRY) TAG=$(IMAGE_TAG) ./scripts/build-distributed.sh
+	@echo "$(GREEN)✓ Image pushed to registry$(RESET)"
+
+cluster-build-fast: ## Quick single-arch build for current platform
+	@echo "$(CYAN)Building for cluster (single-arch, fast)...$(RESET)"
+	REGISTRY=$(CLUSTER_REGISTRY) TAG=$(IMAGE_TAG) PLATFORMS=linux/amd64 ./scripts/build-distributed.sh
 	@echo "$(GREEN)✓ Image pushed to registry$(RESET)"
 
 cluster-deploy: ## Deploy to Kubernetes cluster
@@ -120,12 +134,39 @@ cluster-deploy: ## Deploy to Kubernetes cluster
 	@echo "$(GREEN)✓ Deployment complete$(RESET)"
 
 # ============================================================================
+# BUILDER SETUP
+# ============================================================================
+
+builder-setup: ## Setup distributed builder (parallel ARM64+AMD64)
+	@echo "$(CYAN)Setting up distributed builder...$(RESET)"
+	@./scripts/setup_distributed_builder.sh
+	@echo "$(GREEN)✓ Distributed builder ready$(RESET)"
+
+builder-status: ## Show buildx builder status
+	@echo "$(CYAN)Builder Status$(RESET)"
+	@docker buildx ls
+	@echo ""
+	@echo "Active builder platforms:"
+	@docker buildx inspect --bootstrap 2>/dev/null | grep -E "Platforms|Name|Driver" || echo "No active builder"
+
+# ============================================================================
+# RELEASES (GitHub Container Registry)
+# ============================================================================
+
+release-ghcr: ## Build + push to GitHub Container Registry
+	@echo "$(CYAN)Building for GHCR release...$(RESET)"
+	REGISTRY=ghcr.io/mfahsold TAG=$(IMAGE_TAG) ./scripts/build-distributed.sh
+	@echo "$(GREEN)✓ Image pushed to ghcr.io/mfahsold/montage-ai:$(IMAGE_TAG)$(RESET)"
+
+# ============================================================================
 # MAINTENANCE
 # ============================================================================
 
 clean: ## Clean local caches and Docker resources
-	@echo "$(CYAN)Cleaning local caches...$(RESET)"
+	@echo "$(CYAN)Cleaning local resources...$(RESET)"
 	rm -rf $(CACHE_DIR)
+	docker compose down -v 2>/dev/null || true
+	docker rmi $(IMAGE_NAME):$(IMAGE_TAG) 2>/dev/null || true
 	docker buildx prune -f
 	@echo "$(GREEN)✓ Caches cleared$(RESET)"
 
@@ -284,15 +325,6 @@ ci: ## Run CI locally (no GitHub Actions required)
 	@echo "$(CYAN)Running vendor-agnostic CI pipeline...$(RESET)"
 	./scripts/ci.sh
 	@echo "$(GREEN)✓ CI checks completed$(RESET)"
-
-# ============================================================================
-# MAINTENANCE
-# ============================================================================
-
-clean: ## Clean up local Docker resources
-	@echo "$(CYAN)Cleaning up local resources...$(RESET)"
-	docker compose down -v 2>/dev/null || true
-	docker rmi $(IMAGE_NAME):$(IMAGE_TAG) 2>/dev/null || true
 
 clean-k8s: ## Clean up Kubernetes resources
 	@echo "$(YELLOW)Deleting montage-ai namespace...$(RESET)"
