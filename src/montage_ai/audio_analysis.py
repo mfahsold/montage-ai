@@ -42,6 +42,13 @@ try:
 except ImportError:
     CGPU_AVAILABLE = False
 
+# SOTA: GPU-accelerated spectral analysis (CuPy/PyTorch)
+try:
+    from .audio_analysis_gpu import is_gpu_audio_available, gpu_spectral_analysis, gpu_energy_analysis
+    GPU_AUDIO_AVAILABLE = is_gpu_audio_available()
+except ImportError:
+    GPU_AUDIO_AVAILABLE = False
+
 _settings = get_settings()
 
 
@@ -1325,6 +1332,26 @@ def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> Ene
             print(f"   📊 High Energy (>70%): {profile.high_energy_pct:.1f}% of track")
 
         return profile
+
+    # SOTA: Try GPU-accelerated analysis (CuPy/PyTorch, ~10x faster on large files)
+    if GPU_AUDIO_AVAILABLE:
+        try:
+            gpu_result = gpu_energy_analysis(audio_path)
+            if gpu_result:
+                if verbose:
+                    logger.info("   🚀 Using GPU-accelerated audio analysis (SOTA)")
+                profile = EnergyProfile(
+                    times=gpu_result['times'],
+                    rms=gpu_result['rms'],
+                    sample_rate=gpu_result.get('sample_rate', 44100),
+                    hop_length=gpu_result.get('hop_length', 512)
+                )
+                if verbose:
+                    print(f"   📊 Energy Stats: avg={profile.avg_energy:.2f}, max={profile.max_energy:.2f}, min={profile.min_energy:.2f}")
+                    print(f"   📊 High Energy (>70%): {profile.high_energy_pct:.1f}% of track")
+                return profile
+        except Exception as e:
+            logger.debug(f"GPU audio analysis failed: {e}, falling back to FFmpeg")
 
     # OPTIMIZATION: FFmpeg astats is primary (20-50x faster than librosa)
     # Uses bare-metal FFmpeg ebur128 + astats filters for professional audio analysis

@@ -1,18 +1,23 @@
 """
-Intelligent Clip Selection with LLM Reasoning
+Intelligent Clip Selection with LLM/VLM Reasoning
 
-Enhances clip selection from heuristic scoring to context-aware LLM reasoning.
+Enhances clip selection from heuristic scoring to context-aware AI reasoning.
 
 Architecture:
-    Heuristic Filter → Top N Candidates → LLM Ranking → Best Clip
+    Heuristic Filter → Top N Candidates → LLM/VLM Ranking → Best Clip
+
+Backends (Priority Order):
+    1. VLM (Vision-Language Model) - Qwen2.5-VL, VILA, InternVideo2
+    2. LLM (Text-only) - CreativeDirector
+    3. Heuristic (fallback)
 
 Benefits:
     - Context-aware decisions (style, previous clips, energy, position)
+    - Visual understanding via VLM (SOTA, query-based selection)
     - Explainable reasoning (shown in logs/UI)
     - Better continuity and flow
-    - Preparation for advanced ML features
 
-Version: 0.1.0
+Version: 0.2.0
 """
 
 import json
@@ -28,9 +33,15 @@ try:
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
-    logger.warning("CreativeDirector not available - LLM clip selection disabled")
 
-VERSION = "0.1.0"
+# SOTA: Import VLM Clip Selector (Qwen2.5-VL, VILA, InternVideo2)
+try:
+    from .vlm_clip_selector import VLMClipSelector, get_available_vlm_backend
+    VLM_AVAILABLE = get_available_vlm_backend() is not None
+except ImportError:
+    VLM_AVAILABLE = False
+
+VERSION = "0.2.0"
 
 # Feature toggle - enabled by default for better clip selection
 LLM_CLIP_SELECTION = get_settings().features.llm_clip_selection
@@ -56,32 +67,51 @@ class ClipRanking:
 
 class IntelligentClipSelector:
     """
-    LLM-powered clip selection with reasoning.
+    AI-powered clip selection with reasoning.
+
+    Backend Priority:
+        1. VLM (Vision-Language Model) - Best for visual understanding
+        2. LLM (Text-only) - Good for context-aware decisions
+        3. Heuristic (fallback) - Fast, deterministic
 
     Workflow:
         1. Get top N candidates by heuristic score (fast filter)
-        2. Ask LLM to rank candidates considering context
+        2. Ask VLM/LLM to rank candidates considering context
         3. Return best clip with reasoning
-        4. Fallback to heuristic if LLM fails
+        4. Fallback to heuristic if AI fails
     """
 
-    def __init__(self, style: str = "dynamic", use_llm: bool = None):
+    def __init__(self, style: str = "dynamic", use_llm: bool = None, use_vlm: bool = None):
         """
         Initialize clip selector.
 
         Args:
             style: Editing style (hitchcock, mtv, etc.)
             use_llm: Force enable/disable LLM (None = auto from env)
+            use_vlm: Force enable/disable VLM (None = auto-detect)
         """
         self.style = style
         self.use_llm = LLM_CLIP_SELECTION if use_llm is None else use_llm
+        self.use_vlm = VLM_AVAILABLE if use_vlm is None else use_vlm
 
-        # Initialize LLM if available and enabled
+        # SOTA: Initialize VLM if available (priority over LLM)
+        self.vlm = None
+        if self.use_vlm and VLM_AVAILABLE:
+            try:
+                self.vlm = VLMClipSelector()
+                backend = get_available_vlm_backend()
+                logger.info(f"   🧠 SOTA VLM Clip Selector enabled ({backend})")
+            except Exception as e:
+                logger.debug(f"VLM initialization failed: {e}")
+                self.vlm = None
+                self.use_vlm = False
+
+        # Initialize LLM as fallback if VLM not available
         self.llm = None
-        if self.use_llm and LLM_AVAILABLE:
+        if self.use_llm and LLM_AVAILABLE and not self.vlm:
             try:
                 self.llm = CreativeDirector()
-                logger.info("Intelligent Clip Selector enabled (LLM-powered)")
+                logger.info("   🧠 Intelligent Clip Selector enabled (LLM-powered)")
             except Exception as e:
                 logger.warning(f"Failed to initialize LLM: {e}")
                 self.use_llm = False
@@ -89,57 +119,82 @@ class IntelligentClipSelector:
         # Tracking
         self.selection_count = 0
         self.llm_success_count = 0
+        self.vlm_success_count = 0
 
     def select_best_clip(
         self,
         candidates: List[ClipCandidate],
         context: Dict[str, Any],
-        top_n: int = 3
+        top_n: int = 3,
+        query: Optional[str] = None
     ) -> tuple[ClipCandidate, str]:
         """
-        Select best clip from candidates using LLM reasoning.
+        Select best clip from candidates using VLM/LLM reasoning.
 
         Args:
             candidates: List of clip candidates (already scored heuristically)
             context: Current editing context (energy, position, previous clips, etc.)
-            top_n: Number of top candidates to send to LLM
+            top_n: Number of top candidates to send to AI
+            query: Optional natural language query for VLM selection
 
         Returns:
             (best_clip, reasoning) tuple
         """
         self.selection_count += 1
 
-        # If LLM disabled or not available, use heuristic
-        if not self.use_llm or self.llm is None or len(candidates) <= 1:
+        # If no AI backend available, use heuristic
+        if (not self.vlm and not self.llm) or len(candidates) <= 1:
             best = max(candidates, key=lambda c: c.heuristic_score)
-            return best, "Heuristic selection (LLM disabled)"
+            return best, "Heuristic selection (AI disabled)"
 
         # Get top N by heuristic score (fast filter)
         candidates_sorted = sorted(candidates, key=lambda c: c.heuristic_score, reverse=True)
         top_candidates = candidates_sorted[:min(top_n, len(candidates))]
 
-        # Try LLM ranking
-        try:
-            rankings = self._query_llm_ranking(top_candidates, context)
+        # SOTA: Try VLM first (visual understanding)
+        if self.vlm and query:
+            try:
+                # Convert to scene dicts for VLM
+                scene_dicts = [
+                    {
+                        "path": c.path,
+                        "start": c.start_time,
+                        "end": c.start_time + c.duration,
+                        "duration": c.duration,
+                        "meta": c.metadata,
+                    }
+                    for c in top_candidates
+                ]
+                vlm_results = self.vlm.select_by_query(scene_dicts, query, top_k=1)
+                if vlm_results:
+                    best_result = vlm_results[0]
+                    # Find matching candidate
+                    for c in top_candidates:
+                        if c.path == best_result.scene.get("path") and abs(c.start_time - best_result.scene.get("start", 0)) < 0.5:
+                            self.vlm_success_count += 1
+                            return c, f"VLM choice ({best_result.score:.0%}): {best_result.reason}"
+            except Exception as e:
+                logger.debug(f"VLM selection failed: {e}")
 
-            if rankings:
-                # Get best ranked clip
-                best_ranking = max(rankings, key=lambda r: r.score)
-                best_clip = top_candidates[best_ranking.clip_index]
+        # Fallback: Try LLM ranking
+        if self.llm:
+            try:
+                rankings = self._query_llm_ranking(top_candidates, context)
 
-                self.llm_success_count += 1
+                if rankings:
+                    # Get best ranked clip
+                    best_ranking = max(rankings, key=lambda r: r.score)
+                    best_clip = top_candidates[best_ranking.clip_index]
 
-                return best_clip, f"LLM choice: {best_ranking.reason}"
-            else:
-                # LLM failed - fallback to heuristic
-                best = top_candidates[0]  # Already sorted
-                return best, "Heuristic fallback (LLM returned no ranking)"
+                    self.llm_success_count += 1
 
-        except Exception as e:
-            logger.warning(f"LLM clip selection error: {e}")
-            # Fallback to heuristic
-            best = top_candidates[0]
-            return best, f"Heuristic fallback (LLM error: {str(e)[:50]})"
+                    return best_clip, f"LLM choice: {best_ranking.reason}"
+            except Exception as e:
+                logger.debug(f"LLM clip selection error: {e}")
+
+        # Final fallback: heuristic
+        best = top_candidates[0]  # Already sorted
+        return best, "Heuristic fallback"
 
     def _query_llm_ranking(
         self,
@@ -375,14 +430,18 @@ CRITICAL: Respond with JSON only, no markdown, no explanations."""
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get selector statistics."""
-        llm_success_rate = (self.llm_success_count / self.selection_count * 100) if self.selection_count > 0 else 0
+        ai_selections = self.llm_success_count + self.vlm_success_count
+        ai_success_rate = (ai_selections / self.selection_count * 100) if self.selection_count > 0 else 0
 
         return {
             "total_selections": self.selection_count,
+            "vlm_selections": self.vlm_success_count,
             "llm_selections": self.llm_success_count,
-            "heuristic_selections": self.selection_count - self.llm_success_count,
-            "llm_success_rate": f"{llm_success_rate:.1f}%",
-            "llm_enabled": self.use_llm
+            "heuristic_selections": self.selection_count - ai_selections,
+            "ai_success_rate": f"{ai_success_rate:.1f}%",
+            "vlm_enabled": self.use_vlm and self.vlm is not None,
+            "llm_enabled": self.use_llm and self.llm is not None,
+            "backend": "VLM" if self.vlm else ("LLM" if self.llm else "Heuristic"),
         }
 
 

@@ -329,10 +329,144 @@ def reset_pool() -> None:
             _global_pool = None
 
 
+# =============================================================================
+# DRY Frame Extraction Utilities
+# =============================================================================
+# These functions provide a single point of access for frame extraction.
+# All modules should use these instead of cv2.VideoCapture directly.
+
+
+def extract_frame(
+    video_path: str,
+    time_sec: float,
+    use_pool: bool = True
+) -> Optional[Tuple["np.ndarray", bool]]:
+    """
+    Extract a single frame from a video at a specific time.
+
+    DRY utility - use this instead of cv2.VideoCapture directly.
+
+    Args:
+        video_path: Path to video file
+        time_sec: Time in seconds
+        use_pool: Use capture pool (default True, faster for repeated access)
+
+    Returns:
+        Tuple of (frame, success) or None on error
+    """
+    import numpy as np
+
+    try:
+        if use_pool:
+            pool = get_capture_pool()
+            with pool.get_capture(video_path) as cap:
+                cap.set(cv2.CAP_PROP_POS_MSEC, time_sec * 1000)
+                ret, frame = cap.read()
+                return (frame, ret) if ret else None
+        else:
+            cap = cv2.VideoCapture(video_path)
+            try:
+                cap.set(cv2.CAP_PROP_POS_MSEC, time_sec * 1000)
+                ret, frame = cap.read()
+                return (frame, ret) if ret else None
+            finally:
+                cap.release()
+    except Exception:
+        return None
+
+
+def extract_frame_base64(
+    video_path: str,
+    time_sec: float,
+    quality: int = 85,
+    use_pool: bool = True
+) -> Optional[str]:
+    """
+    Extract a frame and return as base64-encoded JPEG.
+
+    DRY utility for AI vision APIs.
+
+    Args:
+        video_path: Path to video file
+        time_sec: Time in seconds
+        quality: JPEG quality (1-100)
+        use_pool: Use capture pool
+
+    Returns:
+        Base64-encoded JPEG string or None on error
+    """
+    import base64
+
+    result = extract_frame(video_path, time_sec, use_pool)
+    if result is None:
+        return None
+
+    frame, success = result
+    if not success:
+        return None
+
+    try:
+        encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality]
+        _, buffer = cv2.imencode('.jpg', frame, encode_params)
+        return base64.b64encode(buffer).decode('utf-8')
+    except Exception:
+        return None
+
+
+def get_video_info(video_path: str, use_pool: bool = True) -> Optional[Dict]:
+    """
+    Get video metadata (fps, frame count, duration).
+
+    DRY utility - use this instead of opening VideoCapture for metadata.
+
+    Args:
+        video_path: Path to video file
+        use_pool: Use capture pool
+
+    Returns:
+        Dict with fps, frame_count, duration, width, height
+    """
+    try:
+        if use_pool:
+            pool = get_capture_pool()
+            with pool.get_capture(video_path) as cap:
+                return {
+                    "fps": cap.get(cv2.CAP_PROP_FPS),
+                    "frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+                    "duration": cap.get(cv2.CAP_PROP_FRAME_COUNT) / max(1, cap.get(cv2.CAP_PROP_FPS)),
+                    "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                    "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                }
+        else:
+            cap = cv2.VideoCapture(video_path)
+            try:
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                return {
+                    "fps": fps,
+                    "frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+                    "duration": cap.get(cv2.CAP_PROP_FRAME_COUNT) / max(1, fps),
+                    "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                    "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                }
+            finally:
+                cap.release()
+    except Exception:
+        return None
+
+
+# Alias for backward compatibility
+get_video_pool = get_capture_pool
+
+
 # Module exports
 __all__ = [
     "VideoCapturePool",
     "PooledCapture",
     "get_capture_pool",
+    "get_video_pool",
     "reset_pool",
+    # DRY utilities
+    "extract_frame",
+    "extract_frame_base64",
+    "get_video_info",
 ]
