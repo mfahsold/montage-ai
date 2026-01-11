@@ -54,10 +54,13 @@ def start_worker():
     queues = [Queue(name, connection=conn) for name in listen]
     
     # Create worker with connection
+    # Use hostname (pod name in k8s) for unique worker name
+    import socket
+    worker_name = os.environ.get("WORKER_NAME", f"montage-{socket.gethostname()}")
     worker = Worker(
         queues,
         connection=conn,
-        name=f"montage-worker-{os.getpid()}"
+        name=worker_name
     )
     
     logger.info(f"🎬 Worker ready: {worker.name}")

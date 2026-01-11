@@ -417,50 +417,60 @@ def _has_adreno() -> bool:
 
 
 def check_encoder_works(hw_config: HWConfig) -> bool:
-    """Test if an encoder actually works by doing a minimal encode."""
+    """
+    Test if an encoder actually works by doing a minimal encode.
+
+    Uses encoder-specific quality parameters to ensure proper initialization.
+    """
     import subprocess
     import tempfile
-    
+
     # CPU always works
     if hw_config.type == "cpu":
         return True
-        
+
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "test.mp4")
-            
+
             cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
             cmd.extend(hw_config.decoder_args)
             cmd.extend(["-f", "lavfi", "-i", "color=black:s=64x64:d=0.1"])
-            
+
             if hw_config.hwupload_filter:
                 cmd.extend(["-vf", hw_config.hwupload_filter])
-                
+
             cmd.extend(hw_config.encoder_args)
-            
-            # Simple quality args to satisfy encoder requirements
-            if hw_config.type in ("nvenc", "nvmpi"):
-                cmd.extend(["-cq", "35"])
-            elif hw_config.type == "vaapi":
+
+            # Encoder-specific quality parameters
+            if hw_config.type == "nvenc":
+                cmd.extend(["-rc", "vbr", "-cq", "35", "-b:v", "0"])
+            elif hw_config.type == "nvmpi":
+                cmd.extend(["-qp", "35"])
+            elif hw_config.type in ("vaapi", "rocm"):
+                # Use simpler params for testing (ICQ may not be supported on all drivers)
                 cmd.extend(["-qp", "35"])
             elif hw_config.type == "qsv":
                 cmd.extend(["-global_quality", "35"])
-            
+            elif hw_config.type == "videotoolbox":
+                cmd.extend(["-q:v", "65", "-allow_sw", "1"])
+            elif hw_config.type == "adreno":
+                cmd.extend(["-qp", "35"])
+
             cmd.append(output_path)
-            
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=10  # Increased timeout for slower encoders
             )
-            
+
             if result.returncode == 0 and os.path.exists(output_path):
                 return True
             else:
-                # logger might not be available or circular, use simple print in debug/dev
                 return False
-                
+
     except Exception:
         return False
 

@@ -139,6 +139,7 @@ class MontageBuilder:
         from .story_engine import StoryEngine
         self._analyzer = AssetAnalyzer(self.ctx)
         self._render_engine = RenderEngine(self.ctx)
+        self._render_engine.set_progress_callback(self.progress_callback)
         self._pacing_engine = PacingEngine(self.ctx)
         self._selection_engine = SelectionEngine(self.ctx)
         self._story_engine = StoryEngine(self.ctx)

@@ -46,6 +46,125 @@ _settings = get_settings()
 
 
 # =============================================================================
+# SOTA Beat Detection - madmom Integration
+# =============================================================================
+# madmom provides state-of-the-art beat detection accuracy using RNN models.
+# Research shows madmom achieves ~0.02-0.06s less delay than librosa.
+# Priority: Cloud GPU > madmom > FFmpeg
+
+_MADMOM_AVAILABLE: Optional[bool] = None
+
+
+def _check_madmom_available() -> bool:
+    """Check if madmom is available for SOTA beat detection."""
+    global _MADMOM_AVAILABLE
+    if _MADMOM_AVAILABLE is not None:
+        return _MADMOM_AVAILABLE
+
+    try:
+        import madmom
+        _MADMOM_AVAILABLE = True
+        logger.debug("madmom available (SOTA beat detection enabled)")
+    except ImportError:
+        _MADMOM_AVAILABLE = False
+        logger.debug("madmom not available, using FFmpeg fallback")
+
+    return _MADMOM_AVAILABLE
+
+
+def _detect_beats_madmom(audio_path: str) -> Tuple[float, np.ndarray, float]:
+    """
+    Detect beats using madmom (SOTA accuracy, RNN-based).
+
+    madmom uses Deep Neural Networks trained on annotated beat datasets.
+    Achieves state-of-the-art results on MIREX beat tracking benchmarks.
+
+    Returns:
+        Tuple of (tempo_bpm, beat_times_array, duration_seconds)
+    """
+    import madmom
+    from madmom.features.beats import RNNBeatProcessor, BeatTrackingProcessor
+    from madmom.features.tempo import TempoEstimationProcessor
+
+    logger.info("🎵 Using madmom for SOTA beat detection...")
+
+    # Load audio duration
+    duration = probe_duration(audio_path)
+
+    # RNN Beat Processor (state-of-the-art)
+    beat_proc = RNNBeatProcessor()
+    beat_act = beat_proc(audio_path)
+
+    # Beat Tracking with Dynamic Bayesian Network
+    beat_tracker = BeatTrackingProcessor(fps=100)
+    beat_times = beat_tracker(beat_act)
+
+    # Tempo estimation
+    tempo_proc = TempoEstimationProcessor(fps=100)
+    tempi = tempo_proc(beat_act)
+
+    # Get dominant tempo (first result is usually most confident)
+    if len(tempi) > 0:
+        tempo = float(tempi[0][0])  # (tempo, confidence) pairs
+    else:
+        # Fallback: estimate from beat intervals
+        if len(beat_times) > 1:
+            intervals = np.diff(beat_times)
+            avg_interval = np.mean(intervals)
+            tempo = 60.0 / avg_interval if avg_interval > 0 else 120.0
+        else:
+            tempo = 120.0
+
+    logger.info(f"   madmom: {tempo:.1f} BPM, {len(beat_times)} beats detected")
+
+    return tempo, np.array(beat_times), duration
+
+
+def _detect_beats_madmom_downbeat(audio_path: str) -> Tuple[float, np.ndarray, np.ndarray, float]:
+    """
+    Detect beats AND downbeats using madmom (for measure-aligned editing).
+
+    Downbeat detection enables measure-aware editing decisions.
+
+    Returns:
+        Tuple of (tempo_bpm, beat_times, downbeat_times, duration_seconds)
+    """
+    import madmom
+    from madmom.features.beats import RNNBeatProcessor
+    from madmom.features.downbeats import RNNDownBeatProcessor, DBNDownBeatTrackingProcessor
+
+    logger.info("🎵 Using madmom for beat + downbeat detection...")
+
+    duration = probe_duration(audio_path)
+
+    # Combined beat and downbeat processor
+    downbeat_proc = RNNDownBeatProcessor()
+    downbeat_act = downbeat_proc(audio_path)
+
+    # DBN tracking for downbeats
+    downbeat_tracker = DBNDownBeatTrackingProcessor(beats_per_bar=[3, 4], fps=100)
+    beats_and_downbeats = downbeat_tracker(downbeat_act)
+
+    # Separate beats and downbeats
+    # Format: [[time, beat_position], ...] where beat_position=1 is downbeat
+    beat_times = beats_and_downbeats[:, 0]
+    beat_positions = beats_and_downbeats[:, 1]
+    downbeat_times = beat_times[beat_positions == 1]
+
+    # Estimate tempo from beat intervals
+    if len(beat_times) > 1:
+        intervals = np.diff(beat_times)
+        avg_interval = np.mean(intervals)
+        tempo = 60.0 / avg_interval if avg_interval > 0 else 120.0
+    else:
+        tempo = 120.0
+
+    logger.info(f"   madmom: {tempo:.1f} BPM, {len(beat_times)} beats, {len(downbeat_times)} downbeats")
+
+    return tempo, np.array(beat_times), np.array(downbeat_times), duration
+
+
+# =============================================================================
 # Data Classes
 # =============================================================================
 
@@ -1228,16 +1347,16 @@ def analyze_music_energy(audio_path: str, verbose: Optional[bool] = None) -> Ene
     return profile
 
 
-def get_beat_times(audio_path: str, verbose: Optional[bool] = None) -> BeatInfo:
+def get_beat_times(audio_path: str, verbose: Optional[bool] = None, backend: str = "auto") -> BeatInfo:
     """
-    Detect beats and tempo in an audio file using FFmpeg.
+    Detect beats and tempo in an audio file.
 
-    Uses FFmpeg's built-in audio analysis filters for maximum compatibility
-    and performance (no Python audio library dependencies).
+    Backend priority: Cloud GPU > madmom (SOTA) > FFmpeg (fast fallback)
 
     Args:
         audio_path: Path to audio file
         verbose: Override verbose setting (uses config if None)
+        backend: "auto", "madmom", "ffmpeg", or "cloud"
 
     Returns:
         BeatInfo with tempo, beat times, duration, and sample rate
@@ -1247,29 +1366,62 @@ def get_beat_times(audio_path: str, verbose: Optional[bool] = None) -> BeatInfo:
 
     print(f"🎵 Analyzing beat structure of {os.path.basename(audio_path)}...")
 
-    # Try Cloud GPU first
-    cloud_data = _run_cloud_analysis(audio_path)
-    if cloud_data:
-        tempo = cloud_data['tempo']
-        beat_times = np.array(cloud_data['beat_times'])
-        duration = cloud_data['duration']
-        sr = cloud_data['sample_rate']
-        
-        print(f"   Tempo: {tempo:.1f} BPM, Detected {len(beat_times)} beats.")
-        
-        if verbose:
-            print(f"   📊 Track Duration: {duration:.1f}s ({duration/60:.1f} min)")
-            print(f"   📊 Sample Rate: {sr} Hz")
-            print(f"   📊 Beat Interval: {60/tempo:.2f}s avg")
+    # Try Cloud GPU first (if requested or auto)
+    if backend in ("auto", "cloud"):
+        cloud_data = _run_cloud_analysis(audio_path)
+        if cloud_data:
+            tempo = cloud_data['tempo']
+            beat_times = np.array(cloud_data['beat_times'])
+            duration = cloud_data['duration']
+            sr = cloud_data['sample_rate']
 
-        return BeatInfo(
-            tempo=tempo,
-            beat_times=beat_times,
-            duration=duration,
-            sample_rate=sr
-        )
+            print(f"   ☁️ Cloud GPU analysis complete")
+            print(f"   Tempo: {tempo:.1f} BPM, Detected {len(beat_times)} beats.")
 
-    # PRIMARY PATH: FFmpeg analysis (bare-metal, no Python audio deps)
+            if verbose:
+                print(f"   📊 Track Duration: {duration:.1f}s ({duration/60:.1f} min)")
+                print(f"   📊 Sample Rate: {sr} Hz")
+                print(f"   📊 Beat Interval: {60/tempo:.2f}s avg")
+
+            return BeatInfo(
+                tempo=tempo,
+                beat_times=beat_times,
+                duration=duration,
+                sample_rate=sr
+            )
+
+    # SOTA PATH: madmom (RNN-based, highest accuracy)
+    # madmom achieves ~0.02-0.06s less delay than librosa
+    if backend in ("auto", "madmom") and _check_madmom_available():
+        try:
+            tempo, beat_times, duration = _detect_beats_madmom(audio_path)
+            sr = 44100  # madmom uses 44.1kHz internally
+
+            print(f"   🎯 SOTA madmom beat detection (RNN-based)")
+            print(f"   Tempo: {tempo:.1f} BPM, Detected {len(beat_times)} beats.")
+
+            if verbose:
+                print(f"   📊 Track Duration: {duration:.1f}s ({duration/60:.1f} min)")
+                print(f"   📊 Sample Rate: {sr} Hz")
+                print(f"   📊 Beat Interval: {60/tempo:.2f}s avg")
+
+                if tempo > 140:
+                    print(f"   🚀 Fast Tempo (>140 BPM) - will use longer beat groups")
+                elif tempo < 80:
+                    print(f"   🐢 Slow Tempo (<80 BPM) - will use shorter beat groups")
+                else:
+                    print(f"   ⚖️ Medium Tempo - balanced pacing")
+
+            return BeatInfo(
+                tempo=tempo,
+                beat_times=beat_times,
+                duration=duration,
+                sample_rate=sr
+            )
+        except Exception as e:
+            logger.warning(f"madmom beat detection failed: {e}, falling back to FFmpeg")
+
+    # FALLBACK PATH: FFmpeg analysis (bare-metal, no Python audio deps)
     # ⚡ OPTIMIZED: Fast, reliable, no compatibility issues
     duration = probe_duration(audio_path)
     tempo, beat_times = _ffmpeg_estimate_tempo(audio_path, duration)

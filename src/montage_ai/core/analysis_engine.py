@@ -496,9 +496,16 @@ class AssetAnalyzer:
         if cache_hits > 0:
             logger.info(f"   ⚡ Used cached scene detection for {cache_hits}/{len(video_files)} videos")
 
-        # Parallel AI scene analysis (limit to first 20 for speed)
-        logger.info("   🤖 AI Director is watching footage...")
-        scenes_to_analyze = self.ctx.media.all_scenes[:20]
+        # Parallel AI scene analysis
+        # OPTIMIZATION: Configurable limit (was hardcoded to 20)
+        # Set MAX_AI_ANALYZE_SCENES=0 for unlimited analysis
+        max_analyze = self.settings.processing.max_ai_analyze_scenes
+        if max_analyze > 0 and len(self.ctx.media.all_scenes) > max_analyze:
+            logger.info(f"   🤖 AI Director is watching footage... (analyzing {max_analyze}/{len(self.ctx.media.all_scenes)} scenes)")
+            scenes_to_analyze = self.ctx.media.all_scenes[:max_analyze]
+        else:
+            logger.info(f"   🤖 AI Director is watching all {len(self.ctx.media.all_scenes)} scenes...")
+            scenes_to_analyze = self.ctx.media.all_scenes
 
         def analyze_scene(scene):
             """Analyze a single scene (thread-safe)."""
@@ -508,7 +515,11 @@ class AssetAnalyzer:
             except Exception:
                 return scene, {}
 
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        # OPTIMIZATION: Scale workers with scene count (up to CPU cores)
+        cpu_count = os.cpu_count() or 4
+        ai_workers = min(len(scenes_to_analyze), max(4, cpu_count // 2))
+
+        with ThreadPoolExecutor(max_workers=ai_workers) as executor:
             futures = [executor.submit(analyze_scene, s) for s in scenes_to_analyze]
             for future in as_completed(futures):
                 scene, meta = future.result()

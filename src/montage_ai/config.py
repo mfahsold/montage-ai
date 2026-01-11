@@ -579,6 +579,10 @@ class ProcessingConfig:
     cluster_shard_index: int = field(default_factory=get_cluster_shard_index)
     cluster_shard_count: int = field(default_factory=get_cluster_shard_count)
 
+    # OPTIMIZATION: Configurable AI scene analysis limit (0 = unlimited)
+    # Was hardcoded to 20 scenes - now can be scaled up for better quality
+    max_ai_analyze_scenes: int = field(default_factory=ConfigParser.make_int_parser("MAX_AI_ANALYZE_SCENES", 50))
+
     # Adaptive settings for low-resource hardware
     clip_prefetch_count: int = field(default_factory=ConfigParser.make_int_parser("CLIP_PREFETCH_COUNT", 3))
     analysis_timeout: int = field(default_factory=ConfigParser.make_int_parser("ANALYSIS_TIMEOUT", 120))  # seconds

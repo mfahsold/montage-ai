@@ -361,20 +361,67 @@ class FFmpegConfig:
         return self._hw_config.decoder_args if self._hw_config else []
     
     def _gpu_quality_args(self, crf_value: int) -> List[str]:
-        """Map CRF-like value to GPU encoder quality flags."""
+        """
+        Map CRF-like value to GPU encoder quality flags.
+
+        Optimized quality settings for each encoder:
+        - NVENC: VBR with high-quality mode (best quality/size ratio)
+        - NVMPI (Jetson): Constrained QP with B-frames
+        - VAAPI: Rate control with ICQ-like quality
+        - QSV: Global quality with look-ahead for better quality
+        - VideoToolbox: Quality-based VBR
+        - ROCm: Same as VAAPI (uses VAAPI encoder on AMD)
+        """
         crf_clamped = max(0, min(51, int(crf_value)))
         if not self._hw_config:
             return []
+
         if self._hw_config.type == "nvenc":
-            return ["-rc", "vbr_hq", "-cq", str(crf_clamped), "-b:v", "0"]
+            # NVENC: VBR high-quality mode with weighted prediction
+            return [
+                "-rc", "vbr",
+                "-cq", str(crf_clamped),
+                "-b:v", "0",
+                "-bf", "3",  # B-frames for better compression
+                "-g", "250",  # Keyframe interval
+            ]
+
         if self._hw_config.type == "nvmpi":
-            return ["-qp", str(crf_clamped)]
-        if self._hw_config.type == "vaapi":
-            return ["-qp", str(crf_clamped)]
+            # Jetson NVMPI: Constrained QP with B-frames
+            # NVMPI doesn't support all NVENC options
+            return [
+                "-qp", str(crf_clamped),
+                "-bf", "2",  # B-frames (Jetson supports fewer)
+            ]
+
+        if self._hw_config.type in ("vaapi", "rocm"):
+            # VAAPI/ROCm: ICQ mode for quality-based encoding
+            # Works on Intel iGPU and AMD Radeon
+            return [
+                "-rc_mode", "ICQ",
+                "-qp", str(crf_clamped),
+            ]
+
         if self._hw_config.type == "qsv":
-            return ["-global_quality", str(crf_clamped)]
+            # Intel QSV: Global quality with look-ahead for best quality
+            # Optimized for Intel UHD Graphics (Lenovo T14)
+            return [
+                "-global_quality", str(crf_clamped),
+                "-look_ahead", "1",  # Enable look-ahead for better quality
+                "-look_ahead_depth", "40",  # Analysis depth
+            ]
+
         if self._hw_config.type == "videotoolbox":
-            return ["-q:v", str(crf_clamped)]
+            # macOS VideoToolbox: Quality-based VBR
+            return [
+                "-q:v", str(min(100, crf_clamped * 2)),  # Scale to 0-100
+                "-allow_sw", "1",  # Fallback to software if needed
+            ]
+
+        if self._hw_config.type == "adreno":
+            # Qualcomm Adreno V4L2: Simple quality parameter
+            return ["-qp", str(crf_clamped)]
+
         return []
 
     def _strip_codec_args(self, params: List[str]) -> List[str]:

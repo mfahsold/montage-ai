@@ -30,6 +30,7 @@ class RenderEngine:
         self.ctx = context
         self.settings = context.settings
         self._progressive_renderer: Optional[SegmentWriter] = None
+        self._progress_callback: Optional[Any] = None
 
     def init_progressive_renderer(self):
         """Initialize segment writer for progressive output."""
@@ -212,6 +213,10 @@ class RenderEngine:
             # Progressive path: finalize with FFmpeg
             logger.info(f"   🔗 Finalizing with Progressive Renderer ({self._progressive_renderer.get_segment_count()} segments)...")
 
+            output_path = getattr(self.ctx.render, "output_filename", "")
+            current_item = os.path.basename(output_path) if output_path else "render"
+            self._report_render_progress(10, "Rendering final segments", current_item=current_item)
+
             audio_duration = self.ctx.timeline.target_duration
             audio_path = self.ctx.media.audio_result.music_path
 
@@ -236,6 +241,7 @@ class RenderEngine:
                 except Exception as e:
                     logger.warning(f"   ⚠️ Dialogue ducking failed: {e}")
 
+            self._report_render_progress(60, "Finalizing segments", current_item=current_item)
             success = self._progressive_renderer.finalize(
                 output_path=self.ctx.render.output_filename,
                 audio_path=audio_path,
@@ -249,6 +255,7 @@ class RenderEngine:
                 logger.info(f"   ✅ Final video rendered via FFmpeg ({method_str}) in {self.ctx.render.render_duration:.1f}s")
                 if self.ctx.render.logo_path:
                     logger.info(f"   🏷️ Logo overlay: {os.path.basename(self.ctx.render.logo_path)}")
+                self._report_render_progress(100, "Render complete", current_item=current_item)
             else:
                 raise RuntimeError("Progressive render failed")
         else:
@@ -262,6 +269,46 @@ class RenderEngine:
                  self._progressive_renderer.cleanup()
              except Exception:
                  pass
+
+    def set_progress_callback(self, callback: Optional[Any]) -> None:
+        """Register progress callback for render-phase updates."""
+        self._progress_callback = callback
+
+    def _collect_render_resources(self) -> Dict[str, Any]:
+        """Grab CPU/memory/GPU metrics for progress updates."""
+        try:
+            from .analysis_engine import get_resource_snapshot
+            return get_resource_snapshot()
+        except Exception as exc:
+            logger.debug(f"Render resource snapshot skipped: {exc}")
+            return {}
+
+    def _report_render_progress(
+        self,
+        percent: int,
+        message: str,
+        current_item: Optional[str] = None,
+    ) -> None:
+        """Emit a progress callback with optional hardware metrics."""
+        if not self._progress_callback:
+            return
+
+        update = {
+            "percent": max(0, min(100, int(percent))),
+            "message": message,
+        }
+        if current_item:
+            update["current_item"] = current_item
+
+        snapshot = self._collect_render_resources()
+        for key, value in snapshot.items():
+            if value is not None:
+                update[key] = value
+
+        try:
+            self._progress_callback(update)
+        except Exception as exc:
+            logger.debug(f"Render progress callback failed: {exc}")
 
     def export_timeline(self):
         """

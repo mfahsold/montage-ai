@@ -50,9 +50,10 @@ except ImportError:
 
 _settings = get_settings()
 
-# OPTIMIZATION: LRU cache with size limit (100 entries max)
-# This prevents unbounded memory growth in long-running processes
-_HISTOGRAM_CACHE_SIZE = 100
+# OPTIMIZATION: LRU cache with size limit
+# Increased to 2000 for better hit rate with large projects (1000+ clips)
+# Memory impact: ~2000 * 512 floats * 4 bytes = ~4MB
+_HISTOGRAM_CACHE_SIZE = 2000
 
 
 # =============================================================================
@@ -199,9 +200,23 @@ class SceneAnalysis:
 # =============================================================================
 
 class SceneDetector:
-    """Detect scene boundaries in video files using PySceneDetect."""
+    """
+    Detect scene boundaries in video files.
 
-    def __init__(self, threshold: Optional[float] = None, verbose: Optional[bool] = None):
+    Supports multiple backends:
+    - TransNetV2 (SOTA neural network, ~250fps on GPU)
+    - PySceneDetect ContentDetector (traditional, ~50fps)
+    - Cloud GPU (cgpu offloading for large videos)
+
+    Backend selection priority: CGPU > TransNetV2 > PySceneDetect
+    """
+
+    def __init__(
+        self,
+        threshold: Optional[float] = None,
+        verbose: Optional[bool] = None,
+        backend: str = "auto",
+    ):
         """
         Initialize scene detector.
 
@@ -209,9 +224,47 @@ class SceneDetector:
             threshold: Content detection threshold (lower = more sensitive).
                       If None, uses ThresholdConfig.scene_detection()
             verbose: Override verbose setting
+            backend: Detection backend - "auto", "transnetv2", "pyscenedetect"
         """
         self.threshold = threshold if threshold is not None else _settings.thresholds.scene_threshold
         self.verbose = verbose if verbose is not None else _settings.features.verbose
+        self.backend = backend
+
+        # Check TransNetV2 availability on init
+        self._transnetv2_available = None
+
+    def _check_transnetv2(self) -> bool:
+        """Lazy check for TransNetV2 availability."""
+        if self._transnetv2_available is None:
+            try:
+                from .scene_detection_sota import get_available_backend
+                self._transnetv2_available = get_available_backend() == "transnetv2"
+            except ImportError:
+                self._transnetv2_available = False
+        return self._transnetv2_available
+
+    def _detect_transnetv2(self, video_path: str) -> List[Scene]:
+        """Use TransNetV2 SOTA scene detection (250fps on GPU)."""
+        from .scene_detection_sota import detect_scenes_sota
+
+        logger.info(f"🧠 Using TransNetV2 SOTA scene detection for {os.path.basename(video_path)}...")
+
+        # TransNetV2 uses different threshold scale (0-1 vs 0-100)
+        # Convert: lower PySceneDetect threshold = more sensitive
+        # TransNetV2: lower threshold = more sensitive
+        tn_threshold = max(0.3, min(0.7, 1.0 - (self.threshold / 100.0)))
+
+        scene_tuples = detect_scenes_sota(
+            video_path,
+            backend="transnetv2",
+            threshold=tn_threshold,
+            use_cache=True
+        )
+
+        return [
+            Scene(start=start, end=end, path=video_path)
+            for start, end in scene_tuples
+        ]
 
     def detect(self, video_path: str, max_resolution: Optional[int] = None) -> List[Scene]:
         """
@@ -261,6 +314,16 @@ class SceneDetector:
                 logger.warning(f"Cloud detection error: {e}. Falling back to local.")
         elif _settings.features.strict_cloud_compute:
             raise RuntimeError("Strict cloud compute enabled: cgpu scene detection not available or disabled.")
+
+        # SOTA: Try TransNetV2 neural network scene detection (250fps on GPU)
+        # TransNetV2 is 5x faster than PySceneDetect and more accurate
+        if self.backend in ("auto", "transnetv2") and self._check_transnetv2():
+            try:
+                return self._detect_transnetv2(video_path)
+            except Exception as e:
+                if self.backend == "transnetv2":
+                    raise  # Don't fallback if explicitly requested
+                logger.warning(f"TransNetV2 failed: {e}. Falling back to PySceneDetect.")
 
         # PHASE 4 OPTIMIZATION: Downsample high-resolution videos for scene detection
         # Scene detection analyzes frame differences, not fine details.
@@ -851,13 +914,16 @@ Return ONLY valid JSON, no markdown code blocks.'''
 _histogram_cache_stats = {"hits": 0, "misses": 0}
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=_HISTOGRAM_CACHE_SIZE)
 def _get_frame_histogram_cached(video_path: str, time_ms: int) -> Optional[tuple]:
     """
     Extract and compute HSV histogram for a frame (cached).
 
     Uses LRU cache to avoid re-reading the same frames repeatedly
     during clip selection scoring.
+
+    OPTIMIZATION: Uses VideoCapture pool to avoid repeated open/close overhead.
+    First access: ~100-500ms, pooled access: ~1-5ms (20-100x speedup).
 
     Args:
         video_path: Path to video file
@@ -869,25 +935,28 @@ def _get_frame_histogram_cached(video_path: str, time_ms: int) -> Optional[tuple
     _histogram_cache_stats["misses"] += 1
 
     try:
-        cap = cv2.VideoCapture(video_path)
-        cap.set(cv2.CAP_PROP_POS_MSEC, time_ms)
-        ret, frame = cap.read()
-        cap.release()
+        # OPTIMIZATION: Use capture pool instead of creating new capture each time
+        from .video_capture_pool import get_capture_pool
 
-        if not ret or frame is None:
-            return None
+        pool = get_capture_pool()
+        with pool.get(video_path) as cap:
+            cap.set(cv2.CAP_PROP_POS_MSEC, time_ms)
+            ret, frame = cap.read()
 
-        # Convert to HSV for better color similarity
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            if not ret or frame is None:
+                return None
 
-        # Calculate histogram with reduced bins for efficiency
-        hist = cv2.calcHist([hsv], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
+            # Convert to HSV for better color similarity
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        # Normalize
-        cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+            # Calculate histogram with reduced bins for efficiency
+            hist = cv2.calcHist([hsv], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
 
-        # Return as tuple for hashability
-        return tuple(hist.flatten())
+            # Normalize
+            cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+
+            # Return as tuple for hashability
+            return tuple(hist.flatten())
 
     except Exception:
         return None

@@ -1,453 +1,369 @@
-# Kubernetes Deployment for Montage-AI
+# Kubernetes Deployment Guide
 
-Deploy montage-ai as a Kubernetes Job for batch video processing.
+> **Single source of truth for K8s/K3s deployment.**
 
-## 🚀 Current Status: LIVE
+## Quick Start
 
-**Web UI:** http://montage-ai.fluxibri.lan ✅ (Running)
-**Architecture:** AMD64 + ARM64 (Multi-arch build in progress)
-**Quality:** Preview (360p) / Standard (1080p) / High (4K)
+```bash
+# 1. Build & push multi-arch image
+make cluster
 
-See [DEPLOYMENT_STATUS.md](./DEPLOYMENT_STATUS.md) for full deployment details, performance metrics, and 8-week implementation roadmap.
-
-## Directory Structure
-
-```text
-deploy/k3s/
-├── base/                    # Base manifests
-│   ├── namespace.yaml       # montage-ai namespace
-│   ├── configmap.yaml       # Environment configuration
-│   ├── pvc.yaml             # Storage claims (local-path)
-│   ├── nfs-pv.yaml          # NFS PersistentVolumes (for distributed)
-│   ├── job.yaml             # One-off render job
-│   ├── cronjob.yaml         # Scheduled renders
-│   └── kustomization.yaml   # Base kustomization
-├── overlays/
-│   ├── dev/                 # Fast preview settings
-│   │   └── kustomization.yaml
-│   ├── production/          # HQ render + AMD GPU targeting
-│   │   └── kustomization.yaml
-│   ├── amd/                 # AMD GPU (VAAPI) acceleration
-│   │   ├── kustomization.yaml
-│   │   └── patch-job-amd.yaml
-│   ├── jetson/              # NVIDIA Jetson (NVENC) acceleration
-│   │   └── kustomization.yaml
-│   ├── distributed/         # Multi-node GPU with NFS storage
-│   │   ├── kustomization.yaml
-│   │   ├── nfs-pvc.yaml     # NFS PersistentVolumeClaims
-│   │   └── patch-job-distributed.yaml
-│   └── gpu/                 # Generic NVIDIA GPU acceleration
-│       ├── kustomization.yaml
-│       ├── patch-job-gpu.yaml
-│       └── patch-web-gpu.yaml
-└── README.md
+# 2. Access Web UI
+open http://montage-ai.fluxibri.lan
 ```
+
+That's it. For manual control, see sections below.
+
+---
 
 ## Prerequisites
 
 - Kubernetes cluster (K3s, K8s, EKS, GKE, etc.)
 - `kubectl` configured with cluster access
-- Container image available (see Build section)
+- Container registry accessible from cluster
 
-## Build the Image
+## Directory Structure
 
-### Recommended: Tekton Pipeline (Multi-Arch)
-
-For Fluxibri clusters with Tekton CI/CD infrastructure:
-
-```bash
-# Trigger multi-architecture build in cluster
-kubectl create -f deploy/k3s/tekton/montage-ai-pipelinerun.yaml
-
-# Watch build progress
-kubectl get pipelineruns -n tekton-pipelines -w
-
-# View logs
-tkn pipelinerun logs -f -n tekton-pipelines
+```
+deploy/k3s/
+├── base/                    # Base manifests (all overlays use these)
+│   ├── namespace.yaml       # montage-ai namespace
+│   ├── configmap.yaml       # Environment configuration
+│   ├── deployment.yaml      # Web UI deployment
+│   ├── pvc.yaml             # Storage claims (local-path)
+│   ├── nfs-pv.yaml          # NFS PersistentVolumes (distributed)
+│   ├── job.yaml             # One-off render job
+│   ├── cronjob.yaml         # Scheduled renders
+│   └── kustomization.yaml   # Base kustomization
+├── overlays/
+│   ├── dev/                 # Fast preview (360p, minimal resources)
+│   ├── staging/             # Balanced quality
+│   ├── production/          # High quality + AMD GPU
+│   ├── amd/                 # AMD GPU (VAAPI) acceleration
+│   ├── jetson/              # NVIDIA Jetson (NVENC)
+│   ├── gpu/                 # Generic NVIDIA GPU
+│   ├── distributed/         # Multi-node GPU with NFS
+│   └── distributed-parallel/# Indexed Job shards
+└── app/                     # Full app deployment (Fluxibri infra)
+    ├── deployment.yaml
+    ├── service.yaml
+    ├── ingress.yaml
+    └── kustomization.yaml
 ```
 
-**Advantages:**
-- Multi-architecture support (AMD64 + ARM64)
-- Distributed build across cluster nodes
-- Integrated with cluster registry
-- No local Docker daemon required
+---
 
-### Option A: Local Build + Push to Registry
+## Deployment Commands
+
+### Option 1: Makefile (Recommended)
 
 ```bash
-# Build for amd64 architecture
-docker buildx build --platform linux/amd64 \
-  -t ghcr.io/mfahsold/montage-ai:latest .
+# Build multi-arch + push + deploy (all-in-one)
+make cluster
 
-# Push to GitHub Container Registry
-docker push ghcr.io/mfahsold/montage-ai:latest
+# Just build locally
+make dev
 
-# Or push to cluster registry
-docker tag ghcr.io/mfahsold/montage-ai:latest YOUR_REGISTRY:30500/montage-ai:latest
-docker push YOUR_REGISTRY:30500/montage-ai:latest
+# Deploy specific overlay
+kubectl apply -k deploy/k3s/overlays/production/
 ```
 
-### Option B: Manual Import
+### Option 2: Shell Scripts
 
 ```bash
-# Build locally
-docker build -t montage-ai:latest .
+cd deploy/k3s
 
-# Export and import to cluster node
-docker save montage-ai:latest | \
-  ssh user@cluster-node "sudo ctr -n k8s.io images import -"
+# Build & push to cluster registry
+./build-and-push.sh
+
+# Deploy (default: base)
+./deploy.sh
+
+# Deploy specific environment
+./deploy.sh dev
+./deploy.sh staging
+./deploy.sh production
+
+# Undeploy
+./undeploy.sh
 ```
 
-## Deploy to Cluster
-
-### Quick Start (Fluxibri Clusters)
-
-For clusters with Fluxibri infrastructure (Traefik, Prometheus, Grafana):
+### Option 3: kubectl/kustomize Direct
 
 ```bash
-# Deploy with Kustomize (recommended)
-kubectl apply -k deploy/k3s/app/
-
-# Access web UI
-open http://montage-ai.fluxibri.lan
-
-# Monitor in Grafana
-open http://grafana.fluxibri.lan
-```
-
-**Includes:**
-- Web UI with ingress at `montage-ai.fluxibri.lan`
-- Prometheus metrics collection
-- Grafana dashboard integration
-- Auto-scaling and health checks
-- Persistent storage for input/output/music
-
-### Manual Deployment
-
-### Step 1: Create Namespace and Resources
-
-```bash
-# Deploy base resources (namespace, configmap, PVCs)
-kubectl apply -k deploy/k3s/base/
-```
-
-### Step 2: Load Media Data
-
-```bash
-# Option A: Use a data loader pod
-kubectl run -it --rm data-loader \
-  --image=busybox \
-  -n montage-ai \
-  -- sh
-# Then mount PVCs and copy files inside the pod
-
-# Option B: Copy via kubectl (requires running pod)
-kubectl cp ./my-videos/ montage-ai/<pod-name>:/data/input/
-kubectl cp ./my-music.mp3 montage-ai/<pod-name>:/data/music/
-
-# Option C: Use existing shared storage
-# Configure PVCs to use your NFS/SMB storage class
-```
-
-### Step 3: Run Render Job
-
-```bash
-# Start render job
-kubectl apply -f deploy/k3s/base/job.yaml
-
-# Watch progress
-kubectl logs -n montage-ai -f job/montage-ai-render
-
-# Check status
-kubectl get jobs -n montage-ai
-```
-
-### Step 4: Retrieve Output
-
-```bash
-# Copy rendered video from output PVC
-kubectl cp montage-ai/<pod-name>:/data/output/ ./rendered/
-```
-
-## Deployment Variants
-
-```bash
-# Base (any amd64 node)
+# Base deployment
 kubectl apply -k deploy/k3s/base/
 
-# Development (fast preview, low resources)
-kubectl apply -k deploy/k3s/overlays/dev/
-
-# Production (AMD GPU node, high quality)
+# With overlay
 kubectl apply -k deploy/k3s/overlays/production/
 
-# NVIDIA GPU node (generic - device plugin + runtimeclass "nvidia" required)
-kubectl apply -k deploy/k3s/overlays/gpu/
-
-# AMD GPU with VAAPI (codeai-fluxibriserver)
-kubectl apply -k deploy/k3s/overlays/amd/
-
-# NVIDIA Jetson (codeaijetson-desktop)
-kubectl apply -k deploy/k3s/overlays/jetson/
+# Full Fluxibri app (includes ingress, monitoring)
+kubectl apply -k deploy/k3s/app/
 ```
 
-### GPU Overlay Comparison
+---
 
-| Overlay       | Target Node                | GPU Type     | Encoder | Use Case                    |
-| ------------- | -------------------------- | ------------ | ------- | --------------------------- |
-| `gpu`         | Any NVIDIA GPU node        | NVIDIA CUDA  | NVENC   | Generic NVIDIA acceleration |
-| `amd`         | codeai-fluxibriserver      | AMD Radeon   | VAAPI   | AMD GPU encoding            |
-| `jetson`      | codeaijetson-desktop       | NVIDIA Tegra | NVMPI   | Edge device rendering       |
-| `distributed` | Any GPU node (NFS storage) | Auto-detect  | Auto    | Multi-node GPU scheduling   |
+## Environment Overlays
+
+| Overlay | Quality | Resources | Use Case |
+|---------|---------|-----------|----------|
+| `base` | Standard | 4Gi/2CPU | Generic deployment |
+| `dev` | Preview (360p) | 2Gi/500m | Fast iteration |
+| `staging` | Standard | 4Gi/2CPU | QA testing |
+| `production` | High | 8Gi/4CPU | Production renders |
+| `amd` | High + VAAPI | 8Gi/4CPU | AMD GPU encoding |
+| `jetson` | Standard + NVENC | 4Gi | Edge/Jetson devices |
+| `distributed` | High | NFS storage | Multi-node GPU |
+
+---
+
+## GPU Acceleration
+
+### Available GPU Resources
+
+| Node | GPU Type | Resource Key | Encoder |
+|------|----------|--------------|---------|
+| codeaijetson-desktop | NVIDIA Jetson | `nvidia.com/gpu: 1` | NVENC |
+| codeai-fluxibriserver | AMD Radeon | `amd.com/gpu: 1` | VAAPI |
+
+### Deploy with GPU
+
+```bash
+# Check available GPUs
+kubectl get nodes -o custom-columns='NAME:.metadata.name,NVIDIA:.status.allocatable.nvidia\.com/gpu,AMD:.status.allocatable.amd\.com/gpu'
+
+# AMD GPU (VAAPI)
+kubectl apply -k deploy/k3s/overlays/amd/
+
+# NVIDIA Jetson (NVENC)
+kubectl apply -k deploy/k3s/overlays/jetson/
+
+# Generic NVIDIA
+kubectl apply -k deploy/k3s/overlays/gpu/
+```
+
+---
+
+## Storage Configuration
+
+### Local Storage (Single Node)
+
+Default: `local-path` StorageClass (K3s default)
+
+```yaml
+# In pvc.yaml
+storageClassName: local-path  # K3s
+storageClassName: standard    # GKE
+storageClassName: gp2         # AWS EBS
+```
+
+### NFS Storage (Multi-Node / Distributed)
+
+For multi-node GPU rendering, use NFS:
+
+```bash
+# 1. Setup NFS server exports
+sudo mkdir -p /mnt/nfs-montage/{input,music,output,assets}
+echo "/mnt/nfs-montage *(rw,sync,no_subtree_check,no_root_squash)" | sudo tee -a /etc/exports
+sudo exportfs -a
+
+# 2. Update nfs-pv.yaml with your NFS server IP
+# 3. Deploy distributed overlay
+kubectl apply -k deploy/k3s/overlays/distributed/
+```
+
+---
+
+## Access Methods
+
+### Port Forward (Development)
+
+```bash
+kubectl port-forward -n montage-ai svc/montage-ai-web 5000:8080
+open http://localhost:5000
+```
+
+### Ingress (Production)
+
+```bash
+# Ensure DNS/hosts entry exists
+echo "YOUR_CLUSTER_IP  montage-ai.fluxibri.lan" | sudo tee -a /etc/hosts
+
+open http://montage-ai.fluxibri.lan
+```
+
+---
+
+## Running Render Jobs
+
+### One-off Render
+
+```bash
+# Create job from template
+kubectl create job montage-render-$(date +%s) \
+  --from=job/montage-ai-render \
+  -n montage-ai
+
+# Watch progress
+kubectl logs -n montage-ai -f job/montage-render-*
+```
+
+### With Custom Settings
+
+```bash
+# Override via ConfigMap patch
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: montage-ai-config
+  namespace: montage-ai
+data:
+  CUT_STYLE: "hitchcock"
+  STABILIZE: "true"
+  UPSCALE: "true"
+  TARGET_DURATION: "60"
+EOF
+
+kubectl create job montage-custom-$(date +%s) \
+  --from=job/montage-ai-render \
+  -n montage-ai
+```
+
+### Scheduled (CronJob)
+
+```bash
+kubectl apply -f deploy/k3s/base/cronjob.yaml
+kubectl get cronjobs -n montage-ai
+```
+
+---
+
+## Editing Styles
+
+| Style | Description |
+|-------|-------------|
+| `dynamic` | Fast cuts, high energy (default) |
+| `hitchcock` | Suspenseful, methodical pacing |
+| `mtv` | Music video, beat-synchronized |
+| `action` | Quick cuts, action sequences |
+| `documentary` | Slower, informative |
+| `minimalist` | Clean, simple |
+| `wes_anderson` | Symmetric, stylized |
+
+---
+
+## Operations
+
+### View Logs
+
+```bash
+kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai -f
+```
+
+### Restart Deployment
+
+```bash
+kubectl rollout restart deployment/montage-ai-web -n montage-ai
+```
+
+### Scale
+
+```bash
+# Stop
+kubectl scale deployment montage-ai-web -n montage-ai --replicas=0
+
+# Start
+kubectl scale deployment montage-ai-web -n montage-ai --replicas=1
+```
+
+### Shell Access
+
+```bash
+kubectl exec -it -n montage-ai deployment/montage-ai-web -- /bin/bash
+```
+
+### Check Resource Usage
+
+```bash
+kubectl top pods -n montage-ai
+kubectl top nodes
+```
+
+---
+
+## Troubleshooting
+
+### Pod Not Starting
+
+```bash
+# Check events
+kubectl describe pod -n montage-ai -l app.kubernetes.io/name=montage-ai
+
+# Check logs
+kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai --previous
+```
+
+### Image Pull Errors
+
+```bash
+# Verify image exists in registry
+curl http://YOUR_REGISTRY:5000/v2/montage-ai/tags/list
+
+# Check pod image
+kubectl get pod -n montage-ai -o jsonpath='{.items[0].spec.containers[0].image}'
+```
+
+### Storage Issues
+
+```bash
+# Check PVC status (all should be "Bound")
+kubectl get pvc -n montage-ai
+
+# Check disk usage in pod
+kubectl exec -n montage-ai deployment/montage-ai-web -- df -h /data/
+```
+
+### Network Issues
+
+```bash
+# Test DNS from pod
+kubectl exec -n montage-ai deployment/montage-ai-web -- nslookup google.com
+
+# Check network policies
+kubectl get networkpolicy -n montage-ai
+```
+
+---
 
 ## Architecture
 
-```text
+```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Kubernetes Cluster                       │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐     ┌─────────────────────────────────┐   │
-│  │  ConfigMap  │────▶│        montage-ai Job           │   │
+│  │  ConfigMap  │────▶│        montage-ai Pod           │   │
 │  │  (settings) │     │  ┌─────────────────────────┐    │   │
 │  └─────────────┘     │  │   montage-ai container  │    │   │
-│                      │  │   - FFmpeg              │    │   │
-│  ┌─────────────┐     │  │   - librosa             │    │   │
-│  │ PVC: input  │────▶│  │   - Real-ESRGAN         │    │   │
+│                      │  │   - Flask Web UI        │    │   │
+│  ┌─────────────┐     │  │   - FFmpeg              │    │   │
+│  │ PVC: input  │────▶│  │   - Python ML           │    │   │
 │  │ (footage)   │     │  └─────────────────────────┘    │   │
 │  └─────────────┘     └──────────────┬──────────────────┘   │
 │  ┌─────────────┐                    │                      │
 │  │ PVC: music  │────────────────────┤                      │
 │  └─────────────┘                    │                      │
 │  ┌─────────────┐                    │                      │
-│  │ PVC: assets │────────────────────┤                      │
-│  └─────────────┘                    ▼                      │
-│  ┌─────────────┐     ┌─────────────────────────────────┐   │
-│  │ PVC: output │◀────│      Generated Video            │   │
-│  └─────────────┘     └─────────────────────────────────┘   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  Optional: Ollama/KubeAI for Creative Director LLM  │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  │ PVC: output │◀───────────────────┘                      │
+│  └─────────────┘                                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Configuration
+---
 
-### Edit ConfigMap
+## Related Documentation
 
-Modify `configmap.yaml` or use Kustomize overlays:
-
-```yaml
-# deploy/k3s/overlays/production/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - ../../
-patches:
-  - patch: |-
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: montage-ai-config
-      data:
-        CUT_STYLE: "hitchcock"
-        STABILIZE: "true"
-        UPSCALE: "true"
-```
-
-### Available Styles
-
-| Style          | Description                          |
-| -------------- | ------------------------------------ |
-| `dynamic`      | Fast cuts, high energy (default)     |
-| `hitchcock`    | Suspenseful, methodical pacing       |
-| `mtv`          | Music video style, beat-synchronized |
-| `action`       | Quick cuts, action sequences         |
-| `documentary`  | Slower, informative style            |
-| `minimalist`   | Clean, simple edits                  |
-| `wes_anderson` | Symmetric, stylized compositions     |
-
-### Storage Classes
-
-Uncomment and modify `storageClassName` in `pvc.yaml` for your cluster:
-
-```yaml
-# Examples:
-storageClassName: local-path      # K3s default
-storageClassName: standard        # GKE default
-storageClassName: gp2             # AWS EBS
-storageClassName: longhorn        # Longhorn
-storageClassName: nfs-client      # NFS provisioner
-```
-
-## GPU Support
-
-### Available GPU Resources
-
-The cluster has the following GPU resources available:
-
-| Node                     | GPU Type            | Resource Key        | Encoder |
-| ------------------------ | ------------------- | ------------------- | ------- |
-| codeaijetson-desktop     | NVIDIA Jetson Tegra | `nvidia.com/gpu: 1` | NVENC   |
-| codeai-fluxibriserver    | AMD Radeon          | `amd.com/gpu: 1`    | VAAPI   |
-
-### Using GPU Overlays
-
-```bash
-# Check available GPU resources
-kubectl get nodes -o custom-columns='NAME:.metadata.name,NVIDIA:.status.allocatable.nvidia\.com/gpu,AMD:.status.allocatable.amd\.com/gpu'
-
-# Deploy to AMD server with VAAPI
-kubectl apply -k deploy/k3s/overlays/amd/
-
-# Deploy to Jetson with NVENC
-kubectl apply -k deploy/k3s/overlays/jetson/
-
-# Distributed rendering (multi-node GPU)
-kubectl apply -k deploy/k3s/overlays/distributed/
-
-# Distributed parallel rendering (indexed Job shards)
-kubectl apply -k deploy/k3s/overlays/distributed-parallel/
-```
-
-## Distributed Rendering (Multi-Node GPU)
-
-The `distributed` overlay enables jobs to run on **any GPU node** in the cluster using NFS shared storage.
-
-### Parallel Sharding (Indexed Jobs)
-
-Use the `distributed-parallel` overlay to run multiple shards in parallel across the cluster.
-Each shard processes a subset of variants using `CLUSTER_SHARD_INDEX` and `CLUSTER_SHARD_COUNT`.
-
-```bash
-# Example: 2-way sharding
-kubectl apply -k deploy/k3s/overlays/distributed-parallel/
-```
-
-Set `NUM_VARIANTS` in the ConfigMap (or job env) to the total number of variants you want
-and adjust `completions`, `parallelism`, and `CLUSTER_SHARD_COUNT` together.
-
-### Setup NFS Storage
-
-1. **Create NFS exports on your NFS server** (e.g., fluxibriserver):
-
-```bash
-# On NFS server
-sudo mkdir -p /mnt/nfs-montage/{input,music,output,assets}
-sudo chown -R nobody:nogroup /mnt/nfs-montage
-
-# Add to /etc/exports
-echo "/mnt/nfs-montage *(rw,sync,no_subtree_check,no_root_squash)" | sudo tee -a /etc/exports
-sudo exportfs -a
-```
-
-2. **Update NFS PV configuration** in `deploy/k3s/base/nfs-pv.yaml`:
-
-```yaml
-nfs:
-  server: YOUR_NFS_SERVER  # Your NFS server IP
-  path: /mnt/nfs-montage/input
-```
-
-3. **Deploy the distributed overlay**:
-
-```bash
-kubectl apply -k deploy/k3s/overlays/distributed/
-```
-
-### How It Works
-
-- **NFS PVCs** replace local-path PVCs for multi-node access (ReadWriteMany)
-- **Node affinity** prefers GPU nodes (nvidia.com/gpu or amd.com/gpu)
-- **Auto GPU detection**: `FFMPEG_HWACCEL=auto` selects NVENC or VAAPI based on node
-- Jobs can land on Jetson (NVENC), AMD server (VAAPI), or any GPU node
-
-### Cluster Topology
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                 NFS Server (fluxibriserver)                 │
-│                   /mnt/nfs-montage/                         │
-│     input/     music/     output/     assets/               │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ NFS Mount
-       ┌───────────────┼───────────────┐
-       ▼               ▼               ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│   Jetson    │ │  AMD GPU    │ │  CPU Node   │
-│   (NVENC)   │ │  (VAAPI)    │ │  (fallback) │
-└─────────────┘ └─────────────┘ └─────────────┘
-```
-
-### Prerequisites
-
-- **NVIDIA GPU**: Requires nvidia-device-plugin daemonset and `nvidia` RuntimeClass
-- **AMD GPU**: Requires amd-gpu-device-plugin daemonset and `/dev/dri` access
-
-## Triggering Jobs
-
-### One-off Render
-
-```bash
-# Create job with unique name
-kubectl create job montage-ai-$(date +%s) \
-  --from=job/montage-ai-render \
-  -n montage-ai
-```
-
-### With Custom Settings
-
-```bash
-# Override environment variables
-kubectl create job montage-ai-custom \
-  --from=job/montage-ai-render \
-  -n montage-ai \
-  -- env CUT_STYLE=hitchcock STABILIZE=true
-```
-
-### CronJob (Scheduled)
-
-See `cronjob.yaml` for scheduled batch processing.
-
-## Integration with Fluxibri Cluster
-
-If deploying to a Fluxibri cluster, use the existing Ollama service:
-
-```yaml
-# In configmap.yaml
-OLLAMA_HOST: "http://ollama.kubeai-system.svc.cluster.local:11434"
-```
-
-## Troubleshooting
-
-### Check Job Status
-
-```bash
-kubectl get jobs -n montage-ai
-kubectl describe job montage-ai-render -n montage-ai
-```
-
-### View Logs
-
-```bash
-kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai --tail=100
-```
-
-### Debug Pod
-
-```bash
-kubectl run -it --rm debug \
-  --image=ghcr.io/mfahsold/montage-ai:latest \
-  --namespace=montage-ai \
-  -- /bin/bash
-```
-
-### Storage Issues
-
-```bash
-# Check PVC status
-kubectl get pvc -n montage-ai
-
-# Check if PVs are bound
-kubectl get pv | grep montage-ai
-```
+- **[Configuration Reference](../CONFIGURATION.md)** — Environment variables
+- **[Kubernetes Runbook](../../docs/KUBERNETES_RUNBOOK.md)** — Failure recovery & operations
+- **[Getting Started](../../docs/getting-started.md)** — Local development setup

@@ -41,3 +41,48 @@ rq>=1.16.0
 
 # OPTIMIZATION Phase 3: msgpack for 22x faster cache serialization
 msgpack>=1.0.0
+
+# =============================================================================
+# OPTIONAL SOTA DEPENDENCIES (2024-2025 Research)
+# =============================================================================
+# These provide state-of-the-art performance but are not required.
+# montage-ai falls back to fast alternatives when not installed.
+
+# SCENE DETECTION (Priority: AutoShot > TransNetV2 > PySceneDetect)
+# ------------------------------------------------------------------
+# AutoShot: +4.2% F1 over TransNetV2, NAS-optimized 3D ConvNet + Transformer
+#   pip install autoshot  # or clone from https://github.com/wentaozhu/AutoShot
+#
+# TransNetV2: Neural network scene detection, 250fps on GPU
+#   pip install torch transnetv2
+
+# BEAT DETECTION (Priority: madmom > FFmpeg)
+# ------------------------------------------------------------------
+# madmom: SOTA beat tracking using RNN, ~0.02-0.06s more accurate than librosa
+#   pip install madmom
+# Note: madmom requires Cython and may need: pip install cython first
+
+# VLM CLIP SELECTION (Query-based intelligent clip selection)
+# ------------------------------------------------------------------
+# Qwen2.5-VL: Best for long videos (1h+ support), temporal grounding
+#   pip install transformers accelerate
+#   # Model: Qwen/Qwen2-VL-7B-Instruct
+#
+# VILA/NVILA: NVIDIA VLM, good for Jetson deployment
+#   pip install vila  # or clone from https://github.com/NVlabs/VILA
+#
+# InternVideo2: 60+ video tasks, needle-in-haystack search
+#   pip install internvideo2  # or clone from https://github.com/OpenGVLab/InternVideo
+
+# GPU VIDEO STABILIZATION (Priority: CuVista > vidstab)
+# ------------------------------------------------------------------
+# CuVista: CUDA/OpenCL/AVX512 accelerated, 5-10x faster than CPU vidstab
+#   Install from: https://github.com/RainerMtb/cuvista
+#   Requires: CUDA toolkit or OpenCL runtime
+
+# GPU AUDIO ANALYSIS (Optional spectral analysis acceleration)
+# ------------------------------------------------------------------
+# PyTorch or CuPy for GPU-accelerated FFT
+#   pip install torch  # CUDA/MPS/ROCm support
+#   # or
+#   pip install cupy-cuda12x  # CUDA-only, faster for pure FFT

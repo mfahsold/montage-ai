@@ -4,114 +4,86 @@
 
 Free, open-source, privacy-first AI rough-cut tool for creators and professionals.
 
-**Live site:** [mfahsold.github.io/montage-ai](https://mfahsold.github.io/montage-ai) — SEO landing, docs, and quickstarts.
+**Live site:** [mfahsold.github.io/montage-ai](https://mfahsold.github.io/montage-ai)
 
 ---
 
-## 🚀 Start Here
-
-**[DX Guide](DX.md)** - The Golden Path  
-Two workflows. Four commands. 90% of your work.
+## Quick Start
 
 ```bash
-make dev       # Local development (5 sec feedback)
-make cluster   # Cluster deployment (2-15 min)
+# Local development
+make dev && make dev-test
+
+# Kubernetes cluster
+make cluster
 ```
 
 ---
 
-## 📚 Documentation Index
+## Documentation Index
 
-### For Users
+### Getting Started
 
-- **[Getting Started](getting-started.md)** - Installation & first montage
-- **[Features](features.md)** - What Montage AI can do
-- **[Configuration](configuration.md)** - Environment variables
+| Document | Description |
+|----------|-------------|
+| [Getting Started](getting-started.md) | Installation & first montage |
+| [Features](features.md) | What Montage AI can do |
+| [Configuration](configuration.md) | Environment variables |
+| [CLI Reference](CLI_REFERENCE.md) | Command-line usage |
 
-### For Developers
+### Deployment
 
-- **[DX Guide](DX.md)** - Development workflow ⭐ Start here!
-- **[Architecture](architecture.md)** - System design
-- **[LLM Agents](llm-agents.md)** - AI coding guidelines
-- **[Descript Alternative (Offline)](blog/descript-alternative.md)** - SEO landing & positioning
+| Document | Description |
+|----------|-------------|
+| [Deployment Guide](../deploy/README.md) | All deployment options |
+| [K8s Deployment](../deploy/k3s/README.md) | Kubernetes/K3s deployment |
+| [Kubernetes Runbook](KUBERNETES_RUNBOOK.md) | Operations & failure recovery |
+| [Troubleshooting](troubleshooting.md) | Common issues & fixes |
 
-### For Operators
+### Architecture
 
-- **[Kubernetes Runbook](KUBERNETES_RUNBOOK.md)** - Failure recovery & on-call actions
-- **[Cluster Workflow](../deploy/CLUSTER_WORKFLOW.md)** - Deployment steps
-- **[Troubleshooting](troubleshooting.md)** - Common issues
+| Document | Description |
+|----------|-------------|
+| [Architecture](architecture.md) | System design |
+| [Algorithms](algorithms.md) | Beat detection, scene analysis |
+| [Models](models.md) | AI/ML libraries used |
+| [LLM Agent Guidelines](llm-agents.md) | AI coding principles |
 
-### Strategy (Public)
+### Cloud & Infrastructure
 
-- **[Competitive Analysis](COMPETITIVE_ANALYSIS.md)** - Market position
-- **[Marketing Playbook](MARKETING_PLAYBOOK.md)** - GTM strategy
+| Document | Description |
+|----------|-------------|
+| [cgpu Setup](cgpu-setup.md) | Google Cloud GPU credentials |
+| [Optional Dependencies](OPTIONAL_DEPENDENCIES.md) | AI/ML library options |
+
+### Reference
+
+| Document | Description |
+|----------|-------------|
+| [Parameter Reference](PARAMETER_REFERENCE.md) | All configurable parameters |
+| [Style Quick Reference](STYLE_QUICK_REFERENCE.md) | Editing styles |
+| [AI Director Tuning](AI_DIRECTOR_PARAMETER_TUNING.md) | LLM prompt tuning |
+
+### Strategy
+
+| Document | Description |
+|----------|-------------|
+| [Competitive Analysis](COMPETITIVE_ANALYSIS.md) | Market position |
+| [Roadmap 2026](roadmap/ROADMAP_2026.md) | Future plans |
 
 ---
 
-## 🎯 Quick Navigation
+## Quick Navigation
 
 | I want to... | Read this |
-| --- | --- |
-| **Get started** | [Getting Started](getting-started.md) |
-| **Develop locally** | [DX Guide](DX.md) |
-| **Deploy to cluster** | [DX Guide](DX.md) + [Kubernetes Runbook](KUBERNETES_RUNBOOK.md) |
-| **Understand internals** | [Architecture](architecture.md) |
-| **See all features** | [Features](features.md) |
-| **Fix an error** | [Troubleshooting](troubleshooting.md) |
+|--------------|-----------|
+| Get started | [Getting Started](getting-started.md) |
+| Deploy to K8s | [K8s Deployment](../deploy/k3s/README.md) |
+| Fix an error | [Troubleshooting](troubleshooting.md) |
+| Understand internals | [Architecture](architecture.md) |
+| See all features | [Features](features.md) |
 
 ---
 
-**Archive:** [archive/](archive/) - Historical docs
-
-**Principles:**
-
-1. DX.md is the starting point
-2. Each doc has one clear purpose
-3. Examples over theory
-4. Archive, don't delete
-| [Algorithms](algorithms.md) | Beat detection, scene analysis, clip selection |
-| [AI Director](AI_DIRECTOR.md) | LLM prompt interpretation and fallback chain |
-| [Models](models.md) | AI/ML libraries used and why |
-| [LLM Agent Guidelines](llm-agents.md) | Coding principles for AI assistants |
-| [RQ Migration](RQ_MIGRATION.md) | Redis Queue infrastructure (async jobs) |
-| [Contributing](../CONTRIBUTING.md) | How to contribute code |
-
----
-
-## Cloud & Infrastructure
-
-| Doc | Description |
-| --- | --- |
-| [Hybrid Workflow](hybrid-workflow.md) | Local + Cloud GPU setup for limited hardware |
-| [cgpu Setup](cgpu-setup.md) | Google Cloud credentials for cgpu |
-| [Cloud Offloading](cloud_offloading_implementation.md) | cgpu job types and implementation |
-| [Stability Report](stability_report.md) | Memory protection and job admission |
-| [Deployment Scenarios](deployment_scenarios.md) | Docker, Kubernetes, cloud hosting options |
-
----
-
-## Roadmap & Strategy
-
-| Doc | Description |
-| --- | --- |
-| [Business Plan](BUSINESS_PLAN.md) | Market, financials, hiring, investor brief |
-| [Competitive Analysis](COMPETITIVE_ANALYSIS.md) | Deep comparison with Descript, Adobe, Opus, auto-editor |
-| [Strategic Backlog](STRATEGIC_BACKLOG.md) | Future features and research areas |
-
----
-
-## Archive & References
-
-
-Historical documents for reference:
-
-| Doc | Description |
-| --- | --- |
-| [Decisions](archive/decisions.md) | Architecture Decision Records (ADRs) |
-| [Post-Production Pivot](archive/post_production_pivot.md) | Original pivot from generation to editing |
-| [Editor Decomposition](archive/editor_decomposition_plan.md) | Monolithic→modular refactoring (completed) |
-| [Cloud Pipeline Design](archive/cloud_pipeline_design.md) | cgpu_jobs abstraction design |
-| [Cloud Pipeline Spec](archive/cloud_pipeline_technical_spec.md) | Technical implementation details |
-| [Q1 2025 Roadmap](archive/next_steps_q1_2025.md) | Phase 1-4 implementation plan |
-| [Integration Status](archive/integration_status_report.md) | LLM & cgpu integration report |
-| [Offloading Analysis](archive/offloading_analysis.md) | cgpu offloading recommendations |
+**Archive:** [archive/](archive/) — Historical docs
+**Contributing:** [CONTRIBUTING.md](../CONTRIBUTING.md)

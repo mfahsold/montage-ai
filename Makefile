@@ -24,7 +24,7 @@ RESET := \033[0m
 help: ## Show this help
 	@echo "$(CYAN)Montage AI - Golden Path$(RESET)"
 	@echo ""
-	@echo "$(GREEN)📖 Read First: docs/DX.md$(RESET)"
+	@echo "$(GREEN)📖 Read First: deploy/README.md$(RESET)"
 	@echo ""
 	@echo "$(GREEN)Local Development (5 sec feedback):$(RESET)"
 	@echo "  make dev            Build base image with cache (once)"
