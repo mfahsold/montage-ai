@@ -27,14 +27,28 @@ uv python install || true
 # Prefer locked sync if uv.lock exists
 if [ -f uv.lock ]; then
   echo "Found uv.lock — performing locked sync"
-  uv sync --locked --all-extras --dev
+  if ! uv sync --locked --all-extras --dev; then
+    echo "Warning: locked sync with extras failed. Falling back to locked sync without extras."
+    uv sync --locked --dev || { echo "uv sync --locked --dev failed; aborting."; exit 1; }
+  fi
 else
   echo "No uv.lock found — performing best-effort sync"
-  uv sync --all-extras --dev
+  if ! uv sync --all-extras --dev; then
+    echo "Warning: full sync with extras failed (likely optional/private extras). Falling back to sync without extras."
+    if ! uv sync --dev; then
+      echo "Warning: uv sync --dev failed as well. Proceeding to run tests without syncing dependencies (best-effort)."
+      SKIP_SYNC=1
+    fi
+  fi
 fi
 
 # Run test suite
-echo "Running tests via uv"
-uv run pytest -q
+if [ "${SKIP_SYNC:-0}" = "1" ]; then
+  echo "Running tests directly (no uv environment available)"
+  PYTHONPATH=src pytest -q
+else
+  echo "Running tests via uv"
+  uv run pytest -q
+fi
 
 echo "Local CI complete"
