@@ -1278,6 +1278,12 @@ def find_best_start_point(
     Returns:
         Best start timestamp (float)
     """
+    # LOW_MEMORY_MODE: Skip optical flow entirely (too expensive)
+    low_memory = os.getenv("LOW_MEMORY_MODE", "").lower() in ("true", "1", "yes")
+    if low_memory:
+        logger.debug("LOW_MEMORY_MODE: Skipping optical flow, using fallback")
+        return _fallback_start_point(scene_start, scene_end, target_duration)
+
     cap = None
     try:
         cap = cv2.VideoCapture(video_path)
@@ -1290,6 +1296,13 @@ def find_best_start_point(
         if not ret:
             return _fallback_start_point(scene_start, scene_end, target_duration)
 
+        # Resize to 480p for optical flow to reduce memory
+        target_height = 480
+        h, w = prev_frame.shape[:2]
+        if h > target_height:
+            scale = target_height / h
+            prev_frame = cv2.resize(prev_frame, (int(w * scale), target_height))
+
         prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
         current_time = scene_start
 
@@ -1299,6 +1312,12 @@ def find_best_start_point(
 
             if not ret:
                 break
+
+            # Resize for optical flow consistency
+            h, w = frame.shape[:2]
+            if h > target_height:
+                scale = target_height / h
+                frame = cv2.resize(frame, (int(w * scale), target_height))
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
