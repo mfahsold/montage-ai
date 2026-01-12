@@ -63,6 +63,14 @@ git commit -m "docs: update configuration examples"
 
 Add your change to `CHANGELOG.md` under `[Unreleased]`:
 
+### 6. Publish docs (local-first)
+
+We prefer to publish GitHub Pages locally (to avoid unnecessary Actions runner costs).
+
+- Build or verify your `docs/` directory contains the static site HTML.
+- Run `./scripts/publish-docs.sh` to publish to the `gh-pages` branch via the `gh` CLI. You will be prompted to authenticate if not already logged in.
+- Only use the Actions-based Pages workflow for large site rebuilds or if you do not have `gh` access.
+
 ```markdown
 ## [Unreleased]
 

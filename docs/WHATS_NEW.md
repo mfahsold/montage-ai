@@ -27,3 +27,5 @@ This page highlights recent operational and CI improvements that make builds and
 - Ops can choose to enable the internal registry or accept fallbacks (GHCR or node-import) depending on policy.
 
 For the full list of changes see `CHANGELOG.md` under **Unreleased**.
+
+> Note: To avoid incurring GitHub Actions runner costs for routine docs updates we publish GitHub Pages locally using the `gh` CLI. See `scripts/publish-docs.sh` for instructions and automation. This repository still includes an Actions-based Pages workflow for convenience, but we prefer the local `gh pages publish` flow when possible.
