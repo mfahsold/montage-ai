@@ -7,9 +7,24 @@ before execution by NOT importing editor through __init__.py first.
 
 if __name__ == "__main__":
     # Direct import to avoid circular import through __init__.py
-    # Wrap in BrokenPipeError handler to avoid noisy tracebacks when stdout
-    # is closed by a pipe consumer (e.g., user presses Ctrl+C while tee is attached).
+    # Install a sane SIGPIPE handler and suppress logging internal errors so
+    # we don't spew '--- Logging error ---' when stdout/stderr are closed by
+    # a pipe consumer (e.g., `tee`, Ctrl+C, or CI pipelines).
     import sys
+    import signal
+    import logging
+
+    # Default SIGPIPE behavior (terminate) so writes to closed pipes don't
+    # raise expensive exceptions later on.
+    try:
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    except Exception:
+        # Not all platforms support SIGPIPE (e.g., Windows); ignore failures
+        pass
+
+    # Avoid printing internal logging exceptions to stderr in production runs
+    logging.raiseExceptions = False
+
     try:
         from montage_ai.editor import main
         main()
