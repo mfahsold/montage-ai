@@ -140,7 +140,7 @@ CPU_LIMIT="4000m"
 
 ### Before (Hardcoded)
 ```yaml
-image: YOUR_REGISTRY:5000/montage-ai:latest
+image: YOUR_REGISTRY:30500/montage-ai:latest
 namespace: montage-ai
 ```
 

@@ -5,7 +5,9 @@ This guide shows the minimal steps to build multi-arch images and deploy to the 
 Prerequisites
 - Docker and Buildx available (`docker --version`, `docker buildx version`).
 - SSH agent set up when using private git modules (see BuildKit SSH below).
-- Credentials to the registry (e.g., `docker login 192.168.1.12:5000`).
+- Credentials to the registry (e.g., `docker login 192.168.1.12:30500`).
+
+> Note: the canonical internal registry port is now `30500`. Older docs or legacy systems may reference `5000`; both ports are commonly used in the wild.
 
 Quick build example (recommended)
 
@@ -17,7 +19,8 @@ Quick build example (recommended)
 2) Run the distributed build with SSH forwarding (optional):
 
    # Use the cluster registry
-   REGISTRY=192.168.1.12:5000 TAG=20260112-quick BUILDKIT_SSH=1 ./scripts/build-distributed.sh
+   # Note: canonical internal registry port = 30500
+   REGISTRY=192.168.1.12:30500 TAG=20260112-quick BUILDKIT_SSH=1 ./scripts/build-distributed.sh
 
 Notes:
 - `BUILDKIT_SSH=1` enables `--ssh default` so BuildKit can forward your local SSH agent into the build containers. This is useful when Docker build needs to fetch private git modules during `go get` or similar operations.
@@ -39,7 +42,7 @@ Deploy to cluster (canary)
    kubectl rollout status deployment/montage-ai-worker -n montage-ai
 
 Troubleshooting
-- Registry unreachable: `curl -v http://192.168.1.12:5000/v2/` or `nc -zv 192.168.1.12 5000`
+- Registry unreachable: `curl -v http://192.168.1.12:30500/v2/` or `nc -zv 192.168.1.12 30500` (or try legacy port `5000` if applicable)
 - Build failing due to private module access: enable `BUILDKIT_SSH` + ensure `ssh-agent` has keys; or vendor private modules with `go mod vendor` in build step.
 - If you prefer not to use SSH forwarding, consider vendoring private deps into your repo before building.
 

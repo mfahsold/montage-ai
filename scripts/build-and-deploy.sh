@@ -4,7 +4,7 @@
 # 
 # Solves Docker layer caching issues by:
 # 1. Building with BuildKit (better cache invalidation)
-# 2. Tagging for local registry (192.168.1.12:5000)
+# 2. Tagging for local registry (192.168.1.12:30500)
 # 3. Pushing to local registry
 # 4. k3s pulls automatically with imagePullPolicy: Always
 #
@@ -23,7 +23,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-REGISTRY="192.168.1.12:5000"
+REGISTRY="192.168.1.12:30500"
 IMAGE_NAME="montage-ai"
 LOCAL_TAG="${REGISTRY}/${IMAGE_NAME}:latest"
 BUILD_QUALITY="${1:-standard}"
