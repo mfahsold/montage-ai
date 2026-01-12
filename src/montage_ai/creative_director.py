@@ -190,6 +190,13 @@ class CreativeDirector:
         if system_prompt is None:
             system_prompt = "You are an expert AI assistant for video post-production."
         
+        # Tests and CI can disable LLM usage by setting TEST_NO_LLM=1 which forces
+        # a quick failure to allow code paths that fall back to deterministic
+        # behavior to run quickly during infra tests.
+        if os.environ.get("TEST_NO_LLM", "0").lower() in ("1", "true", "yes"):
+            logger.warning("TEST_NO_LLM is set; skipping LLM backends for deterministic testing")
+            raise RuntimeError("LLM backends disabled via TEST_NO_LLM")
+
         formatted_prompt = self._format_user_prompt(prompt)
         effective_timeout = timeout_override if timeout_override else self.timeout
         
