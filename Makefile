@@ -9,7 +9,8 @@ IMAGE_TAG ?= latest
 REGISTRY ?= ghcr.io/mfahsold
 # Default: GHCR for reliable public registry (multi-arch)
 # For cluster-only deployments, override with CLUSTER_REGISTRY=192.168.1.12:30500
-CLUSTER_REGISTRY ?= ghcr.io/mfahsold
+# Resolve cluster registry from deploy/config.env when not explicitly provided
+CLUSTER_REGISTRY ?= $(shell ./scripts/resolve-registry.sh 2>/dev/null || echo ghcr.io/mfahsold)
 NAMESPACE ?= montage-ai
 PLATFORM ?= linux/amd64
 PLATFORMS ?= linux/amd64,linux/arm64
@@ -126,10 +127,10 @@ cluster-build-fast: ## Quick single-arch build for current platform
 	@echo "$(GREEN)✓ Image pushed to registry$(RESET)"
 
 cluster-deploy: ## Deploy to Kubernetes cluster
+	@echo "$(CYAN)Preparing kustomize image settings...$(RESET)"
+	@./scripts/kustomize-set-image.sh "${CLUSTER_REGISTRY}/montage-ai:${IMAGE_TAG}"
 	@echo "$(CYAN)Deploying to cluster...$(RESET)"
-	kubectl set image deployment/montage-ai-worker \
-		montage-ai=$(CLUSTER_REGISTRY)/montage-ai:$(IMAGE_TAG) \
-		-n $(NAMESPACE)
+	kubectl apply -k deploy/k3s/base/ -n $(NAMESPACE)
 	kubectl rollout status deployment/montage-ai-worker -n $(NAMESPACE)
 	@echo "$(GREEN)✓ Deployment complete$(RESET)"
 
@@ -174,6 +175,11 @@ clean: ## Clean local caches and Docker resources
 cleanup: ## Archive large proxies, compress old monitoring JSONs, rotate logs
 	@echo "$(CYAN)Running cleanup script...$(RESET)"
 	./scripts/cleanup.sh
+
+cleanup-obsolete: ## Archive obsolete scripts into scripts/cleanup/obsolete
+	@echo "$(CYAN)Archiving obsolete scripts...$(RESET)"
+	./scripts/archive-obsolete.sh
+	@echo "$(GREEN)✓ Obsolete scripts archived$(RESET)"
 
 .PHONY: registry-check
 registry-check: ## Run registry health checks against default host (192.168.1.12)
