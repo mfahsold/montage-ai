@@ -62,7 +62,7 @@ TEST_UPLOAD_URL="http://localhost:5001/api/upload"
 
 ### 1. Deployment Scripts
 
-All deployment scripts automatically source `deploy/config.env`:
+All deployment scripts automatically source `deploy/config.env` (preferred) and respect environment overrides. The `Dockerfile` also accepts a build-arg `SERVICE_PORT` and sets `ENV SERVICE_PORT` so the web UI listen port can be configured at build time.
 
 ```bash
 # deploy.sh
@@ -71,7 +71,7 @@ kubectl apply -f montage-ai.yaml
 
 # build-and-push.sh
 source "${DEPLOY_ROOT}/config.env"
-docker build -t "${IMAGE_NAME}:${IMAGE_TAG}"
+docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" --build-arg SERVICE_PORT="${SERVICE_PORT:-5000}"
 docker push "${IMAGE_FULL}"
 
 # undeploy.sh
