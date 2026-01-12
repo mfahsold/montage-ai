@@ -40,4 +40,18 @@ Notes for deployment
 
 - Consider adding a liveness/readiness Probe to the registry deployment for quicker CX feedback.
 
+Automated fallback behavior
+
+- The `scripts/build-and-deploy.sh` script attempts to push to the configured registry; if the registry is unreachable or the push fails it will attempt fallbacks in order:
+  1) GHCR (if `GHCR_PAT` is set in the environment or CI secrets)
+  2) Node import using `./scripts/load-image-to-cluster.sh` when `NODE_IMPORT_NODES` (comma-separated list of IPs) is provided.
+
+- Environment variables used by the fallback logic:
+  - `GHCR_PAT`: Personal access token for GHCR (required for GHCR fallback)
+  - `GHCR_OWNER`: Owner/org to push GHCR images into (defaults to repo owner)
+  - `GHCR_USER`: Username used for GHCR login (defaults to the action actor or `mfahsold`)
+  - `NODE_IMPORT_NODES`: Comma-separated list of node IPs for node-import fallback (optional)
+
+- If you prefer to always push to GHCR as a mirror, set `GHCR_PAT` and `GHCR_OWNER` in your CI secrets and optionally add a GHCR fallback workflow (we've added an optional, manual `workflow_dispatch` workflow in `fluxibri_core` to support this).
+
 If you prefer, run `make registry-check` from the repo to run these checks from the current dev host.
