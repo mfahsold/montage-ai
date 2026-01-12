@@ -184,6 +184,11 @@ validate-deps: ## Validate optional dependencies installation
 	@echo "$(CYAN)Validating optional dependencies...$(RESET)"
 	@./scripts/validate_optional_deps.sh
 
+.PHONY: deps-lock
+deps-lock: ## Generate/refresh uv.lock using uv
+	@echo "$(CYAN)Generating uv.lock...$(RESET)"
+	@./scripts/uv-lock.sh
+
 benchmark: ## Run performance baseline benchmarks
 	@echo "$(CYAN)Running performance baseline...$(RESET)"
 	@python3 scripts/benchmark_baseline.py
