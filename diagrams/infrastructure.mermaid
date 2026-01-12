@@ -1,0 +1,42 @@
+graph TB
+    subgraph Host Hardware
+        GPU[NVIDIA GPU <br/> (Optional)]
+        CPU[Multi-Core CPU]
+        RAM[System RAM <br/> (16GB+ Rec)]
+    end
+
+    subgraph Storage Volumes
+        VolInput[/"/data/input"/]
+        VolOutput[/"/data/output"/]
+        VolMusic[/"/data/music"/]
+        VolAssets[/"/data/assets"/]
+        VolRedis[/"redis-data"/]
+    end
+
+    subgraph Docker Compose Stack
+        subgraph Services
+            Web[Web Container <br/> (Flask/Gunicorn)]
+            Worker[Worker Container <br/> (RQ/Python)]
+            Redis[Redis Service]
+        end
+        
+        Web -->|Submit Jobs| Redis
+        Worker -->|Consume Jobs| Redis
+        
+        Web -->|Read| VolOutput
+        Web -->|Read| VolInput
+        
+        Worker -->|Read| VolInput
+        Worker -->|Read| VolMusic
+        Worker -->|Read| VolAssets
+        Worker -->|Write| VolOutput
+        
+        Redis -->|Persist| VolRedis
+    end
+    
+    Worker -.->|Accelerate| GPU
+    Worker -.->|Compute| CPU
+    Web -.->|Serve| CPU
+
+    classDef storage fill:#f9f,stroke:#333,stroke-width:2px;
+    class VolInput,VolOutput,VolMusic,VolAssets,VolRedis storage;

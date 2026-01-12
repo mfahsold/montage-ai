@@ -1,0 +1,45 @@
+graph TD
+    %% Roles
+    User([User])
+    
+    %% Pages
+    subgraph Web UI
+        Dash[Dashboard /]
+        Creator[Montage Creator /montage]
+        Shorts[Shorts Studio /shorts]
+        Settings[Settings /settings]
+        Gallery[Gallery /gallery]
+        Features[Features /features]
+    end
+
+    %% Actions
+    subgraph Actions
+        Config[Configure: <br/>Style, Audio, Options]
+        Upload[Upload Footage]
+        Submit[Submit Job]
+        Monitor[Monitor Progress <br/>(SSE Updates)]
+        Preview[Hover Preview]
+        Download[Download Result]
+    end
+
+    %% Flows
+    User --> Dash
+    Dash -->|Select Workflow| Creator
+    Dash -->|Select Workflow| Shorts
+    Dash -->|Recent Jobs| Monitor
+    Dash -->|View Assets| Gallery
+    
+    Creator --> Upload
+    Creator --> Config
+    Config --> Submit
+    
+    Shorts --> Upload
+    Shorts --> Submit
+    
+    Submit --> Monitor
+    Monitor -->|Job Complete| Gallery
+    Gallery --> Preview
+    Gallery --> Download
+    
+    Dash -->|Nav| Settings
+    Dash -->|Nav| Features

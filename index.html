@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montage AI - Professional AI Video Editor & Post-Production</title>
+    <meta name="description" content="Open Source AI post-production assistant: Beat-sync assembly, Shorts Smart Reframing, Audio Polish (Ducking/Isolation), and OTIO Export. 100% Local, Privacy-First.">
+    <meta name="keywords" content="AI video editor, rough cut, beat sync, smart reframing, vertical video, audio ducking, voice isolation, OTIO, DaVinci Resolve, Premiere Pro, open source, local, privacy first, montage, shorts studio">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://mfahsold.github.io/montage-ai/">
+    <meta property="og:title" content="Montage AI - AI Video Editor">
+    <meta property="og:description" content="Beat-sync montages, transcript editing, OTIO export. Local-first, privacy-first.">
+    <meta property="og:image" content="https://mfahsold.github.io/montage-ai/images/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://mfahsold.github.io/montage-ai/">
+    <meta property="twitter:title" content="Montage AI - AI Video Editor">
+    <meta property="twitter:description" content="Beat-sync montages, transcript editing, OTIO export. Local-first, privacy-first.">
+    <meta property="twitter:image" content="https://mfahsold.github.io/montage-ai/images/og-image.png">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://mfahsold.github.io/montage-ai/">
+    <meta name="robots" content="index, follow">
+    <!-- Privacy-friendly analytics: Plausible (override src to self-host if preferred) -->
+    <script defer data-domain="mfahsold.github.io/montage-ai" src="https://plausible.io/js/script.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- JSON-LD Schema for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Montage AI",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Linux, macOS, Windows",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "Free AI video editor: beat-sync montages, transcript editing, OTIO/EDL export. Local-first, privacy-first.",
+      "url": "https://mfahsold.github.io/montage-ai/",
+      "softwareVersion": "2026",
+      "author": {
+        "@type": "Organization",
+        "name": "Montage AI"
+      },
+      "featureList": "Beat-sync montages, Transcript editing, OTIO/EDL export, Vertical video (9:16), Quality profiles, Local processing, Privacy-first, Story Engine, Color Grading (16+ presets), Dialogue Ducking, Film Grain Simulation, Recipe Cards, Multi-GPU Encoding, Distributed Rendering, Smart Reframing, Highlight Detection, Caption Styles"
+    }
+    </script>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": "Is Montage AI offline and private?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes. Montage AI is local-first with no tracking or uploads. Cloud GPU is optional for upscaling and transcription."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Does Montage AI support vertical video?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Shorts Studio auto-reframes 16:9 to 9:16 with face tracking, beat alignment, and caption presets."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Can I export to professional NLEs?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes. Montage AI exports OTIO/EDL for DaVinci Resolve, Premiere Pro, and Final Cut workflows."
+                    }
+                }
+            ]
+        }
+        </script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="voxel-card">
+            <div class="logo-container">
+                <span class="logo-icon">🎬</span>
+                <div class="logo-text">
+                    <h1>MONTAGE <span class="logo-ai">AI</span></h1>
+                    <p class="subtitle">// We do not generate pixels. We polish them.</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span class="version-badge">2026.2</span>
+                <a href="https://github.com/mfahsold/montage-ai" class="voxel-btn small">GitHub →</a>
+            </div>
+        </header>
+
+        <!-- Hero -->
+        <section class="voxel-card hero">
+            <div class="hero-content">
+                <p class="hero-tag">// Local-first · Privacy-first · Open Source</p>
+                <h2>AI Video Editor. Polish, Don't Generate.</h2>
+                <p class="hero-desc">Beat-sync montages, transcript editing, OTIO/EDL export. Professional rough cuts in minutes—no cloud required. Now with <strong>Shorts Studio 2.0</strong>.</p>
+                <div class="hero-actions">
+                    <a href="https://github.com/mfahsold/montage-ai" class="voxel-btn voxel-btn-primary">GET STARTED</a>
+                    <a href="getting-started.md" class="voxel-btn">DOCS</a>
+                </div>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <span class="stat-value">SHORTS</span>
+                    <span class="stat-label">VERTICAL</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">&lt;3m</span>
+                    <span class="stat-label">PREVIEW</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">100%</span>
+                    <span class="stat-label">LOCAL</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Key Features Grid -->
+        <section class="voxel-card">
+            <h2>// Capabilities</h2>
+            <div class="features-grid">
+                <div class="feature-box">
+                    <span class="feature-icon">🎵</span>
+                    <h4>Beat-Sync</h4>
+                    <p>Cuts aligned to music</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">📝</span>
+                    <h4>Transcript Edit</h4>
+                    <p>Edit video by removing text</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">🎚️</span>
+                    <h4>Pro Export</h4>
+                    <p>OTIO/EDL → DaVinci, Premiere</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">📱</span>
+                    <h4>Shorts Studio</h4>
+                    <p>Auto-reframe to 9:16</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">📖</span>
+                    <h4>Story Engine</h4>
+                    <p>5-phase narrative arc</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">🎨</span>
+                    <h4>Color Grading</h4>
+                    <p>16+ cinematic presets</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">🔇</span>
+                    <h4>Dialogue Duck</h4>
+                    <p>Auto music ducking</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">🎬</span>
+                    <h4>Film Grain</h4>
+                    <p>35mm, 16mm, 8mm looks</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">✨</span>
+                    <h4>Quality Profiles</h4>
+                    <p>Preview → Standard → High</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">📋</span>
+                    <h4>Recipe Cards</h4>
+                    <p>NLE-compatible parameters</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">🖥️</span>
+                    <h4>Cluster Encode</h4>
+                    <p>Multi-GPU distributed</p>
+                </div>
+                <div class="feature-box">
+                    <span class="feature-icon">🔒</span>
+                    <h4>Privacy First</h4>
+                    <p>No tracking. No uploads.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Demo -->
+        <section class="voxel-card">
+            <h2>// QUICK START</h2>
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                    <span class="terminal-title">terminal</span>
+                </div>
+                <div class="terminal-body">
+                    <p><span class="prompt">$</span> ./montage-ai.sh web</p>
+                    <p class="output">[INFO] 🌐 Web UI at http://localhost:5001</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh run hitchcock --quality high</p>
+                    <p class="output success">[DONE] ✅ montage.mp4 + montage.otio</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Why Montage AI -->
+        <section class="voxel-card">
+            <h2>// How It Compares</h2>
+            <div class="comparison-grid">
+                <div class="comparison-box">
+                    <h4>vs. Descript</h4>
+                    <ul class="comparison-list">
+                        <li>Free (vs. $12/mo)</li>
+                        <li>Local processing</li>
+                        <li>OTIO/EDL export</li>
+                    </ul>
+                </div>
+                <div class="comparison-box">
+                    <h4>vs. Frame</h4>
+                    <ul class="comparison-list">
+                        <li>Beat-sync editing</li>
+                        <li>Auto-reframe</li>
+                        <li>Pro handoff</li>
+                    </ul>
+                </div>
+                <div class="comparison-box">
+                    <h4>vs. Adobe</h4>
+                    <ul class="comparison-list">
+                        <li>Free (vs. $55+/mo)</li>
+                        <li>Local-first</li>
+                        <li>No subscription</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="comparison-link-block">
+                <a href="COMPETITIVE_ANALYSIS.md" class="comparison-link">Full comparison →</a>
+            </div>
+        </section>
+
+        <!-- OSS Landscape -->
+        <section class="voxel-card oss-landscape">
+            <h2>// Open Source Video Editing</h2>
+            <div class="oss-grid">
+                <div class="oss-card highlight">
+                    <h4>Montage AI</h4>
+                    <ul class="oss-features">
+                        <li class="has">✓ Beat-sync</li>
+                        <li class="has">✓ Transcript edit</li>
+                        <li class="has">✓ OTIO/EDL export</li>
+                        <li class="has">✓ Auto-reframe</li>
+                    </ul>
+                    <span class="oss-badge">You Are Here</span>
+                </div>
+                <div class="oss-card">
+                    <h4>Frame</h4>
+                    <ul class="oss-features">
+                        <li class="has">✓ Clean UI</li>
+                        <li class="missing">✗ No audio</li>
+                        <li class="missing">✗ No OTIO</li>
+                    </ul>
+                </div>
+                <div class="oss-card">
+                    <h4>AutoClip</h4>
+                    <ul class="oss-features">
+                        <li class="has">✓ Highlights</li>
+                        <li class="missing">✗ Limited export</li>
+                        <li class="missing">✗ No OTIO</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="oss-philosophy">
+                <blockquote>"We do not generate pixels. We polish them."</blockquote>
+            </div>
+        </section>
+
+        <!-- CLI Features -->
+        <section class="voxel-card">
+            <h2>// Command Line Superpowers</h2>
+            <p style="color: #999; margin-bottom: 1.5rem;">27+ integrated features. One command. 100% local or hybrid cloud.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Video Enhancement</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Stabilization (optical flow)</li>
+                        <li>✓ 4K Upscaling (Real-ESRGAN)</li>
+                        <li>✓ AI Denoising (DeepFilterNet)</li>
+                        <li>✓ Sharpening (unsharp mask)</li>
+                        <li>✓ Color Grading (16+ presets)</li>
+                        <li>✓ Film Grain (35mm, 16mm, 8mm)</li>
+                    </ul>
+                </div>
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Audio & Storytelling</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Voice Isolation (htdemucs)</li>
+                        <li>✓ Dialogue Ducking (auto-mix)</li>
+                        <li>✓ Audio Normalization (−14 LUFS)</li>
+                        <li>✓ Captions (5 styles)</li>
+                        <li>✓ Story Engine (LLM narrative)</li>
+                        <li>✓ Export to OTIO/EDL/XML</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem;">
+                <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">CLI Syntax</h4>
+                <div class="code-block" style="background: #05070f; border-left: 3px solid #00ff88; padding: 0.75rem; font-size: 0.85rem; overflow-x: auto;">
+                    <p><span class="prompt">$</span> # Stabilized 1080p with captions</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh run dynamic --stabilize --captions tiktok</p>
+                    <p class="output success">[✓] montage.mp4 + montage.otio exported</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # Preview (fast, 360p)</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh preview hitchcock</p>
+                    <p class="output success">[✓] preview.mp4 (15 sec)</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # 4K with color grade + film grain</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh hq --color-grade teal_orange --film-grain 35mm</p>
+                    <p class="output success">[✓] 4K montage.mp4 (stabilized, upscaled)</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # Interview (voice isolated, normalized)</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh run documentary --isolate-voice --audio-normalize</p>
+                    <p class="output success">[✓] Clean dialogue, −14 LUFS broadcast standard</p>
+                </div>
+            </div>
+
+            <div class="cta-actions">
+                <a href="CLI_REFERENCE.md" class="voxel-btn voxel-btn-primary">Full CLI Docs →</a>
+                <a href="getting-started.md" class="voxel-btn">Setup Guide</a>
+            </div>
+        </section>
+
+        <!-- Styles Section -->
+        <section class="voxel-card">
+            <h2>// 9 Professional Styles</h2>
+            <p style="color: #999; margin-bottom: 1.5rem;">Pacing & cutting templates for every narrative.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem;">
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">dynamic</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Smart pacing, position-aware cuts</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">hitchcock</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Slow build → explosive climax</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">mtv</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Fast 1–2 beat cuts, high energy</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">action</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Rapid rapid-fire cuts, intensity</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">documentary</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Natural pacing, observational</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">minimalist</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Long takes, breathing room</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">wes_anderson</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Symmetrical, whimsical timing</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">vlog</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">Face-centric, personal storytelling</p>
+                </div>
+                <div style="padding: 0.75rem; background: #0a0e27; border-left: 3px solid #00ff88;">
+                    <strong style="color: #00ff88;">sport</strong>
+                    <p style="font-size: 0.85rem; color: #ccc; margin: 0.5rem 0 0 0;">High-energy action sequences</p>
+                </div>
+            </div>
+
+            <div class="cta-actions">
+                <a href="CLI_REFERENCE.md#styles" class="voxel-btn voxel-btn-primary">Explore Styles →</a>
+            </div>
+        </section>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Stabilization (smooth camera shake)</li>
+                        <li>✓ AI Upscaling (4K generation)</li>
+                        <li>✓ Denoising (low-light rescue)</li>
+                        <li>✓ Sharpening (detail enhancement)</li>
+                    </ul>
+                </div>
+
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Audio Polish</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Voice Isolation (clean dialogue)</li>
+                        <li>✓ Auto Ducking (music under speech)</li>
+                        <li>✓ Normalization (-14 LUFS broadcast)</li>
+                        <li>✓ Captions (TikTok/YouTube/Karaoke)</li>
+                    </ul>
+                </div>
+
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Creative Control</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ 9 Cutting Styles (dynamic, hitchcock, MTV, action…)</li>
+                        <li>✓ Story Engine (AI-optimized arcs)</li>
+                        <li>✓ Color Grading (5+ presets)</li>
+                        <li>✓ Film Grain (8mm–35mm textures)</li>
+                    </ul>
+                </div>
+
+                <div style="background: #0a0e27; border: 1px solid #1e3a5f; padding: 1rem; border-radius: 4px;">
+                    <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">Workflow</h4>
+                    <ul style="font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0;">
+                        <li>✓ Vertical Shorts (9:16 auto-reframe)</li>
+                        <li>✓ OTIO/EDL Export (Resolve, Premiere, FCP)</li>
+                        <li>✓ Recipe Cards (audit trail)</li>
+                        <li>✓ Variants (A/B testing, parallel)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="terminal-window" style="margin-bottom: 1.5rem;">
+                <div class="terminal-header">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                    <span class="terminal-title">$ cli examples</span>
+                </div>
+                <div class="terminal-body" style="font-size: 0.85rem;">
+                    <p><span class="prompt">$</span> # TikTok shorts with captions</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh shorts mtv --isolate-voice --captions tiktok</p>
+                    <p class="output">[DONE] ✅ 9:16 vertical, 45s, ready to post</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # High-res trailer with effects</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh hq hitchcock --upscale --film-grain 35mm</p>
+                    <p class="output success">[DONE] ✅ 4K montage.mp4 + montage.otio</p>
+                    <p></p>
+                    <p><span class="prompt">$</span> # Interview with voice isolation</p>
+                    <p><span class="prompt">$</span> ./montage-ai.sh run documentary --isolate-voice --audio-normalize</p>
+                    <p class="output success">[DONE] ✅ Clean dialogue, -14 LUFS audio</p>
+                </div>
+            </div>
+
+            <div class="cta-actions">
+                <a href="CLI_REFERENCE.md" class="voxel-btn voxel-btn-primary">Full CLI Docs →</a>
+                <a href="getting-started.md" class="voxel-btn">Setup Guide</a>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="voxel-card cta">
+            <h2>// Get Started</h2>
+            <div class="cta-actions">
+                <a href="https://github.com/mfahsold/montage-ai" class="voxel-btn voxel-btn-primary">GitHub</a>
+                <a href="features.md" class="voxel-btn">Features</a>
+                <a href="CLI_REFERENCE.md" class="voxel-btn">CLI Guide</a>
+                <a href="getting-started.md" class="voxel-btn">Setup</a>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-links">
+                <a href="https://github.com/mfahsold/montage-ai">GitHub</a>
+                <a href="features.md">Features</a>
+                <a href="getting-started.md">Docs</a>
+                <a href="COMPETITIVE_ANALYSIS.md">Analysis</a>
+                <a href="privacy.html">Privacy</a>
+                <a href="imprint.html">Imprint</a>
+            </div>
+            <p class="copyright">© 2026 Montage AI · <a href="https://github.com/mfahsold/montage-ai/blob/main/LICENSE">PolyForm NC</a></p>
+        </footer>
+    </div>
+</body>
+</html>
