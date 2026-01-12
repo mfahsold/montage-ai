@@ -14,6 +14,8 @@ from typing import List, Optional, Tuple, Any, Dict, Iterable
 # OPTIMIZATION Phase 3: ProcessPoolExecutor for CPU-bound tasks (bypasses GIL)
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
+import numpy as np
+
 from ..logger import logger
 from ..config import Settings
 from .context import AudioAnalysisResult, SceneInfo, MontageContext
@@ -399,11 +401,18 @@ class AssetAnalyzer:
             # PHASE 5: Scale with available cores (cluster-optimized)
             cpu_count = os.cpu_count() or 2
             cfg_workers = self.settings.processing.max_scene_workers
-            max_workers = min(
-                len(uncached_videos),
-                max(4, cpu_count // 2),  # Use 50% of cores (reserve for system)
-                cfg_workers
-            )
+
+            # CRITICAL: Respect LOW_MEMORY_MODE for constrained environments
+            if self.settings.features.low_memory_mode:
+                # Strict sequential processing - never exceed configured workers
+                max_workers = min(len(uncached_videos), cfg_workers)
+                logger.info(f"   ⚠️ LOW_MEMORY_MODE: Sequential scene detection ({max_workers} worker)")
+            else:
+                max_workers = min(
+                    len(uncached_videos),
+                    max(4, cpu_count // 2),  # Use 50% of cores (reserve for system)
+                    cfg_workers
+                )
             logger.info(f"   🚀 ProcessPool scene detection ({len(uncached_videos)} videos, {max_workers}/{cpu_count} CPU workers)")
             
             # Progress tracking setup
@@ -517,7 +526,12 @@ class AssetAnalyzer:
 
         # OPTIMIZATION: Scale workers with scene count (up to CPU cores)
         cpu_count = os.cpu_count() or 4
-        ai_workers = min(len(scenes_to_analyze), max(4, cpu_count // 2))
+        if self.settings.features.low_memory_mode:
+            # LOW_MEMORY_MODE: Sequential AI analysis to minimize memory spikes
+            ai_workers = 1
+            logger.debug("   ⚠️ LOW_MEMORY_MODE: Sequential AI scene analysis")
+        else:
+            ai_workers = min(len(scenes_to_analyze), max(4, cpu_count // 2))
 
         with ThreadPoolExecutor(max_workers=ai_workers) as executor:
             futures = [executor.submit(analyze_scene, s) for s in scenes_to_analyze]

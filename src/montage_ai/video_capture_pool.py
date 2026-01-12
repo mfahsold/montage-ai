@@ -359,7 +359,7 @@ def extract_frame(
     try:
         if use_pool:
             pool = get_capture_pool()
-            with pool.get_capture(video_path) as cap:
+            with pool.get(video_path) as cap:
                 cap.set(cv2.CAP_PROP_POS_MSEC, time_sec * 1000)
                 ret, frame = cap.read()
                 return (frame, ret) if ret else None
@@ -429,7 +429,7 @@ def get_video_info(video_path: str, use_pool: bool = True) -> Optional[Dict]:
     try:
         if use_pool:
             pool = get_capture_pool()
-            with pool.get_capture(video_path) as cap:
+            with pool.get(video_path) as cap:
                 return {
                     "fps": cap.get(cv2.CAP_PROP_FPS),
                     "frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),

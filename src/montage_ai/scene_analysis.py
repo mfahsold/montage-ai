@@ -1130,41 +1130,6 @@ class SceneSimilarityIndex:
         # Sort by similarity descending
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:k]
-        if not self.scenes:
-            return []
-        
-        # Extract target histogram
-        target_hist = _get_histogram_as_array(target_path, target_time)
-        if target_hist is None:
-            return []
-        
-        target_vec = target_hist.flatten()
-        
-        if self.kdtree is not None:
-            # FAST PATH: K-D tree query (O(log n))
-            distances, indices = self.kdtree.query(target_vec, k=min(k, len(self.scenes)))
-            
-            # Convert distances to similarity scores (correlation-like)
-            # K-D tree returns Euclidean distance, convert to similarity
-            similarities = 1.0 / (1.0 + distances)
-            
-            results = []
-            for idx, sim in zip(indices, similarities):
-                if sim >= threshold:
-                    results.append((self.scenes[idx], float(sim)))
-            
-            return sorted(results, key=lambda x: x[1], reverse=True)
-        else:
-            # SLOW PATH: Linear scan with correlation (O(n))
-            results = []
-            for i, scene in enumerate(self.scenes):
-                if i < len(self.histograms):
-                    hist = np.array(self.histograms[i]).reshape((8, 8, 8))
-                    similarity = cv2.compareHist(target_hist, hist, cv2.HISTCMP_CORREL)
-                    if similarity >= threshold:
-                        results.append((scene, max(0.0, float(similarity))))
-            
-            return sorted(results, key=lambda x: x[1], reverse=True)[:k]
 
 
 def detect_faces(video_path: str, time_sec: float) -> int:
@@ -1178,11 +1143,11 @@ def detect_faces(video_path: str, time_sec: float) -> int:
     Returns:
         Number of faces detected
     """
+    cap = None
     try:
         cap = cv2.VideoCapture(video_path)
         cap.set(cv2.CAP_PROP_POS_MSEC, time_sec * 1000)
         ret, frame = cap.read()
-        cap.release()
 
         if not ret:
             return 0
@@ -1191,21 +1156,24 @@ def detect_faces(video_path: str, time_sec: float) -> int:
         # We use the default frontal face detector
         face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         face_cascade = cv2.CascadeClassifier(face_cascade_path)
-        
+
         if face_cascade.empty():
             logger.warning("Failed to load Haar Cascade for face detection")
             return 0
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
+
         # Detect faces
         # scaleFactor=1.1, minNeighbors=5 are standard robust settings
         faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
-        
+
         return len(faces)
     except Exception as e:
         logger.warning(f"Face detection failed: {e}")
         return 0
+    finally:
+        if cap is not None:
+            cap.release()
 
 
 def calculate_visual_similarity(
@@ -1259,11 +1227,11 @@ def detect_motion_blur(video_path: str, time_point: float) -> float:
     Returns:
         Blur score 0-1 (1 = heavy blur, good for cuts)
     """
+    cap = None
     try:
         cap = cv2.VideoCapture(video_path)
         cap.set(cv2.CAP_PROP_POS_MSEC, time_point * 1000)
         ret, frame = cap.read()
-        cap.release()
 
         if not ret:
             return 0.0
@@ -1280,8 +1248,11 @@ def detect_motion_blur(video_path: str, time_point: float) -> float:
         return float(blur_score)
 
     except Exception as e:
-        print(f"   ⚠️ Motion blur detection failed: {e}")
+        logger.warning(f"Motion blur detection failed: {e}")
         return 0.0
+    finally:
+        if cap is not None:
+            cap.release()
 
 
 def find_best_start_point(
@@ -1307,6 +1278,7 @@ def find_best_start_point(
     Returns:
         Best start timestamp (float)
     """
+    cap = None
     try:
         cap = cv2.VideoCapture(video_path)
         cap.set(cv2.CAP_PROP_POS_MSEC, scene_start * 1000)
@@ -1316,7 +1288,6 @@ def find_best_start_point(
 
         ret, prev_frame = cap.read()
         if not ret:
-            cap.release()
             return _fallback_start_point(scene_start, scene_end, target_duration)
 
         prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
@@ -1348,8 +1319,6 @@ def find_best_start_point(
             prev_gray = gray
             current_time += sample_interval
 
-        cap.release()
-
         # Find peak motion (action climax)
         if motion_scores:
             # Use 75th percentile to avoid noise spikes
@@ -1368,7 +1337,10 @@ def find_best_start_point(
                 return max(scene_start, best_start)
 
     except Exception as e:
-        print(f"   ⚠️ Optical Flow analysis failed: {e}")
+        logger.warning(f"Optical Flow analysis failed: {e}")
+    finally:
+        if cap is not None:
+            cap.release()
 
     return _fallback_start_point(scene_start, scene_end, target_duration)
 

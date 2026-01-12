@@ -7,7 +7,8 @@ from rq import Worker, Queue
 from montage_ai.config import get_settings
 from montage_ai.logger import logger
 
-listen = ['default']
+# Listen to both queues (preview jobs on 'default', heavy/standard jobs on 'heavy')
+listen = ['default', 'heavy']
 
 def start_worker():
     """
