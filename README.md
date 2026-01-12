@@ -159,6 +159,7 @@ Input Footage → Analysis → Creative Direction → Editing → Enhancement �
 
 - **[Getting Started](docs/getting-started.md)** — Installation & first project
 - **[Features](docs/features.md)** — Complete capabilities guide
+- **What's new:** **[Recent updates & operational notes](docs/WHATS_NEW.md)** — Deployment, CI, and fallback updates
 - **[Configuration](docs/configuration.md)** — All settings & environment variables
 - **[Architecture](docs/architecture.md)** — How it works (for developers)
 - **[Parameter Reference](docs/PARAMETER_REFERENCE.md)** — All controllable parameters

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Deployment & CI (2026-01-13)
+
+- **Resilient push fallbacks**: `scripts/build-and-deploy.sh` now attempts an ordered series of push fallbacks when the configured registry is unreachable:
+  - Primary: configured registry (from `deploy/config.env` or `REGISTRY`)
+  - Fallback 1: GHCR (when `GHCR_PAT` is available; `GHCR_OWNER`/`GHCR_USER` optional)
+  - Fallback 2: Node-import (`NODE_IMPORT_NODES` comma-separated list, uses `scripts/load-image-to-cluster.sh`)
+  - Added `SKIP_DEPLOY=1` for local/test runs to skip Kubernetes steps
+- **Local CI hardening**: `scripts/ci-local.sh` will skip `uv sync` when private extras (e.g., `cloud-private`) are declared unless `INCLUDE_PRIVATE_EXTRAS=1` is set; this prevents spurious uv resolution failures for contributors without access to private package indexes.
+- **Tests & tooling**: Added integration tests verifying GHCR and node-import fallback behavior and added `scripts/load-image-to-cluster.sh` for node-import workflows.
+- **Docs**: Updated `docs/REGISTRY_TROUBLESHOOTING.md` and `docs/DEPENDENCY_MANAGEMENT.md` with fallback procedures and guidance for private extras.
+
 #### UI/UX
 
 - Web UI polish: Lucide icons via shared macro, centralized utilities in `voxel-dark.css`, class-based visibility helpers, and accessibility labels across montage and shorts templates.
