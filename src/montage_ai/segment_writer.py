@@ -1284,6 +1284,27 @@ class SegmentWriter:
                     "-i", concat_list_path,
                 ])
 
+                # Build cmd for non-audio path as well
+                cmd = build_ffmpeg_cmd(base_args)
+                if _settings.encoding.normalize_clips:
+                    logger.info("   🔄 Re-encoding final output (CFR enforcement)...")
+                    current_target_codec = _ffmpeg_config.codec
+                    if _ffmpeg_config.hwupload_filter:
+                        cmd.extend(["-vf", _ffmpeg_config.hwupload_filter])
+                    cmd.extend(_video_params_for_target(
+                        _ffmpeg_config,
+                        crf=self.ffmpeg_crf,
+                        preset=self.ffmpeg_preset,
+                        target_codec=current_target_codec,
+                        target_profile=TARGET_PROFILE,
+                        target_level=TARGET_LEVEL,
+                        target_pix_fmt=TARGET_PIX_FMT,
+                    ))
+                else:
+                    cmd.extend(["-c:v", "copy"])
+
+                cmd.extend(["-movflags", "+faststart", actual_output])
+
             result = run_command(
                 cmd,
                 capture_output=True,
@@ -1292,40 +1313,35 @@ class SegmentWriter:
                 log_output=False
             )
 
-            # If GPU-accelerated encode failed (e.g., VAAPI hwupload errors), retry
-            # with a software (libx264) fallback. This avoids hard failures when
-            # device mapping isn't present or hwupload fails.
+            # If we failed, inspect stderr for common GPU/hwupload errors and
+            # retry once with a conservative software-only command (libx264).
             if result.returncode != 0:
                 stderr = (result.stderr or "").lower()
-                if _ffmpeg_config.is_gpu_accelerated and (
-                    "hwupload" in stderr or "hardware device" in stderr or "vaapi" in stderr
-                ):
+                first_line = stderr.strip().split("\n")[0] if stderr else ""
+
+                gpu_error_indicators = [
+                    "hwupload",
+                    "hardware device",
+                    "vaapi",
+                    "error reinitializing filters",
+                    "failed to inject frame",
+                    "nothing was written",
+                ]
+
+                if _ffmpeg_config.is_gpu_accelerated and any(ind in stderr for ind in gpu_error_indicators):
                     logger.warning(
-                        "GPU encoding failed (%s). Retrying with software encoder (libx264)...",
-                        stderr.strip().split("\n")[0] if stderr else ""
+                        "GPU encoding detected failure: '%s'. Retrying with software encoder (libx264)...",
+                        first_line
                     )
 
-                    # Build fallback arguments (no GPU init, explicit software codec)
-                    fallback_base = []
+                    # Build a minimal software-only fallback command (no hwinit, no hwupload)
+                    fallback_base = ["-f", "concat", "-safe", "0", "-i", concat_list_path]
                     if audio_path and os.path.exists(audio_path):
-                        fallback_base.extend([
-                            "-f", "concat",
-                            "-safe", "0",
-                            "-i", concat_list_path,
-                            "-i", audio_path,
-                            "-map", "0:v",
-                            "-map", "1:a",
-                        ])
-                    else:
-                        fallback_base.extend([
-                            "-f", "concat",
-                            "-safe", "0",
-                            "-i", concat_list_path,
-                        ])
+                        fallback_base.extend(["-i", audio_path, "-map", "0:v", "-map", "1:a"])
 
                     fallback_cmd = build_ffmpeg_cmd(fallback_base)
 
-                    # Force software target codec
+                    # Force software encoding parameters
                     fallback_cmd.extend(_video_params_for_target(
                         _ffmpeg_config,
                         crf=self.ffmpeg_crf,
@@ -1346,10 +1362,7 @@ class SegmentWriter:
                             actual_output,
                         ])
                     else:
-                        fallback_cmd.extend([
-                            "-movflags", "+faststart",
-                            actual_output,
-                        ])
+                        fallback_cmd.extend(["-movflags", "+faststart", actual_output])
 
                     fallback_result = run_command(
                         fallback_cmd,
@@ -1363,52 +1376,15 @@ class SegmentWriter:
                         logger.info("Software fallback succeeded (libx264)")
                         result = fallback_result
                     else:
-                        logger.error(
-                            "Software fallback also failed: %s",
-                            (fallback_result.stderr or "").strip().split("\n")[0]
-                        )
+                        logger.error("Software fallback failed: %s", (fallback_result.stderr or "").strip().split("\n")[0])
+                        if os.path.exists(actual_output):
+                            os.remove(actual_output)
+                        return False
                 else:
-                        logger.error("FFmpeg failed: %s", (result.stderr or "").strip().split("\n")[0])
-                cmd = build_ffmpeg_cmd(base_args)
-
-                if _settings.encoding.normalize_clips:
-                    logger.info("   🔄 Re-encoding final output (CFR enforcement)...")
-
-                    # Add hwupload filter for GPU encoders (VAAPI, ROCm, etc.)
-                    if _ffmpeg_config.hwupload_filter:
-                        cmd.extend(["-vf", _ffmpeg_config.hwupload_filter])
-
-                    cmd.extend(_video_params_for_target(
-                        _ffmpeg_config,
-                        crf=self.ffmpeg_crf,
-                        preset=self.ffmpeg_preset,
-                        target_codec=TARGET_CODEC,
-                        target_profile=TARGET_PROFILE,
-                        target_level=TARGET_LEVEL,
-                        target_pix_fmt=TARGET_PIX_FMT,
-                    ))
-                else:
-                    cmd.extend(["-c", "copy"])  # Full stream copy
-
-                cmd.extend([
-                    "-movflags", "+faststart",
-                    actual_output
-                ])
-            
-            result = run_command(
-                cmd,
-                capture_output=True,
-                timeout=_settings.processing.ffmpeg_long_timeout,
-                check=False,
-                log_output=False
-            )
-
-            if result.returncode != 0:
-                logger.error(f"   ❌ Final concatenation failed. Command: {' '.join(cmd)}")
-                logger.error(f"   ❌ Stderr: {result.stderr}")
-                if os.path.exists(actual_output):
-                    os.remove(actual_output)
-                return False
+                    logger.error("FFmpeg concat failed: %s", first_line)
+                    if os.path.exists(actual_output):
+                        os.remove(actual_output)
+                    return False
 
             # Apply logo overlay if requested (requires re-encode)
             if logo_path and os.path.exists(logo_path) and os.path.exists(actual_output):

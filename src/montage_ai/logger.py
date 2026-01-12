@@ -127,7 +127,19 @@ def setup_logger(
     logger.setLevel(log_level)
 
     # Console handler with emoji-friendly formatter
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Use a safe handler that catches BrokenPipeError/OSError during emit
+    class SafeStreamHandler(logging.StreamHandler):
+        def emit(self, record: logging.LogRecord) -> None:
+            try:
+                super().emit(record)
+            except (BrokenPipeError, OSError):
+                # Ignore broken pipe / closed stream errors when logging to stdout
+                try:
+                    if self.stream and not self.stream.closed:
+                        self.stream.flush()
+                except Exception:
+                    pass
+    console_handler = SafeStreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
     console_handler.setFormatter(MontageFormatter())
     logger.addHandler(console_handler)
