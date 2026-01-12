@@ -33,7 +33,7 @@ help: ## Show this help
 	@echo ""
 	@echo "$(GREEN)Cluster Deployment (2-15 min):$(RESET)"
 	@echo "  make cluster           Build + push + deploy (all-in-one)"
-	@echo "  make cluster-build     Multi-arch build (ARM64+AMD64)"
+	@echo "  make cluster-build     Multi-arch build (ARM64+AMD64) (set BUILDKIT_SSH=1 to enable BuildKit SSH forwarding)"
 	@echo "  make cluster-build-fast Single-arch quick build"
 	@echo ""
 	@echo "$(GREEN)Builder Management:$(RESET)"
