@@ -25,6 +25,7 @@ Quick build example (recommended)
 Notes:
 - `BUILDKIT_SSH=1` enables `--ssh default` so BuildKit can forward your local SSH agent into the build containers. This is useful when Docker build needs to fetch private git modules during `go get` or similar operations.
 - If you use private Go modules, set `GOPRIVATE=github.com/yourorg/*` before running the build. The script will pass `GOPRIVATE` as a build-arg.
+- Build and deploy scripts read `deploy/config.env` for `REGISTRY_HOST`, `REGISTRY_PORT`, `IMAGE_TAG`, and `SERVICE_PORT`. To override the web UI port when building the image, pass `--build-arg SERVICE_PORT=<port>` to `docker build` or set `SERVICE_PORT` in `deploy/config.env`.
 
 Fallback (no SSH, public-only):
 
