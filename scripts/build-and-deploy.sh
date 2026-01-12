@@ -4,7 +4,11 @@
 # 
 # Solves Docker layer caching issues by:
 # 1. Building with BuildKit (better cache invalidation)
-# 2. Tagging for local registry (192.168.1.12:30500)
+# 2. Tagging for local registry (use `deploy/config.env` to configure registry)
+# shellcheck disable=SC1090
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+# Use REGISTRY_URL from config if not overridden
+REGISTRY="${REGISTRY:-${REGISTRY_URL}}"
 # 3. Pushing to local registry
 # 4. k3s pulls automatically with imagePullPolicy: Always
 #
@@ -57,12 +61,13 @@ echo ""
 
 # Step 1: Verify registry connectivity
 echo -e "${YELLOW}1️⃣  Checking registry connectivity...${NC}"
+REGISTRY_REACHABLE=1
 if ! curl -s "http://${REGISTRY}/v2/" > /dev/null 2>&1; then
-    echo -e "${RED}❌ Cannot reach registry at ${REGISTRY}${NC}"
-    echo -e "${RED}   Please ensure local registry is running${NC}"
-    exit 1
+    echo -e "${YELLOW}⚠️ Registry ${REGISTRY} not reachable; will attempt fallback pushes if needed${NC}"
+    REGISTRY_REACHABLE=0
+else
+    echo -e "${GREEN}✅ Registry reachable${NC}"
 fi
-echo -e "${GREEN}✅ Registry reachable${NC}"
 echo ""
 
 # Step 2: Build image with BuildKit
@@ -98,62 +103,115 @@ else
 fi
 echo ""
 
-# Step 4: Push to local registry
-echo -e "${YELLOW}4️⃣  Pushing to local registry...${NC}"
-docker push "${LOCAL_TAG}" 2>&1 | tail -10
-docker push "${REGISTRY}/${IMAGE_NAME}:${BUILD_VERSION}" 2>&1 | tail -3
-echo -e "${GREEN}✅ Pushed to registry${NC}"
+# Step 4: Push to registry (with fallbacks)
+echo -e "${YELLOW}4️⃣  Pushing to registry...${NC}"
+PUSH_SUCCESS=0
+if [ "${REGISTRY_REACHABLE}" -eq 1 ]; then
+  echo "  • Attempting push to ${REGISTRY}"
+  if docker push "${LOCAL_TAG}" 2>&1 | tail -10; then
+    docker push "${REGISTRY}/${IMAGE_NAME}:${BUILD_VERSION}" 2>&1 | tail -3 || true
+    echo -e "${GREEN}✅ Pushed to registry${NC}"
+    PUSH_SUCCESS=1
+  else
+    echo -e "${YELLOW}⚠️ Push to registry failed${NC}"
+  fi
+else
+  echo -e "${YELLOW}⚠️ Skipping push to registry (unreachable)${NC}"
+fi
+
+# Fallback 1: GHCR (if credentials available)
+if [ "$PUSH_SUCCESS" -eq 0 ] && [ -n "${GHCR_PAT:-}" ]; then
+  GHCR_OWNER="${GHCR_OWNER:-${GITHUB_REPOSITORY_OWNER:-mfahsold}}"
+  GHCR_USER="${GHCR_USER:-${GITHUB_ACTOR:-mfahsold}}"
+  GHCR_IMAGE="ghcr.io/${GHCR_OWNER}/${IMAGE_NAME}:${BUILD_VERSION}"
+  echo -e "${YELLOW}🔁 Attempting GHCR fallback: ${GHCR_IMAGE}${NC}"
+  echo "${GHCR_PAT}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin || true
+  docker tag "${LOCAL_TAG}" "${GHCR_IMAGE}"
+  if docker push "${GHCR_IMAGE}" 2>&1 | tail -5; then
+    echo -e "${GREEN}✅ Pushed to GHCR: ${GHCR_IMAGE}${NC}"
+    PUSH_SUCCESS=1
+  else
+    echo -e "${YELLOW}⚠️ GHCR push failed${NC}"
+  fi
+fi
+
+# Fallback 2: Node import via scripts/load-image-to-cluster.sh
+if [ "$PUSH_SUCCESS" -eq 0 ] && [ -n "${NODE_IMPORT_NODES:-}" ]; then
+  echo -e "${YELLOW}🔁 Attempting node import fallback to: ${NODE_IMPORT_NODES}${NC}"
+  if ./scripts/load-image-to-cluster.sh "${LOCAL_TAG}" "${BUILD_VERSION}"; then
+    echo -e "${GREEN}✅ Node import fallback completed${NC}"
+    PUSH_SUCCESS=1
+  else
+    echo -e "${YELLOW}⚠️ Node import fallback failed${NC}"
+  fi
+fi
+
+if [ "$PUSH_SUCCESS" -eq 0 ]; then
+  echo -e "${RED}❌ All push attempts failed; aborting deployment.${NC}"
+  exit 1
+fi
+
 echo ""
 
 # Step 5: Trigger Kubernetes deployment
-echo -e "${YELLOW}5️⃣  Triggering Kubernetes deployment...${NC}"
-if ! kubectl get ns "$NAMESPACE" > /dev/null 2>&1; then
-    echo -e "${RED}❌ Namespace $NAMESPACE not found${NC}"
-    exit 1
+if [ "${SKIP_DEPLOY:-0}" = "1" ]; then
+  echo -e "${YELLOW}⚠️ SKIP_DEPLOY=1 set; skipping Kubernetes deployment step${NC}"
+else
+  echo -e "${YELLOW}5️⃣  Triggering Kubernetes deployment...${NC}"
+  if ! kubectl get ns "$NAMESPACE" > /dev/null 2>&1; then
+      echo -e "${RED}❌ Namespace $NAMESPACE not found${NC}"
+      exit 1
+  fi
+
+  # Delete old pods to force image pull
+  echo "   Removing old worker pods..."
+  kubectl delete pods -n "$NAMESPACE" -l component=worker --grace-period=30 2>/dev/null || true
+  sleep 2
+
+  # Wait for new pod to start
+  echo "   Waiting for new pod..."
+  sleep 5
+
+  # Get pod status
+  POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l component=worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  if [ -z "$POD_NAME" ]; then
+      echo -e "${RED}❌ No worker pod found${NC}"
+      exit 1
+  fi
+
+  echo -e "${GREEN}✅ Pod: $POD_NAME${NC}"
+  echo ""
 fi
-
-# Delete old pods to force image pull
-echo "   Removing old worker pods..."
-kubectl delete pods -n "$NAMESPACE" -l component=worker --grace-period=30 2>/dev/null || true
-sleep 2
-
-# Wait for new pod to start
-echo "   Waiting for new pod..."
-sleep 5
-
-# Get pod status
-POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l component=worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-if [ -z "$POD_NAME" ]; then
-    echo -e "${RED}❌ No worker pod found${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✅ Pod: $POD_NAME${NC}"
-echo ""
 
 # Step 6: Check pod logs
-echo -e "${YELLOW}6️⃣  Checking pod status...${NC}"
-sleep 3
-POD_STATUS=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null)
-if [ "$POD_STATUS" = "Running" ]; then
-    echo -e "${GREEN}✅ Pod is Running${NC}"
-    
-    # Show logs
-    echo ""
-    echo -e "${BLUE}📜 Pod logs (last 30 lines):${NC}"
-    kubectl logs "$POD_NAME" -n "$NAMESPACE" --tail=30 2>/dev/null || echo "   (logs not yet available)"
+if [ "${SKIP_DEPLOY:-0}" = "1" ]; then
+  echo -e "${YELLOW}⚠️ SKIP_DEPLOY=1 set; skipping pod status/log checks${NC}"
 else
-    echo -e "${YELLOW}⚠️  Pod status: $POD_STATUS${NC}"
-    echo "   Full pod description:"
-    kubectl describe pod "$POD_NAME" -n "$NAMESPACE" 2>/dev/null | tail -20
+  echo -e "${YELLOW}6️⃣  Checking pod status...${NC}"
+  sleep 3
+  POD_STATUS=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null)
+  if [ "$POD_STATUS" = "Running" ]; then
+      echo -e "${GREEN}✅ Pod is Running${NC}"
+      
+      # Show logs
+      echo ""
+      echo -e "${BLUE}📜 Pod logs (last 30 lines):${NC}"
+      kubectl logs "$POD_NAME" -n "$NAMESPACE" --tail=30 2>/dev/null || echo "   (logs not yet available)"
+  else
+      echo -e "${YELLOW}⚠️  Pod status: $POD_STATUS${NC}"
+      echo "   Full pod description:"
+      kubectl describe pod "$POD_NAME" -n "$NAMESPACE" 2>/dev/null | tail -20
+  fi
+  echo ""
 fi
-echo ""
 
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✅ Build and Deploy Complete!${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo "Next steps:"
-echo "  • Monitor pod: kubectl logs -f $POD_NAME -n $NAMESPACE"
+if [ -n "${POD_NAME:-}" ]; then
+  echo "  • Monitor pod: kubectl logs -f $POD_NAME -n $NAMESPACE"
+fi
 echo "  • Check image in registry: curl http://${REGISTRY}/v2/_catalog"
 echo ""

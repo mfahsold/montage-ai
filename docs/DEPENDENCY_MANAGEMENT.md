@@ -38,7 +38,7 @@ CI integration
 
 - We prefer *local CI* to avoid GitHub Actions costs: run `make ci-local` or `./scripts/ci-local.sh` on a developer machine or self-hosted runner. The local CI script installs `uv` (if missing), syncs dependencies and runs `uv run pytest`.
 - A lightweight GitHub Actions workflow (`.github/workflows/uv-ci.yml`) exists but **automatic triggers are disabled** and it is set to `workflow_dispatch` only. This avoids incurring recurring GitHub Actions costs.
-- The workflow currently uses unlocked `uv sync --all-extras --dev` for compatibility while `uv.lock` is being adopted.
+- The workflow currently uses `uv sync --dev` to avoid installing private extras during CI while `uv.lock` is being adopted.
 
 Agent instructions
 
@@ -47,9 +47,24 @@ Agent instructions
 
 Notes & troubleshooting
 
-- Some optional extras (e.g., `cgpu`) are not available on public PyPI or require private registries. If `uv lock` fails locally, either:
-  - Install required private dependencies or set `--index` to a private index, or
-  - Temporarily remove the problematic extras from `pyproject.toml` while generating a lockfile.
+- Some optional extras (e.g., `cgpu`) are not available on public PyPI or require private registries.
+
+Private optional extras (recommended):
+- We moved sensitive/private extras (e.g., `cgpu`) into a dedicated optional group `cloud-private` (not included in `montage-ai[all]`). This avoids breaking `uv sync --all-extras` in CI and developer environments.
+- To install private extras locally, either:
+  - Configure a private index and run `uv lock --index https://private.example/simple`
+  - Install the private extra manually: `uv pip install --index https://private.example/simple cgpu` or `pip install --extra-index-url https://private.example/simple cgpu`.
+
+## Local CI behavior
+
+- The local CI script (`./scripts/ci-local.sh`) skips `uv sync` by default when private extras are declared (e.g., `cloud-private` in `pyproject.toml`) to avoid failing on developer machines that don't have access to private indices.
+- To opt-in and attempt resolving private extras during local runs, set `INCLUDE_PRIVATE_EXTRAS=1` in your environment (for example: `export INCLUDE_PRIVATE_EXTRAS=1`). Use this only when you have configured access to the private index.
+
+If `uv lock` fails locally, either:
+
+- Generate lock locally after installing optional/private dependencies and commit `uv.lock`.
+- Run `uv lock --index <private-index>` if using private registries.
+- Edit pyproject.toml to temporarily remove problematic extras and retry `uv lock`.
 
 Deployment config centralization
 

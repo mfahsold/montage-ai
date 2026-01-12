@@ -33,10 +33,17 @@ if [ -f uv.lock ]; then
   fi
 else
   echo "No uv.lock found — performing best-effort sync"
-  if ! uv sync --all-extras --dev; then
-    echo "Warning: full sync with extras failed (likely optional/private extras). Falling back to sync without extras."
+  # If the project declares private extras (e.g., `cloud-private`) skip automatic sync by default
+  # to avoid failures when a private index or credentials are not available. Developers can opt-in
+  # by setting INCLUDE_PRIVATE_EXTRAS=1 in their environment.
+  if grep -q "^cloud-private" pyproject.toml && [ "${INCLUDE_PRIVATE_EXTRAS:-}" != "1" ]; then
+    echo "Detected private extras (cloud-private) in pyproject.toml — skipping uv sync (set INCLUDE_PRIVATE_EXTRAS=1 to opt-in)."
+    SKIP_SYNC=1
+  else
+    # Avoid resolving private extras across Python versions (reduces spurious uv warnings)
+    export UV_FORK_STRATEGY=requires-python
     if ! uv sync --dev; then
-      echo "Warning: uv sync --dev failed as well. Proceeding to run tests without syncing dependencies (best-effort)."
+      echo "Warning: uv sync --dev failed (this may be network or index related). Proceeding to run tests without syncing dependencies (best-effort)."
       SKIP_SYNC=1
     fi
   fi
