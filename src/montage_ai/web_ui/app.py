@@ -17,7 +17,7 @@ import time
 import signal
 import zipfile
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from collections import deque
 from typing import Optional, List, Dict
@@ -3136,7 +3136,7 @@ def health_check():
     """Health check endpoint for Kubernetes probes."""
     return jsonify({
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "service": "montage-ai-web"
     }), 200
 
