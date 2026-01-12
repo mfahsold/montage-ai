@@ -22,10 +22,11 @@ import sys
 import time
 import threading
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass
 from typing import List, Optional
+from subprocess import Popen, PIPE, TimeoutExpired
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -188,7 +189,7 @@ def run_test(config: TestConfig, videos: List[Path]) -> dict:
                 return
 
             while not monitor_stop.is_set():
-                ts = datetime.utcnow().isoformat() + "Z"
+                ts = datetime.now(timezone.utc).isoformat()
                 cpu = psutil.cpu_percent(interval=None)
                 mem = psutil.virtual_memory()._asdict()
 
@@ -208,18 +209,28 @@ def run_test(config: TestConfig, videos: List[Path]) -> dict:
         monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
         monitor_thread.start()
 
+        proc = None
         try:
-            result = subprocess.run(
-                cmd,
-                env=env,
-                timeout=config.timeout,
-                capture_output=True,
-                text=True,
-            )
+            # Use Popen so we can handle signals and timeouts cleanly
+            proc = Popen(cmd, env=env, stdout=PIPE, stderr=PIPE, text=True)
+            try:
+                stdout, stderr = proc.communicate(timeout=config.timeout)
+                ret = proc.returncode
+            except TimeoutExpired:
+                proc.kill()
+                stdout, stderr = proc.communicate(timeout=10)
+                ret = proc.returncode
+                elapsed = time.time() - start_time
+                print(f"⏰ TIMEOUT after {elapsed:.1f}s")
+                return {
+                    "status": "timeout",
+                    "elapsed_s": elapsed,
+                    "timeout": config.timeout,
+                    "stderr": stderr[-500:],
+                }
 
             elapsed = time.time() - start_time
-
-            if result.returncode == 0:
+            if ret == 0:
                 print(f"✅ SUCCESS in {elapsed:.1f}s")
                 return {
                     "status": "success",
@@ -227,22 +238,27 @@ def run_test(config: TestConfig, videos: List[Path]) -> dict:
                     "videos": len(videos),
                 }
             else:
-                print(f"❌ FAILED (exit {result.returncode}) after {elapsed:.1f}s")
-                print(f"Stderr: {result.stderr[-500:]}")
+                print(f"❌ FAILED (exit {ret}) after {elapsed:.1f}s")
+                print(f"Stderr: {stderr[-500:]}")
                 return {
                     "status": "failed",
                     "elapsed_s": elapsed,
-                    "exit_code": result.returncode,
-                    "stderr": result.stderr[-500:],
+                    "exit_code": ret,
+                    "stderr": stderr[-500:],
                 }
 
-        except subprocess.TimeoutExpired:
+        except KeyboardInterrupt:
+            # If the user interrupts, ensure we stop the child process and save monitoring
+            if proc and proc.poll() is None:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
             elapsed = time.time() - start_time
-            print(f"⏰ TIMEOUT after {elapsed:.1f}s")
+            print(f"⏸️ Interrupted by user after {elapsed:.1f}s")
             return {
-                "status": "timeout",
+                "status": "interrupted",
                 "elapsed_s": elapsed,
-                "timeout": config.timeout,
             }
 
         finally:
@@ -250,7 +266,7 @@ def run_test(config: TestConfig, videos: List[Path]) -> dict:
             monitor_stop.set()
             monitor_thread.join(timeout=2)
             if monitor_data:
-                outfile = DATA_OUTPUT / f"monitoring_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{config.name.replace(' ','_')}.json"
+                outfile = DATA_OUTPUT / f"monitoring_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{config.name.replace(' ','_')}.json"
                 try:
                     with open(outfile, 'w') as f:
                         json.dump(monitor_data, f, indent=2)

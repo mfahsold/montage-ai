@@ -102,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Web UI**: Removed all inline styles in favor of shared `ui-utils.css` for maintainability
 - **Accessibility**: Added proper `aria-label` and `for` attributes to all form inputs across templates
 - **Markdownlint**: Fixed formatting in `docs/STYLE_QUICK_REFERENCE.md` (headings, lists, tables, fenced blocks, line-length). Ran `npx markdownlint-cli2 "docs/**/*.md"` and found additional warnings across several docs; added `docs/MARKDOWNLINT_FIXES.md` with details and next steps.
+- **Tests & Stability**: Added `scripts/run_optimized_tests.py` monitoring and KeyboardInterrupt handling; implemented FFmpeg software fallback (libx264) when GPU encoding (VAAPI/ROCm) fails, preventing hard failures and allowing idempotent test runs.
 
 ### Added
 
