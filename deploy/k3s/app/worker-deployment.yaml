@@ -45,6 +45,8 @@ spec:
           value: "redis"
         - name: REDIS_PORT
           value: "6379"
+        - name: TEMP_DIR
+          value: "/tmp"  # Avoid /dev/shm 64MB limit
         volumeMounts:
         - name: data-input
           mountPath: /data/input

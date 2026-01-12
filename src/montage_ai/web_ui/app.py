@@ -250,7 +250,11 @@ def get_montage_queue(options: dict) -> ResilientQueue:
 
 def enqueue_montage(job_id: str, style: str, options: dict):
     queue = get_montage_queue(options)
-    return queue.enqueue(run_montage, job_id, style, options)
+    # Set appropriate job timeout based on quality profile
+    # Preview: 5 minutes, Standard/Heavy: 30 minutes
+    quality = (options or {}).get("quality_profile", "standard")
+    job_timeout = 300 if quality == "preview" else 1800
+    return queue.enqueue(run_montage, job_id, style, options, job_timeout=job_timeout)
 
 def redis_listener():
     """Listen for updates from Redis and broadcast to SSE clients."""
