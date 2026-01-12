@@ -38,7 +38,7 @@ CI integration
 
 - We prefer *local CI* to avoid GitHub Actions costs: run `make ci-local` or `./scripts/ci-local.sh` on a developer machine or self-hosted runner. The local CI script installs `uv` (if missing), syncs dependencies and runs `uv run pytest`.
 - A lightweight GitHub Actions workflow (`.github/workflows/uv-ci.yml`) exists but **automatic triggers are disabled** and it is set to `workflow_dispatch` only. This avoids incurring recurring GitHub Actions costs.
-- The workflow currently uses unlocked `uv sync --all-extras --dev` for compatibility while `uv.lock` is being adopted.
+- The workflow currently uses `uv sync --dev` to avoid installing private extras during CI while `uv.lock` is being adopted.
 
 Agent instructions
 

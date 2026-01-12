@@ -33,8 +33,8 @@ jobs:
 
       - name: Sync dependencies
         run: |
-          # Use unlocked sync when a lockfile is not yet present or optional extras (e.g., cgpu) are not resolvable in CI.
-          uv sync --all-extras --dev
+          # Avoid installing private extras in CI by default; use --dev for development-only deps
+          uv sync --dev
 
       - name: Run tests
         run: |

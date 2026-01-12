@@ -33,12 +33,9 @@ if [ -f uv.lock ]; then
   fi
 else
   echo "No uv.lock found — performing best-effort sync"
-  if ! uv sync --all-extras --dev; then
-    echo "Warning: full sync with extras failed (likely optional/private extras). Falling back to sync without extras."
-    if ! uv sync --dev; then
-      echo "Warning: uv sync --dev failed as well. Proceeding to run tests without syncing dependencies (best-effort)."
-      SKIP_SYNC=1
-    fi
+  if ! uv sync --dev; then
+    echo "Warning: uv sync --dev failed (this may be network or index related). Proceeding to run tests without syncing dependencies (best-effort)."
+    SKIP_SYNC=1
   fi
 fi
 
