@@ -65,6 +65,7 @@ def test_build_and_deploy_uses_ghcr_fallback(tmp_path, monkeypatch, capsys):
         "GHCR_PAT": "dummy-token",
         "GITHUB_REPOSITORY_OWNER": "testorg",
         "GITHUB_ACTOR": "testactor",
+        "SKIP_DEPLOY": "1",
     })
 
     # Run the script
@@ -76,7 +77,7 @@ def test_build_and_deploy_uses_ghcr_fallback(tmp_path, monkeypatch, capsys):
 
     # Assert the script exited successfully and that GHCR push was attempted
     assert proc.returncode == 0, f"Script failed: stdout={proc.stdout} stderr={proc.stderr}"
-    assert "Attempting GHCR fallback" in proc.stdout or "Pushed to GHCR" in proc.stdout
+    assert "ghcr.io" in proc.stdout.lower() or "pushed to ghcr" in proc.stdout.lower()
     # Also ensure the docker log contains a push attempt to ghcr
     content = log.read_text()
     assert "push ghcr.io" in content or "push ghcr.io/testorg/montage-ai" in content

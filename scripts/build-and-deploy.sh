@@ -154,54 +154,64 @@ fi
 echo ""
 
 # Step 5: Trigger Kubernetes deployment
-echo -e "${YELLOW}5️⃣  Triggering Kubernetes deployment...${NC}"
-if ! kubectl get ns "$NAMESPACE" > /dev/null 2>&1; then
-    echo -e "${RED}❌ Namespace $NAMESPACE not found${NC}"
-    exit 1
+if [ "${SKIP_DEPLOY:-0}" = "1" ]; then
+  echo -e "${YELLOW}⚠️ SKIP_DEPLOY=1 set; skipping Kubernetes deployment step${NC}"
+else
+  echo -e "${YELLOW}5️⃣  Triggering Kubernetes deployment...${NC}"
+  if ! kubectl get ns "$NAMESPACE" > /dev/null 2>&1; then
+      echo -e "${RED}❌ Namespace $NAMESPACE not found${NC}"
+      exit 1
+  fi
+
+  # Delete old pods to force image pull
+  echo "   Removing old worker pods..."
+  kubectl delete pods -n "$NAMESPACE" -l component=worker --grace-period=30 2>/dev/null || true
+  sleep 2
+
+  # Wait for new pod to start
+  echo "   Waiting for new pod..."
+  sleep 5
+
+  # Get pod status
+  POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l component=worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  if [ -z "$POD_NAME" ]; then
+      echo -e "${RED}❌ No worker pod found${NC}"
+      exit 1
+  fi
+
+  echo -e "${GREEN}✅ Pod: $POD_NAME${NC}"
+  echo ""
 fi
-
-# Delete old pods to force image pull
-echo "   Removing old worker pods..."
-kubectl delete pods -n "$NAMESPACE" -l component=worker --grace-period=30 2>/dev/null || true
-sleep 2
-
-# Wait for new pod to start
-echo "   Waiting for new pod..."
-sleep 5
-
-# Get pod status
-POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l component=worker -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-if [ -z "$POD_NAME" ]; then
-    echo -e "${RED}❌ No worker pod found${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✅ Pod: $POD_NAME${NC}"
-echo ""
 
 # Step 6: Check pod logs
-echo -e "${YELLOW}6️⃣  Checking pod status...${NC}"
-sleep 3
-POD_STATUS=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null)
-if [ "$POD_STATUS" = "Running" ]; then
-    echo -e "${GREEN}✅ Pod is Running${NC}"
-    
-    # Show logs
-    echo ""
-    echo -e "${BLUE}📜 Pod logs (last 30 lines):${NC}"
-    kubectl logs "$POD_NAME" -n "$NAMESPACE" --tail=30 2>/dev/null || echo "   (logs not yet available)"
+if [ "${SKIP_DEPLOY:-0}" = "1" ]; then
+  echo -e "${YELLOW}⚠️ SKIP_DEPLOY=1 set; skipping pod status/log checks${NC}"
 else
-    echo -e "${YELLOW}⚠️  Pod status: $POD_STATUS${NC}"
-    echo "   Full pod description:"
-    kubectl describe pod "$POD_NAME" -n "$NAMESPACE" 2>/dev/null | tail -20
+  echo -e "${YELLOW}6️⃣  Checking pod status...${NC}"
+  sleep 3
+  POD_STATUS=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null)
+  if [ "$POD_STATUS" = "Running" ]; then
+      echo -e "${GREEN}✅ Pod is Running${NC}"
+      
+      # Show logs
+      echo ""
+      echo -e "${BLUE}📜 Pod logs (last 30 lines):${NC}"
+      kubectl logs "$POD_NAME" -n "$NAMESPACE" --tail=30 2>/dev/null || echo "   (logs not yet available)"
+  else
+      echo -e "${YELLOW}⚠️  Pod status: $POD_STATUS${NC}"
+      echo "   Full pod description:"
+      kubectl describe pod "$POD_NAME" -n "$NAMESPACE" 2>/dev/null | tail -20
+  fi
+  echo ""
 fi
-echo ""
 
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✅ Build and Deploy Complete!${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo "Next steps:"
-echo "  • Monitor pod: kubectl logs -f $POD_NAME -n $NAMESPACE"
+if [ -n "${POD_NAME:-}" ]; then
+  echo "  • Monitor pod: kubectl logs -f $POD_NAME -n $NAMESPACE"
+fi
 echo "  • Check image in registry: curl http://${REGISTRY}/v2/_catalog"
 echo ""
