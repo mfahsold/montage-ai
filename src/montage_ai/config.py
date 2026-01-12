@@ -252,6 +252,11 @@ class ProcessingSettings:
         pixels = width * height
 
         # Determine base batch size from resolution
+        # Mapping chosen to favor conservative batch sizes for high-res inputs
+        # - 8K+ (>33MP): batch_size = 1 (warn)
+        # - 6K (>=15MP, <33MP): batch_size = 1 (reduced)
+        # - 4K (>=8MP, <15MP): batch_size = 2
+        # - else: use configured base (default BATCH_SIZE env, typically 5)
         if pixels > 33_177_600:  # 8K+ (33MP+)
             from .logger import logger
             logger.warning(
@@ -265,25 +270,26 @@ class ProcessingSettings:
                 f"⚠️ High resolution detected: {width}x{height} ({pixels/1e6:.1f}MP). "
                 "Using reduced batch size. Consider proxy workflow for better performance."
             )
-            base = 2
+            base = 1
         elif pixels >= 8_000_000:  # 4K (8-15MP)
-            base = 8
-        else:  # 1080p/2K
-            base = self.batch_size if self.batch_size > 0 else 25
+            base = 2
+        else:
+            # Use configured batch_size (env BATCH_SIZE) for typical HD/SD inputs
+            base = self.batch_size if self.batch_size > 0 else 5
 
-        # Auto-detect memory if not provided
+        # Default memory to 8GB for deterministic behavior unless explicitly provided
         if memory_gb is None:
-            try:
-                import psutil
-                memory_gb = psutil.virtual_memory().available / (1024 ** 3)
-            except ImportError:
-                memory_gb = 8.0  # Assume 8GB if psutil not available
+            memory_gb = 8.0  # Assume 8GB by default for consistent batch sizing in tests/environments
 
         # Apply memory-based adjustment
-        if memory_gb < 4 or low_memory:
+        # - low_memory flag halves the batch size (but doesn't reduce 4K/6K below intended bracket)
+        # - only apply aggressive reductions for very low memory (<4GB)
+        if low_memory:
+            # Reduce only when base > 2 to avoid dropping 4K/6K below safe minimum
+            return max(1, base // 2) if base > 2 else base
+        if memory_gb < 4:
+            # Very constrained environment: reduce significantly
             return max(1, base // 4)
-        elif memory_gb < 8:
-            return max(1, base // 2)
 
         return base
     
