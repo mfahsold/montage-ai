@@ -18,9 +18,15 @@ Quick build example (recommended)
 
 2) Run the distributed build with SSH forwarding (optional):
 
-   # Use the cluster registry
-   # Note: canonical internal registry port = 30500
+   Recommended: define your registry in `deploy/config.env` (REGISTRY_HOST/REGISTRY_PORT) or override via `REGISTRY` env var.
+
+   Example (override):
+   ```bash
    REGISTRY=192.168.1.12:30500 TAG=20260112-quick BUILDKIT_SSH=1 ./scripts/build-distributed.sh
+   ```
+
+   If `deploy/config.env` is present, scripts will read `REGISTRY_URL` from it automatically.
+
 
 Notes:
 - `BUILDKIT_SSH=1` enables `--ssh default` so BuildKit can forward your local SSH agent into the build containers. This is useful when Docker build needs to fetch private git modules during `go get` or similar operations.
@@ -48,7 +54,10 @@ Troubleshooting
 - If you prefer not to use SSH forwarding, consider vendoring private deps into your repo before building.
 
 Security note
+
 - Do not bake credentials into images. Use BuildKit SSH forwarding or ephemeral secrets.
+
 Dependency management (recommended: `uv`)
+
 - We recommend using `uv` for dependency management and lockfile generation. See `docs/DEPENDENCY_MANAGEMENT.md` for instructions on installing `uv`, generating `uv.lock`, and CI integration.
 - CI currently runs `uv sync --all-extras --dev` while `uv.lock` adoption is in progress; once `uv.lock` is committed, CI will move to `uv sync --locked` for reproducible installs.
