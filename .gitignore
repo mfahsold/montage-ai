@@ -108,3 +108,4 @@ deploy/k3s/overlays/local/
 
 # Cluster-specific global config (contains internal IPs)
 deploy/config-global.yaml
+.venv-ci/
