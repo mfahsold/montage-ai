@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Environment Config**: Updated `.env` and `montage-ai.sh` to correctly handle Google API keys for the cgpu wrapper.
 - **Web UI**: Removed all inline styles in favor of shared `ui-utils.css` for maintainability
 - **Accessibility**: Added proper `aria-label` and `for` attributes to all form inputs across templates
-- **Markdownlint**: Fixed all documentation formatting issues (headings, lists, tables, fences)
+- **Markdownlint**: Fixed formatting in `docs/STYLE_QUICK_REFERENCE.md` (headings, lists, tables, fenced blocks, line-length). Ran `npx markdownlint-cli2 "docs/**/*.md"` and found additional warnings across several docs; added `docs/MARKDOWNLINT_FIXES.md` with details and next steps.
 
 ### Added
 
