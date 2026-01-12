@@ -1,10 +1,10 @@
 name: UV Python CI
 
+# NOTE: Automatic triggers (push/pull_request) are intentionally disabled to avoid
+# incurring GitHub Actions costs. Prefer running `make ci-local` or
+# `./scripts/ci-local.sh` on local machines or self-hosted runners.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch: {}
 
 jobs:
   test:

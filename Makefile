@@ -283,6 +283,11 @@ status: ## Show cluster deployment status
 test: validate test-local test-unit ## Run all tests
 	@echo "$(GREEN)All tests passed!$(RESET)"
 
+ci-local: ## Run CI locally (uv-based). Avoids GitHub Actions costs.
+	@echo "$(CYAN)Running local CI (uv)...$(RESET)"
+	@./scripts/ci-local.sh
+	@echo "$(GREEN)Local CI finished$(RESET)"
+
 test-unit: ## Run unit tests with pytest
 	@echo "$(CYAN)Running unit tests...$(RESET)"
 	PYTHONPATH=src pytest tests/ -v --ignore=tests/integration/

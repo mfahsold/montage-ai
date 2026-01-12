@@ -36,8 +36,14 @@ make deps-lock  # runs ./scripts/uv-lock.sh
 
 CI integration
 
-- We add a lightweight GitHub Actions workflow (`.github/workflows/uv-ci.yml`) that installs `uv` and runs `uv sync` + `uv run pytest`.
+- We prefer *local CI* to avoid GitHub Actions costs: run `make ci-local` or `./scripts/ci-local.sh` on a developer machine or self-hosted runner. The local CI script installs `uv` (if missing), syncs dependencies and runs `uv run pytest`.
+- A lightweight GitHub Actions workflow (`.github/workflows/uv-ci.yml`) exists but **automatic triggers are disabled** and it is set to `workflow_dispatch` only. This avoids incurring recurring GitHub Actions costs.
 - The workflow currently uses unlocked `uv sync --all-extras --dev` for compatibility while `uv.lock` is being adopted.
+
+Agent instructions
+
+- Agents (automation) MUST run the full local CI via `make ci-local` and attach the output to PRs rather than creating/updating GitHub Actions that run on push/pr and produce cost. If a workflow change is proposed that would add recurring CI execution on push/PR, explicitly call out the cost impact and obtain maintainer approval.
+- Agents should include the local CI output (e.g., `uv run pytest -q` result) in the PR description or comments.
 
 Notes & troubleshooting
 
