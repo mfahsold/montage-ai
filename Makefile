@@ -170,6 +170,16 @@ clean: ## Clean local caches and Docker resources
 	docker buildx prune -f
 	@echo "$(GREEN)✓ Caches cleared$(RESET)"
 
+.PHONY: cleanup
+cleanup: ## Archive large proxies, compress old monitoring JSONs, rotate logs
+	@echo "$(CYAN)Running cleanup script...$(RESET)"
+	./scripts/cleanup.sh
+
+.PHONY: registry-check
+registry-check: ## Run registry health checks against default host (192.168.1.12)
+	@echo "$(CYAN)Running registry checks...$(RESET)"
+	./scripts/registry_check.sh
+
 validate-deps: ## Validate optional dependencies installation
 	@echo "$(CYAN)Validating optional dependencies...$(RESET)"
 	@./scripts/validate_optional_deps.sh
