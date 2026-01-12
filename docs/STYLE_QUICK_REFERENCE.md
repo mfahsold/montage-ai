@@ -170,24 +170,28 @@ When adding new UI text:
 ## 🎯 Messaging by Context
 
 ### For Dashboard
+
 - Goal: Status overview, quick actions
 - Tone: Informational, concise
 - Length: Single sentence max
 - Example: "System online. GPU ready. 3 jobs pending."
 
 ### For Workflow Pages (Creator, Shorts, Transcript)
+
 - Goal: Guide user through steps
 - Tone: Instructional, clear
 - Length: 1-2 sentences per step
 - Example: "Choose editing rhythm and visual language."
 
 ### For Documentation
+
 - Goal: Explain capability
 - Tone: Technical, thorough
 - Length: 2-3 paragraphs max
 - Example: "Beat-sync aligns cuts to music rhythm using librosa analysis."
 
 ### For Error Messages
+
 - Goal: Help user fix problem
 - Tone: Helpful, specific
 - Length: 1 sentence + 1 suggestion
