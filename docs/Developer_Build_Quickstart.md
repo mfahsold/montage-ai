@@ -48,3 +48,6 @@ Troubleshooting
 
 Security note
 - Do not bake credentials into images. Use BuildKit SSH forwarding or ephemeral secrets.
+Dependency management (recommended: `uv`)
+- We recommend using `uv` for dependency management and lockfile generation. See `docs/DEPENDENCY_MANAGEMENT.md` for instructions on installing `uv`, generating `uv.lock`, and CI integration.
+- CI currently runs `uv sync --all-extras --dev` while `uv.lock` adoption is in progress; once `uv.lock` is committed, CI will move to `uv sync --locked` for reproducible installs.

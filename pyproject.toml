@@ -16,7 +16,7 @@ dependencies = [
     "Pillow>=10.0.0,<12.0",
     "opencv-python-headless>=4.12.0.88",
     # librosa removed: FFmpeg-first audio analysis
-    "numpy>=1.24.0,<2.0.0",
+    "numpy>=2.0.0,<3.0.0",
     "scenedetect[opencv]>=0.6.7.1",
     "tqdm>=4.67.1",
     "requests>=2.32.5",

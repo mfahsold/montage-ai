@@ -184,6 +184,11 @@ validate-deps: ## Validate optional dependencies installation
 	@echo "$(CYAN)Validating optional dependencies...$(RESET)"
 	@./scripts/validate_optional_deps.sh
 
+.PHONY: deps-lock
+deps-lock: ## Generate/refresh uv.lock using uv
+	@echo "$(CYAN)Generating uv.lock...$(RESET)"
+	@./scripts/uv-lock.sh
+
 benchmark: ## Run performance baseline benchmarks
 	@echo "$(CYAN)Running performance baseline...$(RESET)"
 	@python3 scripts/benchmark_baseline.py
@@ -277,6 +282,11 @@ status: ## Show cluster deployment status
 
 test: validate test-local test-unit ## Run all tests
 	@echo "$(GREEN)All tests passed!$(RESET)"
+
+ci-local: ## Run CI locally (uv-based). Avoids GitHub Actions costs.
+	@echo "$(CYAN)Running local CI (uv)...$(RESET)"
+	@./scripts/ci-local.sh
+	@echo "$(GREEN)Local CI finished$(RESET)"
 
 test-unit: ## Run unit tests with pytest
 	@echo "$(CYAN)Running unit tests...$(RESET)"
