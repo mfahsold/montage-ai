@@ -862,10 +862,10 @@ class SegmentWriter:
         
         segment_path = self.get_segment_path(segment_index)
         concat_list_path = str(self.output_dir / f"concat_{segment_index}.txt")
-        
+
         try:
             logger.info(f"   📼 Writing segment {segment_index} ({len(clip_paths)} clips via FFmpeg -c copy)...")
-            
+
             # Validate stream parameters if requested
             if validate_streams and len(clip_paths) > 1:
                 first_params = ffprobe_stream_params(clip_paths[0])
@@ -878,14 +878,14 @@ class SegmentWriter:
                             logger.warning(f"      Got: {params.fps:.2f}fps, {params.pix_fmt}")
                             # Fall back to re-encoding for this segment
                             return self._write_segment_ffmpeg_reencode(clip_paths, segment_index, concat_list_path)
-            
+
             # Create concat file list
             with open(concat_list_path, 'w') as f:
                 for path in clip_paths:
                     # Escape single quotes in path
                     escaped_path = path.replace("'", "'\\''")
                     f.write(f"file '{escaped_path}'\n")
-            
+
             # FFmpeg concat demuxer with -c copy (no re-encoding, very fast)
             cmd = build_ffmpeg_cmd([
                 "-f", "concat",
@@ -894,7 +894,7 @@ class SegmentWriter:
                 "-c", "copy",  # Stream copy - no re-encoding!
                 segment_path
             ])
-            
+
             result = run_command(
                 cmd,
                 capture_output=True,
@@ -916,38 +916,41 @@ class SegmentWriter:
                 preview = stderr_preview[-1] if stderr_preview else "unknown error"
                 logger.warning(f"   ⚠️ Concat copy failed, trying re-encode: {preview}{log_hint}")
                 return self._write_segment_ffmpeg_reencode(clip_paths, segment_index, concat_list_path)
-            
-            # Cleanup concat list
-            if os.path.exists(concat_list_path):
-                os.remove(concat_list_path)
 
             # Get duration from output file
             duration = self._get_video_duration(segment_path)
-            
+
             segment_info = SegmentInfo(
                 path=segment_path,
                 index=segment_index,
                 clip_count=len(clip_paths),
                 duration=duration
             )
-            
+
             self.segments.append(segment_info)
             self.stats.total_segments += 1
             self.stats.total_clips += len(clip_paths)
             self.stats.total_duration += duration
             self.stats.total_size_bytes += segment_info.size_bytes
-            
+
             logger.info(f"   ✅ Segment {segment_index} (copy): {duration:.1f}s, "
                   f"{segment_info.size_bytes / (1024*1024):.1f}MB")
-            
+
             return segment_info
-            
+
         except subprocess.TimeoutExpired:
             logger.error(f"   ❌ Segment {segment_index} timed out")
             return None
         except Exception as e:
             logger.error(f"   ❌ Failed to write segment {segment_index}: {e}")
             return None
+        finally:
+            # Always cleanup concat list file
+            if os.path.exists(concat_list_path):
+                try:
+                    os.remove(concat_list_path)
+                except OSError:
+                    logger.warning(f"   ⚠️ Failed to cleanup: {concat_list_path}")
     
     def _write_segment_ffmpeg_reencode(self,
                                         clip_paths: List[str],
@@ -1276,16 +1279,91 @@ class SegmentWriter:
                 # Just concatenate video
                 base_args = []
 
-                # Add hardware init for GPU encoders (VAAPI needs init_hw_device)
-                if _settings.encoding.normalize_clips and _ffmpeg_config.is_gpu_accelerated:
-                    gpu_type = _ffmpeg_config.gpu_encoder_type
-                    if gpu_type in ("vaapi", "rocm"):
-                        base_args.extend([
-                            "-init_hw_device", "vaapi=va:/dev/dri/renderD128",
-                            "-filter_hw_device", "va",
+            result = run_command(
+                cmd,
+                capture_output=True,
+                timeout=_settings.processing.ffmpeg_long_timeout,
+                check=False,
+                log_output=False
+            )
+
+            # If GPU-accelerated encode failed (e.g., VAAPI hwupload errors), retry
+            # with a software (libx264) fallback. This avoids hard failures when
+            # device mapping isn't present or hwupload fails.
+            if result.returncode != 0:
+                stderr = (result.stderr or "").lower()
+                if _ffmpeg_config.is_gpu_accelerated and (
+                    "hwupload" in stderr or "hardware device" in stderr or "vaapi" in stderr
+                ):
+                    logger.warning(
+                        "GPU encoding failed (%s). Retrying with software encoder (libx264)...",
+                        stderr.strip().split("\n")[0] if stderr else ""
+                    )
+
+                    # Build fallback arguments (no GPU init, explicit software codec)
+                    fallback_base = []
+                    if audio_path and os.path.exists(audio_path):
+                        fallback_base.extend([
+                            "-f", "concat",
+                            "-safe", "0",
+                            "-i", concat_list_path,
+                            "-i", audio_path,
+                            "-map", "0:v",
+                            "-map", "1:a",
+                        ])
+                    else:
+                        fallback_base.extend([
+                            "-f", "concat",
+                            "-safe", "0",
+                            "-i", concat_list_path,
                         ])
 
-                base_args.extend([
+                    fallback_cmd = build_ffmpeg_cmd(fallback_base)
+
+                    # Force software target codec
+                    fallback_cmd.extend(_video_params_for_target(
+                        _ffmpeg_config,
+                        crf=self.ffmpeg_crf,
+                        preset=self.ffmpeg_preset,
+                        target_codec="libx264",
+                        target_profile=TARGET_PROFILE,
+                        target_level=TARGET_LEVEL,
+                        target_pix_fmt="yuv420p",
+                    ))
+
+                    if audio_path and os.path.exists(audio_path):
+                        fallback_cmd.extend([
+                            "-c:a", "aac",
+                            "-b:a", "192k",
+                            "-af", af_chain,
+                            "-shortest",
+                            "-movflags", "+faststart",
+                            actual_output,
+                        ])
+                    else:
+                        fallback_cmd.extend([
+                            "-movflags", "+faststart",
+                            actual_output,
+                        ])
+
+                    fallback_result = run_command(
+                        fallback_cmd,
+                        capture_output=True,
+                        timeout=_settings.processing.ffmpeg_long_timeout,
+                        check=False,
+                        log_output=False,
+                    )
+
+                    if fallback_result.returncode == 0:
+                        logger.info("Software fallback succeeded (libx264)")
+                        result = fallback_result
+                    else:
+                        logger.error(
+                            "Software fallback also failed: %s",
+                            (fallback_result.stderr or "").strip().split("\n")[0]
+                        )
+                else:
+                    logger.error("FFmpeg failed: %s", (result.stderr or "").strip().split("\n")[0])
                     "-f", "concat",
                     "-safe", "0",
                     "-i", concat_list_path,
@@ -1324,18 +1402,14 @@ class SegmentWriter:
                 check=False,
                 log_output=False
             )
-            
-            # Cleanup concat list
-            # if os.path.exists(concat_list_path):
-            #     os.remove(concat_list_path)
-            
+
             if result.returncode != 0:
                 logger.error(f"   ❌ Final concatenation failed. Command: {' '.join(cmd)}")
                 logger.error(f"   ❌ Stderr: {result.stderr}")
                 if os.path.exists(actual_output):
                     os.remove(actual_output)
                 return False
-            
+
             # Apply logo overlay if requested (requires re-encode)
             if logo_path and os.path.exists(logo_path) and os.path.exists(actual_output):
                 logger.info(f"   🏷️ Adding logo overlay...")
@@ -1351,27 +1425,34 @@ class SegmentWriter:
                 if os.path.exists(output_path):
                     os.remove(output_path)
                 os.rename(actual_output, output_path)
-            
+
             self.stats.concatenation_time = time.time() - start_time
-            
+
             # Cleanup segment files if requested
             if self.cleanup_on_complete:
                 self.cleanup_segments()
-            
+
             final_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
             logger.info(f"   ✅ Final video: {output_path}")
             logger.info(f"      Duration: {self.stats.total_duration:.1f}s")
             logger.info(f"      Size: {final_size / (1024*1024):.1f}MB")
             logger.info(f"      Concatenation time: {self.stats.concatenation_time:.1f}s")
-            
+
             return True
-            
+
         except subprocess.TimeoutExpired:
             logger.error("   ❌ Final concatenation timed out")
             return False
         except Exception as e:
             logger.error(f"   ❌ Concatenation error: {e}")
             return False
+        finally:
+            # Always cleanup concat list file
+            if os.path.exists(concat_list_path):
+                try:
+                    os.remove(concat_list_path)
+                except OSError:
+                    logger.warning(f"   ⚠️ Failed to cleanup: {concat_list_path}")
     
     def _apply_logo_overlay(self, input_path: str, output_path: str, 
                             logo_path: str, position: str = "top-right") -> bool:

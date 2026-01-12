@@ -5,17 +5,21 @@ This guide helps you optimize Montage AI for your hardware and workflow, avoidin
 ## Quick Performance Profiles
 
 ### Laptop / Low-Power (4 GB RAM, 4 CPU)
+
 ```bash
 export LOW_MEMORY_MODE=true
 export BATCH_SIZE=2
 export QUALITY_PROFILE=preview
 export MOTION_SAMPLING_MODE=adaptive
-export HISTOGRAM_BINS=32  # Trade precision for speed
-export CGPU_ENABLED=true  # Offload heavy lifting
+export HISTOGRAM_BINS=32
+# Trade precision for speed
+export CGPU_ENABLED=true
+# Offload heavy lifting
 ./montage-ai.sh run dynamic --cgpu
 ```
 
 ### Workstation / Standard (16 GB RAM, 8+ CPU)
+
 ```bash
 export BATCH_SIZE=5
 export QUALITY_PROFILE=standard
@@ -27,14 +31,17 @@ export UPSCALE=false
 ```
 
 ### Server / High-Performance (32+ GB RAM, 16+ CPU, GPU)
+
 ```bash
 export BATCH_SIZE=10
 export QUALITY_PROFILE=high
 export MOTION_SAMPLING_MODE=full
-export HISTOGRAM_BINS=128  # Maximum detail
+export HISTOGRAM_BINS=128
+# Maximum detail
 export UPSCALE=true
 export STABILIZE=true
-export FFMPEG_HWACCEL=auto  # Auto-detect GPU
+export FFMPEG_HWACCEL=auto
+# Auto-detect GPU
 ./montage-ai.sh run dynamic --upscale --stabilize
 ```
 
@@ -45,6 +52,7 @@ export FFMPEG_HWACCEL=auto  # Auto-detect GPU
 Fine-tune optical flow (motion detection) for your use case:
 
 ### Fast Motion Detection (Real-Time Preview)
+
 ```bash
 export OPTICAL_FLOW_LEVELS=2
 export OPTICAL_FLOW_WINSIZE=7
@@ -53,6 +61,7 @@ export HISTOGRAM_BINS=32
 ```
 
 ### Balanced (Default)
+
 ```bash
 export OPTICAL_FLOW_LEVELS=3
 export OPTICAL_FLOW_WINSIZE=15
@@ -61,6 +70,7 @@ export HISTOGRAM_BINS=64
 ```
 
 ### Precise Motion Tracking (High-Quality Output)
+
 ```bash
 export OPTICAL_FLOW_LEVELS=4
 export OPTICAL_FLOW_WINSIZE=21
@@ -82,16 +92,19 @@ export MOTION_SAMPLING_MODE=full
 Control how strictly Montage AI filters low-focus clips:
 
 ### Lenient (Keep More Clips)
+
 ```bash
 export BLUR_DETECTION_VARIANCE_THRESHOLD=500.0
 ```
 
 ### Standard (Balanced)
+
 ```bash
 export BLUR_DETECTION_VARIANCE_THRESHOLD=1000.0
 ```
 
 ### Strict (High-Quality Only)
+
 ```bash
 export BLUR_DETECTION_VARIANCE_THRESHOLD=1500.0
 ```
@@ -231,7 +244,7 @@ Adjust parameters targeting the slowest phase:
 ## Environment Variable Cheat Sheet
 
 | Variable | Default | Range | Impact |
-|----------|---------|-------|--------|
+| ------- | ------- | ----- | ------ |
 | `BATCH_SIZE` | 5 | 1-20 | Higher = faster but more memory |
 | `QUALITY_PROFILE` | standard | preview/standard/high/master | Output quality & speed |
 | `FFMPEG_PRESET` | medium | ultrafast-veryslow | Encoding speed |

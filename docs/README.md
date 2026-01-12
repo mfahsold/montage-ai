@@ -25,7 +25,7 @@ make cluster
 ### Getting Started
 
 | Document | Description |
-|----------|-------------|
+| ------ | ------------- |
 | [Getting Started](getting-started.md) | Installation & first montage |
 | [Features](features.md) | What Montage AI can do |
 | [Configuration](configuration.md) | Environment variables |
@@ -34,7 +34,7 @@ make cluster
 ### Deployment
 
 | Document | Description |
-|----------|-------------|
+| ------ | ------------- |
 | [Deployment Guide](../deploy/README.md) | All deployment options |
 | [K8s Deployment](../deploy/k3s/README.md) | Kubernetes/K3s deployment |
 | [Kubernetes Runbook](KUBERNETES_RUNBOOK.md) | Operations & failure recovery |
@@ -43,7 +43,7 @@ make cluster
 ### Architecture
 
 | Document | Description |
-|----------|-------------|
+| ------ | ------------- |
 | [Architecture](architecture.md) | System design |
 | [Algorithms](algorithms.md) | Beat detection, scene analysis |
 | [Models](models.md) | AI/ML libraries used |
@@ -52,14 +52,14 @@ make cluster
 ### Cloud & Infrastructure
 
 | Document | Description |
-|----------|-------------|
+| ------ | ------------- |
 | [cgpu Setup](cgpu-setup.md) | Google Cloud GPU credentials |
 | [Optional Dependencies](OPTIONAL_DEPENDENCIES.md) | AI/ML library options |
 
 ### Reference
 
 | Document | Description |
-|----------|-------------|
+| ------ | ------------- |
 | [Parameter Reference](PARAMETER_REFERENCE.md) | All configurable parameters |
 | [Style Quick Reference](STYLE_QUICK_REFERENCE.md) | Editing styles |
 | [AI Director Tuning](AI_DIRECTOR_PARAMETER_TUNING.md) | LLM prompt tuning |
@@ -67,7 +67,7 @@ make cluster
 ### Strategy
 
 | Document | Description |
-|----------|-------------|
+| ------ | ------------- |
 | [Competitive Analysis](COMPETITIVE_ANALYSIS.md) | Market position |
 | [Roadmap 2026](roadmap/ROADMAP_2026.md) | Future plans |
 

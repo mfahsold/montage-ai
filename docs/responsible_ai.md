@@ -1,6 +1,8 @@
 # Responsible AI & Transparency
 
-Montage AI is built as a **local-first, OSS-leaning** editing assistant. We focus on explainability, user control, and practical privacy. This document describes how the system behaves and which safeguards are in place.
+Montage AI is built as a **local-first, OSS-leaning** editing assistant.
+We focus on explainability, user control, and practical privacy.
+This document describes how the system behaves and which safeguards are in place.
 
 ---
 
@@ -17,7 +19,8 @@ Montage AI is built as a **local-first, OSS-leaning** editing assistant. We focu
 ## Data Handling
 
 - **Local processing:** Video, audio, and intermediate files are stored locally in `data/` by default.
-- **Optional remote compute:** When `CGPU_ENABLED=true`, heavy analysis or LLM calls can be offloaded. This is opt-in.
+- **Optional remote compute:** When `CGPU_ENABLED=true`, heavy analysis or LLM calls can be offloaded.
+  This is opt-in.
 - **No training or retention:** We do not train on user footage or prompts. The system does not upload content unless you enable cgpu or other remote backends.
 
 ---
