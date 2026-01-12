@@ -10,6 +10,12 @@ Quick checks
 
 - Example (override): `nc -zv 192.168.1.12 30500` or `curl -v http://192.168.1.12:30500/v2/`
 
+Useful tools
+
+- `./scripts/registry_check.sh` — quick shell based test (TCP + HTTP/HTTPS)
+- `python3 scripts/check-registry.py <host>` — structured output (TCP/HTTP/HTTPS) using `requests` and `socket` (preferred)
+- `./scripts/check-hardcoded-registries.sh` — scan the repo for hardcoded registry strings
+
 Common fixes
 
 - Ensure the registry process (docker container or systemd service) is running and listening on the expected port.

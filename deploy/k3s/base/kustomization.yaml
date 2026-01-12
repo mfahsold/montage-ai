@@ -26,6 +26,10 @@ resources:
 #         newName: your-registry:30500/montage-ai
 #         newTag: latest
 # =============================================================================
+# Use the helper script to set images across overlays:
+#   ./scripts/kustomize-set-image.sh <image>
+# or the Makefile target: `make cluster-deploy` which runs the script for you.
+
 images:
   - name: ghcr.io/mfahsold/montage-ai
     newTag: latest
