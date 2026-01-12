@@ -29,7 +29,7 @@ spec:
               protocol: TCP
           env:
             - name: REGISTRY_HTTP_ADDR
-              value: :5000
+              value: :30500
           volumeMounts:
             - name: registry-data
               mountPath: /var/lib/registry

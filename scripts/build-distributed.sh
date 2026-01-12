@@ -14,13 +14,15 @@
 #   TAG=v1.0.0 ./scripts/build-distributed.sh   # Override via env
 #
 # Environment Variables:
-#   REGISTRY            - Registry host (default: 192.168.1.12:5000 for cluster)
+#   REGISTRY            - Registry host (default: 192.168.1.12:30500 for cluster)
 #   CACHE_REF           - Cache reference (default: $REGISTRY/montage-ai:buildcache)
 #   BUILDER             - Buildx builder name (default: distributed-builder)
 #   PLATFORMS           - Target platforms (default: linux/amd64,linux/arm64)
 #   TAG                 - Image tag (default: git SHA)
 #   PUSH                - Push to registry (default: true)
 #   PARALLEL_JOBS       - Parallel build jobs (default: 4)
+#   BUILDKIT_SSH        - If set to 1, enables BuildKit SSH forwarding (--ssh default)
+#   GOPRIVATE           - If set, passed as a build-arg (useful for Go private modules)
 #
 # For public releases (GitHub Container Registry):
 #   REGISTRY=ghcr.io/mfahsold ./scripts/build-distributed.sh
@@ -167,6 +169,20 @@ BUILD_ARGS=(
 if [ -n "${PARALLEL_JOBS:-}" ] && [ "$PARALLEL_JOBS" -gt 1 ]; then
     # BuildKit parallelism via build-arg
     BUILD_ARGS+=("--build-arg" "BUILDKIT_MULTI_PLATFORM=1")
+fi
+
+# Optional: enable BuildKit SSH forwarding to allow the build container to use
+# your local SSH agent for fetching private git repositories (e.g., private Go modules).
+# Usage: export BUILDKIT_SSH=1 && eval "$(ssh-agent -s)" && ssh-add
+if [ "${BUILDKIT_SSH:-0}" = "1" ]; then
+    echo -e "  ${YELLOW}→ Using BuildKit SSH forwarding (--ssh default). Ensure ssh-agent is running and keys are added.${NC}"
+    BUILD_ARGS+=("--ssh" "default")
+fi
+
+# Pass GOPRIVATE to the build if set (useful for Go builds that require private module access)
+if [ -n "${GOPRIVATE:-}" ]; then
+    echo -e "  ${YELLOW}→ Passing GOPRIVATE to build args${NC}"
+    BUILD_ARGS+=("--build-arg" "GOPRIVATE=${GOPRIVATE}")
 fi
 
 # Add latest tag if building with Git SHA

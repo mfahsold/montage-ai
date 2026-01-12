@@ -23,7 +23,7 @@ resources:
 #   overlays/local/kustomization.yaml:
 #     images:
 #       - name: ghcr.io/mfahsold/montage-ai
-#         newName: your-registry:5000/montage-ai
+#         newName: your-registry:30500/montage-ai
 #         newTag: latest
 # =============================================================================
 images:

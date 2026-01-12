@@ -82,12 +82,12 @@ kubectl get rs -n montage-ai -l app=montage-ai,component=worker -o wide
 
 ```bash
 # Build and push the corrected worker image to the local registry
-docker build -t 192.168.1.12:5000/montage-ai:final .
-docker push 192.168.1.12:5000/montage-ai:final
+docker build -t 192.168.1.12:30500/montage-ai:final .
+docker push 192.168.1.12:30500/montage-ai:final
 
 # Point deployment to the local image and force a fresh pull
 kubectl set image deployment/montage-ai-worker -n montage-ai \
-  montage-ai-worker=192.168.1.12:5000/montage-ai:final
+  montage-ai-worker=192.168.1.12:30500/montage-ai:final
 kubectl rollout restart deployment/montage-ai-worker -n montage-ai
 
 # Optional: remove old ReplicaSets that still reference ghcr
@@ -101,7 +101,7 @@ kubectl get pods -n montage-ai -l component=worker
 kubectl logs -n montage-ai -l component=worker --tail=50
 ```
 
-**Prevent Recurrence:** Keep imagePullPolicy: Always on the worker deployment and use registry-specific tags (192.168.1.12:5000/montage-ai:TAG) so new nodes never pull from ghcr.io by accident.
+**Prevent Recurrence:** Keep imagePullPolicy: Always on the worker deployment and use registry-specific tags (192.168.1.12:30500/montage-ai:TAG) so new nodes never pull from ghcr.io by accident.
 
 ---
 
