@@ -39,7 +39,10 @@ set -euo pipefail
 # Default: GHCR for reliable public registry
 # Cluster: Use REGISTRY=192.168.1.12:30500 for cluster-internal builds
 # Note: Cluster registry uses HTTPS (self-signed cert)
-REGISTRY="${REGISTRY:-ghcr.io/mfahsold}"
+# Load canonical settings
+# shellcheck disable=SC1090
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+REGISTRY="${REGISTRY:-${REGISTRY_URL}}"
 CACHE_REF="${CACHE_REF:-${REGISTRY}/montage-ai:buildcache}"
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
 # simple-builder has parallel ARM64 (Pi) + AMD64 (Server) nodes running natively

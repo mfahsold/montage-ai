@@ -8,7 +8,10 @@ dynamic = ["version"]  # Version from git commit hash at runtime
 description = "AI-powered automatic video montage creation"
 readme = "README.md"
 license = {text = "PolyForm Noncommercial 1.0.0"}
-requires-python = ">=3.10"
+# Temporary: pin to the active CI/runtime Python to avoid uv attempting resolution
+# for newer Python markers which can surface private-extra resolution failures
+# (see docs/DEPENDENCY_MANAGEMENT.md for long-term approach).
+requires-python = ">=3.12,<3.13"
 
 dependencies = [
     # Core video stack
