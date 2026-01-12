@@ -35,7 +35,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}preview${NC}         Quick preview (fast preset, 360p)
   ${GREEN}finalize${NC}        Finalize render (high quality, 1080p, stabilized)
   ${GREEN}hq${NC}              High quality render (1080p/4K)
-  ${GREEN}retrieve${NC}        Retrieve results from cluster
+  ${GREEN}download${NC} JOB_ID  Download job artifacts (video + timeline + logs)
   ${GREEN}export-to-nle${NC}   Export timeline to NLE formats (OTIO/EDL/Premiere/AAF)
   ${GREEN}list${NC}            List available styles
   ${GREEN}build${NC}           Build Docker image
@@ -95,11 +95,15 @@ ${YELLOW}Examples:${NC}
   ./montage-ai.sh run --captions tiktok  # With TikTok-style captions
   ./montage-ai.sh hq --isolate-voice     # HQ with voice isolation
   
+  ${YELLOW}Download Artifacts:${NC}
+  ./montage-ai.sh download 20260112_114010                       # Download from local
+  ./montage-ai.sh download 20260112_114010 --zip                 # Download as ZIP
+  ./montage-ai.sh download 20260112_114010 --api http://host:30080  # From cluster API
+  ./montage-ai.sh download 20260112_114010 --output ./my_project # Custom output dir
+
   ${YELLOW}Export to NLE:${NC}
   ./montage-ai.sh export-to-nle --manifest /data/output/manifest.json
   ./montage-ai.sh export-to-nle --manifest /data/output/manifest.json --formats otio edl premiere
-  ./montage-ai.sh export-to-nle --manifest /data/output/manifest.json \\
-    --params /data/output/parameters.json --project-name "My Project"
 EOF
 }
 
@@ -415,9 +419,38 @@ case "${1:-run}" in
         CGPU_HOST=localhost python3 scripts/test_cgpu_connection.py
         exit 0
         ;;
-    retrieve)
-        python3 scripts/retrieve_results.py
-        exit 0
+    download)
+        shift
+        if [[ -z "$1" ]]; then
+            echo -e "${RED}Error: Job ID required${NC}"
+            echo -e "Usage: ./montage-ai.sh download JOB_ID [--zip] [--output DIR] [--api URL]"
+            exit 1
+        fi
+        JOB_ID="$1"
+        shift
+
+        # Default to local output dir, or API if specified
+        API_URL=""
+        OUTPUT_DIR="./downloads"
+        ZIP_FLAG=""
+
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --api) API_URL="$2"; shift 2 ;;
+                --output|-o) OUTPUT_DIR="$2"; shift 2 ;;
+                --zip|-z) ZIP_FLAG="--zip"; shift ;;
+                *) shift ;;
+            esac
+        done
+
+        if [[ -n "$API_URL" ]]; then
+            echo -e "${GREEN}📥 Downloading job ${JOB_ID} from ${API_URL}...${NC}"
+            python3 scripts/download_job.py --job-id "$JOB_ID" --api "$API_URL" --output "$OUTPUT_DIR" $ZIP_FLAG
+        else
+            echo -e "${GREEN}📥 Downloading job ${JOB_ID} from local output...${NC}"
+            python3 scripts/download_job.py --job-id "$JOB_ID" --local "${OUTPUT_DIR:-/data/output}" --output "$OUTPUT_DIR" $ZIP_FLAG
+        fi
+        exit $?
         ;;
     export-to-nle)
         shift

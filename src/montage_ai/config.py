@@ -228,46 +228,64 @@ class ProcessingSettings:
     warn_threshold_resolution: int = 33177600  # 6K (6144x3160)
     
     def get_adaptive_batch_size_for_resolution(
-        self, width: int, height: int, low_memory: bool = False
+        self, width: int, height: int, low_memory: bool = False, memory_gb: Optional[float] = None
     ) -> int:
-        """Adaptive batch sizing based on input resolution.
-        
-        Resolution Brackets:
-        - 1080p (2MP): batch_size = 5
-        - 4K (8MP): batch_size = 2
-        - 6K (19MP): batch_size = 1
-        - 8K+ (33MP): ❌ Error (proxy required)
+        """Adaptive batch sizing based on input resolution and available memory.
+
+        Resolution Brackets (base values):
+        - 1080p (2MP): batch_size = 25
+        - 4K (8MP): batch_size = 8
+        - 6K (19MP): batch_size = 2
+        - 8K+ (33MP): batch_size = 1 (warning issued)
+
+        Memory Adjustments:
+        - <4GB: Quarter batch size
+        - <8GB: Half batch size
+        - 8GB+: Full batch size
+
+        Args:
+            width: Video width in pixels
+            height: Video height in pixels
+            low_memory: Deprecated - use memory_gb instead
+            memory_gb: Available memory in GB (auto-detected if None)
         """
         pixels = width * height
-        
-        # 8K+ (33MP+): Not supported without proxy workflow
-        if pixels > 33_177_600:
+
+        # Determine base batch size from resolution
+        if pixels > 33_177_600:  # 8K+ (33MP+)
             from .logger import logger
-            logger.error(
-                f"Resolution {width}x{height} ({pixels/1e6:.1f}MP) exceeds 8K limit. "
-                "Please generate proxies first using: "
-                "python -m montage_ai.proxy_generator --format h264 --scale 1920:-1"
+            logger.warning(
+                f"⚠️ Very high resolution: {width}x{height} ({pixels/1e6:.1f}MP). "
+                "Using batch_size=1. Consider proxy workflow for better performance."
             )
-            raise ValueError(f"Resolution {width}x{height} requires proxy workflow")
-        
-        # 6K (15-33MP): Single clip processing (6144x3160 = 19.4MP)
-        elif pixels >= 15_000_000:
+            base = 1
+        elif pixels >= 15_000_000:  # 6K (15-33MP)
             from .logger import logger
             logger.warning(
                 f"⚠️ High resolution detected: {width}x{height} ({pixels/1e6:.1f}MP). "
-                "Using batch_size=1 for safety. Consider proxy workflow for better performance."
+                "Using reduced batch size. Consider proxy workflow for better performance."
             )
-            return 1
-        
-        # 4K (8-15MP): Half batch size (3840x2160 = 8.3MP)
-        elif pixels >= 8_000_000:
-            return max(1, self.batch_size // 2)
-        
-        # 1080p/2K: Standard batch size
-        else:
-            if low_memory:
-                return max(1, self.batch_size // 2)
-            return self.batch_size
+            base = 2
+        elif pixels >= 8_000_000:  # 4K (8-15MP)
+            base = 8
+        else:  # 1080p/2K
+            base = self.batch_size if self.batch_size > 0 else 25
+
+        # Auto-detect memory if not provided
+        if memory_gb is None:
+            try:
+                import psutil
+                memory_gb = psutil.virtual_memory().available / (1024 ** 3)
+            except ImportError:
+                memory_gb = 8.0  # Assume 8GB if psutil not available
+
+        # Apply memory-based adjustment
+        if memory_gb < 4 or low_memory:
+            return max(1, base // 4)
+        elif memory_gb < 8:
+            return max(1, base // 2)
+
+        return base
     
     def validate_resolution(self, width: int, height: int) -> bool:
         """Validate resolution is within safe limits."""
@@ -592,10 +610,34 @@ class ProcessingConfig:
     ffmpeg_long_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_LONG_TIMEOUT", 600))
     render_timeout: int = field(default_factory=ConfigParser.make_int_parser("RENDER_TIMEOUT", 3600))  # 1 hour default
 
-    def get_adaptive_batch_size(self, low_memory: bool = False) -> int:
-        """Get batch size adjusted for memory constraints."""
+    def get_adaptive_batch_size(self, low_memory: bool = False, memory_gb: Optional[float] = None) -> int:
+        """Get batch size adjusted for memory constraints.
+
+        Args:
+            low_memory: Force low memory mode (deprecated - use memory_gb)
+            memory_gb: Available memory in GB (auto-detected if None)
+
+        Returns:
+            Adjusted batch size based on available memory
+        """
+        # Check LOW_MEMORY_MODE environment variable
         if low_memory or ConfigParser.parse_bool("LOW_MEMORY_MODE", False):
-            return max(1, self.batch_size // 4)  # Quarter batch size in low memory mode
+            return max(1, self.batch_size // 4)
+
+        # Auto-detect memory if not provided
+        if memory_gb is None:
+            try:
+                import psutil
+                memory_gb = psutil.virtual_memory().available / (1024 ** 3)
+            except ImportError:
+                return self.batch_size  # Can't detect, use default
+
+        # Memory-based adjustment
+        if memory_gb < 4:
+            return max(1, self.batch_size // 4)
+        elif memory_gb < 8:
+            return max(1, self.batch_size // 2)
+
         return self.batch_size
 
     def get_adaptive_parallel_jobs(self, low_memory: bool = False) -> int:

@@ -1278,6 +1278,11 @@ class SegmentWriter:
             else:
                 # Just concatenate video
                 base_args = []
+                base_args.extend([
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", concat_list_path,
+                ])
 
             result = run_command(
                 cmd,
@@ -1363,12 +1368,7 @@ class SegmentWriter:
                             (fallback_result.stderr or "").strip().split("\n")[0]
                         )
                 else:
-                    logger.error("FFmpeg failed: %s", (result.stderr or "").strip().split("\n")[0])
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", concat_list_path,
-                ])
-
+                        logger.error("FFmpeg failed: %s", (result.stderr or "").strip().split("\n")[0])
                 cmd = build_ffmpeg_cmd(base_args)
 
                 if _settings.encoding.normalize_clips:

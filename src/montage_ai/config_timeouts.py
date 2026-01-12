@@ -45,7 +45,7 @@ Rationale for Default Values:
 """
 
 import os
-from typing import Optional
+from typing import Optional, Tuple
 
 
 class TimeoutConfig:
@@ -203,13 +203,64 @@ class TimeoutConfig:
     def encoding_local() -> int:
         """
         Local video encoding timeout.
-        
+
         Used for: ffmpeg final render, segment encoding
         Default: 3600 seconds (1 hour)
-        
+
         Note: Typically completes in 5-15 min for 1080p, longer for 4K+
         """
         return int(os.getenv("TIMEOUT_ENCODING_LOCAL", "3600"))
+
+    @staticmethod
+    def calculate_ffmpeg_timeout(
+        file_size_mb: float,
+        resolution: Tuple[int, int],
+        gpu_available: bool = False,
+        base_timeout: int = 30
+    ) -> int:
+        """
+        Calculate dynamic FFmpeg timeout based on file and hardware characteristics.
+
+        This provides adaptive timeouts that scale with:
+        - File size (larger files need more time)
+        - Resolution (4K/8K needs more processing)
+        - GPU availability (GPU encoding is faster)
+
+        Args:
+            file_size_mb: File size in megabytes
+            resolution: Video resolution as (width, height) tuple
+            gpu_available: Whether GPU encoding is available
+            base_timeout: Base timeout in seconds (default: 30)
+
+        Returns:
+            Calculated timeout in seconds (minimum 60s, no maximum)
+
+        Examples:
+            # 100MB 1080p without GPU: ~90 seconds
+            # 1GB 4K without GPU: ~300 seconds
+            # 1GB 4K with GPU: ~130 seconds
+
+        Formula:
+            timeout = (base * size_factor * res_factor * gpu_factor) + 60
+            where:
+            - size_factor = 1 + (file_size_mb / 500)
+            - res_factor = 1 + (pixels / 8_294_400)  # 4K reference
+            - gpu_factor = 0.3 if GPU else 1.0
+        """
+        # Size factor: 100MB = 1.2x, 500MB = 2x, 1GB = 3x
+        size_factor = 1 + (file_size_mb / 500)
+
+        # Resolution factor: 1080p = 1.25x, 4K = 2x, 8K = 5x
+        pixels = resolution[0] * resolution[1]
+        res_factor = 1 + (pixels / 8_294_400)  # 4K (3840x2160) as reference
+
+        # GPU speedup: GPU encoding is typically 3-4x faster
+        gpu_factor = 0.3 if gpu_available else 1.0
+
+        # Calculate with minimum of 60 seconds
+        calculated = int(base_timeout * size_factor * res_factor * gpu_factor) + 60
+
+        return calculated
     
     # =========================================================================
     # Generic Get Method

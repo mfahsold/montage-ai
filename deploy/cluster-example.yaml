@@ -1,0 +1,112 @@
+# Example cluster configuration for montage-ai
+#
+# Usage:
+#   1. Copy to ~/.config/montage-ai/cluster.yaml
+#   2. Set MONTAGE_CLUSTER_CONFIG=/path/to/cluster.yaml
+#   3. Or pass config_path to get_cluster_manager()
+#
+# Environment Variables:
+#   MONTAGE_CLUSTER_MODE: "local", "k8s", "config", "auto" (default: "auto")
+#   MONTAGE_CLUSTER_CONFIG: Path to this config file
+#   MONTAGE_FORCE_CPU: Set to "1" to disable GPU detection
+
+# Cluster configuration
+mode: config
+
+# Node definitions
+nodes:
+  # GPU rendering node with NVIDIA GPU
+  - name: gpu-workstation
+    cpu_cores: 16
+    memory_gb: 64.0
+    architecture: x86_64
+    gpu_type: nvidia-nvenc
+    gpu_vram_gb: 24.0
+    gpu_name: "RTX 4090"
+    # encoder/hwaccel auto-populated from gpu_type if not specified
+    # encoder: h264_nvenc
+    # hwaccel: cuda
+    address: "192.168.1.100"
+    labels:
+      tier: gpu
+      purpose: rendering
+
+  # AMD GPU node
+  - name: amd-server
+    cpu_cores: 8
+    memory_gb: 32.0
+    architecture: x86_64
+    gpu_type: amd-rocm
+    gpu_vram_gb: 16.0
+    gpu_name: "RX 7800 XT"
+    address: "192.168.1.101"
+    labels:
+      tier: gpu
+
+  # High-CPU node for scene detection and analysis
+  - name: compute-server
+    cpu_cores: 32
+    memory_gb: 128.0
+    architecture: x86_64
+    gpu_type: none
+    address: "192.168.1.102"
+    labels:
+      tier: compute
+      purpose: analysis
+
+  # Mac Studio with Apple Silicon
+  - name: mac-studio
+    cpu_cores: 12
+    memory_gb: 64.0
+    architecture: arm64
+    gpu_type: apple-vt
+    gpu_name: "M2 Ultra"
+    address: "192.168.1.103"
+    labels:
+      tier: compute
+      os: macos
+
+  # Raspberry Pi for lightweight tasks
+  - name: pi-worker
+    cpu_cores: 4
+    memory_gb: 8.0
+    architecture: arm64
+    gpu_type: none
+    address: "192.168.1.104"
+    labels:
+      tier: edge
+
+  # NVIDIA Jetson for edge inference
+  - name: jetson-orin
+    cpu_cores: 12
+    memory_gb: 32.0
+    architecture: arm64
+    gpu_type: nvidia-tegra
+    gpu_vram_gb: 32.0
+    gpu_name: "Jetson AGX Orin"
+    address: "192.168.1.105"
+    labels:
+      tier: edge
+      purpose: inference
+
+  # Intel NUC with Quick Sync
+  - name: intel-nuc
+    cpu_cores: 8
+    memory_gb: 32.0
+    architecture: x86_64
+    gpu_type: intel-qsv
+    gpu_name: "Intel UHD Graphics"
+    address: "192.168.1.106"
+    labels:
+      tier: compute
+
+# Supported GPU types:
+#   - none: No GPU acceleration
+#   - nvidia-nvenc: NVIDIA desktop GPU (h264_nvenc)
+#   - nvidia-tegra: NVIDIA Jetson (h264_nvenc)
+#   - amd-rocm: AMD GPU with ROCm (h264_amf)
+#   - amd-vaapi: AMD GPU with VAAPI (h264_vaapi)
+#   - intel-qsv: Intel Quick Sync (h264_qsv)
+#   - intel-vaapi: Intel VAAPI (h264_vaapi)
+#   - apple-vt: Apple VideoToolbox (h264_videotoolbox)
+#   - qualcomm-adreno: Qualcomm Adreno (no encoder)

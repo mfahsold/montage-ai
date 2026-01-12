@@ -944,21 +944,131 @@ function updateGalleryUI(jobs) {
             </div>
             <div class="gallery-info">
                 <div class="gallery-style">${job.style.toUpperCase()}</div>
-                <div class="gallery-actions" style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                    ${job.output_file ? 
-                        `<a href="${API_BASE}/download/${job.output_file}" class="voxel-btn primary small">Download</a>` : 
-                        `<span class="status-text">${job.status}</span>`
+                <div class="gallery-actions" style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                    ${job.output_file ? `
+                        <a href="${API_BASE}/download/${job.output_file}" class="voxel-btn primary small" title="Download video only">Video</a>
+                        <a href="${API_BASE}/jobs/${job.id}/download/zip" class="voxel-btn small" title="Download all (video + timeline + logs)" style="background: var(--accent);">📦 ZIP</a>
+                    ` : `<span class="status-text">${job.status}</span>`}
+                    ${(job.status === 'completed' && job.options?.quality_profile === 'preview') ?
+                        `<button onclick="finalizeJob('${job.id}')" class="voxel-btn small secondary" title="Render in High Quality">HQ</button>` : ''
                     }
-                    ${(job.status === 'completed' && job.options?.quality_profile === 'preview') ? 
-                        `<button onclick="finalizeJob('${job.id}')" class="voxel-btn small secondary" title="Render in High Quality">Finalize (1080p)</button>` : ''
+                    ${job.status === 'completed' ?
+                        `<button onclick="showArtifacts('${job.id}')" class="voxel-btn small secondary" title="View all artifacts">Files</button>` : ''
                     }
-                    ${job.status === 'completed' || job.status === 'failed' ? 
+                    ${job.status === 'completed' || job.status === 'failed' ?
                         `<button onclick="showDecisions('${job.id}')" class="voxel-btn small secondary" title="View AI Decisions">Log</button>` : ''
                     }
                 </div>
             </div>
         </div>
     `).join('');
+}
+
+// =============================================================================
+// Artifacts Modal (Download individual files)
+// =============================================================================
+
+async function showArtifacts(jobId) {
+    // Reuse decisions modal for artifacts
+    const modal = document.getElementById('decisionsModal');
+    const content = document.getElementById('decisionsContent');
+
+    if (!modal || !content) return;
+
+    content.innerHTML = '<div class="helper">Loading artifacts...</div>';
+    modal.style.display = 'flex';
+
+    try {
+        const data = await apiCall(`jobs/${jobId}/artifacts`);
+
+        let html = `
+            <div class="transparency-block">
+                <h3>📦 Job Artifacts</h3>
+                <p style="margin-bottom: 1rem;">Total: ${data.total_size_mb} MB</p>
+                <a href="${data.zip_download_url}" class="voxel-btn primary" style="margin-bottom: 1.5rem; display: inline-block;">
+                    ⬇️ Download All (ZIP)
+                </a>
+            </div>
+        `;
+
+        // Video files
+        if (data.artifacts.video?.length > 0) {
+            html += `
+                <div class="transparency-block">
+                    <h3>🎬 Video</h3>
+                    <ul class="transparency-list">
+                        ${data.artifacts.video.map(f => `
+                            <li>
+                                <a href="${f.download_url}" class="artifact-link">${f.name}</a>
+                                <span class="file-size">(${f.size_mb} MB)</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Timeline exports
+        if (data.artifacts.timeline?.length > 0) {
+            html += `
+                <div class="transparency-block">
+                    <h3>📐 Timeline (NLE)</h3>
+                    <ul class="transparency-list">
+                        ${data.artifacts.timeline.map(f => `
+                            <li>
+                                <a href="${f.download_url}" class="artifact-link">${f.name}</a>
+                                <span class="file-size">(${f.size_mb} MB)</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Proxies
+        if (data.artifacts.proxies?.length > 0) {
+            html += `
+                <div class="transparency-block">
+                    <h3>📹 Proxies</h3>
+                    <ul class="transparency-list">
+                        ${data.artifacts.proxies.map(f => `
+                            <li>
+                                <a href="${f.download_url}" class="artifact-link">${f.name}</a>
+                                <span class="file-size">(${f.size_mb} MB)</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Logs
+        if (data.artifacts.logs?.length > 0) {
+            html += `
+                <div class="transparency-block">
+                    <h3>📝 Logs & Metadata</h3>
+                    <ul class="transparency-list">
+                        ${data.artifacts.logs.map(f => `
+                            <li>
+                                <a href="${f.download_url}" class="artifact-link">${f.name}</a>
+                                <span class="file-size">(${f.size_mb} MB)</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        content.innerHTML = html;
+
+    } catch (e) {
+        content.innerHTML = `
+            <div class="system-banner warning">
+                <span class="icon">⚠️</span>
+                <span>Could not load artifacts: ${e.message}</span>
+            </div>
+        `;
+    }
 }
 
 

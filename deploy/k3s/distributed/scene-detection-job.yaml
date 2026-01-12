@@ -1,0 +1,192 @@
+---
+# Distributed Scene Detection Job
+# Uses Kubernetes Indexed Jobs for parallel video analysis across nodes
+# Each pod processes a shard of the input videos
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scene-detect  # Append with -${VIDEO_HASH} when creating
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: scene-detection
+    montage-ai.fluxibri.dev/task-type: cpu-intensive
+spec:
+  # Indexed Job for deterministic shard assignment
+  completionMode: Indexed
+  completions: 4  # Number of parallel workers (adjust based on cluster size)
+  parallelism: 4  # All run simultaneously
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 1800  # Cleanup after 30 min
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: scene-detection
+    spec:
+      restartPolicy: Never
+
+      # Spread across nodes to maximize parallelism
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/component: scene-detection
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: scene-detect
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -m
+            - montage_ai.scene_detection
+            - --shard-mode
+          env:
+            # Kubernetes injects JOB_COMPLETION_INDEX automatically for indexed jobs
+            - name: SHARD_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+            - name: SHARD_COUNT
+              value: "4"
+            - name: VIDEO_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: scene-detect-config
+                  key: video_path
+            - name: OUTPUT_DIR
+              value: "/data/output/scene_cache"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: LOG_LEVEL
+              value: "INFO"
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-input
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-output
+
+---
+# ConfigMap for scene detection job parameters
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scene-detect-config
+  namespace: montage-ai
+data:
+  video_path: "/data/input"
+  detection_threshold: "27.0"
+  min_scene_length: "0.5"
+---
+# GPU-Accelerated Encoding Job
+# Targets GPU nodes for final video encoding
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-encode  # Append with -${JOB_ID} when creating
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: encoder
+    montage-ai.fluxibri.dev/task-type: gpu-encoding
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: encoder
+    spec:
+      restartPolicy: Never
+
+      # GPU node affinity - prefer AMD (fastest), fallback to NVIDIA
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            # Prefer AMD GPU nodes (highest priority)
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: amd.com/gpu
+                    operator: In
+                    values: ["present", "true"]
+            # NVIDIA as second choice
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: accelerator
+                    operator: In
+                    values: ["nvidia"]
+
+      containers:
+        - name: encoder
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -m
+            - montage_ai.encoder
+            - --input
+            - /data/output/timeline.json
+            - --output
+            - /data/output/final.mp4
+          env:
+            - name: FFMPEG_HWACCEL
+              value: "auto"  # Auto-detect best encoder
+            - name: QUALITY_PROFILE
+              value: "standard"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          resources:
+            requests:
+              cpu: "4"
+              memory: "8Gi"
+            limits:
+              cpu: "8"
+              memory: "24Gi"
+              # Request GPU if available (uncomment as needed)
+              # amd.com/gpu: "1"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-input
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-output
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-music

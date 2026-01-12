@@ -216,18 +216,7 @@ def run_test(config: TestConfig, videos: List[Path]) -> dict:
                 capture_output=True,
                 text=True,
             )
-        finally:
-            # Stop monitor and dump data
-            monitor_stop.set()
-            monitor_thread.join(timeout=2)
-            if monitor_data:
-                outfile = DATA_OUTPUT / f"monitoring_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{config.name.replace(' ','_')}.json"
-                try:
-                    with open(outfile, 'w') as f:
-                        json.dump(monitor_data, f, indent=2)
-                    print(f"📈 Monitoring data saved to {outfile}")
-                except Exception as e:
-                    print(f"⚠️ Failed to write monitoring data: {e}")
+
             elapsed = time.time() - start_time
 
             if result.returncode == 0:
@@ -255,6 +244,19 @@ def run_test(config: TestConfig, videos: List[Path]) -> dict:
                 "elapsed_s": elapsed,
                 "timeout": config.timeout,
             }
+
+        finally:
+            # Stop monitor and dump data
+            monitor_stop.set()
+            monitor_thread.join(timeout=2)
+            if monitor_data:
+                outfile = DATA_OUTPUT / f"monitoring_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{config.name.replace(' ','_')}.json"
+                try:
+                    with open(outfile, 'w') as f:
+                        json.dump(monitor_data, f, indent=2)
+                    print(f"📈 Monitoring data saved to {outfile}")
+                except Exception as e:
+                    print(f"⚠️ Failed to write monitoring data: {e}")
 
 
 def main():

@@ -1,0 +1,304 @@
+---
+# Worker DaemonSet - Runs on all capable nodes
+# Each worker pulls jobs from Redis queue and processes locally
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: montage-ai-worker
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: worker
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: montage-ai
+      app.kubernetes.io/component: worker
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      # Run on worker nodes only (not control plane)
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+                  - key: node-role.kubernetes.io/master
+                    operator: DoesNotExist
+
+      tolerations:
+        # Allow scheduling on nodes with GPU taints
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "amd.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+
+      terminationGracePeriodSeconds: 300  # 5 min for job completion
+
+      containers:
+        - name: worker
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "montage_ai.worker"]
+          env:
+            - name: WORKER_MODE
+              value: "true"
+            - name: REDIS_HOST
+              value: "redis.montage-ai.svc.cluster.local"
+            - name: REDIS_PORT
+              value: "6379"
+            # Node identification
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # Hardware detection
+            - name: FFMPEG_HWACCEL
+              value: "auto"
+            # Logging
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: LOG_LEVEL
+              value: "INFO"
+          ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+            - name: assets
+              mountPath: /data/assets
+              readOnly: true
+            - name: cache
+              mountPath: /data/cache
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-input
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-output
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-music
+        - name: assets
+          persistentVolumeClaim:
+            claimName: montage-assets
+        - name: cache
+          persistentVolumeClaim:
+            claimName: montage-cache
+        - name: tmp
+          emptyDir:
+            sizeLimit: 20Gi
+---
+# GPU Worker Deployment - Dedicated GPU node workers
+# Separate from DaemonSet for explicit GPU scheduling
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker-gpu-amd
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: worker-gpu
+    montage-ai.fluxibri.dev/gpu-type: amd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: montage-ai
+      app.kubernetes.io/component: worker-gpu
+      montage-ai.fluxibri.dev/gpu-type: amd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: worker-gpu
+        montage-ai.fluxibri.dev/gpu-type: amd
+    spec:
+      nodeSelector:
+        amd.com/gpu: "present"
+
+      containers:
+        - name: worker
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "montage_ai.worker"]
+          env:
+            - name: WORKER_MODE
+              value: "true"
+            - name: GPU_WORKER
+              value: "true"
+            - name: FFMPEG_HWACCEL
+              value: "amf"
+            - name: OUTPUT_CODEC
+              value: "h264_amf"
+            - name: REDIS_HOST
+              value: "redis.montage-ai.svc.cluster.local"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          resources:
+            requests:
+              cpu: "4"
+              memory: "8Gi"
+            limits:
+              cpu: "8"
+              memory: "24Gi"
+              amd.com/gpu: "1"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-input
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-output
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-music
+        - name: tmp
+          emptyDir:
+            sizeLimit: 50Gi
+---
+# Nvidia GPU Worker (Jetson)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker-gpu-nvidia
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: worker-gpu
+    montage-ai.fluxibri.dev/gpu-type: nvidia
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: montage-ai
+      app.kubernetes.io/component: worker-gpu
+      montage-ai.fluxibri.dev/gpu-type: nvidia
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: worker-gpu
+        montage-ai.fluxibri.dev/gpu-type: nvidia
+    spec:
+      nodeSelector:
+        accelerator: nvidia
+
+      containers:
+        - name: worker
+          image: ghcr.io/mfahsold/montage-ai:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "montage_ai.worker"]
+          env:
+            - name: WORKER_MODE
+              value: "true"
+            - name: GPU_WORKER
+              value: "true"
+            - name: FFMPEG_HWACCEL
+              value: "cuda"
+            - name: OUTPUT_CODEC
+              value: "h264_nvenc"
+            - name: REDIS_HOST
+              value: "redis.montage-ai.svc.cluster.local"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "6"
+              memory: "7Gi"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+            - name: music
+              mountPath: /data/music
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-input
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-output
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-music
+        - name: tmp
+          emptyDir:
+            sizeLimit: 20Gi

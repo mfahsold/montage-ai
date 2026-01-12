@@ -136,8 +136,10 @@ class Monitor:
                         msg += f" | {cgpu_stats}"
                         
                     logger.debug(msg)
-                except Exception:
-                    pass
+                except ImportError:
+                    pass  # psutil not available
+                except Exception as e:
+                    logger.debug(f"Memory monitoring error: {e}")
                 if self._stop_event.wait(self._mem_interval):
                     break
 
@@ -208,24 +210,26 @@ class Monitor:
             self._stop_event.set()
             if self._mem_thread and self._mem_thread.is_alive():
                 self._mem_thread.join(timeout=1)
-        except Exception:
-            pass
-        
+        except RuntimeError as e:
+            logger.debug(f"Thread cleanup error: {e}")
+        except Exception as e:
+            logger.debug(f"Stop event error: {e}")
+
         try:
             if self._tee_enabled:
                 sys.stdout = self._orig_stdout
                 sys.stderr = self._orig_stderr
                 self._tee_enabled = False
-        except Exception:
-            pass
-        
+        except (AttributeError, RuntimeError) as e:
+            logger.debug(f"Stdout restore error: {e}")
+
         try:
             if self._log_file:
                 self._log_file.flush()
                 self._log_file.close()
                 self._log_file = None
-        except Exception:
-            pass
+        except (IOError, OSError) as e:
+            logger.debug(f"Log file cleanup error: {e}")
     
     def _print_header(self):
         """Print startup banner with job info"""

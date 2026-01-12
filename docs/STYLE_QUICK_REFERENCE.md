@@ -36,9 +36,11 @@ beat-sync montages  ← lowercase (description)
 - [ ] Keep verbs active and imperative
 - [ ] Preserve technical accuracy
 
-**Before:** "Choose the editing rhythm and visual language for your project. You can select from multiple preset styles like Dynamic, MTV, and Minimal."
+**Before:** "Choose the editing rhythm and visual language for your project.
+You can select from multiple preset styles like Dynamic, MTV, and Minimal."
 
-**After:** "Choose editing rhythm and visual language. Pick from dynamic, MTV, or minimal."
+**After:** "Choose editing rhythm and visual language. Pick from dynamic, MTV, or
+minimal."
 
 ---
 

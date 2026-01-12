@@ -151,84 +151,90 @@ class DeepFootageAnalyzer:
             SceneAnalysis with all metrics and descriptions
         """
         analysis = SceneAnalysis(source_file=os.path.basename(video_path))
-        
+
+        # Use try-finally to ensure VideoCapture is always released (P0 stability fix)
+        cap = None
+        frames = []
+        motion_magnitudes = []
+        width, height = 0, 0
+
         try:
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
                 return analysis
-            
+
             # Get video properties
             fps = cap.get(cv2.CAP_PROP_FPS)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             duration = total_frames / fps if fps > 0 else 0
-            
+
             analysis.resolution = (width, height)
             analysis.fps = fps
             analysis.start_time = start_time
             analysis.end_time = end_time or duration
             analysis.duration = analysis.end_time - analysis.start_time
-            
+
             # Calculate frame positions to sample
             start_frame = int(start_time * fps)
             end_frame = int((end_time or duration) * fps)
             frame_step = max(1, (end_frame - start_frame) // self.sample_frames)
-            
-            frames = []
+
             prev_frame = None
-            motion_magnitudes = []
-            
+
             for i, frame_idx in enumerate(range(start_frame, end_frame, frame_step)):
                 if i >= self.sample_frames:
                     break
-                    
+
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
                 ret, frame = cap.read()
                 if not ret:
                     continue
-                
+
                 frames.append(frame)
-                
+
                 # Motion detection via frame differencing
                 if prev_frame is not None:
                     gray_curr = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                     gray_prev = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
                     diff = cv2.absdiff(gray_curr, gray_prev)
                     motion_magnitudes.append(np.mean(diff) / 255.0)
-                
+
                 prev_frame = frame
-            
-            cap.release()
-            
-            if not frames:
-                return analysis
-            
-            # Analyze visual characteristics
-            analysis.visual = self._analyze_visuals(frames)
-            
-            # Analyze motion
-            analysis.motion = self._analyze_motion(motion_magnitudes, frames)
-            
-            # Derive narrative qualities
-            analysis.narrative = self._derive_narrative(analysis.visual, analysis.motion, 
-                                                        width, height, analysis.duration)
-            
-            # Generate human-readable description
-            analysis.description = self._generate_description(analysis)
-            analysis.tags = self._generate_tags(analysis)
-            analysis.best_used_for = self._suggest_usage(analysis)
-            
-            self.analyses.append(analysis)
-            
-            if self.verbose:
-                self._print_analysis(analysis)
-            
-            return analysis
-            
+
         except Exception as e:
             logger.warning(f"   ⚠️ Analysis failed for {video_path}: {e}")
             return analysis
+        finally:
+            if cap is not None:
+                cap.release()
+
+        # Analysis code runs after VideoCapture is released
+        if not frames:
+            return analysis
+
+        # Analyze visual characteristics
+        analysis.visual = self._analyze_visuals(frames)
+
+        # Analyze motion
+        analysis.motion = self._analyze_motion(motion_magnitudes, frames)
+
+        # Derive narrative qualities
+        analysis.narrative = self._derive_narrative(analysis.visual, analysis.motion,
+                                                    width, height, analysis.duration)
+
+        # Generate human-readable description
+        analysis.description = self._generate_description(analysis)
+        analysis.tags = self._generate_tags(analysis)
+        analysis.best_used_for = self._suggest_usage(analysis)
+
+        self.analyses.append(analysis)
+
+        if self.verbose:
+            self._print_analysis(analysis)
+
+        return analysis
     
     def _analyze_visuals(self, frames: List[np.ndarray]) -> VisualCharacteristics:
         """Analyze visual characteristics from sampled frames"""

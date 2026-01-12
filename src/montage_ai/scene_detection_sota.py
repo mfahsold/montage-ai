@@ -278,7 +278,7 @@ def _detect_transnetv2(
     if model is None:
         raise RuntimeError("TransNetV2 model not available")
 
-    # Open video
+    # Open video (P0 stability fix: use try-finally for cleanup)
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError(f"Cannot open video: {video_path}")
@@ -297,58 +297,59 @@ def _detect_transnetv2(
 
     start_time = time.perf_counter()
 
-    with torch.no_grad():
-        frame_idx = 0
+    try:
+        with torch.no_grad():
+            frame_idx = 0
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
-            # Resize and convert to RGB
-            frame_small = cv2.resize(frame, target_size)
-            frame_rgb = cv2.cvtColor(frame_small, cv2.COLOR_BGR2RGB)
-            frames.append(frame_rgb)
-            frame_idx += 1
+                # Resize and convert to RGB
+                frame_small = cv2.resize(frame, target_size)
+                frame_rgb = cv2.cvtColor(frame_small, cv2.COLOR_BGR2RGB)
+                frames.append(frame_rgb)
+                frame_idx += 1
 
-            # Process in batches of windows
-            if len(frames) >= window_size:
-                # Stack frames into window
+                # Process in batches of windows
+                if len(frames) >= window_size:
+                    # Stack frames into window
+                    window = np.stack(frames[:window_size], axis=0)
+
+                    # To tensor
+                    device = next(model.parameters()).device
+                    input_tensor = torch.from_numpy(window).float().unsqueeze(0)
+                    input_tensor = input_tensor.permute(0, 1, 4, 2, 3) / 255.0  # BCTHW
+                    input_tensor = input_tensor.to(device)
+
+                    # Inference
+                    single_frame_pred, _ = model(input_tensor)
+                    pred = single_frame_pred[0].cpu().numpy()
+                    predictions.extend(pred.tolist())
+
+                    # Slide window
+                    frames = frames[1:]
+
+            # Process remaining frames
+            if frames:
+                # Pad to window_size
+                while len(frames) < window_size:
+                    frames.append(frames[-1])
+
                 window = np.stack(frames[:window_size], axis=0)
-
-                # To tensor
                 device = next(model.parameters()).device
                 input_tensor = torch.from_numpy(window).float().unsqueeze(0)
-                input_tensor = input_tensor.permute(0, 1, 4, 2, 3) / 255.0  # BCTHW
+                input_tensor = input_tensor.permute(0, 1, 4, 2, 3) / 255.0
                 input_tensor = input_tensor.to(device)
 
-                # Inference
                 single_frame_pred, _ = model(input_tensor)
                 pred = single_frame_pred[0].cpu().numpy()
-                predictions.extend(pred.tolist())
 
-                # Slide window
-                frames = frames[1:]
-
-        # Process remaining frames
-        if frames:
-            # Pad to window_size
-            while len(frames) < window_size:
-                frames.append(frames[-1])
-
-            window = np.stack(frames[:window_size], axis=0)
-            device = next(model.parameters()).device
-            input_tensor = torch.from_numpy(window).float().unsqueeze(0)
-            input_tensor = input_tensor.permute(0, 1, 4, 2, 3) / 255.0
-            input_tensor = input_tensor.to(device)
-
-            single_frame_pred, _ = model(input_tensor)
-            pred = single_frame_pred[0].cpu().numpy()
-
-            remaining = min(len(pred), total_frames - len(predictions))
-            predictions.extend(pred[:remaining].tolist())
-
-    cap.release()
+                remaining = min(len(pred), total_frames - len(predictions))
+                predictions.extend(pred[:remaining].tolist())
+    finally:
+        cap.release()
 
     elapsed = time.perf_counter() - start_time
     effective_fps = total_frames / elapsed if elapsed > 0 else 0
@@ -418,41 +419,42 @@ def _detect_autoshot(
 
     start_time = time.perf_counter()
 
-    with torch.no_grad():
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+    try:
+        with torch.no_grad():
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
-            # Resize and convert to RGB
-            frame_resized = cv2.resize(frame, target_size)
-            frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
-            frames_buffer.append(frame_rgb)
+                # Resize and convert to RGB
+                frame_resized = cv2.resize(frame, target_size)
+                frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
+                frames_buffer.append(frame_rgb)
 
-            # Process when we have enough frames
-            if len(frames_buffer) >= window_size:
-                # Stack frames into window [B, T, H, W, C] -> [B, C, T, H, W]
-                window = np.stack(frames_buffer[:window_size], axis=0)
-                input_tensor = torch.from_numpy(window).float().unsqueeze(0)
-                input_tensor = input_tensor.permute(0, 4, 1, 2, 3) / 255.0
-                input_tensor = input_tensor.to(device)
+                # Process when we have enough frames
+                if len(frames_buffer) >= window_size:
+                    # Stack frames into window [B, T, H, W, C] -> [B, C, T, H, W]
+                    window = np.stack(frames_buffer[:window_size], axis=0)
+                    input_tensor = torch.from_numpy(window).float().unsqueeze(0)
+                    input_tensor = input_tensor.permute(0, 4, 1, 2, 3) / 255.0
+                    input_tensor = input_tensor.to(device)
 
-                # Model inference
-                try:
-                    output = model(input_tensor)
-                    # AutoShot outputs per-frame shot boundary probabilities
-                    if isinstance(output, tuple):
-                        output = output[0]
-                    pred = torch.sigmoid(output).cpu().numpy().flatten()
-                    predictions.extend(pred[:1].tolist())  # One prediction per window slide
-                except Exception as e:
-                    logger.debug(f"AutoShot inference error: {e}")
-                    predictions.append(0.0)
+                    # Model inference
+                    try:
+                        output = model(input_tensor)
+                        # AutoShot outputs per-frame shot boundary probabilities
+                        if isinstance(output, tuple):
+                            output = output[0]
+                        pred = torch.sigmoid(output).cpu().numpy().flatten()
+                        predictions.extend(pred[:1].tolist())  # One prediction per window slide
+                    except Exception as e:
+                        logger.debug(f"AutoShot inference error: {e}")
+                        predictions.append(0.0)
 
-                # Slide by 1 frame
-                frames_buffer = frames_buffer[1:]
-
-    cap.release()
+                    # Slide by 1 frame
+                    frames_buffer = frames_buffer[1:]
+    finally:
+        cap.release()
 
     elapsed = time.perf_counter() - start_time
     effective_fps = total_frames / elapsed if elapsed > 0 else 0
@@ -602,10 +604,12 @@ def _boundaries_to_scenes(
 
     # Get video duration
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-    duration = total_frames / fps if fps > 0 else 0
-    cap.release()
+    try:
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        duration = total_frames / fps if fps > 0 else 0
+    finally:
+        cap.release()
 
     if not boundaries:
         # No cuts detected - whole video is one scene

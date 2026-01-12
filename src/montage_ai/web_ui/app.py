@@ -15,10 +15,12 @@ import psutil
 import queue
 import time
 import signal
+import zipfile
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from collections import deque
-from typing import Optional
+from typing import Optional, List, Dict
 from flask import Flask, render_template, request, jsonify, send_file, Response, send_from_directory, redirect, url_for
 from werkzeug.utils import secure_filename
 
@@ -1060,11 +1062,163 @@ def api_download(filename):
     mimetype = 'video/mp4' if safe_filename.endswith('.mp4') else None
     
     return send_file(
-        filepath, 
+        filepath,
         as_attachment=True,
         download_name=safe_filename,  # Explicit filename for download
         mimetype=mimetype
     )
+
+
+def _collect_job_artifacts(job_id: str) -> Dict[str, List[Path]]:
+    """
+    Collect all artifacts for a job (video, proxies, timeline exports, logs).
+
+    Returns dict with categorized file paths:
+        - video: Main output video(s)
+        - timeline: OTIO, EDL, XML timeline files
+        - proxies: Generated proxy files
+        - logs: Render logs and recipe cards
+    """
+    artifacts = {
+        "video": [],
+        "timeline": [],
+        "proxies": [],
+        "logs": [],
+    }
+
+    # Pattern to match job_id in filenames
+    # Supports: gallery_montage_20260112_114010_v1_dynamic.mp4, render_20260112_114010.log
+    patterns = {
+        "video": [f"*{job_id}*.mp4"],
+        "timeline": [f"*{job_id}*.otio", f"*{job_id}*.edl", f"*{job_id}*.xml"],
+        "logs": [f"render_{job_id}.log", f"*{job_id}*_RECIPE_CARD.md", f"decisions_{job_id}.json"],
+    }
+
+    for category, globs in patterns.items():
+        for pattern in globs:
+            for path in OUTPUT_DIR.glob(pattern):
+                if path.is_file():
+                    artifacts[category].append(path)
+
+    # Check for proxies in proxies subdirectory
+    proxy_dir = OUTPUT_DIR / "proxies"
+    if proxy_dir.exists():
+        for proxy in proxy_dir.glob("*.mp4"):
+            artifacts["proxies"].append(proxy)
+        for proxy in proxy_dir.glob("*.mov"):
+            artifacts["proxies"].append(proxy)
+
+    return artifacts
+
+
+@app.route('/api/jobs/<job_id>/download/zip', methods=['GET'])
+def api_job_download_zip(job_id):
+    """
+    Download all job artifacts as a ZIP file.
+
+    Includes:
+    - Output video(s)
+    - Timeline exports (OTIO, EDL)
+    - Proxies (if generated)
+    - Logs and recipe cards
+
+    Query params:
+        include_proxies: bool (default: true) - Include proxy files
+        include_logs: bool (default: true) - Include logs and metadata
+    """
+    # Check if job exists
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+
+    if job.get("status") not in ("completed", "success"):
+        return jsonify({"error": f"Job not completed (status: {job.get('status')})"}), 400
+
+    # Parse options
+    include_proxies = request.args.get('include_proxies', 'true').lower() == 'true'
+    include_logs = request.args.get('include_logs', 'true').lower() == 'true'
+
+    # Collect artifacts
+    artifacts = _collect_job_artifacts(job_id)
+
+    # Check if we have anything to download
+    if not artifacts["video"]:
+        return jsonify({"error": "No output files found for this job"}), 404
+
+    # Create ZIP file
+    zip_filename = f"montage_{job_id}.zip"
+
+    try:
+        # Use tempfile to create ZIP
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp:
+            tmp_path = tmp.name
+
+        with zipfile.ZipFile(tmp_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # Add video files (in root)
+            for video in artifacts["video"]:
+                zf.write(video, video.name)
+
+            # Add timeline files (in timeline/ folder)
+            for timeline in artifacts["timeline"]:
+                zf.write(timeline, f"timeline/{timeline.name}")
+
+            # Add proxies (in proxies/ folder)
+            if include_proxies and artifacts["proxies"]:
+                for proxy in artifacts["proxies"]:
+                    zf.write(proxy, f"proxies/{proxy.name}")
+
+            # Add logs (in logs/ folder)
+            if include_logs and artifacts["logs"]:
+                for log in artifacts["logs"]:
+                    zf.write(log, f"logs/{log.name}")
+
+        # Send ZIP file
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=zip_filename,
+            mimetype='application/zip'
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to create ZIP for job {job_id}: {e}")
+        return jsonify({"error": f"Failed to create ZIP: {str(e)}"}), 500
+
+
+@app.route('/api/jobs/<job_id>/artifacts', methods=['GET'])
+def api_job_artifacts(job_id):
+    """
+    List all artifacts for a job (for UI to show download options).
+
+    Returns:
+        artifacts: Dict with categorized files and their sizes
+        total_size_mb: Total size of all artifacts
+    """
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+
+    artifacts = _collect_job_artifacts(job_id)
+
+    # Build response with file info
+    result = {"artifacts": {}, "total_size_mb": 0}
+    total_bytes = 0
+
+    for category, files in artifacts.items():
+        result["artifacts"][category] = []
+        for f in files:
+            size = f.stat().st_size
+            total_bytes += size
+            result["artifacts"][category].append({
+                "name": f.name,
+                "size_mb": round(size / (1024 * 1024), 2),
+                "download_url": f"/api/download/{f.name}"
+            })
+
+    result["total_size_mb"] = round(total_bytes / (1024 * 1024), 2)
+    result["zip_download_url"] = f"/api/jobs/{job_id}/download/zip"
+
+    return jsonify(result)
 
 
 @app.route('/api/styles', methods=['GET'])

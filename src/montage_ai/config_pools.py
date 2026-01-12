@@ -71,18 +71,23 @@ class PoolConfig:
     def thread_workers() -> int:
         """
         Number of workers for ThreadPoolExecutor (I/O-bound tasks).
-        
+
         Use for: FFmpeg subprocess management, file I/O, network requests
-        
-        Default: 100% of CPU cores (I/O doesn't block cores)
-        Range: [1, 128] (reasonable for most hardware)
-        
+
+        Default: min(cpu_count, 8) - capped to prevent context switching overhead
+        Range: [2, 8] (recommended for I/O-bound work)
+
+        Note: For I/O-bound tasks like FFmpeg, more threads beyond 8 typically
+        don't improve performance due to context switching overhead, and can
+        actually hurt performance on systems with many cores.
+
         Returns:
             Number of worker threads
         """
-        cpu_count = os.cpu_count() or 2
-        default = cpu_count
-        
+        cpu_count = os.cpu_count() or 4
+        # Cap at 8 threads for I/O-bound work (beyond this, context switching overhead hurts)
+        default = min(cpu_count, 8)
+
         return int(os.getenv("THREAD_WORKERS", str(default)))
     
     @staticmethod

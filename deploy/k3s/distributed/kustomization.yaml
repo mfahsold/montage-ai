@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: montage-ai
+
+resources:
+  - scene-detection-job.yaml
+  - worker-daemonset.yaml
+
+# Common labels for distributed components
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: montage-ai
+      montage-ai.fluxibri.dev/mode: distributed
+    includeSelectors: false
+
+# Image configuration - override in production
+images:
+  - name: ghcr.io/mfahsold/montage-ai
+    newTag: latest
+
+# Patches for environment-specific configs
+patches:
+  # Increase resources for 4K processing
+  - target:
+      kind: Job
+      name: scene-detect
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "8Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "16Gi"

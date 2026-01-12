@@ -174,7 +174,10 @@ class ResourceManager:
         """
         try:
             from .cgpu_utils import is_cgpu_available, check_cgpu_gpu
-        except Exception:
+        except ImportError:
+            return False, None
+        except Exception as e:
+            logger.debug(f"cgpu detection error: {e}")
             return False, None
 
         if not is_cgpu_available():
@@ -201,7 +204,14 @@ class ResourceManager:
                 timeout=5
             )
             return response.status_code == 200
-        except Exception:
+        except ImportError:
+            logger.debug("requests library not available")
+            return False
+        except requests.RequestException as e:
+            logger.debug(f"cgpu serve connection failed: {e}")
+            return False
+        except Exception as e:
+            logger.debug(f"Unexpected cgpu serve error: {e}")
             return False
 
     def _detect_local_gpu(self) -> Tuple[bool, Optional[str], Optional[str]]:
@@ -232,8 +242,12 @@ class ResourceManager:
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     info = f"NVENC: {result.stdout.strip()}"
-            except Exception:
-                pass
+            except FileNotFoundError:
+                logger.debug("nvidia-smi not found")
+            except subprocess.TimeoutExpired:
+                logger.debug("nvidia-smi timeout")
+            except Exception as e:
+                logger.debug(f"nvidia-smi error: {e}")
 
             if hw_config.type == "nvmpi":
                 try:
@@ -241,8 +255,8 @@ class ResourceManager:
                     if os.path.exists(tegra_release):
                         release_info = Path(tegra_release).read_text(encoding="utf-8").strip()
                         info = f"Jetson: {release_info}"
-                except Exception:
-                    pass
+                except (OSError, IOError) as e:
+                    logger.debug(f"Jetson release file read error: {e}")
 
         # For VAAPI, try to get device info
         elif hw_config.type == "vaapi":
@@ -258,8 +272,12 @@ class ResourceManager:
                         if 'Driver version' in line:
                             info = f"VAAPI: {line.split(':')[-1].strip()}"
                             break
-            except Exception:
-                pass
+            except FileNotFoundError:
+                logger.debug("vainfo not found")
+            except subprocess.TimeoutExpired:
+                logger.debug("vainfo timeout")
+            except Exception as e:
+                logger.debug(f"vainfo error: {e}")
 
         return True, hw_config.type, info
 
