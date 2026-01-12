@@ -327,7 +327,7 @@ def main():
     print("=" * 60)
     for name, result in results.items():
         status = result["status"]
-        emoji = {"success": "✅", "failed": "❌", "timeout": "⏰", "skipped": "⏭️"}[status]
+        emoji = {"success": "✅", "failed": "❌", "timeout": "⏰", "skipped": "⏭️", "interrupted": "⏸️"}.get(status, "❓")
         elapsed = result.get("elapsed_s", 0)
         print(f"  {emoji} {name}: {status} ({elapsed:.1f}s)")
 
