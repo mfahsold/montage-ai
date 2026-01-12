@@ -48,7 +48,10 @@ RUN groupadd -g ${GID} montage && \
     chown -R montage:montage /app
 
 # Expose port for web UI
-EXPOSE 5000
+# Allow override via build-arg/service config; default kept as 5000 for backwards compatibility
+ARG SERVICE_PORT=5000
+EXPOSE ${SERVICE_PORT}
+ENV SERVICE_PORT=${SERVICE_PORT}
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1

@@ -23,11 +23,19 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-REGISTRY="192.168.1.12:30500"
-IMAGE_NAME="montage-ai"
-LOCAL_TAG="${REGISTRY}/${IMAGE_NAME}:latest"
+# Load centralized deployment config if present
+if [ -f "deploy/config.env" ]; then
+  # shellcheck disable=SC1091
+  source "deploy/config.env"
+fi
+
+# REGISTRY can come from deploy/config.env (REGISTRY_URL) or environment overrides
+REGISTRY="${REGISTRY_URL:-${REGISTRY:-192.168.1.12:30500}}"
+IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+LOCAL_TAG="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 BUILD_QUALITY="${1:-standard}"
-NAMESPACE="montage-ai"
+NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
 
 # Build metadata
 BUILD_VERSION=$(git describe --tags --always 2>/dev/null || echo "dev")

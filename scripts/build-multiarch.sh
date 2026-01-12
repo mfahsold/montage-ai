@@ -5,7 +5,13 @@ set -euo pipefail
 
 echo "WARNING: scripts/build-multiarch.sh is deprecated. Delegating to scripts/build-distributed.sh"
 
-REGISTRY="${REGISTRY:-ghcr.io/mfahsold}"
+# Load centralized deployment config if present
+if [ -f "deploy/config.env" ]; then
+  # shellcheck disable=SC1091
+  source "deploy/config.env"
+fi
+
+REGISTRY="${REGISTRY_URL:-${REGISTRY:-ghcr.io/mfahsold}}"
 TAG="${TAG:-latest}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 

@@ -51,6 +51,17 @@ Notes & troubleshooting
   - Install required private dependencies or set `--index` to a private index, or
   - Temporarily remove the problematic extras from `pyproject.toml` while generating a lockfile.
 
+Deployment config centralization
+
+- Build and deploy scripts (`scripts/build-and-deploy.sh`, `scripts/build-multiarch.sh`) now source `deploy/config.env` when present and respect `REGISTRY_URL`, `IMAGE_NAME`, `IMAGE_TAG`, and `CLUSTER_NAMESPACE` variables. Override these via environment variables or by editing `deploy/config.env` per environment.
+- The `Dockerfile` accepts a build arg `SERVICE_PORT` (default `5000`) and sets `ENV SERVICE_PORT` so the port is configurable at build time. To build with a custom port:
+
+```bash
+docker build --build-arg SERVICE_PORT=8080 -t ${REGISTRY}/montage-ai:${TAG} .
+```
+
+- Update `deploy/config.env` to set `REGISTRY_HOST`, `REGISTRY_PORT`, `IMAGE_TAG`, or `SERVICE_PORT` as needed for your environment.
+
 - Best practice: pin `UV_VERSION` in `deploy/config.env` and in CI workflows to ensure reproducible tooling.
 
 Next steps
