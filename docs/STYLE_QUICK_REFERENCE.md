@@ -7,7 +7,7 @@
 ## 🎯 Brand Voice
 
 | Aspect | Rule |
-|--------|------|
+| ------ | ------ |
 | **Philosophy** | "Polish, don't generate." |
 | **Tone** | Technical, concise, professional |
 | **Tempo** | Fast-paced, action-oriented |
@@ -17,8 +17,9 @@
 
 ## 📝 Capitalization Quick Rules
 
-```
+```text
 Montage Creator     ← Title Case (feature name)
+
 STEP 1: Select      ← STEP + Title Case
 Generate Short      ← Title Case (button)
 ENABLED             ← UPPERCASE (status)
@@ -44,13 +45,15 @@ beat-sync montages  ← lowercase (description)
 ## 🔤 Typography System
 
 ### Font Stack
+
 ```css
 Headings:  "Share Tech Mono", monospace
 Body:      System font stack (Segoe UI, Roboto, sans-serif)
 ```
 
 ### Font Size (Responsive)
-```
+
+```text
 H1: clamp(2.5rem, 7vw, 4rem)        /* 40–64px */
 H2: clamp(2rem, 5vw, 3rem)          /* 32–48px */
 H3: clamp(1.5rem, 3.5vw, 2rem)      /* 24–32px */
@@ -59,7 +62,8 @@ Small: 0.75rem                       /* 12px */
 ```
 
 ### Colors
-```
+
+```text
 Primary Text:    #e0e0e0 (var(--fg))
 Secondary:       #a0a0a0 (var(--muted-fg))
 Accent Primary:  #0055ff (electric blue)
@@ -73,7 +77,8 @@ Error:           #ff3333 (red)
 ## 🎨 Component Patterns
 
 ### Button Text
-```
+
+```text
 ✅ Launch Creator
 ✅ Generate Short
 ✅ Apply Edits & Render
@@ -85,7 +90,8 @@ Error:           #ff3333 (red)
 ```
 
 ### Step Labels
-```
+
+```text
 ✅ STEP 1: Select Style
 ✅ STEP 2: AI Settings
 ✅ STEP 3: Safe Zones (Optional)
@@ -96,7 +102,8 @@ Error:           #ff3333 (red)
 ```
 
 ### Descriptions (Max 1-2 Sentences)
-```
+
+```text
 ✅ "Edit video by removing text. AI handles the cuts."
 ✅ "Auto-reframe to 9:16. Face detection, safe zones, platform presets."
 
@@ -106,7 +113,8 @@ Error:           #ff3333 (red)
 ```
 
 ### Feature List
-```
+
+```text
 ✅ • Beat-sync montages
 ✅ • Transcript editing  
 ✅ • OTIO/EDL export
@@ -120,7 +128,7 @@ Error:           #ff3333 (red)
 ## 📊 Terminology Standards
 
 | Tech | Usage | NOT |
-|------|-------|-----|
+| ------ | ------- | ----- |
 | OTIO | "OTIO/EDL export to DaVinci" | "OpenTimelineIO export" |
 | FFmpeg | "FFmpeg rendering" | "FFmpeg (the video encoder)" |
 | MediaPipe | "MediaPipe face detection" | "the MediaPipe library by Google" |
@@ -134,7 +142,7 @@ Error:           #ff3333 (red)
 ## 🚨 Common Mistakes to Avoid
 
 | ❌ NO | ✅ YES |
-|-------|--------|
+| ------- | -------- |
 | "Using Real-ESRGAN..." | "Real-ESRGAN enhancement" |
 | "Which will allow you to..." | "Enables you to..." |
 | "Click to configure" | "Configure" (use button label) |
