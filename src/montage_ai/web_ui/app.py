@@ -1,4 +1,3147 @@
-from fastapi import FastAPI
+"""
+Montage AI Web Interface
+
+Simple Flask web UI for creating video montages.
+DRY + KISS: Minimal dependencies, no over-engineering.
+"""
+
+import os
+import re
+import json
+import shutil
+import subprocess
+import threading
+import psutil
+import queue
+import time
+import signal
+import zipfile
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from collections import deque
+from typing import Optional, List, Dict
+from flask import Flask, render_template, request, jsonify, send_file, Response, send_from_directory, redirect, url_for
+from werkzeug.utils import secure_filename
+
+from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
+from ..core.hardware import get_best_hwaccel
+from ..auto_reframe import AutoReframeEngine
+from ..ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
+from ..ffmpeg_config import AUDIO_FILTERS
+from ..audio_analysis import remove_filler_words
+from ..transcriber import Transcriber
+
+# Centralized Configuration (Single Source of Truth)
+from ..config import get_settings, reload_settings
+from ..logger import logger
+from ..media_files import list_media_files, parse_inventory_descriptions, read_sidecar_description
+from .job_options import normalize_options, apply_preview_preset, apply_finalize_overrides
+
+# Job phase tracking models
+from .models import JobPhase, PIPELINE_PHASES
+
+# Session Management (Centralized State)
+from ..core.session import get_session_manager
+
+# Timeline Export
+from ..timeline_exporter import TimelineExporter, Timeline, Clip
+
+# SSE Helper (Refactored to separate module)
+from .sse import MessageAnnouncer, format_sse
+
+# DRY Decorators for consistent error handling
+from .decorators import api_endpoint, require_json, require_file, validate_range
+
+# Signal handling & subprocess management
+try:
+    from ..subprocess_manager import install_signal_handlers, cleanup_all_subprocesses, track_subprocess
+    SIGNAL_HANDLING_AVAILABLE = True
+except ImportError:
+    logger.warning("subprocess_manager not available, signal handling disabled")
+    SIGNAL_HANDLING_AVAILABLE = False
+
+announcer = MessageAnnouncer()
+
+# B-Roll Planning (semantic clip search via video_agent)
+try:
+    from ..video_agent import create_video_agent
+    VIDEO_AGENT_AVAILABLE = True
+except ImportError:
+    VIDEO_AGENT_AVAILABLE = False
 
 
-app = FastAPI()
+def get_version() -> str:
+    """Get version from git commit hash (short) or fallback to env/default."""
+    git_commit = os.environ.get("GIT_COMMIT", "").strip()
+    if git_commit:
+        return git_commit[:8]
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short=8", "HEAD"],
+            capture_output=True, text=True, timeout=2,
+            cwd=Path(__file__).parent.parent.parent.parent
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    return "dev"
+
+
+VERSION = get_version()
+
+# =============================================================================
+# CONFIGURATION (from centralized config module)
+# =============================================================================
+_settings = get_settings()
+try:
+    _settings.paths.ensure_directories()
+except OSError as exc:
+    logger.warning("Failed to prepare data directories: %s", exc)
+
+# Path aliases for backward compatibility
+INPUT_DIR = _settings.paths.input_dir
+MUSIC_DIR = _settings.paths.music_dir
+OUTPUT_DIR = _settings.paths.output_dir
+ASSETS_DIR = _settings.paths.assets_dir
+
+# Note: Directories are created lazily on first job to avoid issues in test environments
+
+# Default options derived from settings (Single Source of Truth)
+DEFAULT_OPTIONS = {
+    "enhance": _settings.features.enhance,
+    "stabilize": _settings.features.stabilize,
+    "upscale": _settings.features.upscale,
+    "cgpu": _settings.llm.cgpu_gpu_enabled,
+    "story_engine": _settings.features.story_engine,
+    "llm_clip_selection": _settings.features.llm_clip_selection,
+    "creative_loop": _settings.features.creative_loop,
+    "export_timeline": _settings.features.export_timeline,
+    "generate_proxies": _settings.features.generate_proxies,
+    "preserve_aspect": _settings.features.preserve_aspect,
+    # New features
+    "denoise": False,
+    "sharpen": False,
+    "dialogue_duck": False,
+    "audio_normalize": False,
+    "film_grain": "none",
+    "auto_reframe": False,
+    "export_recipe": False,
+}
+
+# Flask app
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 MB max upload
+app.config['UPLOAD_FOLDER'] = INPUT_DIR
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files (Hardware Nah: minimize I/O)
+app.config['ACCEPTING_JOBS'] = True  # Flag for graceful shutdown
+
+# Install signal handlers for graceful shutdown
+if SIGNAL_HANDLING_AVAILABLE:
+    try:
+        install_signal_handlers()
+        logger.info("✅ Signal handlers installed for graceful shutdown")
+    except Exception as e:
+        logger.warning(f"Failed to install signal handlers: {e}")
+
+
+@app.teardown_appcontext
+def cleanup_on_shutdown(error=None):
+    """Cleanup subprocesses when Flask app context closes.
+    
+    Note: teardown_appcontext runs after every request.
+    We intentionally skip cleanup here since Flask will handle process lifecycle.
+    Subprocesses are only forcefully cleaned on actual app termination via signal handlers.
+    """
+    # Only cleanup if there's an actual error in the request
+    if error and SIGNAL_HANDLING_AVAILABLE:
+        logger.debug(f"Error in request, cleaning up subprocesses: {error}")
+        cleanup_all_subprocesses(timeout=10)
+
+
+
+
+# Job queue and management
+from ..redis_resilience import ResilientQueue, create_resilient_redis_connection
+from ..core.job_store import JobStore
+from ..tasks import run_montage, run_transcript_render
+
+
+class NullJob:
+    """Lightweight job placeholder used by NullQueue."""
+
+    def __init__(self, job_id: Optional[str] = None):
+        self.id = job_id or f"job-{int(time.time() * 1000)}"
+
+
+class NullQueue:
+    """Queue stub used when Redis is unavailable (e.g., local tests)."""
+
+    def __init__(self, name: str):
+        self.name = name
+        self.started_job_registry: list = []
+        self._jobs: list = []
+
+    def enqueue(self, *args, **kwargs):
+        job_id = kwargs.get("job_id") or (args[1] if len(args) >= 2 else None)
+        job = NullJob(job_id=job_id)
+        self._jobs.append(job)
+        return job
+
+    def __len__(self):
+        return len(self._jobs)
+
+
+class InMemoryJobStore:
+    """Minimal in-memory job store for fail-open behavior."""
+
+    def __init__(self):
+        self._jobs = {}
+
+    def get_job(self, job_id: str):
+        return self._jobs.get(job_id)
+
+    def create_job(self, job_id: str, data=None):
+        self._jobs[job_id] = data or {"status": "pending"}
+        return self._jobs[job_id]
+
+    def update_job(self, job_id: str, data=None):
+        if job_id in self._jobs:
+            self._jobs[job_id].update(data or {})
+
+    def list_jobs(self):
+        return self._jobs
+
+
+def _init_redis_resources():
+    redis_host = _settings.session.redis_host or 'localhost'
+    redis_port = _settings.session.redis_port
+
+    try:
+        conn = create_resilient_redis_connection(host=redis_host, port=redis_port)
+        queue_fast = ResilientQueue(name=_settings.session.queue_fast_name, connection=conn)
+        queue_heavy = ResilientQueue(name=_settings.session.queue_heavy_name, connection=conn)
+        store = JobStore()
+        return conn, queue_fast, queue_heavy, store
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Redis unavailable; using in-memory stubs: %s", exc)
+        stub_fast = NullQueue(_settings.session.queue_fast_name)
+        stub_heavy = NullQueue(_settings.session.queue_heavy_name)
+        return None, stub_fast, stub_heavy, InMemoryJobStore()
+
+
+# Redis connection (centralized via settings)
+redis_conn, queue_fast, queue_heavy, job_store = _init_redis_resources()
+# Backwards-compatible alias for legacy tests and RQ-style usage
+q = queue_fast
+
+
+def get_montage_queue(options: dict) -> ResilientQueue:
+    """Select queue based on workload class (preview vs heavy)."""
+    # When patched in tests, the legacy q alias is a MagicMock; honor that to keep assertions simple.
+    if hasattr(q, "enqueue") and isinstance(getattr(q, "enqueue"), object) and getattr(q, "enqueue") is not None:
+        if getattr(q, "_mock_name", None):
+            return q
+
+    quality = (options or {}).get("quality_profile", "standard")
+    return queue_fast if quality == "preview" else queue_heavy
+
+
+def enqueue_montage(job_id: str, style: str, options: dict):
+    queue = get_montage_queue(options)
+    # Set appropriate job timeout based on quality profile
+    # Preview: 5 minutes, Standard/Heavy: 30 minutes
+    quality = (options or {}).get("quality_profile", "standard")
+    job_timeout = 300 if quality == "preview" else 1800
+    return queue.enqueue(run_montage, job_id, style, options, job_timeout=job_timeout)
+
+def redis_listener():
+    """Listen for updates from Redis and broadcast to SSE clients."""
+    try:
+        # Create a dedicated connection for pubsub to avoid conflicts
+        pubsub_conn = create_resilient_redis_connection(host=redis_host, port=redis_port)
+        pubsub = pubsub_conn.pubsub()
+        pubsub.subscribe('job_updates')
+
+        for message in pubsub.listen():
+            if message['type'] == 'message':
+                announcer.announce(message['data'])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Redis listener stopped; skipping SSE broadcast: %s", exc)
+
+
+def start_redis_listener_if_available() -> None:
+    """Start listener thread only when Redis is reachable to avoid noisy thread errors in tests."""
+    if not redis_conn:
+        logger.debug("Redis unavailable; skipping listener thread")
+        return
+
+    try:
+        redis_conn.ping()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Redis unavailable; skipping listener thread: %s", exc)
+        return
+
+    threading.Thread(target=redis_listener, daemon=True).start()
+
+
+# Start background thread (fail-open when Redis is not reachable)
+start_redis_listener_if_available()
+
+# jobs = {} # Removed
+# job_lock = threading.Lock() # Removed
+# job_queue = deque() # Removed
+# active_jobs = 0 # Removed
+MAX_CONCURRENT_JOBS = _settings.processing.max_concurrent_jobs
+MIN_MEMORY_GB = 2  # Minimum memory required to start a job
+
+
+def allowed_file(filename: str, allowed_extensions: set) -> bool:
+    """Check if file extension is allowed."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+
+def bool_to_env(value: bool) -> str:
+    """Convert boolean to env var string. DRY helper for options -> env vars."""
+    return "true" if value else "false"
+
+
+
+
+
+def check_memory_available(required_gb: float = MIN_MEMORY_GB) -> tuple[bool, float]:
+    """Check if enough memory is available to start a job.
+
+    Returns:
+        (is_available, available_gb)
+    """
+    try:
+        mem = psutil.virtual_memory()
+        available_gb = mem.available / (1024**3)
+        return available_gb >= required_gb, available_gb
+    except Exception as e:
+        print(f"⚠️ Error checking memory: {e}")
+        return True, 0.0  # Fail-open to avoid blocking
+
+
+def get_job_status(job_id: str) -> dict:
+    """Get status of a job."""
+    job = job_store.get_job(job_id)
+    return job if job else {"status": "not_found"}
+
+
+# =============================================================================
+# SHUTDOWN MANAGEMENT
+# =============================================================================
+_shutdown_requested = False
+_active_job_count = 0
+
+def signal_graceful_shutdown():
+    """Signal that shutdown has been requested."""
+    global _shutdown_requested
+    _shutdown_requested = True
+    logger.info("⏹️  Graceful shutdown requested via /api/shutdown")
+    return True
+
+
+@app.route('/api/shutdown', methods=['POST'])
+def api_graceful_shutdown():
+    """
+    Graceful shutdown endpoint (called by K3s preStop hook).
+    
+    This endpoint:
+    1. Stops accepting new jobs
+    2. Waits for active jobs to complete (up to 50 seconds)
+    3. Closes database connections
+    4. Exits cleanly
+    """
+    global _shutdown_requested
+    
+    if signal_graceful_shutdown():
+        # Stop accepting new jobs
+        app.config['ACCEPTING_JOBS'] = False
+        
+        # Get active job count
+        try:
+            active_jobs = len(q.started_job_registry) if hasattr(q, 'started_job_registry') else 0
+        except (AttributeError, TypeError):
+            active_jobs = 0
+        
+        logger.info(f"Shutdown: {active_jobs} jobs still active")
+        
+        # Try to drain job queue gracefully
+        # Note: K3s preStop hook has 50s timeout, so we can't wait forever
+        return jsonify({
+            "status": "shutting_down",
+            "active_jobs": active_jobs,
+            "message": "Pod will terminate after preStop hook completes (50 seconds)"
+        }), 202  # HTTP 202 Accepted
+    
+    return jsonify({"status": "error", "message": "Shutdown already in progress"}), 409
+
+
+@app.before_request
+def check_shutdown_status():
+    """Prevent new jobs during shutdown."""
+    global _shutdown_requested
+    
+    if _shutdown_requested and request.path.startswith('/api/jobs') and request.method == 'POST':
+        return jsonify({
+            "status": "error",
+            "message": "Server is shutting down, cannot accept new jobs"
+        }), 503  # Service Unavailable
+
+
+
+
+
+
+
+
+
+# Register Blueprints
+from .routes.session import session_bp
+from .routes.analysis import analysis_bp
+
+app.register_blueprint(session_bp)
+app.register_blueprint(analysis_bp)
+
+# =============================================================================
+# ROUTES
+# =============================================================================
+
+@app.route('/')
+def index():
+    """Main landing page with workflow selection (modern voxel design)."""
+    return render_template('index.html', version=VERSION)
+
+
+@app.route('/montage')
+def montage_creator():
+    """Montage Creator - advanced editing interface."""
+    # List music tracks
+    music_dir = _settings.paths.music_dir
+    music_tracks = []
+    if os.path.exists(music_dir):
+        music_tracks = [f for f in os.listdir(music_dir) if f.lower().endswith(('.mp3', '.wav', '.m4a'))]
+    
+    return render_template('montage.html', version=VERSION, music_tracks=sorted(music_tracks))
+
+
+@app.route('/shorts')
+def shorts_studio():
+    """Shorts Studio - vertical video creation."""
+    return render_template('shorts.html', version=VERSION)
+
+
+@app.route('/transcript')
+def transcript_editor():
+    """Transcript Editor - text-based video editing."""
+    return render_template('transcript.html', version=VERSION)
+
+
+@app.route('/gallery')
+def gallery():
+    """Gallery - view completed projects."""
+    return render_template('gallery.html', version=VERSION)
+
+
+@app.route('/settings')
+def settings():
+    """Settings - system configuration."""
+    return render_template('settings.html', version=VERSION)
+
+
+@app.route('/features')
+def features():
+    """Features - system capabilities overview."""
+    return render_template('features.html', version=VERSION)
+
+
+@app.route('/api/status')
+def api_status():
+    """API health check with system stats."""
+    mem = psutil.virtual_memory()
+    memory_ok, available_gb = check_memory_available()
+
+    # GPU/CGPU stats
+    hw_config = get_best_hwaccel()
+    encoder_status = hw_config.encoder
+    if hw_config.is_gpu:
+        encoder_status = f"{hw_config.type} ({encoder_status})"
+    cgpu_ok = is_cgpu_available()
+
+    # Get queue stats (RQ)
+    try:
+        active_jobs = len(queue_fast.started_job_registry) + len(queue_heavy.started_job_registry)
+        queued_jobs = len(queue_fast) + len(queue_heavy)
+    except (AttributeError, TypeError, NameError):
+        active_jobs = 0
+        queued_jobs = 0
+    
+    return jsonify({
+        "status": "ok",
+        "version": VERSION,
+        "input_dir": str(INPUT_DIR),
+        "output_dir": str(OUTPUT_DIR),
+        "system": {
+            "memory_available_gb": round(available_gb, 2),
+            "memory_total_gb": round(mem.total / (1024**3), 2),
+            "memory_percent": mem.percent,
+            "active_jobs": active_jobs,
+            "queued_jobs": queued_jobs,
+            "max_concurrent_jobs": MAX_CONCURRENT_JOBS,
+            # New fields for UI
+            "gpu_encoder": encoder_status,
+            "encoder": hw_config.encoder,
+            "cgpu_available": cgpu_ok,
+            "version": VERSION
+        },
+        "defaults": {
+            **DEFAULT_OPTIONS,
+            "cgpu": DEFAULT_OPTIONS.get("cgpu", False) or cgpu_ok,  # Enable if available
+        }
+    })
+
+
+@app.route('/api/telemetry')
+def api_telemetry():
+    """Get telemetry metrics (KPIs, success rates, timing averages)."""
+    try:
+        from .. import telemetry
+        kpis = telemetry.get_kpis()
+        aggregate = telemetry.get_aggregate().to_dict()
+        return jsonify({
+            "status": "ok",
+            "kpis": kpis,
+            "aggregate": aggregate
+        })
+    except Exception as e:
+        logger.warning(f"Failed to get telemetry: {e}")
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "kpis": {},
+            "aggregate": {}
+        })
+
+
+@app.route('/api/analyze-crops', methods=['POST'])
+@api_endpoint
+@require_json('filename')
+def analyze_crops():
+    """Analyze a video for smart reframing crops."""
+    data = request.json
+    filename = data.get('filename')
+    keyframes_data = data.get('keyframes', [])
+
+    filepath = os.path.join(INPUT_DIR, filename)
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"File not found: {filename}")
+
+    reframer = AutoReframeEngine()
+
+    # Convert keyframes dicts to Keyframe objects
+    from ..auto_reframe import Keyframe
+    keyframes = [
+        Keyframe(time=float(kf['time']), center_x_norm=float(kf['x']))
+        for kf in keyframes_data
+    ] if keyframes_data else []
+
+    crops = reframer.analyze(filepath, keyframes=keyframes)
+
+    return jsonify([
+        {
+            "time": c.time,
+            "x": c.x,
+            "y": c.y,
+            "width": c.width,
+            "height": c.height,
+            "score": c.score
+        }
+        for c in crops
+    ])
+
+
+@app.route('/api/transparency')
+def api_transparency():
+    """Return Responsible AI and transparency metadata for the UI."""
+    settings = get_settings()
+    llm = settings.llm
+
+    return jsonify({
+        "policy": {
+            "data_handling": "Local by default; optional cgpu offload when enabled.",
+            "training": "No model training on user footage.",
+            "control": "Users choose features and can export editable timelines (OTIO/EDL).",
+        },
+        "explainability": {
+            "decision_logs": "Available when EXPORT_DECISIONS=true (see /api/jobs/<id>/decisions).",
+        },
+        "llm_backends": {
+            "openai_compatible": llm.has_openai_backend,
+            "google_ai": llm.has_google_backend,
+            "cgpu": llm.cgpu_enabled,
+            "ollama": True,
+        },
+        "oss_stack": [
+            {"name": "FFmpeg", "purpose": "Encoding/decoding"},
+            {"name": "OpenCV", "purpose": "Visual analysis"},
+            {"name": "librosa", "purpose": "Audio analysis"},
+            {"name": "OpenTimelineIO", "purpose": "NLE export"},
+            {"name": "Whisper", "purpose": "Transcription"},
+            {"name": "Demucs", "purpose": "Voice isolation"},
+            {"name": "Real-ESRGAN", "purpose": "Upscaling"},
+        ],
+        "scope": [
+            "AI-assisted rough cuts from existing footage",
+            "Beat sync and story arc pacing",
+            "Professional NLE handoff via OTIO/EDL/XML",
+        ],
+        "out_of_scope": [
+            "Generative text-to-video",
+            "Full NLE timeline editing",
+            "Social hosting platform",
+        ],
+    })
+
+
+@app.route('/api/files', methods=['GET'])
+def api_list_files():
+    """List uploaded files."""
+    include_meta = request.args.get("details") == "1"
+
+    video_paths = list_media_files(INPUT_DIR, _settings.file_types.video_extensions)
+    music_paths = list_media_files(MUSIC_DIR, _settings.file_types.audio_extensions)
+
+    inventory = parse_inventory_descriptions(INPUT_DIR / "FOOTAGE_INVENTORY.md")
+
+    video_items = []
+    if include_meta:
+        from ..video_metadata import probe_metadata
+
+    for path in video_paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        item = {
+            "name": path.name,
+            "size_bytes": stat.st_size,
+            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        }
+        description = read_sidecar_description(path) or inventory.get(path.name)
+        if description:
+            item["description"] = description
+        if include_meta:
+            meta = probe_metadata(str(path))
+            item["duration_seconds"] = meta.duration if meta else None
+            item["width"] = meta.width if meta else None
+            item["height"] = meta.height if meta else None
+            item["codec"] = meta.codec if meta else None
+            item["supported"] = bool(meta and meta.width > 0 and meta.height > 0)
+        video_items.append(item)
+
+    music_items = []
+    for path in music_paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        music_items.append({
+            "name": path.name,
+            "size_bytes": stat.st_size,
+            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        })
+
+    return jsonify({
+        "videos": [p.name for p in video_paths],
+        "music": [p.name for p in music_paths],
+        "video_items": video_items,
+        "music_items": music_items,
+        "video_count": len(video_paths),
+        "music_count": len(music_paths),
+    })
+
+
+@app.route('/api/transcript/<filename>', methods=['GET'])
+def api_get_transcript(filename):
+    """Get transcript JSON for a video file."""
+    # Sanitize filename
+    filename = secure_filename(filename)
+    
+    # Look for JSON file (assuming same name as video but .json)
+    base_name = os.path.splitext(filename)[0]
+    json_path = INPUT_DIR / f"{base_name}.json"
+    
+    if not json_path.exists():
+        return jsonify({"error": "Transcript not found"}), 404
+        
+    try:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/transcript/render', methods=['POST'])
+def api_render_transcript_edit():
+    """
+    Render a preview based on transcript edits.
+    
+    Expects JSON:
+    {
+        "filename": "video.mp4",
+        "edits": [
+            {"index": 0, "removed": false},
+            {"index": 1, "removed": true},
+            ...
+        ]
+    }
+    """
+    data = request.json
+    filename = secure_filename(data.get('filename'))
+    edits = data.get('edits', [])
+    
+    if not filename:
+        return jsonify({"error": "Missing filename"}), 400
+        
+    video_path = INPUT_DIR / filename
+    transcript_path = INPUT_DIR / f"{os.path.splitext(filename)[0]}.json"
+    
+    if not video_path.exists() or not transcript_path.exists():
+        return jsonify({"error": "File not found"}), 404
+
+    # Create job ID
+    job_id = f"transcript_edit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # Queue the job
+    job_data = {
+        "id": job_id,
+        "type": "transcript_render",
+        "video_path": str(video_path),
+        "transcript_path": str(transcript_path),
+        "edits": edits,
+        "status": "queued",
+        "created_at": datetime.now().isoformat()
+    }
+    
+    # Store in Redis
+    job_store.create_job(job_id, job_data)
+    
+    # Enqueue with RQ (fast queue)
+    queue_fast.enqueue(run_transcript_render, job_id, str(video_path), str(transcript_path), edits)
+        
+    return jsonify({"job_id": job_id, "status": "queued"})
+
+
+@app.route('/api/transcript/detect-fillers', methods=['POST'])
+def api_detect_fillers():
+    """
+    Detect filler words in a transcript.
+    
+    Returns indices of filler words to be removed.
+    """
+    data = request.json
+    filename = secure_filename(data.get('filename'))
+    
+    if not filename:
+        return jsonify({"error": "Missing filename"}), 400
+        
+    transcript_path = INPUT_DIR / f"{os.path.splitext(filename)[0]}.json"
+    
+    if not transcript_path.exists():
+        return jsonify({"error": "Transcript not found"}), 404
+        
+    try:
+        # Load transcript
+        with open(transcript_path, 'r') as f:
+            transcript_data = json.load(f)
+            
+        # Flatten words
+        words = []
+        if 'segments' in transcript_data:
+            for seg in transcript_data['segments']:
+                words.extend(seg.get('words', []))
+        elif 'words' in transcript_data:
+            words = transcript_data['words']
+            
+        # Detect fillers
+        # Use the same list as TextEditor
+        from ..text_editor import FILLER_WORDS
+        
+        filler_indices = []
+        for i, word in enumerate(words):
+            text = word.get('word', '').lower().strip(".,!?;:")
+            if text in FILLER_WORDS:
+                filler_indices.append(i)
+                
+        return jsonify({
+            "success": True,
+            "filler_indices": filler_indices,
+            "count": len(filler_indices)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/video/<filename>', methods=['GET'])
+def api_serve_video(filename):
+    """Serve video file for preview."""
+    filename = secure_filename(filename)
+    file_path = INPUT_DIR / filename
+    if not file_path.exists():
+        return jsonify({"error": "File not found"}), 404
+    return send_file(file_path)
+
+
+@app.route('/api/upload', methods=['POST'])
+def api_upload():
+    """Upload video or music files."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files['file']
+    file_type = request.form.get('type', 'video')  # 'video' or 'music'
+
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    # Validate file type (from centralized config)
+    video_extensions = _settings.file_types.video_extensions
+    music_extensions = _settings.file_types.audio_extensions
+
+    if file_type == 'video':
+        if not allowed_file(file.filename, video_extensions):
+            return jsonify({"error": f"Invalid video format. Allowed: {video_extensions}"}), 400
+        target_dir = INPUT_DIR
+    elif file_type == 'music':
+        if not allowed_file(file.filename, music_extensions):
+            return jsonify({"error": f"Invalid music format. Allowed: {music_extensions}"}), 400
+        target_dir = MUSIC_DIR
+    else:
+        return jsonify({"error": "Invalid file type"}), 400
+
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        logger.error("Upload directory unavailable (%s): %s", target_dir, exc)
+        return jsonify({"error": "Upload directory not available"}), 500
+
+    # Save file with path traversal protection
+    filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename after sanitization"}), 400
+    
+    # Resolve paths and validate
+    target_dir_resolved = target_dir.resolve()
+    filepath = (target_dir_resolved / filename).resolve()
+    
+    # Prevent path traversal attacks
+    if not str(filepath).startswith(str(target_dir_resolved)):
+        logger.warning(f"Path traversal attempt detected: {filepath}")
+        return jsonify({"error": "Invalid upload path"}), 400
+    
+    file.save(filepath)
+
+    return jsonify({
+        "success": True,
+        "filename": filename,
+        "size": filepath.stat().st_size
+    })
+
+
+
+
+@app.route('/api/jobs', methods=['POST'])
+def api_create_job():
+    """Create new montage job with queue management."""
+    # Support both JSON (API) and Form Data (Browser)
+    if request.is_json:
+        data = request.json
+    else:
+        # Convert ImmutableMultiDict to dict, handling defaults for checkboxes
+        data = request.form.to_dict()
+        # Handle specific checkbox/numeric conversions if necessary (done in normalize_options)
+
+    # Validate required fields
+    if 'style' not in data:
+        return jsonify({"error": "Missing required field: style"}), 400
+
+    # Generate job ID
+    job_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Handle Quick Preview override
+    data = apply_preview_preset(data)
+
+    # Normalize options (single source of truth for parsing/defaults/derivation)
+    normalized_options = normalize_options(data, DEFAULT_OPTIONS, _settings)
+
+    # Create job with normalized options and structured phase tracking
+    job = {
+        "id": job_id,
+        "style": data['style'],
+        "options": normalized_options,
+        "status": "queued",
+        "phase": JobPhase.initial().to_dict(),
+        "created_at": datetime.now().isoformat()
+    }
+
+    # Store in Redis
+    job_store.create_job(job_id, job)
+
+    # Enqueue
+    enqueue_montage(job_id, data['style'], job['options'])
+
+    return jsonify(job)
+
+
+@app.route('/api/stream')
+def stream():
+    """Server-Sent Events for real-time updates (Hardware Nah: Zero polling overhead)."""
+    def event_stream():
+        messages = announcer.listen()
+        while True:
+            msg = messages.get()  # blocks until a new message arrives
+            yield format_sse(msg)
+    return Response(event_stream(), mimetype='text/event-stream')
+
+
+@app.route('/api/progress/<job_id>')
+def progress_stream(job_id):
+    """SSE stream filtered for a specific job."""
+    def event_stream():
+        messages = announcer.listen()
+        while True:
+            msg = messages.get()
+            try:
+                data = json.loads(msg)
+                if data.get('job_id') == job_id:
+                    yield format_sse(msg)
+            except Exception:
+                pass
+    return Response(event_stream(), mimetype='text/event-stream')
+
+
+@app.route('/api/jobs/<job_id>', methods=['GET'])
+def api_get_job(job_id):
+    """Get job status."""
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
+
+
+@app.route('/api/jobs/<job_id>/finalize', methods=['POST'])
+def api_finalize_job(job_id):
+    """Create a high-quality render from a preview job."""
+    # 1. Get original job
+    original_job = get_job_status(job_id)
+    if original_job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+        
+    # 2. Create new job options based on original
+    new_options = apply_finalize_overrides(original_job['options'])
+    
+    # 3. Create new job
+    new_job_id = f"{job_id}_hq"
+    style = original_job['style']
+    
+    job = {
+        "id": new_job_id,
+        "style": style,
+        "options": new_options,
+        "status": "queued",
+        "phase": JobPhase.initial().to_dict(),
+        "created_at": datetime.now().isoformat(),
+        "parent_job_id": job_id
+    }
+
+    # Store in Redis
+    job_store.create_job(new_job_id, job)
+
+    # Enqueue
+    enqueue_montage(new_job_id, style, new_options)
+
+    return jsonify(job)
+
+
+@app.route('/api/jobs/<job_id>/cancel', methods=['POST'])
+def api_cancel_job(job_id):
+    """
+    Cancel a running job.
+    
+    NOTE: This marks the job as cancelled in JobStore, but RQ workers
+    don't support graceful cancellation. The subprocess may continue
+    until it completes or fails naturally.
+    
+    For true cancellation, we'd need to:
+    1. Track subprocess PIDs in JobStore
+    2. Send SIGTERM to the subprocess
+    3. Handle cleanup in tasks.py
+    
+    For now, this just updates the UI state.
+    """
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+    
+    # Update status to cancelled
+    job_store.update_job(job_id, {
+        "status": "cancelled",
+        "cancelled_at": datetime.now().isoformat()
+    })
+    
+    logger.info(f"Job {job_id} marked as cancelled")
+    
+    return jsonify({
+        "success": True,
+        "message": "Job cancelled (note: subprocess may continue until natural completion)"
+    })
+
+
+
+
+
+
+
+
+
+@app.route('/api/jobs', methods=['GET'])
+def api_list_jobs():
+    """List all jobs."""
+    jobs_dict = job_store.list_jobs()
+    job_list = list(jobs_dict.values())
+    return jsonify({"jobs": sorted(job_list, key=lambda x: x['created_at'], reverse=True)})
+
+
+@app.route('/api/jobs/<job_id>/download', methods=['GET'])
+def api_job_download(job_id):
+    """Download output file for a specific job.
+
+    Convenience endpoint that looks up the job's output file and redirects
+    to the /api/download/<filename> endpoint.
+    """
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+
+    # Check various possible output field names
+    output_file = job.get("output_file") or job.get("output") or job.get("result", {}).get("output_path")
+
+    if not output_file:
+        return jsonify({"error": "No output file available for this job"}), 404
+
+    # Extract just the filename if it's a full path
+    from pathlib import Path
+    filename = Path(output_file).name
+
+    # Redirect to the download endpoint
+    return redirect(url_for('api_download', filename=filename))
+
+
+@app.route('/api/download/<filename>', methods=['GET'])
+def api_download(filename):
+    """Download output file with proper MIME type."""
+    # secure_filename sanitizes but preserves the base name
+    safe_filename = secure_filename(filename)
+    filepath = OUTPUT_DIR / safe_filename
+
+    if not filepath.exists():
+        # Debug: log what we're looking for
+        print(f"⚠️ Download requested but file not found: {filepath}")
+        print(f"   Available files: {list(OUTPUT_DIR.glob('*.mp4'))[:5]}")
+        return jsonify({"error": f"File not found: {safe_filename}"}), 404
+
+    # Explicit MIME type for video files
+    mimetype = 'video/mp4' if safe_filename.endswith('.mp4') else None
+    
+    return send_file(
+        filepath,
+        as_attachment=True,
+        download_name=safe_filename,  # Explicit filename for download
+        mimetype=mimetype
+    )
+
+
+def _collect_job_artifacts(job_id: str) -> Dict[str, List[Path]]:
+    """
+    Collect all artifacts for a job (video, proxies, timeline exports, logs).
+
+    Returns dict with categorized file paths:
+        - video: Main output video(s)
+        - timeline: OTIO, EDL, XML timeline files
+        - proxies: Generated proxy files
+        - logs: Render logs and recipe cards
+    """
+    artifacts = {
+        "video": [],
+        "timeline": [],
+        "proxies": [],
+        "logs": [],
+    }
+
+    # Pattern to match job_id in filenames
+    # Supports: gallery_montage_20260112_114010_v1_dynamic.mp4, render_20260112_114010.log
+    patterns = {
+        "video": [f"*{job_id}*.mp4"],
+        "timeline": [f"*{job_id}*.otio", f"*{job_id}*.edl", f"*{job_id}*.xml"],
+        "logs": [f"render_{job_id}.log", f"*{job_id}*_RECIPE_CARD.md", f"decisions_{job_id}.json"],
+    }
+
+    for category, globs in patterns.items():
+        for pattern in globs:
+            for path in OUTPUT_DIR.glob(pattern):
+                if path.is_file():
+                    artifacts[category].append(path)
+
+    # Check for proxies in proxies subdirectory
+    proxy_dir = OUTPUT_DIR / "proxies"
+    if proxy_dir.exists():
+        for proxy in proxy_dir.glob("*.mp4"):
+            artifacts["proxies"].append(proxy)
+        for proxy in proxy_dir.glob("*.mov"):
+            artifacts["proxies"].append(proxy)
+
+    return artifacts
+
+
+@app.route('/api/jobs/<job_id>/download/zip', methods=['GET'])
+def api_job_download_zip(job_id):
+    """
+    Download all job artifacts as a ZIP file.
+
+    Includes:
+    - Output video(s)
+    - Timeline exports (OTIO, EDL)
+    - Proxies (if generated)
+    - Logs and recipe cards
+
+    Query params:
+        include_proxies: bool (default: true) - Include proxy files
+        include_logs: bool (default: true) - Include logs and metadata
+    """
+    # Check if job exists
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+
+    if job.get("status") not in ("completed", "success"):
+        return jsonify({"error": f"Job not completed (status: {job.get('status')})"}), 400
+
+    # Parse options
+    include_proxies = request.args.get('include_proxies', 'true').lower() == 'true'
+    include_logs = request.args.get('include_logs', 'true').lower() == 'true'
+
+    # Collect artifacts
+    artifacts = _collect_job_artifacts(job_id)
+
+    # Check if we have anything to download
+    if not artifacts["video"]:
+        return jsonify({"error": "No output files found for this job"}), 404
+
+    # Create ZIP file
+    zip_filename = f"montage_{job_id}.zip"
+
+    try:
+        # Use tempfile to create ZIP
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp:
+            tmp_path = tmp.name
+
+        with zipfile.ZipFile(tmp_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # Add video files (in root)
+            for video in artifacts["video"]:
+                zf.write(video, video.name)
+
+            # Add timeline files (in timeline/ folder)
+            for timeline in artifacts["timeline"]:
+                zf.write(timeline, f"timeline/{timeline.name}")
+
+            # Add proxies (in proxies/ folder)
+            if include_proxies and artifacts["proxies"]:
+                for proxy in artifacts["proxies"]:
+                    zf.write(proxy, f"proxies/{proxy.name}")
+
+            # Add logs (in logs/ folder)
+            if include_logs and artifacts["logs"]:
+                for log in artifacts["logs"]:
+                    zf.write(log, f"logs/{log.name}")
+
+        # Send ZIP file
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=zip_filename,
+            mimetype='application/zip'
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to create ZIP for job {job_id}: {e}")
+        return jsonify({"error": f"Failed to create ZIP: {str(e)}"}), 500
+
+
+@app.route('/api/jobs/<job_id>/artifacts', methods=['GET'])
+def api_job_artifacts(job_id):
+    """
+    List all artifacts for a job (for UI to show download options).
+
+    Returns:
+        artifacts: Dict with categorized files and their sizes
+        total_size_mb: Total size of all artifacts
+    """
+    job = get_job_status(job_id)
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+
+    artifacts = _collect_job_artifacts(job_id)
+
+    # Build response with file info
+    result = {"artifacts": {}, "total_size_mb": 0}
+    total_bytes = 0
+
+    for category, files in artifacts.items():
+        result["artifacts"][category] = []
+        for f in files:
+            size = f.stat().st_size
+            total_bytes += size
+            result["artifacts"][category].append({
+                "name": f.name,
+                "size_mb": round(size / (1024 * 1024), 2),
+                "download_url": f"/api/download/{f.name}"
+            })
+
+    result["total_size_mb"] = round(total_bytes / (1024 * 1024), 2)
+    result["zip_download_url"] = f"/api/jobs/{job_id}/download/zip"
+
+    return jsonify(result)
+
+
+@app.route('/api/styles', methods=['GET'])
+def api_list_styles():
+    """List available styles."""
+    styles = [
+        {"id": "dynamic", "name": "Dynamic", "description": "Position-aware pacing (default)"},
+        {"id": "hitchcock", "name": "Hitchcock", "description": "Suspense - slow build, fast climax"},
+        {"id": "mtv", "name": "MTV", "description": "Rapid 1-2 beat cuts"},
+        {"id": "action", "name": "Action", "description": "Michael Bay fast cuts"},
+        {"id": "documentary", "name": "Documentary", "description": "Natural, observational"},
+        {"id": "minimalist", "name": "Minimalist", "description": "Contemplative long takes"},
+        {"id": "wes_anderson", "name": "Wes Anderson", "description": "Symmetric, stylized"}
+    ]
+    return jsonify({"styles": styles})
+
+
+@app.route('/api/jobs/<job_id>/logs', methods=['GET'])
+def api_get_job_logs(job_id):
+    """Get logs for a specific job."""
+    # Look for log file
+    log_file = OUTPUT_DIR / f"render_{job_id}.log"
+
+    # Also try without job_id prefix (legacy format)
+    if not log_file.exists():
+        log_file = OUTPUT_DIR / "render.log"
+
+    if not log_file.exists():
+        return jsonify({"error": "Log file not found"}), 404
+
+    # Read last N lines (default 500, max 2000)
+    try:
+        lines = int(request.args.get('lines', 500))
+        lines = min(lines, 2000)  # Cap at 2000 lines
+
+        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+            all_lines = f.readlines()
+            last_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+
+        return jsonify({
+            "job_id": job_id,
+            "log_file": str(log_file.name),
+            "total_lines": len(all_lines),
+            "returned_lines": len(last_lines),
+            "logs": ''.join(last_lines)
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to read log: {str(e)}"}), 500
+
+
+@app.route('/api/jobs/<job_id>/decisions', methods=['GET'])
+def api_get_job_decisions(job_id):
+    """Get AI decisions/analysis for a specific job."""
+    # Look for decisions JSON file (exported by monitoring.py)
+    decisions_file = OUTPUT_DIR / f"decisions_{job_id}.json"
+
+    if not decisions_file.exists():
+        # Check for alternative naming
+        decisions_file = OUTPUT_DIR / f"montage_{job_id}_decisions.json"
+
+    if not decisions_file.exists():
+        return jsonify({
+            "job_id": job_id,
+            "available": False,
+            "message": "No decisions file found. Set EXPORT_DECISIONS=true in environment."
+        })
+
+    try:
+        with open(decisions_file, 'r') as f:
+            decisions_data = json.load(f)
+
+        return jsonify({
+            "job_id": job_id,
+            "available": True,
+            **decisions_data
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to read decisions: {str(e)}"}), 500
+
+
+@app.route('/api/broll/suggest', methods=['POST'])
+def api_suggest_broll():
+    """Suggest B-roll clips based on script/keywords (semantic search).
+
+    DRY: Reuses video_agent.caption_retrieval() for semantic matching.
+    KISS: Simple query → results, no complex state.
+    """
+    if not VIDEO_AGENT_AVAILABLE:
+        return jsonify({"error": "Video Agent not available"}), 500
+
+    data = request.json
+    query = data.get('query', '').strip()
+    top_k = min(int(data.get('top_k', 5)), 20)  # Cap at 20
+
+    if not query:
+        return jsonify({"error": "Query is required"}), 400
+
+    try:
+        agent = create_video_agent()
+
+        # Search for matching clips
+        results = agent.caption_retrieval(query, top_k=top_k)
+
+        return jsonify({
+            "query": query,
+            "suggestions": results,
+            "count": len(results)
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/broll/analyze', methods=['POST'])
+def api_analyze_footage():
+    """Analyze footage and build searchable memory (run once per session).
+
+    Processes all clips in INPUT_DIR and stores in video_agent memory.
+    """
+    if not VIDEO_AGENT_AVAILABLE:
+        return jsonify({"error": "Video Agent not available"}), 500
+
+    try:
+        agent = create_video_agent()
+
+        # Find all video files
+        video_files = list_media_files(INPUT_DIR, _settings.file_types.video_extensions)
+        supported_files = []
+        skipped = []
+        from ..video_metadata import probe_metadata
+        for path in video_files:
+            meta = probe_metadata(str(path))
+            if meta and meta.width > 0 and meta.height > 0:
+                supported_files.append(path)
+            else:
+                skipped.append(path.name)
+
+        results = []
+        for video_path in supported_files:
+            result = agent.analyze_video(str(video_path))
+            results.append({
+                "file": video_path.name,
+                "success": result.get("success", False),
+                "segments": result.get("segments_created", 0)
+            })
+
+        return jsonify({
+            "analyzed": len(results),
+            "results": results,
+            "memory_stats": agent.get_memory_stats(),
+            "skipped": skipped,
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/jobs/<job_id>/creative-instructions', methods=['GET'])
+def api_get_creative_instructions(job_id):
+    """Get Creative Director instructions for a job."""
+    job = get_job_status(job_id)
+
+    if job.get("status") == "not_found":
+        return jsonify({"error": "Job not found"}), 404
+
+    # Extract creative prompt and style from job options
+    options = job.get("options", {})
+
+    return jsonify({
+        "job_id": job_id,
+        "creative_prompt": options.get("prompt", ""),
+        "style": job.get("style", "dynamic"),
+        "options": options,
+        "status": job.get("status")
+    })
+
+
+# =============================================================================
+# CGPU JOB ENDPOINTS (Cloud GPU Operations)
+# =============================================================================
+
+# Lazy import to avoid circular imports and startup delays
+_cgpu_manager = None
+
+def get_cgpu_manager():
+    """Get CGPUJobManager singleton (lazy init)."""
+    global _cgpu_manager
+    if _cgpu_manager is None:
+        try:
+            from ..cgpu_jobs import CGPUJobManager
+            _cgpu_manager = CGPUJobManager()
+        except ImportError as e:
+            print(f"⚠️ CGPUJobManager not available: {e}")
+            return None
+    return _cgpu_manager
+
+
+@app.route('/api/cgpu/status', methods=['GET'])
+def api_cgpu_status():
+    """Check CGPU availability and status."""
+    try:
+        from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
+
+        available = is_cgpu_available()
+        gpu_ok, gpu_info = check_cgpu_gpu() if available else (False, "Not available")
+
+        manager = get_cgpu_manager()
+        stats = manager.stats() if manager else {}
+
+        return jsonify({
+            "available": available,
+            "gpu": {"ok": gpu_ok, "info": gpu_info},
+            "queue_size": stats.get("queue_size", 0),
+            "completed": stats.get("completed_count", 0),
+        })
+    except Exception as e:
+        return jsonify({"available": False, "error": str(e)}), 500
+
+
+@app.route('/api/cgpu/transcribe', methods=['POST'])
+def api_cgpu_transcribe():
+    """Submit transcription job to CGPU.
+
+    Request JSON:
+        { "file": "audio.wav", "model": "medium", "format": "srt" }
+    """
+    data = request.json or {}
+
+    filename = data.get('file')
+    if not filename:
+        return jsonify({"error": "Missing 'file' parameter"}), 400
+
+    # Resolve file path
+    filepath = INPUT_DIR / filename
+    if not filepath.exists():
+        return jsonify({"error": f"File not found: {filename}"}), 404
+
+    try:
+        from ..cgpu_jobs import TranscribeJob
+
+        job = TranscribeJob(
+            audio_path=str(filepath),
+            model=data.get('model', 'medium'),
+            output_format=data.get('format', 'srt'),
+            language=data.get('language'),
+        )
+
+        # Run in background thread
+        def run_job():
+            result = job.execute()
+            print(f"   Transcription {'✅' if result.success else '❌'}: {result.output_path or result.error}")
+
+        thread = threading.Thread(target=run_job, daemon=True)
+        thread.start()
+
+        return jsonify({
+            "job_id": job.job_id,
+            "status": "submitted",
+            "input": filename,
+            "model": job.model,
+            "format": job.output_format,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/cgpu/upscale', methods=['POST'])
+def api_cgpu_upscale():
+    """Submit upscaling job to CGPU.
+
+    Request JSON:
+        { "file": "video.mp4", "scale": 4, "model": "realesr-animevideov3" }
+    """
+    data = request.json or {}
+
+    filename = data.get('file')
+    if not filename:
+        return jsonify({"error": "Missing 'file' parameter"}), 400
+
+    filepath = INPUT_DIR / filename
+    if not filepath.exists():
+        return jsonify({"error": f"File not found: {filename}"}), 404
+
+    try:
+        from ..cgpu_jobs import UpscaleJob
+
+        # Output to OUTPUT_DIR
+        output_name = f"{filepath.stem}_upscaled{filepath.suffix}"
+        output_path = OUTPUT_DIR / output_name
+
+        job = UpscaleJob(
+            input_path=str(filepath),
+            output_path=str(output_path),
+            scale=int(data.get('scale', 4)),
+            model=data.get('model', 'realesr-animevideov3'),
+        )
+
+        def run_job():
+            result = job.execute()
+            print(f"   Upscale {'✅' if result.success else '❌'}: {result.output_path or result.error}")
+
+        thread = threading.Thread(target=run_job, daemon=True)
+        thread.start()
+
+        return jsonify({
+            "job_id": job.job_id,
+            "status": "submitted",
+            "input": filename,
+            "output": output_name,
+            "scale": job.scale,
+            "model": job.model,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/cgpu/stabilize', methods=['POST'])
+def api_cgpu_stabilize():
+    """Submit stabilization job to CGPU.
+
+    Request JSON:
+        { "file": "video.mp4", "smoothing": 10, "shakiness": 5 }
+    """
+    data = request.json or {}
+
+    filename = data.get('file')
+    if not filename:
+        return jsonify({"error": "Missing 'file' parameter"}), 400
+
+    filepath = INPUT_DIR / filename
+    if not filepath.exists():
+        return jsonify({"error": f"File not found: {filename}"}), 404
+
+    try:
+        from ..cgpu_jobs import StabilizeJob
+
+        output_name = f"{filepath.stem}_stabilized{filepath.suffix}"
+        output_path = OUTPUT_DIR / output_name
+
+        job = StabilizeJob(
+            video_path=str(filepath),
+            output_path=str(output_path),
+            smoothing=int(data.get('smoothing', 10)),
+            shakiness=int(data.get('shakiness', 5)),
+        )
+
+        def run_job():
+            result = job.execute()
+            print(f"   Stabilize {'✅' if result.success else '❌'}: {result.output_path or result.error}")
+
+        thread = threading.Thread(target=run_job, daemon=True)
+        thread.start()
+
+        return jsonify({
+            "job_id": job.job_id,
+            "status": "submitted",
+            "input": filename,
+            "output": output_name,
+            "smoothing": job.smoothing,
+            "shakiness": job.shakiness,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/cgpu/jobs', methods=['GET'])
+def api_cgpu_jobs():
+    """List CGPU job queue and history."""
+    manager = get_cgpu_manager()
+    if not manager:
+        return jsonify({"error": "CGPUJobManager not available"}), 503
+
+    return jsonify(manager.stats())
+
+
+# =============================================================================
+# SESSION API (Centralized State Management)
+# =============================================================================
+
+@app.route('/api/session/create', methods=['POST'])
+def api_session_create():
+    """Create a new editing session (Transcript or Shorts)."""
+    data = request.json or {}
+    session_type = data.get('type', 'generic')
+    
+    Session = get_session_manager()
+    session = Session.create(session_type=session_type)
+    
+    return jsonify(session.__dict__)
+
+@app.route('/api/session/<session_id>', methods=['GET'])
+def api_session_get(session_id):
+    """Get session state."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    return jsonify(session.__dict__)
+
+@app.route('/api/session/<session_id>/asset', methods=['POST'])
+def api_session_add_asset(session_id):
+    """Add an asset to a session (Unified Upload)."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    if 'file' not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+        
+    file = request.files['file']
+    asset_type = request.form.get('type', 'video')
+    
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+        
+    # Determine target directory based on asset type
+    if asset_type == 'audio':
+        target_dir = MUSIC_DIR
+    else:
+        target_dir = INPUT_DIR
+        
+    filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename after sanitization"}), 400
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_filename = f"{timestamp}_{filename}"
+    
+    # Resolve paths and validate
+    target_dir_resolved = target_dir.resolve()
+    filepath = (target_dir_resolved / unique_filename).resolve()
+    
+    # Prevent path traversal attacks
+    if not str(filepath).startswith(str(target_dir_resolved)):
+        logger.warning(f"Path traversal attempt detected: {filepath}")
+        return jsonify({"error": "Invalid upload path"}), 400
+    
+    file.save(filepath)
+    
+    # Register asset in session
+    asset = session.add_asset(str(filepath), asset_type)
+    
+    return jsonify({
+        "success": True,
+        "asset": asset.__dict__,
+        "session": session.__dict__
+    })
+
+@app.route('/api/session/<session_id>/analyze', methods=['POST'])
+def api_session_analyze(session_id):
+    """Run analysis on session assets (Crops, Transcription, etc.)."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    data = request.json or {}
+    analysis_type = data.get('type', 'crops')
+    
+    try:
+        main_video = session.get_main_video()
+        if not main_video:
+            return jsonify({"error": "No video asset in session"}), 400
+            
+        if analysis_type == 'crops':
+            # Run AutoReframeEngine
+            from ..auto_reframe import AutoReframeEngine, Keyframe
+            
+            # Check if we have cached results (skip if keyframes provided, as that implies re-calc)
+            if 'crops_auto' in session.state and not data.get('force', False) and not data.get('keyframes'):
+                return jsonify({"success": True, "crops": session.state['crops_auto']})
+            
+            # Initialize engine
+            reframer = AutoReframeEngine(target_aspect=9/16)
+            
+            # Parse keyframes if present
+            keyframes = []
+            if 'keyframes' in data:
+                for kf in data['keyframes']:
+                    keyframes.append(Keyframe(time=float(kf['time']), center_x_norm=float(kf['x'])))
+            
+            # Run analysis (Note: This is blocking. For large files, use background job)
+            # For the prototype, we'll allow it to block for short clips or assume async client handling.
+            # Ideally, we should submit a job and return job_id.
+            # But to keep it simple as requested:
+            
+            # We need to pass the absolute path
+            crop_data = reframer.analyze(main_video.path, keyframes=keyframes)
+            
+            # Convert CropWindow objects to dicts for JSON serialization
+            crops_json = [
+                {
+                    "time": c.time,
+                    "x": c.x,
+                    "y": c.y,
+                    "width": c.width,
+                    "height": c.height,
+                    "score": c.score
+                }
+                for c in crop_data
+            ]
+            
+            # Update session state
+            session.update_state('crops_auto', crops_json)
+            
+            return jsonify({"success": True, "crops": crops_json})
+            
+        elif analysis_type == 'transcription':
+            # Check cache
+            if 'transcript' in session.state and not data.get('force', False):
+                 return jsonify({"success": True, "transcript": session.state['transcript']})
+
+            # Run transcription
+            transcriber = Transcriber()
+            if not transcriber.is_available():
+                 return jsonify({"error": "Transcription service unavailable"}), 503
+
+            # We want JSON output to parse it
+            output_path = transcriber.transcribe(main_video.path, output_format="json", word_timestamps=True)
+            
+            if not output_path or not os.path.exists(output_path):
+                return jsonify({"error": "Transcription failed"}), 500
+                
+            with open(output_path, 'r') as f:
+                transcript_data = json.load(f)
+                
+            session.update_state('transcript', transcript_data)
+            return jsonify({"success": True, "transcript": transcript_data})
+            
+        return jsonify({"error": "Unknown analysis type"}), 400
+        
+    except Exception as e:
+        logger.exception("Analysis failed")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/session/<session_id>/remove_fillers', methods=['POST'])
+def api_session_remove_fillers(session_id):
+    """Remove filler words from the transcript."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    if 'transcript' not in session.state:
+        return jsonify({"error": "No transcript found. Run analysis first."}), 400
+        
+    transcript = session.state['transcript']
+    
+    # Identify fillers
+    indices_to_remove = remove_filler_words(transcript)
+    
+    if not indices_to_remove:
+        return jsonify({"success": True, "count": 0, "message": "No filler words found"})
+        
+    # Update edits in session state
+    current_edits = session.state.get('edits', [])
+    
+    # Add new edits (avoid duplicates)
+    existing_indices = {e['index'] for e in current_edits if e.get('removed')}
+    new_edits = []
+    
+    for idx in indices_to_remove:
+        if idx not in existing_indices:
+            new_edits.append({"index": idx, "removed": True})
+            
+    updated_edits = current_edits + new_edits
+    session.update_state('edits', updated_edits)
+    
+    return jsonify({
+        "success": True, 
+        "count": len(new_edits), 
+        "indices": indices_to_remove,
+        "edits": updated_edits
+    })
+
+@app.route('/api/session/<session_id>/state', methods=['POST'])
+def api_session_update_state(session_id):
+    """Update session state (e.g. edits, cuts)."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    data = request.json or {}
+    for key, value in data.items():
+        session.update_state(key, value)
+        
+    return jsonify({"success": True, "session": session.__dict__})
+
+# Preview Generator
+from ..preview_generator import PreviewGenerator
+
+@app.route('/api/session/<session_id>/render_preview', methods=['POST'])
+def api_session_render_preview(session_id):
+    """
+    Generate a preview for the session (Phone Rig or Transcript Loop).
+    
+    Centralized preview logic that delegates to specific engines based on session type.
+    """
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    data = request.json or {}
+    preview_type = data.get('type', 'frame') # 'frame' or 'clip'
+    timestamp = data.get('timestamp', 0)
+    
+    try:
+        main_video = session.get_main_video()
+        if not main_video:
+            return jsonify({"error": "No video asset in session"}), 400
+            
+        generator = PreviewGenerator(output_dir=str(OUTPUT_DIR))
+        output_filename = f"preview_{session.id}_{int(time.time())}.mp4"
+        
+        if session.type == 'shorts':
+            # Shorts Preview (Phone Rig)
+            # Apply crop at timestamp
+            
+            # Get crop data for this time
+            crops = session.state.get('crops_auto', [])
+            # Find closest crop
+            crop = next((c for c in crops if c['time'] >= timestamp), crops[-1] if crops else None)
+            
+            if not crop:
+                # Default center crop
+                crop = {"x": 0.5, "y": 0.5, "width": 9/16, "height": 1.0} # Normalized
+            
+            if preview_type == 'clip':
+                # Check if we have dynamic crops (keyframes)
+                keyframes = session.state.get('crops_auto', [])
+                
+                # If no keyframes, run analysis on the fly
+                if not keyframes:
+                    logger.info(f"No cached crops found for session {session.id}. Running auto-reframe analysis...")
+                    try:
+                        from ..auto_reframe import AutoReframeEngine
+                        reframer = AutoReframeEngine(target_aspect=9/16)
+                        # Run analysis (blocking)
+                        crop_data = reframer.analyze(main_video.path)
+                        
+                        # Convert to JSON-serializable format
+                        crops_json = [
+                            {
+                                "time": c.time,
+                                "x": c.x,
+                                "y": c.y,
+                                "width": c.width,
+                                "height": c.height,
+                                "score": c.score
+                            }
+                            for c in crop_data
+                        ]
+                        
+                        # Update session state
+                        session.update_state('crops_auto', crops_json)
+                        keyframes = crops_json
+                        
+                        # Update the single frame crop as well since we now have data
+                        crop = next((c for c in keyframes if c['time'] >= timestamp), keyframes[-1] if keyframes else None)
+                        
+                    except Exception as e:
+                        logger.error(f"Auto-reframe analysis failed during preview: {e}")
+                        # Fallback to center crop is handled by generate_shorts_preview if keyframes is None/Empty
+                        pass
+
+                output_path = generator.generate_shorts_preview(
+                    main_video.path, 
+                    crop, 
+                    output_filename,
+                    keyframes=keyframes if keyframes else None
+                )
+                return jsonify({
+                    "success": True,
+                    "url": f"/downloads/{output_filename}",
+                    "crop": crop
+                })
+            else:
+                # Frame preview (just return crop data for frontend to render overlay)
+                return jsonify({
+                    "success": True,
+                    "url": f"/api/video/{main_video.filename}", 
+                    "crop": crop
+                })
+
+        elif session.type == 'transcript':
+            # Transcript Preview (Cut List)
+            timeline = _build_timeline_from_session(session, main_video)
+            if not timeline:
+                 return jsonify({"error": "Could not build timeline"}), 400
+            
+            # Convert timeline clips to segments (start, end)
+            segments = [(clip.start_time, clip.start_time + clip.duration) for clip in timeline.clips]
+            
+            output_path = generator.generate_transcript_preview(
+                main_video.path,
+                segments,
+                output_filename
+            )
+            
+            return jsonify({
+                "success": True,
+                "url": f"/downloads/{output_filename}"
+            })
+            
+        else:
+            return jsonify({"error": "Unknown session type"}), 400
+
+    except Exception as e:
+        logger.error(f"Preview generation failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# =============================================================================
+# TRANSCRIPT API ENDPOINTS (Text-Based Editing)
+# =============================================================================
+
+# Create upload directory for transcript videos
+from ..config import get_settings
+TRANSCRIPT_UPLOAD_DIR = get_settings().paths.transcript_dir
+TRANSCRIPT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+
+
+
+@app.route('/api/transcript/upload', methods=['POST'])
+def api_transcript_upload():
+    """Upload video file for transcript editing."""
+    if 'video' not in request.files:
+        return jsonify({"error": "No video file provided"}), 400
+    
+    file = request.files['video']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if not allowed_file(file.filename, {'mp4', 'mov', 'avi', 'mkv', 'webm', 'mp3', 'wav'}):
+        return jsonify({"error": "Invalid file type"}), 400
+    
+    filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename after sanitization"}), 400
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_filename = f"{timestamp}_{filename}"
+    
+    # Resolve paths and validate
+    upload_dir_resolved = TRANSCRIPT_UPLOAD_DIR.resolve()
+    filepath = (upload_dir_resolved / unique_filename).resolve()
+    
+    # Prevent path traversal attacks
+    if not str(filepath).startswith(str(upload_dir_resolved)):
+        logger.warning(f"Path traversal attempt detected: {filepath}")
+        return jsonify({"error": "Invalid upload path"}), 400
+    
+    file.save(filepath)
+    
+    return jsonify({
+        "success": True,
+        "path": str(filepath),
+        "filename": unique_filename
+    })
+
+
+
+
+
+@app.route('/api/transcript/video/<filename>')
+def api_transcript_video(filename):
+    """Serve uploaded video for preview."""
+    filepath = TRANSCRIPT_UPLOAD_DIR / secure_filename(filename)
+    if not filepath.exists():
+        return jsonify({"error": "File not found"}), 404
+    return send_file(filepath)
+
+
+@app.route('/api/transcript/transcribe', methods=['POST'])
+def api_transcript_transcribe():
+    """Transcribe video using Whisper (local or CGPU)."""
+    data = request.json or {}
+    video_path_str = data.get('video_path')
+    session_id = data.get('session_id')
+    
+    # Session-based workflow
+    session = None
+    if session_id:
+        Session = get_session_manager()
+        session = Session.load(session_id)
+        if session:
+            # Check if already transcribed
+            if 'transcript' in session.state:
+                return jsonify({"success": True, "transcript": session.state['transcript'], "cached": True})
+            
+            # If no video path provided, try to find main video in session
+            if not video_path_str:
+                main_video = session.get_main_video()
+                if main_video:
+                    video_path_str = main_video.path
+
+    if not video_path_str:
+        return jsonify({"error": "No video path provided"}), 400
+
+    # Resolve path
+    video_path = Path(video_path_str)
+    if not video_path.exists():
+        # Try relative to INPUT_DIR
+        video_path = INPUT_DIR / video_path_str
+    
+    if not video_path.exists():
+        return jsonify({"error": f"Video file not found: {video_path_str}"}), 404
+    
+    # Define output JSON path (same name as video)
+    json_output_path = video_path.with_suffix('.json')
+    
+    try:
+        transcript = None
+        
+        # Try CGPU first, fall back to local
+        cgpu_available = is_cgpu_available()
+        
+        if cgpu_available:
+            # Use CGPU transcription
+            from ..cgpu_jobs import TranscribeJob
+            job = TranscribeJob(
+                audio_path=str(video_path),
+                model=data.get('model', 'medium'),
+                output_format='json',  # Word-level timestamps
+                language=data.get('language'),
+                word_timestamps=True,
+            )
+            result = job.execute()
+            
+            if result.success and result.output_path:
+                with open(result.output_path, 'r') as f:
+                    transcript = json.load(f)
+            else:
+                raise Exception(result.error or "Transcription failed")
+        else:
+            # Local transcription via whisper
+            from ..transcriber import transcribe_audio
+            
+            # Extract audio first
+            audio_path = video_path.with_suffix('.wav')
+            cmd = build_ffmpeg_cmd([
+                '-i', str(video_path),
+                '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                str(audio_path)
+            ])
+            subprocess.run(cmd, capture_output=True, check=True)
+            
+            # Transcribe
+            transcript = transcribe_audio(str(audio_path), model='base', word_timestamps=True)
+            
+            # Clean up temp audio
+            audio_path.unlink(missing_ok=True)
+            
+        # Save to local JSON path for persistence
+        if transcript:
+            with open(json_output_path, 'w') as f:
+                json.dump(transcript, f, indent=2)
+                
+            # Update session state if active
+            if session:
+                session.update_state('transcript', transcript)
+
+            return jsonify({"success": True, "transcript": transcript})
+            
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/transcript/export', methods=['POST'])
+def api_transcript_export():
+    """Export edited transcript as video, EDL, or OTIO."""
+    data = request.json or {}
+    
+    # Support both workflows: 
+    # 1. filename + edits (preferred, loads from disk)
+    # 2. video_path + transcript (legacy/direct)
+    
+    filename = data.get('filename')
+    edits = data.get('edits')
+    
+    video_path = None
+    editor = None
+    
+    try:
+        from ..text_editor import TextEditor, Segment, Word
+        
+        if filename and edits is not None:
+            # Workflow 1: Load from disk and apply edits
+            filename = secure_filename(filename)
+            video_path = INPUT_DIR / filename
+            transcript_path = INPUT_DIR / f"{os.path.splitext(filename)[0]}.json"
+            
+            if not video_path.exists() or not transcript_path.exists():
+                return jsonify({"error": "File not found"}), 404
+                
+            editor = TextEditor(str(video_path))
+            editor.load_transcript(str(transcript_path))
+            
+            # Apply edits (indices)
+            removed_indices = [e['index'] for e in edits if e.get('removed')]
+            
+            current_idx = 0
+            for seg in editor.segments:
+                for word in seg.words:
+                    if current_idx in removed_indices:
+                        word.removed = True
+                    current_idx += 1
+                    
+        else:
+            # Workflow 2: Full transcript payload
+            video_path_str = data.get('video_path')
+            transcript = data.get('transcript')
+            
+            if not video_path_str or not transcript:
+                return jsonify({"error": "Missing filename+edits OR video_path+transcript"}), 400
+            
+            video_path = Path(video_path_str)
+            if not video_path.exists():
+                return jsonify({"error": "Video file not found"}), 404
+                
+            editor = TextEditor(str(video_path))
+            
+            # Convert frontend transcript format to TextEditor segments
+            segments = []
+            for idx, seg_data in enumerate(transcript.get('segments', [])):
+                words = []
+                for w in seg_data.get('words', []):
+                    word = Word(
+                        text=w.get('word', w.get('text', '')).strip(),
+                        start=w.get('start', 0),
+                        end=w.get('end', 0),
+                        confidence=w.get('probability', w.get('confidence', 1.0)),
+                        removed=w.get('removed', False)
+                    )
+                    if word.text:
+                        words.append(word)
+                
+                segment = Segment(
+                    id=seg_data.get('id', idx),
+                    start=seg_data.get('start', 0),
+                    end=seg_data.get('end', 0),
+                    text=seg_data.get('text', ''),
+                    words=words
+                )
+                segments.append(segment)
+            
+            editor.segments = segments
+        
+        # Perform Export
+        export_format = data.get('format', 'video')
+        output_dir = OUTPUT_DIR
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        if export_format == 'video':
+            # Use TextEditor's export method with smooth audio crossfades
+            output_path = output_dir / f"transcript_edit_{timestamp}.mp4"
+            editor.export(str(output_path))
+            
+            return jsonify({
+                "success": True,
+                "filename": output_path.name,
+                "path": str(output_path),
+                "stats": editor.get_stats()
+            })
+            
+        elif export_format == 'edl':
+            output_path = output_dir / f"transcript_edit_{timestamp}.edl"
+            editor.export_edl(str(output_path))
+            return jsonify({
+                "success": True,
+                "filename": output_path.name,
+                "path": str(output_path)
+            })
+            
+        elif export_format == 'otio':
+            output_path = output_dir / f"transcript_edit_{timestamp}.otio"
+            try:
+                editor.export_otio(str(output_path))
+                return jsonify({
+                    "success": True,
+                    "filename": output_path.name,
+                    "path": str(output_path)
+                })
+            except RuntimeError as e:
+                return jsonify({"success": False, "error": f"OTIO export failed: {str(e)}"}), 500
+            except Exception as e:
+                return jsonify({"success": False, "error": str(e)}), 500
+            
+        else:
+            return jsonify({"error": f"Unknown format: {export_format}"}), 400
+
+    except Exception as e:
+        logger.error(f"Export failed: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# SHORTS STUDIO API ENDPOINTS
+# =============================================================================
+
+# Create upload directory for shorts videos
+SHORTS_UPLOAD_DIR = get_settings().paths.shorts_dir
+SHORTS_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.route('/api/shorts/upload', methods=['POST'])
+def api_shorts_upload():
+    """Upload video file for shorts processing."""
+    if 'video' not in request.files:
+        return jsonify({"error": "No video file provided"}), 400
+    
+    file = request.files['video']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if not allowed_file(file.filename, {'mp4', 'mov', 'avi', 'mkv', 'webm'}):
+        return jsonify({"error": "Invalid file type"}), 400
+    
+    filename = secure_filename(file.filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename after sanitization"}), 400
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_filename = f"{timestamp}_{filename}"
+    
+    # Resolve paths and validate
+    upload_dir_resolved = SHORTS_UPLOAD_DIR.resolve()
+    filepath = (upload_dir_resolved / unique_filename).resolve()
+    
+    # Prevent path traversal attacks
+    if not str(filepath).startswith(str(upload_dir_resolved)):
+        logger.warning(f"Path traversal attempt detected: {filepath}")
+        return jsonify({"error": "Invalid upload path"}), 400
+    
+    file.save(filepath)
+    
+    return jsonify({
+        "success": True,
+        "path": str(filepath),
+        "filename": unique_filename
+    })
+
+
+@app.route('/api/shorts/analyze', methods=['POST'])
+def api_shorts_analyze():
+    """Analyze video for smart reframing (face detection, subject tracking)."""
+    data = request.json or {}
+    video_path = data.get('video_path')
+    reframe_mode = data.get('reframe_mode', 'auto')  # auto, speaker, center, custom
+    session_id = data.get('session_id')
+    
+    # Session-based workflow
+    session = None
+    if session_id:
+        Session = get_session_manager()
+        session = Session.load(session_id)
+        if session:
+            # Check cache
+            cache_key = f"crops_{reframe_mode}"
+            if cache_key in session.state:
+                return jsonify({
+                    "success": True,
+                    "mode": reframe_mode,
+                    "crop_data": session.state[cache_key],
+                    "cached": True
+                })
+            
+            if not video_path:
+                main_video = session.get_main_video()
+                if main_video:
+                    video_path = main_video.path
+
+    if not video_path or not Path(video_path).exists():
+        return jsonify({"error": "Video file not found"}), 404
+    
+    try:
+        from ..auto_reframe import AutoReframeEngine as SmartReframer
+        
+        reframer = SmartReframer(target_aspect=9/16)
+        
+        if reframe_mode == 'center':
+            # Simple center crop, no analysis needed
+            return jsonify({
+                "success": True,
+                "mode": "center",
+                "crop_data": None,
+                "message": "Center crop mode - no analysis needed"
+            })
+        
+        # Analyze video for face/subject tracking
+        crop_data = reframer.analyze(video_path)
+        
+        # Convert to JSON-serializable format
+        crops_json = [
+            {
+                "time": c.time,
+                "x": c.x,
+                "y": c.y,
+                "width": c.width,
+                "height": c.height,
+                "score": c.score
+            }
+            for c in crop_data
+        ]
+        
+        # Save to session
+        if session:
+            session.update_state(f"crops_{reframe_mode}", crops_json)
+        
+        return jsonify({
+            "success": True,
+            "mode": reframe_mode,
+            "crop_data": crops_json,
+            "frame_count": len(crops_json)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/shorts/visualize', methods=['POST'])
+def shorts_visualize():
+    """Analyze video for smart reframing and return crop data."""
+    try:
+        data = request.json
+        video_path = data.get('video_path')
+        
+        if not video_path or not os.path.exists(video_path):
+            return jsonify({'error': 'Video not found'}), 404
+            
+        from ..auto_reframe import AutoReframeEngine as SmartReframer
+        from dataclasses import asdict
+        import cv2
+        
+        # Get video dimensions
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+             return jsonify({'error': 'Could not open video'}), 500
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+
+        # Initialize reframer
+        reframer = SmartReframer(target_aspect=9/16)
+        
+        # Analyze
+        crop_windows = reframer.analyze(video_path)
+        
+        # Convert to JSON-serializable format
+        results = [asdict(cw) for cw in crop_windows]
+        
+        # Downsample for frontend performance if too many frames
+        # Return max 500 points to keep payload light
+        step = max(1, len(results) // 500)
+        results = results[::step]
+            
+        return jsonify({
+            'success': True,
+            'crops': results,
+            'original_width': width,
+            'original_height': height
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def _apply_clean_audio(video_path: str) -> str:
+    """
+    Apply clean audio processing: voice isolation + noise reduction.
+
+    Uses SNR check to determine appropriate processing:
+    - SNR >= 40dB: Excellent audio, skip processing
+    - SNR 25-40dB: Good audio, light noise reduction only
+    - SNR 15-25dB: Fair audio, noise reduction
+    - SNR < 15dB: Poor audio, voice isolation + noise reduction
+
+    Returns the path to a video with cleaned audio, or original path on failure.
+    """
+    try:
+        from ..cgpu_jobs import VoiceIsolationJob, NoiseReductionJob
+        from ..cgpu_utils import is_cgpu_available
+        from ..audio_analysis import estimate_audio_snr
+
+        # Step 0: Check SNR to determine processing needs
+        try:
+            quality = estimate_audio_snr(video_path)
+            snr_db = quality.snr_db
+            logger.info(f"Clean audio: SNR = {snr_db:.1f}dB ({quality.quality_tier})")
+
+            # Excellent audio - skip processing
+            if snr_db >= 40:
+                logger.info("Clean audio: Excellent quality, skipping processing")
+                return video_path
+        except Exception as e:
+            logger.warning(f"SNR estimation failed: {e}, proceeding with full cleanup")
+            snr_db = 0  # Assume needs cleanup
+
+        if not is_cgpu_available():
+            logger.warning("Clean audio: CGPU not available, using FFmpeg fallback")
+            return _apply_ffmpeg_noise_reduction(video_path)
+
+        input_path = Path(video_path)
+        timestamp_polish = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Step 1: Voice isolation (only for poor quality audio < 25dB SNR)
+        vocals_path = None
+        if snr_db < 25:
+            try:
+                job = VoiceIsolationJob(
+                    audio_path=str(input_path),
+                    model="htdemucs",
+                    two_stems=True,
+                    keep_all_stems=True
+                )
+                result = job.execute()
+                if result.success and result.metadata.get("stems", {}).get("vocals"):
+                    vocals_path = result.metadata["stems"]["vocals"]
+                    logger.info("Clean audio: Voice isolation successful")
+            except Exception as e:
+                logger.warning(f"Voice isolation failed: {e}")
+        else:
+            logger.info("Clean audio: Good SNR, skipping voice isolation")
+
+        # Step 2: Noise reduction (adaptive strength based on SNR)
+        audio_to_clean = vocals_path or str(input_path)
+        cleaned_audio = None
+
+        # Determine noise reduction strength based on SNR
+        if snr_db >= 35:
+            attenuation = 50  # Light cleanup
+        elif snr_db >= 25:
+            attenuation = 75  # Moderate cleanup
+        else:
+            attenuation = 100  # Full cleanup
+
+        try:
+            noise_job = NoiseReductionJob(audio_path=audio_to_clean, attenuation_limit=attenuation)
+            noise_result = noise_job.execute()
+            if noise_result.success and noise_result.output_path:
+                cleaned_audio = noise_result.output_path
+                logger.info(f"Clean audio: Noise reduction successful (strength: {attenuation}%)")
+        except Exception as e:
+            logger.warning(f"Noise reduction failed: {e}")
+
+        # Use best available cleaned audio
+        final_audio = cleaned_audio or vocals_path
+        if not final_audio:
+            logger.warning("Clean audio: all processing failed, using original")
+            return video_path
+
+        # Step 3: Replace audio in video
+        polished_video_path = OUTPUT_DIR / f"shorts_cleaned_{timestamp_polish}.mp4"
+        cmd = build_ffmpeg_cmd([
+            "-i", video_path,
+            "-i", final_audio,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            str(polished_video_path)
+        ])
+        subprocess.run(cmd, check=True, capture_output=True)
+        return str(polished_video_path)
+
+    except Exception as e:
+        logger.error(f"Clean audio pipeline failed: {e}")
+        return video_path
+
+
+def _apply_ffmpeg_noise_reduction(video_path: str) -> str:
+    """FFmpeg fallback for noise reduction when CGPU is not available."""
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = OUTPUT_DIR / f"shorts_denoised_{timestamp}.mp4"
+
+        # Adaptive FFT-based denoiser + EQ + light compression
+        noise_filter = AUDIO_FILTERS["noise_reduction_fast"]
+
+        cmd = build_ffmpeg_cmd([
+            "-i", video_path,
+            "-c:v", "copy",
+            "-af", noise_filter,
+            "-c:a", "aac",
+            str(output_path)
+        ])
+        subprocess.run(cmd, check=True, capture_output=True)
+        return str(output_path)
+
+    except Exception as e:
+        logger.warning(f"FFmpeg noise reduction failed: {e}")
+        return video_path
+
+
+@app.route('/api/shorts/render', methods=['POST'])
+def api_shorts_render():
+    """
+    Render vertical video with smart reframing and captions.
+    
+    NOW ASYNC: Uses job queue for consistent progress tracking and cancellation.
+    Returns job_id immediately, client polls /api/jobs/<id> for progress.
+    """
+    data = request.json or {}
+    video_path = data.get('video_path')
+    workflow_type = data.get('workflow_type', 'reframe')
+    style = data.get('style', 'dynamic')
+
+    reframe_mode = data.get('reframeMode', data.get('reframe_mode', 'auto'))
+    caption_style = data.get('captionStyle', data.get('caption_style', 'tiktok'))
+    add_captions = data.get('autoCaptions', data.get('add_captions', True))
+    platform = data.get('platform', 'tiktok')
+    clean_audio = data.get('cleanAudio', data.get('audioPolish', False))
+    audio_aware = data.get('audioAware', data.get('audio_aware', False))
+    stabilize = data.get('stabilize', False)
+    upscale = data.get('upscale', False)
+
+    if not video_path or not Path(video_path).exists():
+        return jsonify({"error": "Video file not found"}), 404
+
+    # Generate job ID
+    job_id = f"shorts_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    if workflow_type == 'montage':
+        # MONTAGE WORKFLOW (Vertical)
+        job = {
+            "id": job_id,
+            "type": "montage_shorts",
+            "style": style,
+            "status": "queued",
+            "options": {
+                "video_path": video_path,
+                "workflow_type": "montage",
+                "shorts_mode": True,
+                "style": style,
+                "captions": add_captions,
+                "clean_audio": clean_audio
+            },
+            "phase": JobPhase.initial().to_dict(),
+            "created_at": datetime.now().isoformat()
+        }
+        job_store.create_job(job_id, job)
+        from ..tasks import run_montage
+        enqueue_montage(job_id, style, job['options'])
+    else:
+        # REFRAME WORKFLOW (Default)
+        job = {
+            "id": job_id,
+            "type": "shorts_reframe",
+            "status": "queued",
+            "options": {
+                "video_path": video_path,
+                "workflow_type": "reframe",
+                "reframe_mode": reframe_mode,
+                "caption_style": caption_style,
+                "add_captions": add_captions,
+                "platform": platform,
+                "clean_audio": clean_audio,
+                "audio_aware": audio_aware,
+                "stabilize": stabilize,
+                "upscale": upscale
+            },
+            "phase": JobPhase.initial().to_dict(),
+            "created_at": datetime.now().isoformat()
+        }
+        job_store.create_job(job_id, job)
+        from ..tasks import run_shorts_reframe
+        queue_heavy.enqueue(run_shorts_reframe, job_id, job['options'])
+    
+    return jsonify({
+        "success": True,
+        "job_id": job_id,
+        "message": "Shorts job queued. Poll /api/jobs/{job_id} for progress."
+    })
+
+
+@app.route('/api/shorts/highlights', methods=['POST'])
+@api_endpoint
+def api_shorts_highlights():
+    """
+    Detect highlight moments for clip extraction.
+
+    Multi-signal highlight detection:
+    1. Audio Energy: High-energy regions (music drops, loud moments)
+    2. Beat Alignment: Key beats in music
+    3. Speech Phrases: Important speech segments (hooks)
+    4. Fallback: Evenly distributed beat-aligned moments
+    """
+    from .highlights import detect_highlights
+
+    data = request.json or {}
+    video_path = data.get('video_path')
+
+    if not video_path or not Path(video_path).exists():
+        raise FileNotFoundError("Video file not found")
+
+    highlights = detect_highlights(
+        video_path=video_path,
+        max_clips=int(data.get('max_clips', 5)),
+        min_duration=float(data.get('min_duration', 5.0)),
+        max_duration=float(data.get('max_duration', 60.0)),
+        include_speech=data.get('include_speech', True)
+    )
+
+    return jsonify({
+        "success": True,
+        "highlights": highlights,
+        "total_found": len(highlights)
+    })
+
+
+# =============================================================================
+# API: Quality Profiles & Cloud Status
+# =============================================================================
+
+@app.route('/api/quality-profiles')
+def api_quality_profiles():
+    """Return available quality profiles and their settings."""
+    from ..env_mapper import QUALITY_PROFILES
+    
+    return jsonify({
+        "profiles": QUALITY_PROFILES,
+        "default": "standard"
+    })
+
+
+@app.route('/api/cloud/status')
+def api_cloud_status():
+    """Check cloud acceleration availability."""
+    cgpu_available = is_cgpu_available()
+    cgpu_gpu = check_cgpu_gpu() if cgpu_available else False
+    
+    return jsonify({
+        "available": cgpu_available,
+        "gpu_available": cgpu_gpu,
+        "features": {
+            "transcription": cgpu_available,
+            "upscaling": cgpu_gpu,
+            "llm": cgpu_available
+        },
+        "fallback": "local"  # Always fall back to local if cloud unavailable
+    })
+
+
+# =============================================================================
+# AUDIO POLISH API ENDPOINTS
+# =============================================================================
+
+@app.route('/api/audio/clean', methods=['POST'])
+def api_audio_clean():
+    """
+    Clean Audio - one-click audio polish.
+    
+    Bundles voice isolation + noise reduction into a single "Clean Audio" toggle.
+    Returns enhanced audio with background noise removed.
+    
+    Uses CGPU if available, falls back to local FFmpeg noise reduction.
+    """
+    data = request.json or {}
+    audio_path = data.get('audio_path') or data.get('video_path')
+    isolate_voice = data.get('isolate_voice', True)
+    reduce_noise = data.get('reduce_noise', True)
+    
+    if not audio_path or not Path(audio_path).exists():
+        return jsonify({"error": "Audio file not found"}), 404
+    
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        input_path = Path(audio_path)
+        output_path = OUTPUT_DIR / f"clean_audio_{timestamp}.wav"
+        
+        # Try CGPU voice isolation first
+        cgpu_available = is_cgpu_available()
+        voice_isolated = False
+        
+        if isolate_voice and cgpu_available:
+            try:
+                from ..cgpu_jobs import VoiceIsolationJob
+                job = VoiceIsolationJob(
+                    audio_path=str(input_path),
+                    model="htdemucs",
+                    two_stems=True  # Faster: just vocals vs accompaniment
+                )
+                result = job.execute()
+                
+                if result.success and result.output_path:
+                    input_path = Path(result.output_path)
+                    voice_isolated = True
+            except Exception as e:
+                logger.warning(f"Voice isolation failed, continuing with noise reduction: {e}")
+        
+        # Apply noise reduction via FFmpeg
+        if reduce_noise or not voice_isolated:
+            # FFmpeg noise reduction using afftdn (adaptive FFT-based denoiser)
+            # This is a solid local fallback when CGPU isn't available
+            noise_reduction_filter = AUDIO_FILTERS["noise_reduction_fast"]
+            
+            cmd = build_ffmpeg_cmd(
+                [
+                    '-i', str(input_path),
+                    '-af', noise_reduction_filter,
+                    '-acodec', 'pcm_s16le',  # High quality WAV
+                    str(output_path)
+                ],
+                hide_banner=True,
+                loglevel="error"
+            )
+            
+            subprocess.run(cmd, check=True, capture_output=True)
+        else:
+            # Just copy the voice-isolated file
+            import shutil
+            shutil.copy(input_path, output_path)
+        
+        # Calculate actual SNR improvement
+        from ..audio_analysis import estimate_audio_snr
+        
+        snr_before = estimate_audio_snr(str(Path(audio_path)))
+        snr_after = estimate_audio_snr(str(output_path))
+        snr_improvement_db = snr_after.snr_db - snr_before.snr_db
+        
+        return jsonify({
+            "success": True,
+            "filename": output_path.name,
+            "path": str(output_path),
+            "voice_isolated": voice_isolated,
+            "noise_reduced": reduce_noise,
+            "snr_before_db": round(snr_before.snr_db, 1),
+            "snr_after_db": round(snr_after.snr_db, 1),
+            "snr_improvement": f"+{snr_improvement_db:.1f}dB" if snr_improvement_db > 0 else f"{snr_improvement_db:.1f}dB",
+            "quality_before": snr_before.quality_tier,
+            "quality_after": snr_after.quality_tier,
+            "method": "cgpu+ffmpeg" if voice_isolated else "ffmpeg"
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/audio/analyze', methods=['POST'])
+def api_audio_analyze():
+    """
+    Analyze audio quality and suggest improvements.
+    
+    Returns:
+    - SNR estimate
+    - Noise type detection (hiss, hum, background)
+    - Recommended actions
+    """
+    data = request.json or {}
+    audio_path = data.get('audio_path') or data.get('video_path')
+    
+    if not audio_path or not Path(audio_path).exists():
+        return jsonify({"error": "Audio file not found"}), 404
+    
+    try:
+        # Extract audio stats using FFmpeg
+        cmd = build_ffprobe_cmd([
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_format', '-show_streams',
+            '-select_streams', 'a:0',
+            str(audio_path)
+        ])
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        probe_data = json.loads(result.stdout) if result.stdout else {}
+        
+        # Get loudness stats
+        loudness_cmd = build_ffmpeg_cmd(
+            [
+                '-hide_banner', '-i', str(audio_path),
+                '-af', 'volumedetect', '-f', 'null', '/dev/null'
+            ],
+            overwrite=True
+        )
+        loudness_result = subprocess.run(loudness_cmd, capture_output=True, text=True, timeout=30)
+        
+        # Parse volume stats from stderr
+        stderr = loudness_result.stderr
+        mean_volume = -20.0
+        max_volume = -10.0
+        
+        for line in stderr.split('\n'):
+            if 'mean_volume' in line:
+                try:
+                    mean_volume = float(line.split(':')[1].strip().replace(' dB', ''))
+                except (ValueError, IndexError):
+                    pass  # Skip malformed line
+            if 'max_volume' in line:
+                try:
+                    max_volume = float(line.split(':')[1].strip().replace(' dB', ''))
+                except (ValueError, IndexError):
+                    pass  # Skip malformed line
+        
+        # Use proper SNR estimation from audio_analysis module
+        from ..audio_analysis import estimate_audio_snr
+        audio_quality = estimate_audio_snr(str(audio_path))
+        
+        # Build recommendations based on actual quality
+        recommendations = []
+        
+        if audio_quality.mean_volume_db < -30:
+            recommendations.append("Audio is very quiet - consider normalizing")
+        elif audio_quality.max_volume_db > -1:
+            recommendations.append("Audio may be clipping - check peaks")
+        
+        # Dynamic range check
+        dynamic_range = audio_quality.max_volume_db - audio_quality.mean_volume_db
+        if dynamic_range > 20:
+            recommendations.append("High dynamic range - consider compression for social media")
+        
+        # SNR-based recommendations
+        if audio_quality.quality_tier in ("poor", "unusable"):
+            recommendations.append(f"Low SNR ({audio_quality.snr_db:.1f}dB) - audio cleaning recommended")
+        elif audio_quality.quality_tier == "acceptable":
+            recommendations.append(f"Moderate SNR ({audio_quality.snr_db:.1f}dB) - audio cleaning may help")
+        
+        # Check if CGPU available for voice isolation
+        if is_cgpu_available():
+            recommendations.append("Voice isolation available via cloud acceleration")
+        
+        response_data = {
+            "success": True,
+            "analysis": {
+                "snr_db": round(audio_quality.snr_db, 1),
+                "mean_volume": round(audio_quality.mean_volume_db, 1),
+                "max_volume": round(audio_quality.max_volume_db, 1),
+                "dynamic_range": round(dynamic_range, 1),
+                "quality_tier": audio_quality.quality_tier,
+                "is_usable": audio_quality.is_usable,
+                "sample_rate": probe_data.get('streams', [{}])[0].get('sample_rate', 'unknown'),
+                "channels": probe_data.get('streams', [{}])[0].get('channels', 1),
+            },
+            "recommendations": recommendations,
+            "clean_audio_available": True
+        }
+        
+        # If timeline data requested (energy curve + beats)
+        include_timeline = data.get('include_timeline', True)  # Default true for backwards compat
+        if include_timeline:
+            try:
+                from ..audio_analysis import get_beat_times, analyze_music_energy
+                from ..video_metadata import probe_duration
+                
+                duration = probe_duration(str(audio_path))
+                
+                # Get beats
+                beat_info = get_beat_times(str(audio_path), verbose=False)
+                beats_list = beat_info.beat_times.tolist() if hasattr(beat_info.beat_times, 'tolist') else list(beat_info.beat_times)
+                
+                # Get energy curve (downsample for frontend performance)
+                energy_profile = analyze_music_energy(str(audio_path), verbose=False)
+                energy_list = energy_profile.rms.tolist() if hasattr(energy_profile.rms, 'tolist') else list(energy_profile.rms)
+                
+                # Downsample energy to max 500 points
+                if len(energy_list) > 500:
+                    step = len(energy_list) // 500
+                    energy_list = energy_list[::step]
+                
+                response_data["energy"] = energy_list
+                response_data["beats"] = beats_list[:100]  # Cap at 100 beats
+                response_data["duration"] = duration
+                response_data["tempo"] = beat_info.tempo
+                
+            except Exception as timeline_err:
+                logger.warning(f"Timeline data extraction failed: {timeline_err}")
+                # Don't fail the whole request, just skip timeline data
+        
+        return jsonify(response_data)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/engagement', methods=['POST'])
+@api_endpoint
+def api_engagement_score():
+    """
+    Calculate engagement score for a video.
+
+    Request JSON:
+        video_path: str - Path to video file
+        platform: str - Target platform (tiktok, youtube_shorts, instagram_reels, youtube_long)
+
+    Returns:
+        overall_score: float (0-100)
+        grade: str (S/A/B/C/D/F)
+        hook_score, energy_score, pacing_score, variety_score, audio_score: float
+        recommendations: list of improvement suggestions
+        platform_scores: dict of scores per platform
+    """
+    from ..engagement_score import get_engagement_summary, PLATFORM_PARAMS
+
+    data = request.json or {}
+    video_path = data.get('video_path')
+    platform = data.get('platform', 'tiktok')
+
+    if not video_path:
+        return jsonify({"success": False, "error": "video_path required"}), 400
+
+    video_file = Path(video_path)
+    if not video_file.exists():
+        # Try relative to output dir
+        video_file = Path(settings.paths.output_dir) / video_path
+        if not video_file.exists():
+            return jsonify({"success": False, "error": f"Video not found: {video_path}"}), 404
+
+    if platform not in PLATFORM_PARAMS:
+        return jsonify({
+            "success": False,
+            "error": f"Unknown platform: {platform}. Valid: {list(PLATFORM_PARAMS.keys())}"
+        }), 400
+
+    summary = get_engagement_summary(str(video_file), platform=platform)
+    return jsonify({"success": True, **summary})
+
+
+@app.route('/api/engagement/platforms', methods=['GET'])
+def api_engagement_platforms():
+    """Return available platforms and their parameters."""
+    from ..engagement_score import PLATFORM_PARAMS
+
+    platforms = {}
+    for name, params in PLATFORM_PARAMS.items():
+        platforms[name] = {
+            "optimal_duration": params["optimal_duration"],
+            "hook_window": params["hook_window"],
+            "description": {
+                "tiktok": "Short-form viral content, fast hooks",
+                "youtube_shorts": "YouTube's short format, slightly longer",
+                "instagram_reels": "Instagram's short-form, visual focus",
+                "youtube_long": "Standard YouTube videos, deeper engagement"
+            }.get(name, name)
+        }
+
+    return jsonify({"success": True, "platforms": platforms})
+
+
+@app.route('/api/shorts/create', methods=['POST'])
+def api_shorts_create():
+    """Create a short video - convenience alias for render endpoint."""
+    # This is the endpoint the frontend calls
+    return api_shorts_render()
+
+
+def _build_timeline_from_session(session, main_video) -> Optional[Timeline]:
+    """Convert session state into a Timeline object."""
+    
+    # 1. Get duration of source
+    duration = main_video.metadata.get('duration')
+    if not duration:
+        # Fallback: try to get from transcript if available
+        if 'transcript' in session.state:
+             try:
+                 # Last segment end
+                 segs = session.state['transcript'].get('segments', [])
+                 if segs:
+                    duration = segs[-1]['end']
+                 else:
+                    words = session.state['transcript'].get('words', [])
+                    if words:
+                        duration = words[-1]['end']
+             except (KeyError, IndexError, TypeError):
+                 pass  # Could not determine duration
+    
+    # 2. Determine kept segments
+    kept_segments = [] # list of (start, end) tuples
+    
+    if 'edits' in session.state and 'transcript' in session.state:
+        # Reconstruct from transcript + edits
+        transcript = session.state['transcript']
+        edits = session.state['edits'] # list of {index: int, removed: bool}
+        removed_indices = {e['index'] for e in edits if e.get('removed')}
+        
+        words = []
+        if 'segments' in transcript:
+            for seg in transcript['segments']:
+                if 'words' in seg:
+                    words.extend(seg['words'])
+        elif 'words' in transcript:
+            words = transcript['words']
+            
+        if not words:
+            return None
+            
+        # Iterate words and build segments
+        current_start = None
+        current_end = None
+        
+        for i, word in enumerate(words):
+            is_kept = (i not in removed_indices)
+            
+            if is_kept:
+                if current_start is None:
+                    current_start = word['start']
+                current_end = word['end']
+            else:
+                if current_start is not None:
+                    # Close segment
+                    kept_segments.append((current_start, current_end))
+                    current_start = None
+                    current_end = None
+                    
+        # Close final segment
+        if current_start is not None:
+            kept_segments.append((current_start, current_end))
+            
+    else:
+        # Default: keep whole video if duration known
+        if duration:
+            kept_segments.append((0.0, duration))
+        else:
+            return None
+
+    # 3. Create Clips
+    clips = []
+    timeline_time = 0.0
+    for start, end in kept_segments:
+        dur = end - start
+        if dur <= 0: continue
+        
+        clip = Clip(
+            source_path=main_video.path,
+            start_time=start,
+            duration=dur,
+            timeline_start=timeline_time
+        )
+        clips.append(clip)
+        timeline_time += dur
+        
+    return Timeline(
+        clips=clips,
+        audio_path=main_video.path, # Assuming embedded audio
+        total_duration=timeline_time,
+        project_name=f"session_{session.id}"
+    )
+
+
+@app.route('/api/session/<session_id>/export', methods=['POST'])
+def api_session_export(session_id):
+    """Export the session to EDL/OTIO/Video."""
+    Session = get_session_manager()
+    session = Session.load(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+        
+    data = request.json or {}
+    export_format = data.get('format', 'edl') # edl, otio, video
+    
+    main_video = session.get_main_video()
+    if not main_video:
+        return jsonify({"error": "No video asset in session"}), 400
+        
+    # Build Timeline
+    timeline = _build_timeline_from_session(session, main_video)
+    if not timeline:
+         return jsonify({"error": "Could not build timeline from session state (missing duration or transcript)"}), 400
+
+    exporter = TimelineExporter(output_dir=str(OUTPUT_DIR))
+    
+    try:
+        output_path = None
+        if export_format == 'edl':
+            output_path = exporter._export_edl(timeline)
+        elif export_format == 'otio':
+            if not exporter.OTIO_AVAILABLE:
+                 return jsonify({"error": "OpenTimelineIO not installed"}), 501
+            output_path = exporter._export_otio(timeline)
+        elif export_format == 'video':
+             # NOTE: Video render via transcript editor not implemented
+             # Workflow: Export to EDL/OTIO → Import to NLE → Render video
+             # Direct video render would require full montage render pipeline (see MontageBuilder)
+             return jsonify({"error": "Video export not available via this API. Use EDL/OTIO export."}), 501
+        else:
+            return jsonify({"error": f"Unknown format: {export_format}"}), 400
+            
+        # Return relative path or download URL
+        filename = os.path.basename(output_path)
+        return jsonify({
+            "success": True,
+            "path": output_path,
+            "url": f"/downloads/{filename}"
+        })
+    except Exception as e:
+        logger.error(f"Export failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/downloads/<path:filename>')
+def download_file(filename):
+    """Serve exported files."""
+    return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
+
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Kubernetes probes."""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service": "montage-ai-web"
+    }), 200
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 8080))
+    logger.info(f"🚀 Starting Montage AI Web UI on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=False)

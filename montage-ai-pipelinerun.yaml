@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: montage-ai-manual-build-
+  namespace: ci
+spec:
+  pipelineRef:
+    name: build-push-deploy-pipeline
+  params:
+  - name: IMAGE
+    value: 192.168.1.12:30500/montage-ai:latest
+  - name: MANIFEST_DIR
+    value: ./deploy/k3s/overlays/amd
+  workspaces:
+  - name: source
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: kubeconfig
+    secret:
+      secretName: ci-kubeconfig
