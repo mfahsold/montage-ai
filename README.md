@@ -173,6 +173,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. We welcome:
 - Documentation improvements
 - Translation help
 
+**Programming style & AI assistants:** We follow a *config-first* programming style — **do not hardcode configuration values**; use `deploy/config.env` or the project's `config.Settings` instead. See `docs/llm-agents.md` and `.github/copilot-instructions.md` for detailed programming style guidance for humans and AI agents. We also use VS Code Copilot and OpenAI Codex in the workflow — be sure to follow the project Copilot instructions and any provider-specific guidelines when using those tools.
+
 ## License
 
 [PolyForm Noncommercial 1.0.0](LICENSE) — Free for personal use.

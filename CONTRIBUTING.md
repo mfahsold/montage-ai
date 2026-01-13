@@ -32,9 +32,9 @@ git checkout -b fix/that-annoying-bug
 
 ### 2. Do your thing
 
-- Write some code
-- Add tests if it's a new feature
-- Update docs if needed
+- Write focused code with small, testable commits
+- Add unit tests and small fixtures in `test_data/` for rendering-related changes
+- Update docs when behavior or configuration changes
 
 ### 3. Test it
 
@@ -51,36 +51,31 @@ make validate
 
 ### 4. Commit
 
-Use [Conventional Commits](https://www.conventionalcommits.org/) style:
+Use [Conventional Commits](https://www.conventionalcommits.org/) style and write clear messages:
 
 ```bash
 git commit -m "feat: add support for vertical videos"
-git commit -m "fix: beat detection crash on short clips"
-git commit -m "docs: update configuration examples"
 ```
 
 ### 5. Update CHANGELOG
 
-Add your change to `CHANGELOG.md` under `[Unreleased]`:
+Add your change to `CHANGELOG.md` under `[Unreleased]` with a short note.
 
-### 6. Publish docs (local-first)
+### 6. Publish docs (optional)
 
-We prefer to publish GitHub Pages locally (to avoid unnecessary Actions runner costs).
+Use the local publish script when possible to avoid Actions runner costs:
 
-- Build or verify your `docs/` directory contains the static site HTML.
-- Run `./scripts/publish-docs.sh` to publish to the `gh-pages` branch via the `gh` CLI. You will be prompted to authenticate if not already logged in.
-- Only use the Actions-based Pages workflow for large site rebuilds or if you do not have `gh` access.
+- `./scripts/publish-docs.sh` (uses `gh` CLI)
+- Use Actions Pages only for large site rebuilds or when `gh` is not available.
 
-```markdown
-## [Unreleased]
+### 7. Open a PR
 
-### Added
-- Support for vertical videos
-```
+Push your branch and open a pull request. Include:
+- `make ci-local` output attached to the PR
+- Output of `./scripts/check-hardcoded-registries.sh` (ensure no accidental literals)
+- A short note on any increased CI cost or long-running tests
 
-### 6. Open a PR
-
-Push your branch and open a pull request. We'll review it as soon as we can.
+We will review and merge after checks pass. Please address review comments promptly.
 
 ---
 
@@ -118,11 +113,8 @@ Styles are just JSON files. Super easy:
 
 ### Python
 
-Nothing fancy:
-
-- Type hints are nice
-- Docstrings for public functions
-- PEP 8 (your editor probably handles this)
+- Type hints and docstrings for public functions.
+- Follow PEP 8.
 
 ```python
 def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
@@ -133,7 +125,14 @@ def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
 ### YAML
 
 - 2-space indentation
-- Comments for anything non-obvious
+- Comment non-obvious choices
+
+### Programming style & AI assistants
+
+- **Config-first**: Do NOT hardcode config values (IPs, registry URLs, paths, resource limits). Add settings to `deploy/config.env` or `config.Settings`. 
+- Run `./scripts/check-hardcoded-registries.sh` before committing.
+- Run `make ci-local` and attach the logs to PRs.
+- When using AI assistants (VS Code Copilot, OpenAI Codex), follow `.github/copilot-instructions.md` and `docs/llm-agents.md`. Our agent persona: **Senior Creative Technologist** — prioritize stability, make small, well-tested changes, and document reasoning in PRs.
 
 ---
 

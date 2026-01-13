@@ -60,6 +60,8 @@ TEST_UPLOAD_URL="http://localhost:5001/api/upload"
 
 ## Usage
 
+**Hardcoded values policy:** Do not commit new hardcoded values (IPs, paths, registry URLs, resource limits, or credentials) into the codebase. Add new deployment or runtime settings to `deploy/config.env` (for k8s/cluster settings) or the appropriate `config`/`settings` module for runtime defaults. Run `./scripts/check-hardcoded-registries.sh` and the pre-push hook to detect accidental literals.
+
 ### 1. Deployment Scripts
 
 All deployment scripts automatically source `deploy/config.env` (preferred) and respect environment overrides. The `Dockerfile` also accepts a build-arg `SERVICE_PORT` and sets `ENV SERVICE_PORT` so the web UI listen port can be configured at build time.

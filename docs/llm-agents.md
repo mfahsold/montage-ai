@@ -37,6 +37,7 @@ Montage AI is a post-production assistant, not a generative video AI. We take ex
 
 ### 3. Critical Design Patterns
 
+*   **No hardcoded values**: Avoid hardcoding registry URLs, IPs, file paths, resource limits, or credentials. Add new deployment/runtime settings to `deploy/config.env` (cluster/deploy values) or project `config.Settings` (runtime defaults), and document them. Run `./scripts/check-hardcoded-registries.sh` and pre-push checks before committing.
 *   **Configuration Singleton**: `FFmpegConfig` is a singleton. Do not instantiate it manually unless overriding hardware acceleration. Use `get_config()`.
 *   **Clip Metadata**: `ClipMetadata` objects track everything about a clip (source, start, duration, applied effects). This is the "state" of the edit.
 *   **Lazy Loading**: Heavy ML libraries (torch, mediapipe) are imported inside functions or try/except blocks to keep CLI startup fast.
