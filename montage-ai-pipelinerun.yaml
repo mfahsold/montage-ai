@@ -4,13 +4,19 @@ metadata:
   generateName: montage-ai-manual-build-
   namespace: ci
 spec:
+  serviceAccountName: ci-runner
+  podTemplate:
+    nodeSelector:
+      kubernetes.io/arch: amd64
   pipelineRef:
     name: buildx-multiarch-pipeline
   params:
   - name: REPO_URL
     value: https://github.com/mfahsold/montage-ai.git
   - name: IMAGE
-    value: 192.168.1.12:30500/montage-ai:latest
+    value: 10.43.173.243:5000/montage-ai:latest
+  - name: INSECURE
+    value: "true"
   workspaces:
   - name: source
     volumeClaimTemplate:
