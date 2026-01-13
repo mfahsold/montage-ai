@@ -29,8 +29,8 @@ deploy/
 
 ### Registry Configuration
 ```bash
-REGISTRY_HOST="YOUR_REGISTRY_IP"              # Registry hostname/IP
-REGISTRY_PORT="5000"                       # Registry port
+REGISTRY_HOST="192.168.1.12"               # Internal NodePort registry
+REGISTRY_PORT="30500"                      # Default port
 REGISTRY_URL="${REGISTRY_HOST}:${REGISTRY_PORT}"
 IMAGE_NAME="montage-ai"                    # Image name
 IMAGE_TAG="latest"                         # Image tag

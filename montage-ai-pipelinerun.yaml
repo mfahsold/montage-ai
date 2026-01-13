@@ -5,12 +5,12 @@ metadata:
   namespace: ci
 spec:
   pipelineRef:
-    name: build-push-deploy-pipeline
+    name: buildx-multiarch-pipeline
   params:
+  - name: REPO_URL
+    value: https://github.com/mfahsold/montage-ai.git
   - name: IMAGE
     value: 192.168.1.12:30500/montage-ai:latest
-  - name: MANIFEST_DIR
-    value: ./deploy/k3s/overlays/amd
   workspaces:
   - name: source
     volumeClaimTemplate:
@@ -20,6 +20,11 @@ spec:
         resources:
           requests:
             storage: 1Gi
-  - name: kubeconfig
+  - name: dockerconfig
+    configMap:
+      name: docker-config
+  - name: git-ssh
     secret:
-      secretName: ci-kubeconfig
+      secretName: github-ssh-key
+  - name: kubeconfig
+    emptyDir: {}
