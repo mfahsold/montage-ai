@@ -61,6 +61,9 @@ def run(style: Optional[str], stabilize: bool, upscale: bool, cgpu: bool, varian
         "cgpu": cgpu
     }
     env_vars = map_options_to_env(style, options)
+    # NOTE: --variants is accepted for CLI compatibility but not implemented yet
+    if variants != 1:
+        console.print("[yellow]Note: --variants not implemented yet; ignoring[/]")
     
     if docker:
         cmd = ["docker", "compose", "run", "--rm", "montage-ai", "./montage-ai.sh", "run", style]

@@ -21,9 +21,8 @@ from pathlib import Path
 from typing import List, Optional
 import uuid
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -294,7 +293,6 @@ async def download_output(filename: str):
 
 @app.post("/api/render")
 async def trigger_render(
-    background_tasks: BackgroundTasks,
     style: str = Form("dynamic"),
     stabilize: bool = Form(False),
     upscale: bool = Form(False),

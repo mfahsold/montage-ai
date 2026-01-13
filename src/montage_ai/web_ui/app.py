@@ -33,7 +33,7 @@ from ..audio_analysis import remove_filler_words
 from ..transcriber import Transcriber
 
 # Centralized Configuration (Single Source of Truth)
-from ..config import get_settings, reload_settings
+from ..config import get_settings
 from ..logger import logger
 from ..media_files import list_media_files, parse_inventory_descriptions, read_sidecar_description
 from .job_options import normalize_options, apply_preview_preset, apply_finalize_overrides
@@ -55,7 +55,7 @@ from .decorators import api_endpoint, require_json, require_file, validate_range
 
 # Signal handling & subprocess management
 try:
-    from ..subprocess_manager import install_signal_handlers, cleanup_all_subprocesses, track_subprocess
+    from ..subprocess_manager import install_signal_handlers, cleanup_all_subprocesses
     SIGNAL_HANDLING_AVAILABLE = True
 except ImportError:
     logger.warning("subprocess_manager not available, signal handling disabled")

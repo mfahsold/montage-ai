@@ -8,7 +8,7 @@ IMAGE_NAME ?= ghcr.io/mfahsold/montage-ai
 IMAGE_TAG ?= latest
 REGISTRY ?= ghcr.io/mfahsold
 # Default: GHCR for reliable public registry (multi-arch)
-# For cluster-only deployments, override with CLUSTER_REGISTRY="${REGISTRY_HOST}:${REGISTRY_PORT}" (e.g., REGISTRY_HOST=192.168.1.12 REGISTRY_PORT=30500)
+# For cluster-only deployments, override with CLUSTER_REGISTRY="${REGISTRY_HOST}:${REGISTRY_PORT}" (e.g., REGISTRY_HOST=registry-host REGISTRY_PORT=registry-port)
 # Resolve cluster registry from deploy/config.env when not explicitly provided
 CLUSTER_REGISTRY ?= $(shell ./scripts/resolve-registry.sh 2>/dev/null || echo ghcr.io/mfahsold)
 NAMESPACE ?= montage-ai
@@ -43,6 +43,13 @@ help: ## Show this help
 	@echo ""
 	@echo "$(GREEN)CI / Validation:$(RESET)"
 	@echo "  make ci             Run vendor-agnostic CI checks locally"
+	@echo "  make code-health    Run vulture to detect potentially unused code (non-blocking)"
+
+.PHONY: code-health
+code-health: ## Run vulture to detect potentially unused code (non-blocking)
+	@echo "Running vulture (dead-code detection)..."
+	@vulture src --min-confidence 50 || true
+	@echo "  make code-health    Run vulture to detect potentially dead code (non-blocking)"
 	@echo ""
 	@echo "$(GREEN)Releases:$(RESET)"
 	@echo "  make release-ghcr   Build + push to GitHub Container Registry"
