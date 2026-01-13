@@ -37,7 +37,7 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
       - name: scene-detect
-        image: 192.168.1.12:30500/montage-ai:latest
+        image: ${REGISTRY}/montage-ai:latest
         env:
         - name: SHARD_INDEX
           valueFrom:
@@ -99,7 +99,7 @@ spec:
         amd.com/gpu: "present"
       containers:
       - name: encoder
-        image: 192.168.1.12:30500/montage-ai:latest
+        image: ${REGISTRY}/montage-ai:latest
         env:
         - name: FFMPEG_HWACCEL
           value: "amf"
@@ -172,7 +172,7 @@ spec:
                 operator: DoesNotExist
       containers:
       - name: worker
-        image: 192.168.1.12:30500/montage-ai:latest
+        image: ${REGISTRY}/montage-ai:latest
         env:
         - name: WORKER_MODE
           value: "true"
@@ -184,7 +184,7 @@ spec:
       volumes:
       - name: nfs-data
         nfs:
-          server: 192.168.1.12
+          server: ${NFS_SERVER_IP:-YOUR_NFS_SERVER}
           path: /data/montage-ai
 ```
 

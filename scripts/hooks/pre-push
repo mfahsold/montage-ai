@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pre-push hook to prevent hardcoded registry values from being pushed.
+# Install by running: cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+
+echo "Running hardcoded registry scan..."
+if ./scripts/check-hardcoded-registries.sh; then
+  echo "Registry scan passed."
+  exit 0
+else
+  echo "ERROR: Hardcoded registry references detected. Fix them or update deploy/config.env and re-run the scan." >&2
+  exit 1
+fi
