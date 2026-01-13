@@ -1,20 +1,21 @@
-# Code Health & Dead Code Detection
+# Code Health Guidelines
 
-This document describes the repository's lightweight dead-code detection approach.
+This document explains the process for running a dead-code detector (vulture) and how to safely triage and remove unused code.
 
-- We use `vulture` to scan `src/` for potentially unused code.
-- Findings must be triaged manually: some items may be false positives (dynamic usage, optional imports, plugin hooks).
+## Running the scanner
 
-Triage guidance
+Run locally with:
 
-- If an item is an import or variable that is truly unused, remove it and run tests.
-- If an item is used dynamically (e.g., looked up by string or used only when an optional dependency is present), add a short comment explaining why it must be kept and/or move the import into the function that uses it.
+```bash
+make code-health
+```
 
-Usage:
+## Triage steps
 
-- Run locally: `make code-health` (non-blocking; prints results)
-- Address high-confidence findings by removing clearly unused imports/vars or by adding explanatory comments/guarding imports.
+1. Run `vulture` with a moderate confidence threshold (e.g. 50%).
+2. Manually inspect each finding; consider whether code is used dynamically (plugins, optional dependencies).
+3. If a finding is safe to remove, open a small, focused PR with a concise rationale and a local CI run (`make ci-local`), and reference the triage issue (e.g., #12).
 
-This PR removes obvious unused imports and parameters and adds a `make code-health` target.
+## CI
 
-Related: issue #12
+We run a non-blocking vulture smoke test in CI and maintain a triage issue to track findings.
