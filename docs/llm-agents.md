@@ -109,10 +109,10 @@ We recently added a "Preview" quality profile.
 
 **🔴 PRIVATE REPO** (internal tracking):
 
-* **Audit Results**: `private/docs/audits/` (dependency audits, performance benchmarks, security scans)
-* **Status Tracking**: `private/docs/status/` (deployment logs, incident reports)
-* **Strategy & Planning**: `private/archive/` (business strategy, roadmap planning, internal decisions)
-* **Sensitive Configuration**: `private/secrets/` (API keys, deployment credentials)
+* **Audit Results**: Internal docs (contact the maintainers for access) — dependency audits, performance benchmarks, security scans
+* **Status Tracking**: Internal docs (contact the maintainers for access) — deployment logs, incident reports
+* **Strategy & Planning**: Internal docs (contact the maintainers for access) — business strategy, roadmap planning, internal decisions
+* **Sensitive Configuration**: Internal secrets (not listed in public docs) — API keys, deployment credentials
 
 ### Pre-Push Validation
 
@@ -144,7 +144,7 @@ git diff --cached --name-only | grep -E "(\.env|secrets|credentials|private)" &&
 #!/bin/bash
 find docs/ -type f \( -name "*AUDIT*" -o -name "*STATUS*" -o -name "*STRATEGY*" \) && {
   echo "❌ ERROR: Found internal docs in public docs/ folder"
-  echo "Move to private/docs/audits/ or private/archive/"
+  echo "Move to internal docs area (contact maintainers for access)"
   exit 1
 }
 git diff --cached --name-only | grep -E "(\.env|secrets|credentials)" && {
@@ -161,7 +161,7 @@ When updating docs:
 2. **`docs/features.md`**: "What can it do?" (User facing).
 3. **`docs/architecture.md`**: "How does it work?" (Dev facing).
 4. **`docs/llm-agents.md`**: "How do I code this?" (Agent facing).
-5. **`private/docs/audits/`**: Audit results, benchmarks, CVE reports.
-6. **`private/archive/`**: Strategic planning, business decisions, deployment logs.
+5. Internal docs (audit results, benchmarks, CVE reports) — contact the maintainers for access.
+6. Internal archive (strategic planning, business decisions, deployment logs) — contact the maintainers for access.
 
 Keep all public docs aligned with the "Polish, don't generate" vision. Reserve internal docs for internal tracking only.

@@ -862,7 +862,7 @@ class VideoAgentAdapter:
     def get_clips_for_story_phase(
         self, 
         phase: str,
-        music_bpm: float,
+        _music_bpm: float,
         available_videos: List[str]
     ) -> List[Dict[str, Any]]:
         """

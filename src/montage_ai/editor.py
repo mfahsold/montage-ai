@@ -56,7 +56,7 @@ from .moviepy_compat import (
     crossfadein, crossfadeout,
     enforce_dimensions, log_clip_info, ensure_even_dimensions, pad_to_target,
 )
-from tqdm import tqdm
+
 
 # Alias for backward compatibility
 subclip_compat = subclip
@@ -86,7 +86,6 @@ from . import segment_writer as segment_writer_module
 # Import color-matcher for shot-to-shot color consistency
 try:
     from color_matcher import ColorMatcher
-    from color_matcher.io_handler import load_img_file, save_img_file
     COLOR_MATCHER_AVAILABLE = True
 except ImportError:
     COLOR_MATCHER_AVAILABLE = False
@@ -102,7 +101,7 @@ except ImportError:
 
 # Import Metadata Cache for pre-computed scene analysis
 try:
-    from .metadata_cache import MetadataCache, get_metadata_cache
+    from .metadata_cache import MetadataCache
     METADATA_CACHE_AVAILABLE = True
 except ImportError:
     METADATA_CACHE_AVAILABLE = False

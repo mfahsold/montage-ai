@@ -138,11 +138,9 @@ class StoryArcCSPSolver:
         """Select solver backend."""
         if requested == "auto":
             # Try Z3 first
-            try:
-                import z3
+            import importlib
+            if importlib.util.find_spec("z3") is not None:
                 return "z3"
-            except ImportError:
-                pass
 
             # Try OR-Tools
             try:
@@ -154,12 +152,11 @@ class StoryArcCSPSolver:
             return "fallback"
 
         elif requested == "z3":
-            try:
-                import z3
+            import importlib
+            if importlib.util.find_spec("z3") is not None:
                 return "z3"
-            except ImportError:
-                logger.warning("Z3 not available, using fallback")
-                return "fallback"
+            logger.warning("Z3 not available, using fallback")
+            return "fallback"
 
         elif requested == "ortools":
             try:
@@ -254,7 +251,7 @@ class StoryArcCSPSolver:
     ) -> Dict[str, Any]:
         """Solve using Z3 SMT solver."""
         try:
-            from z3 import Solver, Bool, If, Sum, And, Or, Not, AtMost, sat
+            from z3 import Solver, Bool, If, Sum, Or, Not, AtMost, sat
 
             solver = Solver()
             n = len(clips)

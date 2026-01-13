@@ -254,8 +254,8 @@ class AudioFallbackProcessor:
 
     def _determine_strategy(
         self,
-        original: AudioQuality,
-        processed: AudioQuality,
+        _original: AudioQuality,
+        _processed: AudioQuality,
         artifacts: ArtifactReport,
         snr_improvement: float
     ) -> FallbackStrategy:

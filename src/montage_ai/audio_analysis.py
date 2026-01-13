@@ -68,12 +68,11 @@ def _check_madmom_available() -> bool:
     if _MADMOM_AVAILABLE is not None:
         return _MADMOM_AVAILABLE
 
-    try:
-        import madmom
-        _MADMOM_AVAILABLE = True
+    import importlib
+    _MADMOM_AVAILABLE = importlib.util.find_spec("madmom") is not None
+    if _MADMOM_AVAILABLE:
         logger.debug("madmom available (SOTA beat detection enabled)")
-    except ImportError:
-        _MADMOM_AVAILABLE = False
+    else:
         logger.debug("madmom not available, using FFmpeg fallback")
 
     return _MADMOM_AVAILABLE
@@ -89,7 +88,6 @@ def _detect_beats_madmom(audio_path: str) -> Tuple[float, np.ndarray, float]:
     Returns:
         Tuple of (tempo_bpm, beat_times_array, duration_seconds)
     """
-    import madmom
     from madmom.features.beats import RNNBeatProcessor, BeatTrackingProcessor
     from madmom.features.tempo import TempoEstimationProcessor
 
@@ -136,7 +134,6 @@ def _detect_beats_madmom_downbeat(audio_path: str) -> Tuple[float, np.ndarray, n
     Returns:
         Tuple of (tempo_bpm, beat_times, downbeat_times, duration_seconds)
     """
-    import madmom
     from madmom.features.beats import RNNBeatProcessor
     from madmom.features.downbeats import RNNDownBeatProcessor, DBNDownBeatTrackingProcessor
 
@@ -846,6 +843,10 @@ def _ffmpeg_detect_onsets(audio_path: str, duration: float) -> List[float]:
     This finds moments where audio jumps from silence/quiet to loud,
     which typically correspond to beat onsets.
 
+    This function is retained as a legacy/fallback helper and may be useful
+    for debugging or optional downstream integrations; do not remove without
+    confirming callers or plugin usage.
+
     Returns:
         List of onset times in seconds
     """
@@ -891,6 +892,10 @@ def _ffmpeg_analyze_loudness(audio_path: str, duration: float) -> Tuple[np.ndarr
     Analyze audio loudness envelope using FFmpeg's ebur128 filter.
 
     Returns momentary loudness values at ~100ms intervals for peak detection.
+
+    This function is retained as a compatibility helper for legacy analysis
+    or external integrations that prefer FFmpeg 'ebur128' results; treat as a
+    fallback and confirm callers before removing.
 
     Returns:
         (times_array, loudness_array) - loudness in LUFS
@@ -1166,7 +1171,6 @@ def _ffmpeg_analyze_energy_legacy(audio_path: str, duration: float) -> Tuple[np.
         (times_array, rms_normalized_array)
     """
     import tempfile
-    import struct
 
     # Window size for RMS calculation (0.1s = 100ms)
     window_sec = 0.1

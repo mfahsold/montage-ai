@@ -285,7 +285,7 @@ class MemoryMonitorContext:
         logger.info(f"   🔍 [{self.operation_name}] Starting - Memory: {self.start_mb:.1f}MB")
         return self.memory_manager
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, _exc_tb):
         """Exit context - record ending memory and print summary."""
         self.end_mb = self.memory_manager.get_current_usage_mb()
         delta_mb = self.end_mb - self.start_mb

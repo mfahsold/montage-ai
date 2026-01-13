@@ -20,7 +20,6 @@ Usage:
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-import math
 
 from .logger import logger
 from .utils import clamp

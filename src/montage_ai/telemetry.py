@@ -355,7 +355,7 @@ class TelemetryContext:
         self._collector.start_job(self._job_id, self._job_type)
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type, exc_val, _exc_tb) -> None:
         if exc_type is not None:
             self._error = str(exc_val) if exc_val else str(exc_type)
             self._success = False

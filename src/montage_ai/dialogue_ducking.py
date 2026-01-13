@@ -164,7 +164,6 @@ def _detect_with_silero(audio_path: str, sample_rate: int = 16000) -> List[Dialo
     achieves high accuracy on diverse audio sources.
     """
     import torch
-    import torchaudio
 
     # Load model
     model, utils = torch.hub.load(
