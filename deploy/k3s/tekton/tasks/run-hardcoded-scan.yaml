@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: run-hardcoded-scan
+  labels:
+    app.kubernetes.io/name: montage-ai
+spec:
+  description: "Run the hardcoded registry/IP scanner against the workspace source"
+  workspaces:
+  - name: source
+  steps:
+  - name: scan
+    image: alpine:3.18
+    script: |
+      #!/usr/bin/env sh
+      set -euo pipefail
+      echo "Running hardcoded registry scanner..."
+      cd "$(workspaces.source.path)"
+      if [ -x scripts/check-hardcoded-registries.sh ]; then
+        scripts/check-hardcoded-registries.sh
+      else
+        echo "Scanner missing or not executable: scripts/check-hardcoded-registries.sh" >&2
+        exit 2
+      fi

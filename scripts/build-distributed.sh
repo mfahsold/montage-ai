@@ -14,7 +14,7 @@
 #   TAG=v1.0.0 ./scripts/build-distributed.sh   # Override via env
 #
 # Environment Variables:
-#   REGISTRY            - Registry host (default: 192.168.1.12:30500 for cluster)
+#   REGISTRY            - Registry host (default: ${REGISTRY_HOST:-192.168.1.12}:${REGISTRY_PORT:-30500} for cluster)
 #   CACHE_REF           - Cache reference (default: $REGISTRY/montage-ai:buildcache)
 #   BUILDER             - Buildx builder name (default: distributed-builder)
 #   PLATFORMS           - Target platforms (default: linux/amd64,linux/arm64)

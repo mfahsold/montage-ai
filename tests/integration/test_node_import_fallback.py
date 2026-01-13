@@ -60,7 +60,7 @@ def test_node_import_fallback_invoked(tmp_path, monkeypatch):
 
         env = os.environ.copy()
         env.update({
-            "REGISTRY": "192.168.1.12:30500",
+            "REGISTRY": os.environ.get("REGISTRY", os.environ.get("REGISTRY_HOST", "192.168.1.12") + ':' + os.environ.get("REGISTRY_PORT", "30500")), 
             "IMAGE_NAME": "montage-ai",
             "IMAGE_TAG": "test",
             "BUILD_QUALITY": "preview",

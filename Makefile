@@ -8,7 +8,7 @@ IMAGE_NAME ?= ghcr.io/mfahsold/montage-ai
 IMAGE_TAG ?= latest
 REGISTRY ?= ghcr.io/mfahsold
 # Default: GHCR for reliable public registry (multi-arch)
-# For cluster-only deployments, override with CLUSTER_REGISTRY=192.168.1.12:30500
+# For cluster-only deployments, override with CLUSTER_REGISTRY="${REGISTRY_HOST}:${REGISTRY_PORT}" (e.g., REGISTRY_HOST=192.168.1.12 REGISTRY_PORT=30500)
 # Resolve cluster registry from deploy/config.env when not explicitly provided
 CLUSTER_REGISTRY ?= $(shell ./scripts/resolve-registry.sh 2>/dev/null || echo ghcr.io/mfahsold)
 NAMESPACE ?= montage-ai

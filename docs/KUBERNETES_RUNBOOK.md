@@ -106,7 +106,7 @@ kubectl get pods -n montage-ai -l component=worker
 kubectl logs -n montage-ai -l component=worker --tail=50
 ```
 
-**Prevent Recurrence:** Keep imagePullPolicy: Always on the worker deployment and use registry-specific tags (192.168.1.12:30500/montage-ai:TAG) so new nodes never pull from ghcr.io by accident.
+**Prevent Recurrence:** Keep imagePullPolicy: Always on the worker deployment and use registry-specific tags (${REGISTRY_HOST:-192.168.1.12}:${REGISTRY_PORT:-30500}/montage-ai:TAG) so new nodes never pull from ghcr.io by accident.
 
 ---
 

@@ -22,7 +22,11 @@ Quick build example (recommended)
 
    Example (override):
    ```bash
-   REGISTRY=192.168.1.12:30500 TAG=20260112-quick BUILDKIT_SSH=1 ./scripts/build-distributed.sh
+   # Example: set your registry via env
+   export REGISTRY_HOST="${REGISTRY_HOST:-192.168.1.12}"
+   export REGISTRY_PORT="${REGISTRY_PORT:-30500}"
+   export REGISTRY="${REGISTRY_HOST}:${REGISTRY_PORT}"
+   TAG=20260112-quick BUILDKIT_SSH=1 REGISTRY="$REGISTRY" ./scripts/build-distributed.sh
    ```
 
    If `deploy/config.env` is present, scripts will read `REGISTRY_URL` from it automatically.
@@ -49,7 +53,8 @@ Deploy to cluster (canary)
    kubectl rollout status deployment/montage-ai-worker -n montage-ai
 
 Troubleshooting
-- Registry unreachable: `curl -v http://192.168.1.12:30500/v2/` or `nc -zv 192.168.1.12 30500` (or try legacy port `5000` if applicable)
+
+- Registry unreachable: `curl -v http://${REGISTRY_HOST:-192.168.1.12}:${REGISTRY_PORT:-30500}/v2/` or `nc -zv ${REGISTRY_HOST:-192.168.1.12} ${REGISTRY_PORT:-30500}` (or try legacy port `5000` if applicable)
 - Build failing due to private module access: enable `BUILDKIT_SSH` + ensure `ssh-agent` has keys; or vendor private modules with `go mod vendor` in build step.
 - If you prefer not to use SSH forwarding, consider vendoring private deps into your repo before building.
 
