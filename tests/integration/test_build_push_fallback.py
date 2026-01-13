@@ -58,7 +58,7 @@ def test_build_and_deploy_uses_ghcr_fallback(tmp_path, monkeypatch, capsys):
     # Set env to simulate registry unreachable and enable GHCR token
     env = os.environ.copy()
     env.update({
-        "REGISTRY": os.environ.get("REGISTRY", os.environ.get("REGISTRY_HOST", "192.168.1.12") + ':' + os.environ.get("REGISTRY_PORT", "30500")),
+        "REGISTRY": os.environ.get("REGISTRY", os.environ.get("REGISTRY_HOST", "localhost") + ':' + os.environ.get("REGISTRY_PORT", "5000")),
         "IMAGE_NAME": "montage-ai",
         "IMAGE_TAG": "test",
         "BUILD_QUALITY": "preview",
