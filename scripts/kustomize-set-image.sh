@@ -26,7 +26,7 @@ for d in "${KUST_DIRS[@]}"; do
     echo "-> Updating images in $d"
     pushd "$d" >/dev/null
     # attempting to replace the default image name with computed image
-    kustomize edit set image ghcr.io/mfahsold/montage-ai=${IMAGE} || true
+    kustomize edit set image montage-ai=${IMAGE} || true
     popd >/dev/null
   fi
 done

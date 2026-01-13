@@ -17,7 +17,8 @@ else
   elif [ -n "${REGISTRY_HOST:-}" ]; then
     REGISTRY_URL="${REGISTRY_HOST}"
   else
-    REGISTRY_URL="ghcr.io/mfahsold"
+    # Default to internal registry mentioned in fluxibri_core docs
+    REGISTRY_URL="192.168.1.12:30500"
   fi
 fi
 

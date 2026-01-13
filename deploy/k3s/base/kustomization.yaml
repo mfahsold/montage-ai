@@ -31,7 +31,8 @@ resources:
 # or the Makefile target: `make cluster-deploy` which runs the script for you.
 
 images:
-  - name: ghcr.io/mfahsold/montage-ai
+  - name: montage-ai
+    newName: 192.168.1.12:30500/montage-ai
     newTag: latest
 
 # ConfigMap for deployment settings (overlays can patch)

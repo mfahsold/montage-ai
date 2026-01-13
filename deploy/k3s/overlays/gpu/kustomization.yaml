@@ -12,5 +12,5 @@ patches:
 
 images:
   # Override to your registry if needed
-  - name: ghcr.io/mfahsold/montage-ai
+  - name: montage-ai
     newTag: latest

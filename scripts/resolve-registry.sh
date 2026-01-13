@@ -18,5 +18,6 @@ if [ -n "${REGISTRY_HOST:-}" ] && [ -n "${REGISTRY_PORT:-}" ]; then
 elif [ -n "${REGISTRY_HOST:-}" ]; then
   echo "${REGISTRY_HOST}"
 else
-  echo "ghcr.io/mfahsold"
+  # Default to internal cluster registry
+  echo "192.168.1.12:30500"
 fi

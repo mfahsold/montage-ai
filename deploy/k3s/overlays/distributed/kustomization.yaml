@@ -11,9 +11,9 @@ kind: Kustomization
 
 namespace: montage-ai
 
-# Use ghcr.io
+# Use internal registry
 images:
-  - name: ghcr.io/mfahsold/montage-ai
+  - name: montage-ai
     newTag: latest
 
 resources:

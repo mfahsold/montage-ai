@@ -10,7 +10,7 @@ namespace: montage-ai
 
 # Use registry from config.env (via deploy.sh substitution)
 images:
-  - name: ghcr.io/mfahsold/montage-ai
+  - name: montage-ai
     newTag: latest
 
 # Production deployment configuration

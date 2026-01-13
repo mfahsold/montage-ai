@@ -5,8 +5,7 @@ resources:
   - ../../base
 
 images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newName: ghcr.io/mfahsold/montage-ai
+  - name: montage-ai
     newTag: latest
 
 patches:

@@ -6,7 +6,7 @@ resources:
 
 # Use local cluster registry (development)
 images:
-  - name: ghcr.io/mfahsold/montage-ai
+  - name: montage-ai
     newTag: latest
 
 # Patches for development environment

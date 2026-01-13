@@ -10,7 +10,7 @@ namespace: montage-ai
 
 # Image configuration - uses local registry
 images:
-  - name: ghcr.io/mfahsold/montage-ai
+  - name: montage-ai
     newTag: latest
 
 # Replicas for staging
