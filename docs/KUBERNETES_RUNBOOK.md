@@ -82,12 +82,17 @@ kubectl get rs -n montage-ai -l app=montage-ai,component=worker -o wide
 
 ```bash
 # Build and push the corrected worker image to the local registry
-docker build -t 192.168.1.12:30500/montage-ai:final .
-docker push 192.168.1.12:30500/montage-ai:final
+# Set REGISTRY (e.g., export REGISTRY=your-registry:30500)
+# Then run:
+# docker build -t ${REGISTRY}/montage-ai:final .
+# docker push ${REGISTRY}/montage-ai:final
+
+# Alternatively, use the project's build script which respects deploy/config.env:
+# ./scripts/build-and-deploy.sh
 
 # Point deployment to the local image and force a fresh pull
 kubectl set image deployment/montage-ai-worker -n montage-ai \
-  montage-ai-worker=192.168.1.12:30500/montage-ai:final
+  montage-ai-worker=${REGISTRY}/montage-ai:final
 kubectl rollout restart deployment/montage-ai-worker -n montage-ai
 
 # Optional: remove old ReplicaSets that still reference ghcr

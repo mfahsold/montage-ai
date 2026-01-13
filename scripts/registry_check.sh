@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Simple registry health checks for 192.168.1.12
-REGISTRY_HOST=${1:-192.168.1.12}
-PORTS=(5000 30500)
+# Simple registry health checks (defaults from deploy/config.env if present)
+# Usage: ./scripts/registry_check.sh [registry-host]
+# Default: use REGISTRY_HOST env var or 'localhost'
+REGISTRY_HOST=${1:-${REGISTRY_HOST:-localhost}}
+PORTS=(${REGISTRY_PORT:-5000} 30500)
 
 echo "Checking host: $REGISTRY_HOST"
 

@@ -5,7 +5,7 @@ This guide shows the minimal steps to build multi-arch images and deploy to the 
 Prerequisites
 - Docker and Buildx available (`docker --version`, `docker buildx version`).
 - SSH agent set up when using private git modules (see BuildKit SSH below).
-- Credentials to the registry (e.g., `docker login 192.168.1.12:30500`).
+- Credentials to the registry (e.g., `docker login ${REGISTRY}` where `REGISTRY` is set in `deploy/config.env` or as an env var).
 
 > Note: the canonical internal registry port is now `30500`. Older docs or legacy systems may reference `5000`; both ports are commonly used in the wild.
 

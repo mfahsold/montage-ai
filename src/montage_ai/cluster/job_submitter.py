@@ -44,7 +44,7 @@ class JobSpec:
     namespace: str = "montage-ai"
     parallelism: int = 4
     completions: int = 4
-    image: str = "ghcr.io/mfahsold/montage-ai:latest"
+    image: str = os.environ.get("IMAGE_FULL", os.environ.get("MONTAGE_IMAGE", "ghcr.io/mfahsold/montage-ai:latest"))
     env: Dict[str, str] = None
     resources: Dict[str, Any] = None
 
@@ -132,6 +132,7 @@ data:
 """
 
         # Create Job manifest
+        image_var = os.environ.get("IMAGE_FULL", os.environ.get("MONTAGE_IMAGE", "ghcr.io/mfahsold/montage-ai:latest"))
         job_yaml = f"""
 apiVersion: batch/v1
 kind: Job
@@ -162,7 +163,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: scene-detect
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: {image_var}
           imagePullPolicy: IfNotPresent
           command:
             - python
@@ -371,7 +372,7 @@ spec:
                     values: ["nvidia"]
       containers:
         - name: encoder
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: {image_var}
           command:
             - ffmpeg
             - -i

@@ -34,7 +34,7 @@ if [ -f "deploy/config.env" ]; then
 fi
 
 # REGISTRY can come from deploy/config.env (REGISTRY_URL) or environment overrides
-REGISTRY="${REGISTRY_URL:-${REGISTRY:-192.168.1.12:30500}}"
+REGISTRY="${REGISTRY_URL:-${REGISTRY:-localhost:30500}}"
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 LOCAL_TAG="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"

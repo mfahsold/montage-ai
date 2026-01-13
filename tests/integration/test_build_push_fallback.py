@@ -25,7 +25,7 @@ def test_build_and_deploy_uses_ghcr_fallback(tmp_path, monkeypatch, capsys):
             ;;
           push)
             # If pushing to internal registry, fail
-            if [[ "$*" == *"192.168.1.12:30500"* ]]; then
+            if [[ "$*" == *"${{REGISTRY}}"* ]]; then
                 echo "push to registry failed" >&2
                 exit 1
             fi

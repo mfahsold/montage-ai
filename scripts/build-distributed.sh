@@ -37,8 +37,8 @@ set -euo pipefail
 
 # Build configuration
 # Default: GHCR for reliable public registry
-# Cluster: Use REGISTRY=192.168.1.12:30500 for cluster-internal builds
-# Note: Cluster registry uses HTTPS (self-signed cert)
+# Cluster: set REGISTRY to your local cluster registry (e.g., REGISTRY=your-registry:30500)
+# Note: Cluster registry may use self-signed certs; configure trust accordingly
 # Load canonical settings
 # shellcheck disable=SC1090
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
