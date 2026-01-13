@@ -101,7 +101,7 @@ class Monitor:
         """Context manager support."""
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, _exc_tb):
         """Ensure cleanup on context manager exit."""
         self.cleanup()
         return False
@@ -587,7 +587,7 @@ class Monitor:
         """Log transition decision"""
         logger.info(f"   │  🔄 Transition: {transition_type} ({duration:.2f}s) - {reason}")
     
-    def log_enhancement_applied(self, clip_num: int, enhancements: List[str], duration_ms: float):
+    def log_enhancement_applied(self, _clip_num: int, enhancements: List[str], duration_ms: float):
         """Log applied enhancements"""
         enh_str = " + ".join(enhancements) if enhancements else "none"
         logger.info(f"   │  ✨ Enhancements: {enh_str} ({duration_ms:.0f}ms)")

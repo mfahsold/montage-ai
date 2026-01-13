@@ -18,7 +18,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Callable, Optional, Union, List
 
-from flask import request, jsonify, Response
+from flask import request, jsonify
 
 from ..logger import logger
 

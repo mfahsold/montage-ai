@@ -9,7 +9,7 @@ like Chain-of-Thought (CoT) and structured JSON outputs.
 
 from enum import Enum
 from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 # =============================================================================
 # Enums & Constants

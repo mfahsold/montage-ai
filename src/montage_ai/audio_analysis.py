@@ -1166,7 +1166,6 @@ def _ffmpeg_analyze_energy_legacy(audio_path: str, duration: float) -> Tuple[np.
         (times_array, rms_normalized_array)
     """
     import tempfile
-    import struct
 
     # Window size for RMS calculation (0.1s = 100ms)
     window_sec = 0.1

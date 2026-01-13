@@ -7,7 +7,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from montage_ai.core.job_store import JobStore
-from montage_ai.env_mapper import map_options_to_env
 from montage_ai.config import get_settings
 from montage_ai.logger import logger
 from montage_ai.core.workflow import WorkflowOptions
@@ -129,7 +128,7 @@ def run_montage(job_id: str, style: str, options: dict):
             logger.removeHandler(file_handler)
             file_handler.close()
 
-def run_transcript_render(job_data: dict):
+def run_transcript_render(_job_data: dict):
     """Run transcript render in background."""
     # Similar to run_montage but for transcript
     # For now, just a stub or copy logic if needed
