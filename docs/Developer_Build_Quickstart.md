@@ -23,8 +23,8 @@ Quick build example (recommended)
    Example (override):
    ```bash
    # Example: set your registry via env
-   export REGISTRY_HOST="${REGISTRY_HOST:-192.168.1.12}"
-   export REGISTRY_PORT="${REGISTRY_PORT:-30500}"
+   export REGISTRY_HOST="${REGISTRY_HOST:-registry-host}"
+   export REGISTRY_PORT="${REGISTRY_PORT:-registry-port}"
    export REGISTRY="${REGISTRY_HOST}:${REGISTRY_PORT}"
    TAG=20260112-quick BUILDKIT_SSH=1 REGISTRY="$REGISTRY" ./scripts/build-distributed.sh
    ```
@@ -54,7 +54,7 @@ Deploy to cluster (canary)
 
 Troubleshooting
 
-- Registry unreachable: `curl -v http://${REGISTRY_HOST:-192.168.1.12}:${REGISTRY_PORT:-30500}/v2/` or `nc -zv ${REGISTRY_HOST:-192.168.1.12} ${REGISTRY_PORT:-30500}` (or try legacy port `5000` if applicable)
+- Registry unreachable: `curl -v http://${REGISTRY_HOST:-registry-host}:${REGISTRY_PORT:-registry-port}/v2/` or `nc -zv ${REGISTRY_HOST:-registry-host} ${REGISTRY_PORT:-registry-port}` (or try legacy port `5000` if applicable)
 - Build failing due to private module access: enable `BUILDKIT_SSH` + ensure `ssh-agent` has keys; or vendor private modules with `go mod vendor` in build step.
 - If you prefer not to use SSH forwarding, consider vendoring private deps into your repo before building.
 

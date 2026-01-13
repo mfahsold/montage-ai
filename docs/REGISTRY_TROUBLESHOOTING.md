@@ -8,7 +8,7 @@ Quick checks
 
 - Preferred: Use the `REGISTRY_URL` value from `deploy/config.env` and check it directly: `curl -v ${REGISTRY_URL}/v2/` or `nc -zv <registry-host> <registry-port>` (canonical port: `30500`, legacy: `5000`).
 
-- Example (override): `nc -zv ${REGISTRY_HOST:-192.168.1.12} ${REGISTRY_PORT:-30500}` or `curl -v http://${REGISTRY_HOST:-192.168.1.12}:${REGISTRY_PORT:-30500}/v2/`
+- Example (override): `nc -zv ${REGISTRY_HOST:-registry-host} ${REGISTRY_PORT:-registry-port}` or `curl -v http://${REGISTRY_HOST:-registry-host}:${REGISTRY_PORT:-registry-port}/v2/`
 
 Useful tools
 
