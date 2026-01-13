@@ -1,0 +1,15 @@
+name: Hardcoded Registry Scan
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  scan:
+    name: Check for hardcoded registries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run hardcoded registry scanner
+        run: scripts/check-hardcoded-registries.sh
