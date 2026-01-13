@@ -68,12 +68,11 @@ def _check_madmom_available() -> bool:
     if _MADMOM_AVAILABLE is not None:
         return _MADMOM_AVAILABLE
 
-    try:
-        import madmom
-        _MADMOM_AVAILABLE = True
+    import importlib
+    _MADMOM_AVAILABLE = importlib.util.find_spec("madmom") is not None
+    if _MADMOM_AVAILABLE:
         logger.debug("madmom available (SOTA beat detection enabled)")
-    except ImportError:
-        _MADMOM_AVAILABLE = False
+    else:
         logger.debug("madmom not available, using FFmpeg fallback")
 
     return _MADMOM_AVAILABLE
@@ -89,7 +88,6 @@ def _detect_beats_madmom(audio_path: str) -> Tuple[float, np.ndarray, float]:
     Returns:
         Tuple of (tempo_bpm, beat_times_array, duration_seconds)
     """
-    import madmom
     from madmom.features.beats import RNNBeatProcessor, BeatTrackingProcessor
     from madmom.features.tempo import TempoEstimationProcessor
 
@@ -136,7 +134,6 @@ def _detect_beats_madmom_downbeat(audio_path: str) -> Tuple[float, np.ndarray, n
     Returns:
         Tuple of (tempo_bpm, beat_times, downbeat_times, duration_seconds)
     """
-    import madmom
     from madmom.features.beats import RNNBeatProcessor
     from madmom.features.downbeats import RNNDownBeatProcessor, DBNDownBeatTrackingProcessor
 

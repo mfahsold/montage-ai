@@ -219,11 +219,9 @@ class SceneProvider:
     def _select_detection_backend(self) -> str:
         """Select best available detection backend."""
         # Try pyscenedetect first (best quality)
-        try:
-            import scenedetect
+        import importlib
+        if importlib.util.find_spec("scenedetect") is not None:
             return "pyscenedetect"
-        except ImportError:
-            pass
 
         # Try cgpu if enabled (central settings)
         from ..config import get_settings
