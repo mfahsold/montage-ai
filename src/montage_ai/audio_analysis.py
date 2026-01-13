@@ -843,6 +843,10 @@ def _ffmpeg_detect_onsets(audio_path: str, duration: float) -> List[float]:
     This finds moments where audio jumps from silence/quiet to loud,
     which typically correspond to beat onsets.
 
+    This function is retained as a legacy/fallback helper and may be useful
+    for debugging or optional downstream integrations; do not remove without
+    confirming callers or plugin usage.
+
     Returns:
         List of onset times in seconds
     """
@@ -888,6 +892,10 @@ def _ffmpeg_analyze_loudness(audio_path: str, duration: float) -> Tuple[np.ndarr
     Analyze audio loudness envelope using FFmpeg's ebur128 filter.
 
     Returns momentary loudness values at ~100ms intervals for peak detection.
+
+    This function is retained as a compatibility helper for legacy analysis
+    or external integrations that prefer FFmpeg 'ebur128' results; treat as a
+    fallback and confirm callers before removing.
 
     Returns:
         (times_array, loudness_array) - loudness in LUFS
