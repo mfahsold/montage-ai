@@ -211,6 +211,10 @@ class FeatureConfig:
     # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)
     low_memory_mode: bool = field(default_factory=ConfigParser.make_bool_parser("LOW_MEMORY_MODE", False))
 
+    # Cluster Mode: Distribute heavy processing across multiple Kubernetes nodes
+    cluster_mode: bool = field(default_factory=ConfigParser.make_bool_parser("CLUSTER_MODE", False))
+    cluster_parallelism: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_PARALLELISM", 4))
+
     # Color/levels normalization controls (can be disabled for clean footage)
     colorlevels: bool = field(default_factory=ConfigParser.make_bool_parser("COLORLEVELS", True))
     luma_normalize: bool = field(default_factory=ConfigParser.make_bool_parser("LUMA_NORMALIZE", True))

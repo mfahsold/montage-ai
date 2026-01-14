@@ -523,7 +523,13 @@ class MontageBuilder:
         
         # Pass renderer to engine (if not already managed there in future)
         self._render_engine.set_renderer(self._progressive_renderer)
-        self._render_engine.render_output()
+
+        # DISTRIBUTED MODE: Phase 2 (Distributed Rendering)
+        if self.settings.cluster.cluster_mode:
+            logger.info("   🌐 Cluster Mode: Switching to Distributed Rendering...")
+            self._render_engine.render_distributed()
+        else:
+            self._render_engine.render_output()
         
         self.progress.rendering_complete()
 

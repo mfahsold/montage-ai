@@ -1,0 +1,33 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: montage-ai-manual-build-
+  namespace: ci
+spec:
+  serviceAccountName: ci-runner
+  pipelineRef:
+    name: buildx-multiarch-pipeline
+  params:
+  - name: REPO_URL
+    value: https://github.com/mfahsold/montage-ai.git
+  - name: REVISION
+    value: main
+  - name: IMAGE
+    value: 10.43.173.243:5000/montage-ai:latest
+  workspaces:
+  - name: source
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: dockerconfig
+    configMap:
+      name: docker-config
+  - name: git-ssh
+    secret:
+      secretName: github-ssh-key
+  - name: kubeconfig
+    emptyDir: {}

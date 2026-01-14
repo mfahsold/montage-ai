@@ -32,6 +32,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}shorts${NC} [STYLE]  Create vertical shorts (9:16) with smart reframing
   ${GREEN}text-edit${NC}       Text-based editing (remove fillers, edit by transcript)
   ${GREEN}web${NC}             Start Web UI
+  ${GREEN}status${NC}          Check running job status and logs
   ${GREEN}preview${NC}         Quick preview (fast preset, 360p)
   ${GREEN}finalize${NC}        Finalize render (high quality, 1080p, stabilized)
   ${GREEN}hq${NC}              High quality render (1080p/4K)
@@ -297,6 +298,8 @@ run_montage() {
         -e COLOR_GRADING="${COLOR_GRADING:-}" \
         -e COLOR_INTENSITY="${COLOR_INTENSITY:-0.7}" \
         -e UPSCALE="${UPSCALE:-false}" \
+        -e CLUSTER_MODE="$CLUSTER_MODE" \
+        -e CLUSTER_PARALLELISM="$CLUSTER_PARALLELISM" \
         -e DENOISE="$DENOISE" \
         -e SHARPEN="$SHARPEN" \
         -e FILM_GRAIN="$FILM_GRAIN" \
@@ -333,6 +336,8 @@ DIALOGUE_DUCK="false"
 AUDIO_NORMALIZE="false"
 STORY_ARC=""
 EXPORT_RECIPE="false"
+CLUSTER_MODE="false"
+CLUSTER_PARALLELISM="4"
 
 case "${1:-run}" in
     run)
@@ -413,6 +418,16 @@ case "${1:-run}" in
         ;;
     cgpu-status)
         cgpu_status
+        exit 0
+        ;;
+    status)
+        echo -e "${YELLOW}📊 Checking job status...${NC}"
+        CONTAINER_ID=$(docker ps -q --filter "label=com.docker.compose.service=montage-ai" | head -n 1)
+        if [[ -n "$CONTAINER_ID" ]]; then
+            docker logs "$CONTAINER_ID" | tail -n 50
+        else
+            echo -e "${RED}No running montage-ai container found.${NC}"
+        fi
         exit 0
         ;;
     cgpu-test)
@@ -517,6 +532,8 @@ while [[ $# -gt 0 ]]; do
             fi
             shift ;;
         --export-recipe) EXPORT_RECIPE="true"; shift ;;
+        --cluster) CLUSTER_MODE="true"; shift ;;
+        --cluster-parallelism) CLUSTER_PARALLELISM="$2"; shift 2 ;;
         *) shift ;;
     esac
 done

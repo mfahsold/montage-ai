@@ -437,3 +437,148 @@ spec:
 
         result = self._kubectl(*args)
         return result.returncode == 0
+
+    def wait_for_job(self, job_name: str, timeout_seconds: int = 3600, poll_interval: int = 10) -> bool:
+        """Wait for a job to complete."""
+        logger.info(f"⏳ Waiting for job {job_name} to complete (timeout: {timeout_seconds}s)...")
+        
+        start_time = time.time()
+        while time.time() - start_time < timeout_seconds:
+            status = self.get_job_status(job_name)
+            if status is None:
+                logger.warning(f"⚠️ Job {job_name} not found.")
+                return False
+                
+            if status.is_complete:
+                if status.is_successful:
+                    logger.info(f"✅ Job {job_name} succeeded.")
+                    return True
+                else:
+                    logger.error(f"❌ Job {job_name} failed.")
+                    return False
+            
+            time.sleep(poll_interval)
+            
+        logger.error(f"⌛ Job {job_name} timed out after {timeout_seconds}s.")
+        return False
+
+    def get_job_status(self, job_name: str) -> Optional[JobStatus]:
+        """Get the current status of a job."""
+        result = self._kubectl("get", "job", job_name, "-o", "json")
+        if result.returncode != 0:
+            return None
+            
+        data = json.loads(result.stdout)
+        status = data.get("status", {})
+        
+        return JobStatus(
+            name=job_name,
+            active=status.get("active", 0),
+            succeeded=status.get("succeeded", 0),
+            failed=status.get("failed", 0),
+            completion_time=status.get("completionTime"),
+            conditions=status.get("conditions", [])
+        )
+
+    def is_job_successful(self, job_name: str) -> bool:
+        """Check if a job has completed successfully."""
+        status = self.get_job_status(job_name)
+        return status is not None and status.is_successful
+
+    def submit_generic_job(
+        self,
+        job_id: str,
+        command: List[str],
+        parallelism: int = 1,
+        completions: Optional[int] = None,
+        component: str = "generic",
+        env: Optional[Dict[str, str]] = None,
+        resources: Optional[Dict[str, Any]] = None
+    ) -> JobSpec:
+        """
+        Submit a generic completion-indexed Job.
+        """
+        if completions is None:
+            completions = parallelism
+            
+        image_var = os.environ.get("IMAGE_FULL", os.environ.get("MONTAGE_IMAGE", "ghcr.io/mfahsold/montage-ai:latest"))
+        namespace = self.namespace
+        
+        # Build env vars
+        env_section = ""
+        if env:
+            for key, value in env.items():
+                env_section += f"""
+            - name: {key}
+              value: "{value}" """
+
+        # Kubernetes Job Manifest
+        job_yaml = f"""
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {job_id}
+  namespace: {namespace}
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: {component}
+    montage-ai.fluxibri.dev/job-id: "{job_id}"
+spec:
+  completionMode: Indexed
+  completions: {completions}
+  parallelism: {parallelism}
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 1800
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: {image_var}
+          imagePullPolicy: IfNotPresent
+          command: {json.dumps(command)}
+          env:
+            - name: SHARD_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+            - name: SHARD_COUNT
+              value: "{completions}"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: CLUSTER_MODE
+              value: "true" {env_section}
+          resources:
+            requests:
+              cpu: "{resources.get('cpu', '2') if resources else '2'}"
+              memory: "{resources.get('memory', '4Gi') if resources else '4Gi'}"
+            limits:
+              cpu: "{resources.get('limit_cpu', '4') if resources else '4'}"
+              memory: "{resources.get('limit_memory', '8Gi') if resources else '8Gi'}"
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+              readOnly: true
+            - name: output
+              mountPath: /data/output
+      volumes:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-input
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-output
+"""
+
+        result = subprocess.run(
+            ["kubectl", "apply", "-f", "-"],
+            input=job_yaml,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"Job creation failed: {result.stderr}")
+
+        logger.info(f"✅ Submitted {component} job: {job_id}")
+        return JobSpec(name=job_id, namespace=namespace, parallelism=parallelism, completions=completions)

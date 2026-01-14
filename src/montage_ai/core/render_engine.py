@@ -274,6 +274,113 @@ class RenderEngine:
         """Register progress callback for render-phase updates."""
         self._progress_callback = callback
 
+    def render_distributed(self) -> None:
+        """
+        Distributed Phase 5: Render final output across multiple nodes.
+        """
+        logger.info("\n   🌐 Entering Distributed Render Mode (Phase 2)...")
+        
+        if not self.ctx.timeline.clips_metadata:
+            logger.warning("   ⚠️ No clips in timeline to render.")
+            return
+
+        render_start_time = time.time()
+        job_id = self.ctx.job_id
+        
+        # 1. Prepare shared storage path for clips metadata
+        temp_dir = Path(self.ctx.paths.temp_dir)
+        clips_json_path = temp_dir / f"clips_{job_id}.json"
+        
+        # Convert ClipMetadata objects to dicts for JSON
+        import dataclasses
+        clips_data = [dataclasses.asdict(c) for c in self.ctx.timeline.clips_metadata]
+        
+        with open(clips_json_path, "w") as f:
+            json.dump(clips_data, f)
+            
+        logger.info(f"   📝 Saved timeline metadata ({len(clips_data)} clips) to {clips_json_path}")
+
+        # 2. Submit K8s Jobs
+        try:
+            from ..cluster.job_submitter import JobSubmitter
+            submitter = JobSubmitter()
+            
+            parallelism = self.settings.cluster.cluster_parallelism
+            logger.info(f"   🚀 Submitting {parallelism} rendering shards to cluster...")
+            
+            # Note: We need to implement submit_render_job in JobSubmitter
+            # Or use a generic submit_job method
+            job_spec = submitter.submit_generic_job(
+                job_id=f"render-{job_id}",
+                command=[
+                    "python", "-m", "montage_ai.cluster.distributed_rendering",
+                    "--clips-json", str(clips_json_path),
+                    "--shard-count", str(parallelism),
+                    "--output-dir", str(temp_dir / f"segments_{job_id}"),
+                    "--job-id", job_id,
+                    "--quality", self.settings.encoding.quality_profile
+                ],
+                parallelism=parallelism,
+                component="distributed-rendering"
+            )
+            
+            # 3. Wait for completion
+            self._report_render_progress(20, "Waiting for cluster nodes to render segments...")
+            submitter.wait_for_job(job_spec.name)
+            
+            if not submitter.is_job_successful(job_spec.name):
+                raise RuntimeError("Cluster rendering failed. Check K8s logs.")
+                
+            # 4. Finalize: Concatenate segments from all shards
+            self._report_render_progress(80, "Aggregating segments from nodes...")
+            
+            # Collect all shard reports and segment paths
+            all_segments = []
+            segments_dir = temp_dir / f"segments_{job_id}"
+            
+            # Search for shard reports
+            import glob
+            report_files = glob.glob(str(segments_dir / "shard_*" / "shard_report.json"))
+            report_files.sort() # Ensure shards stay in order
+            
+            for report_path in report_files:
+                with open(report_path, "r") as f:
+                    report = json.load(f)
+                    all_segments.extend(report.get("segments", []))
+            
+            logger.info(f"   🔗 Aggregated {len(all_segments)} segments from {len(report_files)} shards")
+
+            # Finalize using ProgressiveRenderer logic
+            output_path = self.ctx.render.output_filename
+            audio_path = self.ctx.media.audio_result.music_path
+            audio_duration = self.ctx.timeline.target_duration
+            
+            # We use ProgressiveRenderer to wrap SegmentWriter
+            from ..segment_writer import ProgressiveRenderer
+            pr = ProgressiveRenderer(output_dir=str(segments_dir))
+            # Manually inject segments into the inner segment_writer
+            from ..segment_writer import SegmentInfo
+            for seg_path in all_segments:
+                pr.segment_writer.segments.append(SegmentInfo(path=seg_path, duration=0, clip_count=0))
+                
+            success = pr.finalize(
+                output_path=output_path,
+                audio_path=audio_path,
+                audio_duration=audio_duration,
+                logo_path=self.ctx.render.logo_path
+            )
+            
+            if success:
+                self.ctx.render.render_duration = time.time() - render_start_time
+                logger.info(f"   ✅ Distributed render complete in {self.ctx.render.render_duration:.1f}s")
+                self._report_render_progress(100, "Render complete")
+            else:
+                raise RuntimeError("Final concatenation failed")
+
+        except Exception as e:
+            logger.error(f"   ❌ Distributed render failed: {e}")
+            raise
+
     def _collect_render_resources(self) -> Dict[str, Any]:
         """Grab CPU/memory/GPU metrics for progress updates."""
         try:

@@ -1,0 +1,103 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: kaniko-fallback
+  namespace: ci
+spec:
+  params:
+    - name: IMAGE
+      description: "Fully-qualified image name (registry/repo:tag)"
+      type: string
+    - name: PLATFORMS
+      description: "Comma-separated platforms to attempt (linux/amd64,linux/arm64)"
+      type: string
+      default: "linux/amd64,linux/arm64"
+    - name: CONTEXT
+      description: "build context path"
+      type: string
+      default: "."
+    - name: DOCKERFILE
+      description: "Dockerfile path"
+      type: string
+      default: "Dockerfile"
+    - name: INSECURE
+      description: "Allow insecure registry"
+      type: string
+      default: "true"
+  results:
+    - name: images
+      description: "Space-separated list of pushed per-arch images"
+    - name: any_pushed
+      description: "true if any images were pushed"
+  workspaces:
+    - name: source
+    - name: dockerconfig
+      description: "Optional secret-mounted workspace for docker credentials"
+  steps:
+    - name: build-amd64
+      image: gcr.io/kaniko-project/executor:v1.21.1
+      command: ["/kaniko/executor"]
+      args:
+        - "--dockerfile=$(workspaces.source.path)/$(params.DOCKERFILE)"
+        - "--context=dir://$(workspaces.source.path)/$(params.CONTEXT)"
+        - "--destination=$(params.IMAGE)-amd64"
+        - "--verbosity=info"
+        - "--insecure"
+        - "--insecure-pull"
+        - "--skip-tls-verify"
+        - "--custom-platform=linux/amd64"
+      env:
+        - name: DOCKER_CONFIG
+          value: $(workspaces.dockerconfig.path)
+      computeResources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "4"
+          memory: 8Gi
+    - name: mark-amd64
+      image: alpine:3.18
+      script: |
+        set -e
+        echo "$(params.IMAGE)-amd64" >> "$(workspaces.source.path)/.kaniko_pushed" || true
+    - name: build-arm64
+      image: gcr.io/kaniko-project/executor:v1.21.1
+      command: ["/kaniko/executor"]
+      args:
+        - "--dockerfile=$(workspaces.source.path)/$(params.DOCKERFILE)"
+        - "--context=dir://$(workspaces.source.path)/$(params.CONTEXT)"
+        - "--destination=$(params.IMAGE)-arm64"
+        - "--verbosity=info"
+        - "--insecure"
+        - "--insecure-pull"
+        - "--skip-tls-verify"
+        - "--custom-platform=linux/arm64"
+      env:
+        - name: DOCKER_CONFIG
+          value: $(workspaces.dockerconfig.path)
+      computeResources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "4"
+          memory: 8Gi
+    - name: mark-arm64
+      image: alpine:3.18
+      script: |
+        set -e
+        echo "$(params.IMAGE)-arm64" >> "$(workspaces.source.path)/.kaniko_pushed" || true
+    - name: finalize
+      image: alpine:3.18
+      script: |
+        set -e
+        PUSHED_FILE="$(workspaces.source.path)/.kaniko_pushed"
+        if [ -f "$PUSHED_FILE" ]; then
+          IMAGES=$(cat "$PUSHED_FILE" | tr '\n' ' ' | sed -e 's/^ //; s/ $//')
+          echo -n "$IMAGES" > /tekton/results/images
+          echo -n "true" > /tekton/results/any_pushed
+        else
+          echo -n "" > /tekton/results/images
+          echo -n "false" > /tekton/results/any_pushed
+        fi

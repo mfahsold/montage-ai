@@ -40,20 +40,22 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 | `finalize [STYLE]` | High-quality render (1080p, stabilized) | Slow |
 | `hq [STYLE]` | High quality with upscaling (1080p/4K) | Slow |
 | `shorts [STYLE]` | Vertical 9:16 with smart reframing | Medium |
-| `web` | Launch Web UI (http://localhost:8080) | - |
+| `download JOB_ID` | Download job artifacts (video, timeline, logs) | - |
+| `web` | Launch Web UI (<http://localhost:8080>) | - |
 | `list` | Show available styles | - |
 
 ### Utility Commands
 
 | Command | Purpose |
-|---------|---------|
+| :--- | :--- |
 | `text-edit` | Transcript-based editing (remove filler words) |
 | `build` | Build Docker image locally |
+| `status` | Check running job status and logs |
 | `cgpu-start` | Start cgpu Gemini server (port 8090) |
 | `cgpu-stop` | Stop cgpu server |
 | `cgpu-status` | Check cgpu installation & status |
 | `cgpu-test` | Test cgpu connection |
-| `retrieve` | Retrieve results from Kubernetes cluster |
+| `export-to-nle` | Export results to OTIO/Premiere/EDL |
 | `help` | Show full help message |
 
 ---

@@ -1,0 +1,86 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: kaniko-manifest
+  namespace: ci
+spec:
+  params:
+    - name: IMAGE
+      description: "The final multi-arch image name (registry/repo:tag)"
+      type: string
+    - name: PLATFORMS
+      description: "Comma-separated platforms"
+      type: string
+      default: "linux/amd64,linux/arm64"
+    - name: FAIL_IF_MANIFEST_MISSING
+      description: "If 'true', fail when per-arch images are missing"
+      type: string
+      default: "false"
+  results:
+    - name: manifest_status
+    - name: created
+  workspaces:
+    - name: dockerconfig
+  steps:
+    - name: check-and-tag-fallback
+      image: quay.io/skopeo/stable:v1.21.0
+      env:
+        - name: DOCKER_CONFIG
+          value: $(workspaces.dockerconfig.path)
+      script: |
+        set -e
+        IMAGE="$(params.IMAGE)"
+        AMD64_IMG="$IMAGE-amd64"
+        ARM64_IMG="$IMAGE-arm64"
+        
+        echo "Checking for per-arch images..."
+        HAS_AMD64=0
+        HAS_ARM64=0
+        
+        if skopeo inspect "docker://$AMD64_IMG" >/dev/null 2>&1; then
+          HAS_AMD64=1
+          echo "✅ Found AMD64 image"
+        fi
+        
+        if skopeo inspect "docker://$ARM64_IMG" >/dev/null 2>&1; then
+          HAS_ARM64=1
+          echo "✅ Found ARM64 image"
+        fi
+        
+        if [ $HAS_AMD64 -eq 1 ] && [ $HAS_ARM64 -eq 1 ]; then
+          echo "Both images found. Manifest creation will proceed."
+          echo -n "pending" > /tekton/results/manifest_status
+        elif [ $HAS_AMD64 -eq 1 ]; then
+          echo "只有 AMD64 image found. Tagging it as the main image..."
+          skopeo copy "docker://$AMD64_IMG" "docker://$IMAGE" --all-tls-verify=false
+          echo -n "created" > /tekton/results/manifest_status
+          echo -n "true" > /tekton/results/created
+          exit 0
+        elif [ $HAS_ARM64 -eq 1 ]; then
+          echo "只有 ARM64 image found. Tagging it as the main image..."
+          skopeo copy "docker://$ARM64_IMG" "docker://$IMAGE" --all-tls-verify=false
+          echo -n "created" > /tekton/results/manifest_status
+          echo -n "true" > /tekton/results/created
+          exit 0
+        else
+          echo "No per-arch images found!"
+          if [ "$(params.FAIL_IF_MANIFEST_MISSING)" = "true" ]; then
+            exit 1
+          fi
+          echo -n "skipped" > /tekton/results/manifest_status
+          echo -n "false" > /tekton/results/created
+          exit 0
+        fi
+    - name: crane-create-manifest
+      image: gcr.io/go-containerregistry/crane:v0.20.3
+      script: |
+        set -e
+        STATUS=$(cat /tekton/results/manifest_status)
+        if [ "$STATUS" != "pending" ]; then
+          echo "Manifest already handled or skipped. Skipping crane."
+          exit 0
+        fi
+        /ko-app/crane manifest create "$(params.IMAGE)" "$(params.IMAGE)-amd64" "$(params.IMAGE)-arm64"
+        /ko-app/crane push "$(params.IMAGE)"
+        echo -n "created" > /tekton/results/manifest_status
+        echo -n "true" > /tekton/results/created

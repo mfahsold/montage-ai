@@ -393,11 +393,19 @@ class AssetAnalyzer:
             else:
                 uncached_videos.append(v_path)
 
-        # OPTIMIZATION Phase 3: ProcessPoolExecutor for CPU-intensive scene detection
-        # Bypasses Python GIL for 2-4x speedup on multi-core systems
+        # Cluster-Mode: Parallelize across nodes via K8s
         detected_scenes = {}  # path -> scenes list
 
-        if uncached_videos:
+        if uncached_videos and self.settings.features.cluster_mode:
+            try:
+                detected_scenes = self._detect_scenes_distributed(uncached_videos, threshold, progress_callback)
+            except Exception as e:
+                logger.warning(f"   ⚠️ Distributed scene detection failed ({e}), falling back to local processing")
+                # Fall through to local processing below
+        
+        if uncached_videos and not detected_scenes:
+            # OPTIMIZATION Phase 3: ProcessPoolExecutor for CPU-intensive scene detection
+            # Bypasses Python GIL for 2-4x speedup on multi-core systems
             # PHASE 5: Scale with available cores (cluster-optimized)
             cpu_count = os.cpu_count() or 2
             cfg_workers = self.settings.processing.max_scene_workers
@@ -546,6 +554,74 @@ class AssetAnalyzer:
         self.ctx.media.all_scenes_dicts = [s.to_dict() for s in self.ctx.media.all_scenes]
 
         logger.info(f"   📹 Found {len(self.ctx.media.all_scenes)} scenes in {len(video_files)} videos")
+
+    def _detect_scenes_distributed(self, video_paths: List[str], threshold: float, progress_callback: Optional[Any] = None) -> Dict[str, List]:
+        """
+        Distribute scene detection across the cluster using Kubernetes Jobs.
+        """
+        from ..cluster.job_submitter import JobSubmitter
+        from ..cluster.distributed_scene_detection import aggregate_shard_results
+
+        logger.info(f"   🌐 Cluster Mode: Submitting distributed scene detection job for {len(video_paths)} videos...")
+        
+        submitter = JobSubmitter()
+        
+        # Parallelism matches Cluster settings
+        parallelism = min(len(video_paths), self.settings.features.cluster_parallelism)
+        
+        try:
+            job = submitter.submit_scene_detection(
+                video_paths=video_paths,
+                parallelism=parallelism,
+                threshold=threshold
+            )
+            
+            logger.info(f"   🚀 Job submitted: {job.name} (parallelism={parallelism})")
+            
+            # Monitor progress
+            last_succeeded = -1
+            while True:
+                status = submitter.get_job_status(job.name)
+                if status is None:
+                    break
+                    
+                if status.succeeded > last_succeeded:
+                    logger.info(f"   ⏳ Progress: {status.succeeded}/{parallelism} workers completed")
+                    last_succeeded = status.succeeded
+                    
+                    if progress_callback:
+                        progress_callback({
+                            "percent": int((status.succeeded / parallelism) * 100),
+                            "message": f"Cluster processing: {status.succeeded}/{parallelism} nodes complete",
+                        })
+                
+                if status.is_complete:
+                    break
+                time.sleep(5)
+                
+            status = submitter.get_job_status(job.name)
+            if not status or not status.is_successful:
+                total_failed = status.failed if status else "unknown"
+                raise RuntimeError(f"Distributed job {job.name} failed (failed={total_failed})")
+                
+            logger.info(f"   ✅ Distributed job {job.name} finished successfully")
+            
+            # Aggregate results
+            output_dir = "/data/output/scene_cache"
+            scenes_data = aggregate_shard_results(output_dir, job.name)
+            
+            # Convert list of dicts to path-mapped dict
+            results = {}
+            for s in scenes_data:
+                path = s["path"]
+                if path not in results:
+                    results[path] = []
+                results[path].append((s["start"], s["end"]))
+                
+            return results
+        except Exception as e:
+            logger.error(f"   ❌ Distributed scene detection failed: {e}")
+            raise
 
     def _get_files(self, directory: str, extensions: Iterable[str]) -> List[str]:
         """Get valid files from directory."""
