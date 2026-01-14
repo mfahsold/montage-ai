@@ -1,0 +1,27 @@
+{
+  "job_id": "20260114_133320",
+  "total_duration_s": 231.8223283290863,
+  "phase_times_ms": {
+    "initialization": 2.566099166870117,
+    "variant_1": 231814.3608570099
+  },
+  "kpis": {},
+  "feature_usage": {},
+  "decisions": [],
+  "metrics": {},
+  "events": [
+    {
+      "timestamp": "13:37:17.345",
+      "level": "METRIC",
+      "category": "resources",
+      "message": "Process: 0.4GB RAM, 0% CPU",
+      "data": {
+        "process_rss_gb": 0.3939018249511719,
+        "process_cpu_pct": 0.0,
+        "system_mem_pct": 69.3,
+        "system_available_gb": 4.731899261474609
+      },
+      "duration_ms": null
+    }
+  ]
+}

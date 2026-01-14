@@ -183,8 +183,9 @@ def save_shard_result(result: ShardResult, output_dir: str, job_id: str) -> str:
         "processing_time": result.processing_time
     }
 
+    from ..utils import NumpyEncoder
     with open(output_path, "w") as f:
-        json.dump(data, f, indent=2)
+        json.dump(data, f, indent=2, cls=NumpyEncoder)
 
     logger.info(f"📁 Saved shard result to {output_path}")
     return str(output_path)

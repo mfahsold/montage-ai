@@ -214,7 +214,10 @@ def process_clip_task(
         # RE-ADD setsar=1 to match original code
         vf_filters.append("setsar=1")
 
-        if getattr(settings.features, "colorlevels", True):
+        # Optimization: Skip expensive filters in preview mode
+        is_preview = settings.encoding.quality_profile == "preview"
+        
+        if getattr(settings.features, "colorlevels", True) and not is_preview:
             vf_filters.append(
                 "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:"
                 "rimax=0.922:gimax=0.922:bimax=0.922"
@@ -236,6 +239,10 @@ def process_clip_task(
             cmd = build_ffmpeg_cmd([])
             if cfg and cfg.is_gpu_accelerated:
                 cmd.extend(cfg.hwaccel_input_params())
+            
+            # Log normalization start (only once per clip)
+            # logger.info(f"   ⚙️ Normalizing {label}: {os.path.basename(current_path)}")
+
             cmd.extend([
                 "-i", current_path,
                 "-vf", vf,

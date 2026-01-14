@@ -2,44 +2,44 @@
 
 Provides unified API for both MoviePy versions, centralizing all
 version-specific workarounds in one place.
-
-MoviePy 2.x changes (from 1.x):
-- from moviepy.editor → from moviepy
-- .subclip() → .subclipped()
-- .set_audio() → .with_audio()
-- .set_duration() → .with_duration()
-- .set_position() → .with_position()
-- .resize() → .resized()
-- .crop() → .cropped()
-- .rotate() → .rotated()
-- write_videofile(): 'verbose' parameter REMOVED (use logger=None instead)
 """
 
-try:
-    # MoviePy 2.x
-    from moviepy import (
-        VideoFileClip,
-        AudioFileClip,
-        ImageClip,
-        ColorClip,
-        TextClip,
-        CompositeVideoClip,
-        concatenate_videoclips,
-    )
-except ImportError:
-    # MoviePy 1.x
-    from moviepy.editor import (
-        VideoFileClip,
-        AudioFileClip,
-        ImageClip,
-        ColorClip,
-        TextClip,
-        CompositeVideoClip,
-        concatenate_videoclips,
-    )
+import sys
+from typing import Any
+
+# Global cache for moviepy modules
+_moviepy_cache = {}
+
+def _get_moviepy():
+    """Lazy load moviepy modules."""
+    if "moviepy" not in _moviepy_cache:
+        try:
+            # MoviePy 2.x
+            import moviepy
+            _moviepy_cache["moviepy"] = moviepy
+            _moviepy_cache["version"] = 2
+        except ImportError:
+            # MoviePy 1.x
+            import moviepy.editor as moviepy_editor
+            _moviepy_cache["moviepy"] = moviepy_editor
+            _moviepy_cache["version"] = 1
+    return _moviepy_cache["moviepy"]
+
+def _getattr_compat(name: str) -> Any:
+    """Helper to get attribute from lazy-loaded moviepy."""
+    return getattr(_get_moviepy(), name)
+
+# These will be dynamically resolved when accessed via this module
+def __getattr__(name: str) -> Any:
+    if name in [
+        "VideoFileClip", "AudioFileClip", "ImageClip", "ColorClip", 
+        "TextClip", "CompositeVideoClip", "concatenate_videoclips"
+    ]:
+        return _getattr_compat(name)
+    raise AttributeError(f"module {__name__} has no attribute {name}")
 
 __all__ = [
-    # Re-exports
+    # Re-exports (via __getattr__)
     "VideoFileClip",
     "AudioFileClip",
     "ImageClip",

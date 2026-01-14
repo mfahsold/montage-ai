@@ -25,15 +25,17 @@ import cv2
 import numpy as np
 import requests
 
-from scenedetect import open_video, SceneManager
-from scenedetect.detectors import ContentDetector
+# Lazy-loaded imports in classes/functions below
+# - scenedetect
+# - scipy.spatial.KDTree
 
 # OPTIMIZATION: K-D tree for fast scene similarity queries (sub-linear search)
+KDTREE_AVAILABLE = False
 try:
-    from scipy.spatial import KDTree
+    import scipy.spatial
     KDTREE_AVAILABLE = True
 except ImportError:
-    KDTREE_AVAILABLE = False
+    pass
 
 from .config import get_settings
 from .video_metadata import probe_metadata  # Expose for tests to patch
@@ -377,6 +379,9 @@ class SceneDetector:
                 effective_path = self._create_downsampled_proxy(video_path, max_resolution)
         except Exception as e:
             logger.warning(f"Could not check resolution for proxy/downsampling: {e}. Using original.")
+
+        from scenedetect import open_video, SceneManager
+        from scenedetect.detectors import ContentDetector
 
         video = open_video(effective_path)
         scene_manager = SceneManager()
@@ -1059,6 +1064,7 @@ class SceneSimilarityIndex:
         
         if self.histograms:
             # Build K-D tree (O(n log n) construction)
+            from scipy.spatial import KDTree
             self.kdtree = KDTree(self.histograms)
             logger.info(f"   ✓ K-D tree built with {len(self.histograms)} feature vectors")
         else:
@@ -1284,8 +1290,21 @@ def find_best_start_point(
         logger.debug("LOW_MEMORY_MODE: Skipping optical flow, using fallback")
         return _fallback_start_point(scene_start, scene_end, target_duration)
 
+    # Optimization: Skip if in preview mode
+    settings = get_settings()
+    if settings.encoding.quality_profile == "preview":
+        logger.debug("QUALITY_PROFILE=preview: Skipping optical flow")
+        return _fallback_start_point(scene_start, scene_end, target_duration)
+
     cap = None
     try:
+        # Adaptation: Limit samples to cap processing time
+        duration = scene_end - scene_start
+        max_samples = 20
+        if duration / sample_interval > max_samples:
+            sample_interval = duration / max_samples
+            logger.debug(f"   ⏱️ Adapting optical flow interval to {sample_interval:.1f}s for {duration:.1f}s scene")
+
         cap = cv2.VideoCapture(video_path)
         cap.set(cv2.CAP_PROP_POS_MSEC, scene_start * 1000)
 

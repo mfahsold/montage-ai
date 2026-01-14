@@ -133,8 +133,9 @@ class MetadataCache:
         }
 
         try:
+            from .utils import NumpyEncoder
             with open(cache_path, 'w') as f:
-                json.dump(cache_data, f, indent=2)
+                json.dump(cache_data, f, indent=2, cls=NumpyEncoder)
         except OSError as e:
             logger.warning(f"   ⚠️  Failed to save cache for {video_path}: {e}")
 

@@ -9,8 +9,33 @@ Usage:
 """
 
 import os
+import json
 from pathlib import Path
-from typing import Union
+from typing import Union, Any
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+
+
+class NumpyEncoder(json.JSONEncoder):
+    """
+    JSON encoder that handles NumPy types (bool_, int64, float64, etc.)
+    Required because standard json module doesn't know how to serialize numpy types.
+    """
+    def default(self, obj: Any) -> Any:
+        if NUMPY_AVAILABLE:
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            if isinstance(obj, (np.integer, np.int64, np.int32, np.intc, np.intp)):
+                return int(obj)
+            if isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
+                return float(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+        return super().default(obj)
 
 
 def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:

@@ -426,6 +426,8 @@ class MontageBuilder:
                     pass
             if completed > 0:
                 logger.info(f"   ✅ {completed} Proxies ready")
+        
+        self.progress.metadata_extraction_complete()
 
     def _setup_output_paths(self, style_name: str):
         """Determine output filename and logo path."""
@@ -452,6 +454,7 @@ class MontageBuilder:
         - Run clip selection loop (beat-synced, AI-scored)
         """
         logger.info("\n   📋 Planning montage...")
+        self.progress.assembly_start()
 
         # Story Engine Planning (Phase 1)
         if self.settings.features.story_engine:
@@ -525,7 +528,7 @@ class MontageBuilder:
         self._render_engine.set_renderer(self._progressive_renderer)
 
         # DISTRIBUTED MODE: Phase 2 (Distributed Rendering)
-        if self.settings.cluster.cluster_mode:
+        if self.settings.features.cluster_mode:
             logger.info("   🌐 Cluster Mode: Switching to Distributed Rendering...")
             self._render_engine.render_distributed()
         else:
@@ -928,6 +931,7 @@ class MontageBuilder:
         # Flush remaining futures
         self._flush_pending_futures()
 
+        self.progress.assembly_complete()
         logger.info(f"   ✅ Assembly complete: {self.ctx.timeline.cut_number} cuts, {self.ctx.timeline.current_time:.1f}s")
 
     def _process_and_add_clip(

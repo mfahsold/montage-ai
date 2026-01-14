@@ -395,10 +395,10 @@ class FFmpegConfig:
             ]
 
         if self._hw_config.type in ("vaapi", "rocm"):
-            # VAAPI/ROCm: ICQ mode for quality-based encoding
-            # Works on Intel iGPU and AMD Radeon
+            # VAAPI/ROCm: CQP mode for quality-based encoding
+            # Older drivers often don't support ICQ, CQP is more compatible.
             return [
-                "-rc_mode", "ICQ",
+                "-rc_mode", "CQP",
                 "-qp", str(crf_clamped),
             ]
 

@@ -194,45 +194,44 @@ class ProxyGenerator:
     def generate_analysis_proxy(source_path: str, output_path: str, height: int = 720) -> bool:
         """
         Generate a lightweight proxy for fast analysis (scene detection, feature extraction).
-        
-        Args:
-            source_path: Input video file
-            output_path: Output proxy file (h264 mp4)
-            height: Proxy height in pixels (default 720p); maintains aspect ratio
-        
-        Returns:
-            True if successful, raises on failure
-        
-        Example:
-            ProxyGenerator.generate_analysis_proxy(
-                source_path="/data/input/long_raw_video.mp4",
-                output_path="/tmp/proxy_long_raw_video.mp4",
-                height=720
-            )
         """
         import subprocess
+        from .ffmpeg_config import FFmpegConfig
+        
+        # Use CPU for analysis proxy generation to avoid VAAPI filter format issues
+        # and because it's usually very small/fast anyway.
+        config = FFmpegConfig(hwaccel="none")
         
         # Build FFmpeg command
-        # Use hardware acceleration if available (auto-detect)
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-hwaccel", "auto",
-            "-i", str(source_path),
-            # Scale to target height (maintains aspect ratio)
-            "-vf", f"scale=-1:{height}",
-            # Fast H.264 encoding (CRF 28 = acceptable quality for analysis)
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-crf", "28",
-            # Copy audio as-is (we don't analyze it)
-            "-c:a", "aac",
-            "-b:a", "128k",
-            # Output
-            str(output_path)
-        ]
+        cmd = ["ffmpeg", "-y"]
+        cmd.extend(config.hwaccel_input_params())
+        cmd.extend(["-i", str(source_path)])
         
-        logger.info(f"Generating analysis proxy: {height}p ({source_path} → {output_path})")
+        # Scale filter
+        vf_chain = [f"scale=-2:{height}"]
+        hw_filter = config.hwupload_filter
+        if hw_filter and config._hw_config.type != "nvenc":
+            # For VAAPI/QSV, we might need a more complex filter chain if we want to stay in GPU memory
+            # but for analysis proxy generation, stay simple and robust.
+            pass
+            
+        cmd.extend(["-vf", ",".join(vf_chain)])
+
+        # Fast encoding using centralized config for encoder selection
+        # We use a high CRF (low quality) for analysis proxies to maximize speed
+        video_params = config.video_params(
+            crf=28,
+            preset="ultrafast"
+        )
+        cmd.extend(video_params)
+        
+        # Audio: Minimal for analysis
+        cmd.extend(["-c:a", "aac", "-b:a", "64k"])
+        
+        # Output
+        cmd.append(str(output_path))
+        
+        logger.info(f"Generating analysis proxy: {height}p ({source_path} → {output_path}) using {config.effective_codec}")
         
         try:
             from .config import get_settings

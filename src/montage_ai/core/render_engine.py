@@ -305,7 +305,7 @@ class RenderEngine:
             from ..cluster.job_submitter import JobSubmitter
             submitter = JobSubmitter()
             
-            parallelism = self.settings.cluster.cluster_parallelism
+            parallelism = self.settings.features.cluster_parallelism
             logger.info(f"   🚀 Submitting {parallelism} rendering shards to cluster...")
             
             # Note: We need to implement submit_render_job in JobSubmitter

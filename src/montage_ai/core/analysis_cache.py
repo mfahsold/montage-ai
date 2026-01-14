@@ -297,8 +297,9 @@ class AnalysisCache:
             else:
                 actual_path = cache_path
                 temp_path = actual_path.with_suffix(f"{actual_path.suffix}.tmp")
+                from ..utils import NumpyEncoder
                 with open(temp_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2)
+                    json.dump(data, f, indent=2, cls=NumpyEncoder)
             
             # Atomic rename
             temp_path.replace(actual_path)

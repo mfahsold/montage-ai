@@ -543,9 +543,29 @@ class AssetAnalyzer:
 
         with ThreadPoolExecutor(max_workers=ai_workers) as executor:
             futures = [executor.submit(analyze_scene, s) for s in scenes_to_analyze]
+            completed_ai = 0
+            total_ai = len(scenes_to_analyze)
+            start_time = time.time()
+            
             for future in as_completed(futures):
                 scene, meta = future.result()
                 scene.meta = meta
+                
+                # Update progress
+                completed_ai += 1
+                if self.ctx.job_id:  # Only if we have a job context
+                    from ..monitoring import get_monitor
+                    monitor = get_monitor()
+                    
+                    elapsed = time.time() - start_time
+                    avg_dur = elapsed / completed_ai
+                    
+                    # Log to progress tracker if available via MontageBuilder
+                    # Since AssetAnalyzer doesn't have direct ref to progress, 
+                    # we use the monitor or just standard logging for now.
+                    # Actually, we can assume the caller (MontageBuilder) set up self.progress_callback
+                    if completed_ai % max(1, total_ai // 10) == 0:
+                        logger.info(f"   🤖 AI Analysis: {completed_ai}/{total_ai} ({int(completed_ai/total_ai*100)}%)")
 
         # Shuffle for variety
         random.shuffle(self.ctx.media.all_scenes)
