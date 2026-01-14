@@ -24,9 +24,6 @@ from ..logger import logger
 from ..config import get_settings
 from ..segment_writer import ProgressiveRenderer
 from ..core.context import ClipMetadata
-from ..core.clip_processor import process_clip_task
-from ..resource_manager import get_resource_manager
-
 
 def render_shard(
     clips_metadata: List[Dict[str, Any]],
@@ -40,16 +37,6 @@ def render_shard(
 ):
     """
     Render a specific shard of the timeline.
-
-    Args:
-        clips_metadata: Full list of clip metadata for the project
-        shard_index: This worker's index
-        shard_count: Total number of workers
-        output_dir: Shared output directory for segments
-        job_id: Unique job ID
-        enable_xfade: Enable transitions
-        xfade_duration: Transition duration
-        quality_profile: 'preview', 'standard', or 'high'
     """
     settings = get_settings()
     
@@ -68,12 +55,11 @@ def render_shard(
     logger.info(f"   🎬 Shard {shard_index}/{shard_count} rendering {len(my_clips)} clips (indices {start_idx}-{end_idx-1})")
 
     # 2. Setup Progressive Renderer for this shard
-    # We want each shard to produce its own sequence of segments
     shard_output_dir = os.path.join(output_dir, f"shard_{shard_index}")
     os.makedirs(shard_output_dir, exist_ok=True)
 
     renderer = ProgressiveRenderer(
-        batch_size=len(my_clips), # We want one big segment for the shard if possible, or use standard batching
+        batch_size=len(my_clips), 
         output_dir=shard_output_dir,
         job_id=f"{job_id}_s{shard_index}",
         enable_xfade=enable_xfade,
@@ -82,69 +68,54 @@ def render_shard(
     )
 
     # 3. Process Clips
-    resource_manager = get_resource_manager()
-    
-    # In distributed mode, we can use more local threads since the node only handles one shard
-    # max_threads = resource_manager.get_optimal_threads()
-    
-    render_start = time.time()
     for i, clip_dict in enumerate(my_clips):
         # Reconstruct ClipMetadata
         meta = ClipMetadata(**clip_dict)
         
-        # We need to simulate the loop from MontageBuilder
-        # Note: In distributed renderer, we assume the clip is already analyzed
-        # and we just need to run the FFmpeg render part.
-        
         logger.info(f"   ✂️ Shard {shard_index}: Rendering clip {i+1}/{len(my_clips)}: {os.path.basename(meta.source_path)}")
-        
-        # Simulating process_clip_task (simplified for worker)
-        # Note: process_clip_task returns a path to a temporary video file
         temp_path = os.path.join(shard_output_dir, f"clip_{shard_index}_{i}.mp4")
         
-        # If the worker script is running in a container, it has access to /data/input via NFS
         try:
-            # We don't have the original 'scene' dict anymore, but ClipMetadata has source_path, start_time, duration.
-            # We can use FFmpeg directly to extract the subclip.
-            
-            # Use the logic from clip_processor but simplified
             from ..ffmpeg_config import get_config
             cfg = get_config()
             
-            # Build FFmpeg command for the subclip
-            cmd = cfg.video_params() # Basic params
-            
-            # Extract subclip
+            hwaccel = []
+            if os.environ.get("FFMPEG_HWACCEL") and os.environ.get("FFMPEG_HWACCEL") != "none":
+                hwaccel = ["-hwaccel", os.environ.get("FFMPEG_HWACCEL")]
+
             import subprocess
             ffmpeg_cmd = [
-                "ffmpeg", "-y", "-ss", str(meta.start_time), "-t", str(meta.duration),
+                "ffmpeg", "-y"
+            ] + hwaccel + [
+                "-ss", f"{meta.start_time:.3f}", "-t", f"{meta.duration:.3f}",
                 "-i", meta.source_path,
-                "-vf", f"scale={settings.encoding.width}:{settings.encoding.height}",
-                "-c:v", cfg.codec, "-crf", str(settings.encoding.crf), "-preset", "fast",
+                "-vf", f"scale={settings.encoding.width}:{settings.encoding.height},setsar=1",
+                "-c:v", os.environ.get("FFMPEG_ENCODER", cfg.codec),
+                "-crf", str(settings.encoding.crf),
+                "-preset", "fast",
                 "-c:a", "aac", "-b:a", "192k",
                 temp_path
             ]
             
             logger.debug(f"   Executing: {' '.join(ffmpeg_cmd)}")
-            subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
             
+            if result.returncode != 0:
+                logger.error(f"   ❌ FFmpeg failed (code {result.returncode}): {result.stderr}")
+                continue
+                
             renderer.add_clip_path(temp_path)
             
         except Exception as e:
             logger.error(f"   ❌ Shard {shard_index}: Clip {i} failed: {e}")
 
     # 4. Finalize Shard Segment
-    # This will create one or more segments for this shard
-    shard_segments = renderer.flush_batch()
-    
-    render_duration = time.time() - render_start
-    logger.info(f"   ✅ Shard {shard_index} completed in {render_duration:.1f}s")
+    renderer.flush_batch()
     
     # Save shard report
     report = {
         "shard_index": shard_index,
         "clip_count": len(my_clips),
-        "duration": render_duration,
         "segments": [s.path for s in renderer.segment_writer.segments] if hasattr(renderer.segment_writer, 'segments') else []
     }
     
@@ -182,7 +153,6 @@ def main():
         xfade_duration=args.xfade_duration,
         quality_profile=args.quality
     )
-
 
 if __name__ == "__main__":
     main()

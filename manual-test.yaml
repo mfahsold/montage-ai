@@ -1,0 +1,14 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: manual-test-job
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: ghcr.io/mfahsold/montage-ai:latest
+        command: ["echo", "Manual test successful"]
+      restartPolicy: Never
+  backoffLimit: 1

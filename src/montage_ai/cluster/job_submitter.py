@@ -550,11 +550,11 @@ spec:
               value: "true" {env_section}
           resources:
             requests:
-              cpu: "{resources.get('cpu', '2') if resources else '2'}"
-              memory: "{resources.get('memory', '4Gi') if resources else '4Gi'}"
+              cpu: "{resources.get('requests_cpu', '1') if resources else '1'}"
+              memory: "{resources.get('requests_memory', '2Gi') if resources else '2Gi'}"
             limits:
-              cpu: "{resources.get('limit_cpu', '4') if resources else '4'}"
-              memory: "{resources.get('limit_memory', '8Gi') if resources else '8Gi'}"
+              cpu: "{resources.get('limits_cpu', '2') if resources else '2'}"
+              memory: "{resources.get('limits_memory', '4Gi') if resources else '4Gi'}"
           volumeMounts:
             - name: input
               mountPath: /data/input
