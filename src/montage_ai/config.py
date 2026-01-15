@@ -400,6 +400,44 @@ class CloudConfig:
     track_usage: bool = field(default_factory=lambda: os.environ.get("TRACK_USAGE", "true").lower() == "true")
 
 
+@dataclass
+class ClusterConfig:
+    """
+    Kubernetes cluster and registry configuration.
+    
+    Syncs with deploy/config.env values for distributed processing.
+    """
+    registry_host: str = field(default_factory=lambda: os.environ.get("REGISTRY_HOST", "192.168.1.12"))
+    registry_port: str = field(default_factory=lambda: os.environ.get("REGISTRY_PORT", "30500"))
+    image_name: str = field(default_factory=lambda: os.environ.get("IMAGE_NAME", "montage-ai"))
+    image_tag: str = field(default_factory=lambda: os.environ.get("IMAGE_TAG", "latest-amd64"))
+    namespace: str = field(default_factory=lambda: os.environ.get("CLUSTER_NAMESPACE", "montage-ai"))
+    image_pull_secret: Optional[str] = field(default_factory=lambda: os.environ.get("IMAGE_PULL_SECRET"))
+    pvc_name: str = field(default_factory=lambda: os.environ.get("PVC_NAME", "montage-ai-data"))
+
+    # Resource Tiers (Canonical Fluxibri Tiers)
+    tiers: dict = field(default_factory=lambda: {
+        "minimal": {"requests": {"cpu": "10m", "memory": "32Mi"}, "limits": {"cpu": "100m", "memory": "128Mi"}},
+        "small": {"requests": {"cpu": "100m", "memory": "256Mi"}, "limits": {"cpu": "500m", "memory": "1Gi"}},
+        "medium": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2", "memory": "4Gi"}},
+        "large": {"requests": {"cpu": "2", "memory": "4Gi"}, "limits": {"cpu": "8", "memory": "16Gi"}},
+        "gpu": {"requests": {"cpu": "1", "memory": "4Gi"}, "limits": {"cpu": "16", "memory": "32Gi"}}
+    })
+
+    @property
+    def image_full(self) -> str:
+        """Full remote image path for Kubernetes."""
+        host = self.registry_host
+        port = self.registry_port
+        name = self.image_name
+        tag = self.image_tag
+        
+        # Build image path
+        if port:
+            return f"{host}:{port}/{name}:{tag}"
+        return f"{host}/{name}:{tag}"
+
+
 # =============================================================================
 # Motion Analysis & Performance Tuning
 # =============================================================================
@@ -924,6 +962,7 @@ class Settings:
     llm: LLMConfig = field(default_factory=LLMConfig)
     gpu: GPUConfig = field(default_factory=GPUConfig)
     cloud: CloudConfig = field(default_factory=CloudConfig)
+    cluster: ClusterConfig = field(default_factory=ClusterConfig)
     encoding: EncodingConfig = field(default_factory=EncodingConfig)
     export: ExportConfig = field(default_factory=ExportConfig)
     upscale: UpscaleConfig = field(default_factory=UpscaleConfig)

@@ -39,15 +39,20 @@ def validate():
 
     # Submit a dummy job
     job_id = f"test-orchestration-{int(time.time())}"
-    command = ["echo", "Orchestration test successful"]
+    # Use sh -c for better portability and ensure we're not hitting a missing binary path
+    command = ["sh", "-c", "echo 'Orchestration test successful'"]
     
-    logger.info(f"🚀 Submitting test job: {job_id}")
+    # Try AMD64 first as it's the primary target for heavy lifting
+    node_selector = {"kubernetes.io/arch": "amd64"}
+    
+    logger.info(f"🚀 Submitting test job: {job_id} (Target: amd64)")
     try:
         job_spec = submitter.submit_generic_job(
             job_id=job_id,
             command=command,
             parallelism=1,
-            component="test-orchestration"
+            component="test-orchestration",
+            node_selector=node_selector
         )
         
         # Wait for completion
@@ -55,12 +60,11 @@ def validate():
         
         if success:
             logger.info("✅ Test Job completed successfully")
+            # Cleanup only on success
+            logger.info(f"🧹 Deleting test job {job_id}")
+            submitter.delete_job(job_spec.name)
         else:
-            logger.error("❌ Test Job failed or timed out")
-            
-        # Cleanup
-        logger.info(f"🧹 Deleting test job {job_id}")
-        submitter.delete_job(job_spec.name)
+            logger.error("❌ Test Job failed or timed out. Leaving for inspection.")
         
         return success
         

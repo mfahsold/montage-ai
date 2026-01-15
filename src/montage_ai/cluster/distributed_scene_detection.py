@@ -348,26 +348,62 @@ def main():
             save_shard_result(result, args.output_dir, args.job_id)
 
     elif args.shard_mode:
-        # K8s indexed job mode - get videos from env
-        video_dir = os.environ.get("VIDEO_PATH", "/data/input")
-        video_paths = [
-            str(p) for p in Path(video_dir).glob("*.mp4")
-        ]
+        # K8s indexed job mode - get videos from env or glob
+        videos_env = os.environ.get("VIDEOS")
+        video_path_env = os.environ.get("VIDEO_PATH")
+        
+        if videos_env:
+            video_paths = [v.strip() for v in videos_env.split(",") if v.strip()]
+        elif video_path_env and os.path.isfile(video_path_env):
+            video_paths = [video_path_env]
+        else:
+            video_dir = video_path_env or "/data/input"
+            video_paths = [
+                str(p) for p in Path(video_dir).glob("*.mp4")
+            ]
 
-        shard_videos = get_shard_files(video_paths, args.shard_index, args.shard_count)
-        logger.info(
-            f"🔧 K8s shard mode: Processing {len(shard_videos)} videos "
-            f"(shard {args.shard_index}/{args.shard_count})"
-        )
+        if len(video_paths) == 1:
+            # Automatic time-based sharding for single video in cluster mode
+            video_path = video_paths[0]
+            meta = probe_metadata(video_path)
+            duration = meta.get("duration", 0.0)
 
-        for video_path in shard_videos:
+            time_range = get_shard_time_range(
+                duration,
+                args.shard_index,
+                args.shard_count
+            )
+
+            logger.info(
+                f"🔧 K8s shard mode (Time-based): Processing {video_path} "
+                f"range {time_range[0]:.2f}-{time_range[1]:.2f}s "
+                f"(shard {args.shard_index}/{args.shard_count})"
+            )
+
             result = detect_scenes_shard(
                 video_path,
                 args.shard_index,
                 args.shard_count,
+                time_range=time_range,
                 threshold=args.threshold
             )
             save_shard_result(result, args.output_dir, args.job_id)
+        else:
+            # File-based sharding
+            shard_videos = get_shard_files(video_paths, args.shard_index, args.shard_count)
+            logger.info(
+                f"🔧 K8s shard mode (File-based): Processing {len(shard_videos)} videos "
+                f"(shard {args.shard_index}/{args.shard_count})"
+            )
+
+            for video_path in shard_videos:
+                result = detect_scenes_shard(
+                    video_path,
+                    args.shard_index,
+                    args.shard_count,
+                    threshold=args.threshold
+                )
+                save_shard_result(result, args.output_dir, args.job_id)
 
     else:
         parser.error("Must specify --video, --videos, or --shard-mode")

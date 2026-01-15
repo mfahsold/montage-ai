@@ -30,23 +30,32 @@ import json
 import os
 import subprocess
 import time
+import yaml
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
+from kubernetes import client, config, watch
+from kubernetes.client.rest import ApiException
+
 from ..logger import logger
+from ..config import get_settings
+
+# Use lazy-initialized settings
+settings = get_settings()
 
 
 @dataclass
 class JobSpec:
     """Specification for a distributed job."""
     name: str
-    namespace: str = "montage-ai"
+    namespace: str = settings.cluster.namespace
     parallelism: int = 4
     completions: int = 4
-    image: str = os.environ.get("IMAGE_FULL", os.environ.get("MONTAGE_IMAGE", "ghcr.io/mfahsold/montage-ai:latest"))
+    image: str = settings.cluster.image_full
     env: Dict[str, str] = None
     resources: Dict[str, Any] = None
+    image_pull_secret: Optional[str] = settings.cluster.image_pull_secret
 
 
 @dataclass
@@ -58,26 +67,50 @@ class JobStatus:
     failed: int
     completion_time: Optional[str]
     conditions: List[Dict[str, str]]
+    is_not_found: bool = False
 
     @property
     def is_complete(self) -> bool:
-        return self.succeeded >= 1 or self.failed >= 1
+        """Check if job has finished (success or failure)."""
+        if self.is_not_found:
+            return False
+        return (self.succeeded >= 1 or self.failed >= 1)
 
     @property
     def is_successful(self) -> bool:
+        """Check if job completed successfully."""
+        if self.is_not_found:
+            return False
         return self.succeeded >= 1 and self.failed == 0
 
 
 class JobSubmitter:
     """
-    Submit and manage distributed Kubernetes jobs.
-
-    Requires kubectl access to the cluster.
+    Submit and manage distributed Kubernetes jobs using the official K8s client.
     """
 
-    def __init__(self, namespace: str = "montage-ai", kubeconfig: Optional[str] = None):
-        self.namespace = namespace
+    def __init__(self, namespace: Optional[str] = None, kubeconfig: Optional[str] = None):
+        self.namespace = namespace or settings.cluster.namespace
         self.kubeconfig = kubeconfig or os.environ.get("KUBECONFIG")
+        self.image = settings.cluster.image_full
+        
+        # Initialize K8s client
+        try:
+            if self.kubeconfig:
+                config.load_kube_config(config_file=self.kubeconfig)
+            else:
+                try:
+                    config.load_incluster_config()
+                except config.ConfigException:
+                    config.load_kube_config()
+            
+            self.batch_v1 = client.BatchV1Api()
+            self.core_v1 = client.CoreV1Api()
+            logger.info(f"✅ Kubernetes client initialized (Namespace: {self.namespace})")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Kubernetes client: {e}")
+            self.batch_v1 = None
+            self.core_v1 = None
 
     def _kubectl(self, *args, capture_output: bool = True) -> subprocess.CompletedProcess:
         """Run kubectl command."""
@@ -92,8 +125,8 @@ class JobSubmitter:
     def _generate_job_id(self, prefix: str, *args) -> str:
         """Generate unique job ID based on inputs."""
         content = "-".join(str(a) for a in args)
-        hash_suffix = hashlib.md5(content.encode()).hexdigest()[:8]
-        timestamp = int(time.time()) % 100000
+        hash_suffix = hashlib.md5(content.encode()).hexdigest()[:12]
+        timestamp = int(time.time()) % 1000000
         return f"{prefix}-{timestamp}-{hash_suffix}"
 
     def submit_scene_detection(
@@ -104,351 +137,148 @@ class JobSubmitter:
         output_dir: str = "/data/output/scene_cache"
     ) -> JobSpec:
         """
-        Submit distributed scene detection job.
-
-        Args:
-            video_paths: List of video paths to analyze
-            parallelism: Number of parallel workers
-            threshold: Scene detection threshold
-            output_dir: Output directory for results
-
-        Returns:
-            JobSpec with job details
+        Submit distributed scene detection job using K8s API.
         """
         job_id = self._generate_job_id("scene-detect", *video_paths)
-
-        # Create ConfigMap with job config
-        config_yaml = f"""
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: scene-detect-config-{job_id}
-  namespace: {self.namespace}
-data:
-  video_paths: "{','.join(video_paths)}"
-  threshold: "{threshold}"
-  output_dir: "{output_dir}"
-  job_id: "{job_id}"
-"""
-
-        # Create Job manifest
-        image_var = os.environ.get("IMAGE_FULL", os.environ.get("MONTAGE_IMAGE", "ghcr.io/mfahsold/montage-ai:latest"))
-        job_yaml = f"""
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: {job_id}
-  namespace: {self.namespace}
-  labels:
-    app.kubernetes.io/name: montage-ai
-    app.kubernetes.io/component: scene-detection
-    montage-ai.fluxibri.dev/job-id: "{job_id}"
-spec:
-  completionMode: Indexed
-  completions: {parallelism}
-  parallelism: {parallelism}
-  backoffLimit: 2
-  ttlSecondsAfterFinished: 3600
-  template:
-    spec:
-      restartPolicy: Never
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app.kubernetes.io/component: scene-detection
-                topologyKey: kubernetes.io/hostname
-      containers:
-        - name: scene-detect
-          image: {image_var}
-          imagePullPolicy: IfNotPresent
-          command:
-            - python
-            - -m
-            - montage_ai.cluster.distributed_scene_detection
-            - --shard-mode
-          env:
-            - name: SHARD_INDEX
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
-            - name: SHARD_COUNT
-              value: "{parallelism}"
-            - name: VIDEO_PATH
-              value: "{video_paths[0] if len(video_paths) == 1 else '/data/input'}"
-            - name: VIDEOS
-              value: "{','.join(video_paths)}"
-            - name: OUTPUT_DIR
-              value: "{output_dir}"
-            - name: JOB_ID
-              value: "{job_id}"
-            - name: PYTHONUNBUFFERED
-              value: "1"
-          resources:
-            requests:
-              cpu: "2"
-              memory: "4Gi"
-            limits:
-              cpu: "4"
-              memory: "8Gi"
-          volumeMounts:
-            - name: input
-              mountPath: /data/input
-              readOnly: true
-            - name: output
-              mountPath: /data/output
-      volumes:
-        - name: input
-          persistentVolumeClaim:
-            claimName: montage-input
-        - name: output
-          persistentVolumeClaim:
-            claimName: montage-output
-"""
-
-        # Apply ConfigMap
-        result = subprocess.run(
-            ["kubectl", "apply", "-f", "-"],
-            input=config_yaml,
-            capture_output=True,
-            text=True
+        
+        # Create ConfigMap via API
+        config_map_name = f"scene-detect-config-{job_id}"
+        cm_body = client.V1ConfigMap(
+            api_version="v1",
+            kind="ConfigMap",
+            metadata=client.V1ObjectMeta(name=config_map_name, namespace=self.namespace),
+            data={
+                "video_paths": ",".join(video_paths),
+                "threshold": str(threshold),
+                "output_dir": output_dir,
+                "job_id": job_id
+            }
         )
-        if result.returncode != 0:
-            logger.error(f"Failed to create ConfigMap: {result.stderr}")
-            raise RuntimeError(f"ConfigMap creation failed: {result.stderr}")
+        
+        try:
+            self.core_v1.create_namespaced_config_map(self.namespace, cm_body)
+        except ApiException as e:
+            if getattr(e, "status", 0) != 409: # Ignore already exists
+                logger.error(f"Failed to create ConfigMap: {e}")
+                raise
 
-        # Apply Job
-        result = subprocess.run(
-            ["kubectl", "apply", "-f", "-"],
-            input=job_yaml,
-            capture_output=True,
-            text=True
-        )
-        if result.returncode != 0:
-            logger.error(f"Failed to create Job: {result.stderr}")
-            raise RuntimeError(f"Job creation failed: {result.stderr}")
-
-        logger.info(f"✅ Submitted distributed scene detection job: {job_id}")
-        logger.info(f"   Parallelism: {parallelism}, Videos: {len(video_paths)}")
-
-        return JobSpec(
-            name=job_id,
-            namespace=self.namespace,
+        # Build Job Spec using the newly refactored submit_generic_job
+        env = {
+            "VIDEO_PATH": video_paths[0] if len(video_paths) == 1 else "/data/input",
+            "VIDEOS": ",".join(video_paths),
+            "OUTPUT_DIR": output_dir,
+            "JOB_ID": job_id,
+            "SCENE_DETECT_CONFIG": config_map_name
+        }
+        
+        return self.submit_generic_job(
+            job_id=job_id,
+            command=["python", "-m", "montage_ai.cluster.distributed_scene_detection", "--shard-mode"],
             parallelism=parallelism,
-            completions=parallelism,
-            env={"JOB_ID": job_id, "VIDEOS": ",".join(video_paths)}
+            component="scene-detection",
+            env=env,
+            tier="medium"
         )
 
     def get_job_status(self, job_name: str) -> Optional[JobStatus]:
-        """Get status of a job."""
-        result = self._kubectl(
-            "get", "job", job_name,
-            "-o", "json"
-        )
-
-        if result.returncode != 0:
-            return None
-
-        data = json.loads(result.stdout)
-        status = data.get("status", {})
-
-        return JobStatus(
-            name=job_name,
-            active=status.get("active", 0),
-            succeeded=status.get("succeeded", 0),
-            failed=status.get("failed", 0),
-            completion_time=status.get("completionTime"),
-            conditions=status.get("conditions", [])
-        )
-
-    def wait_for_job(
-        self,
-        job_name: str,
-        timeout: int = 3600,
-        poll_interval: int = 10
-    ) -> JobStatus:
-        """
-        Wait for job completion.
-
-        Args:
-            job_name: Name of the job
-            timeout: Maximum wait time in seconds
-            poll_interval: Polling interval in seconds
-
-        Returns:
-            Final JobStatus
-        """
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            status = self.get_job_status(job_name)
-            if status is None:
-                raise RuntimeError(f"Job {job_name} not found")
-
-            if status.is_complete:
-                if status.is_successful:
-                    logger.info(f"✅ Job {job_name} completed successfully")
-                else:
-                    logger.warning(f"⚠️ Job {job_name} failed")
-                return status
-
-            logger.info(
-                f"⏳ Job {job_name}: {status.succeeded} succeeded, "
-                f"{status.active} active, {status.failed} failed"
+        """Get status of a job using K8s API."""
+        if not self.batch_v1:
+            # Fallback to kubectl if client failed
+            result = self._kubectl("get", "job", job_name, "-o", "json")
+            if result.returncode != 0:
+                return None
+            data = json.loads(result.stdout)
+            status = data.get("status", {})
+            return JobStatus(
+                name=job_name,
+                active=status.get("active", 0),
+                succeeded=status.get("succeeded", 0),
+                failed=status.get("failed", 0),
+                completion_time=status.get("completionTime"),
+                conditions=status.get("conditions", [])
             )
-            time.sleep(poll_interval)
 
-        raise TimeoutError(f"Job {job_name} did not complete within {timeout}s")
-
-    def get_scene_results(self, job_id: str, output_dir: str = "/data/output/scene_cache") -> List[dict]:
-        """
-        Get aggregated scene detection results.
-
-        Args:
-            job_id: Job ID
-            output_dir: Output directory where results are stored
-
-        Returns:
-            List of detected scenes
-        """
-        # Check for aggregated results file
-        result_path = Path(output_dir) / f"scenes_{job_id}.json"
-
-        if result_path.exists():
-            with open(result_path) as f:
-                data = json.load(f)
-                return data.get("scenes", [])
-
-        # If not aggregated yet, trigger aggregation
-        from .distributed_scene_detection import aggregate_shard_results
-        return aggregate_shard_results(output_dir, job_id)
-
-    def submit_gpu_encoding(
-        self,
-        input_path: str,
-        output_path: str,
-        codec: str = "h264_amf",
-        quality: str = "standard"
-    ) -> JobSpec:
-        """
-        Submit GPU encoding job.
-
-        Routes to best available GPU node.
-        """
-        job_id = self._generate_job_id("encode", input_path)
-
-        job_yaml = f"""
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: {job_id}
-  namespace: {self.namespace}
-  labels:
-    app.kubernetes.io/name: montage-ai
-    app.kubernetes.io/component: encoder
-spec:
-  backoffLimit: 1
-  ttlSecondsAfterFinished: 3600
-  template:
-    spec:
-      restartPolicy: Never
-      affinity:
-        nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              preference:
-                matchExpressions:
-                  - key: amd.com/gpu
-                    operator: In
-                    values: ["present", "true"]
-            - weight: 50
-              preference:
-                matchExpressions:
-                  - key: accelerator
-                    operator: In
-                    values: ["nvidia"]
-      containers:
-        - name: encoder
-          image: {image_var}
-          command:
-            - ffmpeg
-            - -i
-            - "{input_path}"
-            - -c:v
-            - "{codec}"
-            - -preset
-            - fast
-            - -y
-            - "{output_path}"
-          env:
-            - name: FFMPEG_HWACCEL
-              value: "auto"
-          resources:
-            requests:
-              cpu: "4"
-              memory: "8Gi"
-            limits:
-              cpu: "8"
-              memory: "24Gi"
-          volumeMounts:
-            - name: output
-              mountPath: /data/output
-      volumes:
-        - name: output
-          persistentVolumeClaim:
-            claimName: montage-output
-"""
-
-        result = subprocess.run(
-            ["kubectl", "apply", "-f", "-"],
-            input=job_yaml,
-            capture_output=True,
-            text=True
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(f"Job creation failed: {result.stderr}")
-
-        logger.info(f"✅ Submitted GPU encoding job: {job_id}")
-        return JobSpec(name=job_id, namespace=self.namespace)
+        try:
+            job = self.batch_v1.read_namespaced_job_status(job_name, self.namespace)
+            status = job.status
+            return JobStatus(
+                name=job_name,
+                active=status.active or 0,
+                succeeded=status.succeeded or 0,
+                failed=status.failed or 0,
+                completion_time=status.completion_time.isoformat() if status.completion_time else None,
+                conditions=[{
+                    "type": c.type,
+                    "status": c.status,
+                    "reason": c.reason,
+                    "message": c.message
+                } for c in (status.conditions or [])]
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return JobStatus(name=job_name, active=0, succeeded=0, failed=0, completion_time=None, conditions=[], is_not_found=True)
+            logger.error(f"Error getting job status: {e}")
+            return None
 
     def list_jobs(self, label_selector: str = "app.kubernetes.io/name=montage-ai") -> List[Dict]:
         """List all montage-ai jobs."""
-        result = self._kubectl(
-            "get", "jobs",
-            "-l", label_selector,
-            "-o", "json"
-        )
+        if not self.batch_v1:
+            result = self._kubectl("get", "jobs", "-l", label_selector, "-o", "json")
+            if result.returncode != 0:
+                return []
+            data = json.loads(result.stdout)
+            return data.get("items", [])
 
-        if result.returncode != 0:
+        try:
+            jobs = self.batch_v1.list_namespaced_job(self.namespace, label_selector=label_selector)
+            return [j.to_dict() for j in jobs.items]
+        except ApiException as e:
+            logger.error(f"Error listing jobs: {e}")
             return []
-
-        data = json.loads(result.stdout)
-        return data.get("items", [])
 
     def delete_job(self, job_name: str, cascade: bool = True) -> bool:
         """Delete a job and its pods."""
-        args = ["delete", "job", job_name]
-        if cascade:
-            args.append("--cascade=foreground")
+        if not self.batch_v1:
+            args = ["delete", "job", job_name]
+            if cascade:
+                args.append("--cascade=foreground")
+            result = self._kubectl(*args)
+            return result.returncode == 0
 
-        result = self._kubectl(*args)
-        return result.returncode == 0
+        try:
+            # Use background propagation for cleaner deletion usually, but foreground ensures it's gone
+            body = client.V1DeleteOptions(propagation_policy='Foreground' if cascade else 'Background')
+            self.batch_v1.delete_namespaced_job(job_name, self.namespace, body=body)
+            return True
+        except ApiException as e:
+            if e.status == 404:
+                return True
+            logger.error(f"Error deleting job: {e}")
+            return False
 
-    def wait_for_job(self, job_name: str, timeout_seconds: int = 3600, poll_interval: int = 10) -> bool:
+    def wait_for_job(self, job_name: str, timeout_seconds: int = 3600, poll_interval: int = 5) -> bool:
         """Wait for a job to complete."""
         logger.info(f"⏳ Waiting for job {job_name} to complete (timeout: {timeout_seconds}s)...")
         
         start_time = time.time()
+        not_found_count = 0
+        max_not_found = 3  # Allow for some K8s API propagation delay
+
         while time.time() - start_time < timeout_seconds:
             status = self.get_job_status(job_name)
+            
             if status is None:
-                logger.warning(f"⚠️ Job {job_name} not found.")
-                return False
-                
+                not_found_count += 1
+                if not_found_count >= max_not_found:
+                    logger.warning(f"⚠️ Job {job_name} not found after {not_found_count} attempts.")
+                    return False
+                logger.info(f"  (Job {job_name} not found yet, retrying... {not_found_count}/{max_not_found})")
+                time.sleep(2)
+                continue
+            
+            # Reset not_found if we found it once
+            not_found_count = 0
+
             if status.is_complete:
                 if status.is_successful:
                     logger.info(f"✅ Job {job_name} succeeded.")
@@ -462,29 +292,6 @@ spec:
         logger.error(f"⌛ Job {job_name} timed out after {timeout_seconds}s.")
         return False
 
-    def get_job_status(self, job_name: str) -> Optional[JobStatus]:
-        """Get the current status of a job."""
-        result = self._kubectl("get", "job", job_name, "-o", "json")
-        if result.returncode != 0:
-            return None
-            
-        data = json.loads(result.stdout)
-        status = data.get("status", {})
-        
-        return JobStatus(
-            name=job_name,
-            active=status.get("active", 0),
-            succeeded=status.get("succeeded", 0),
-            failed=status.get("failed", 0),
-            completion_time=status.get("completionTime"),
-            conditions=status.get("conditions", [])
-        )
-
-    def is_job_successful(self, job_name: str) -> bool:
-        """Check if a job has completed successfully."""
-        status = self.get_job_status(job_name)
-        return status is not None and status.is_successful
-
     def submit_generic_job(
         self,
         job_id: str,
@@ -493,92 +300,163 @@ spec:
         completions: Optional[int] = None,
         component: str = "generic",
         env: Optional[Dict[str, str]] = None,
-        resources: Optional[Dict[str, Any]] = None
+        resources: Optional[Dict[str, Any]] = None,
+        tier: str = "small",
+        image_pull_secret: Optional[str] = None,
+        node_selector: Optional[Dict[str, str]] = None,
+        affinity: Optional[client.V1Affinity] = None
     ) -> JobSpec:
         """
-        Submit a generic completion-indexed Job.
+        Submit a generic completion-indexed Job using K8s API.
         """
         if completions is None:
             completions = parallelism
             
-        image_var = os.environ.get("IMAGE_FULL", os.environ.get("MONTAGE_IMAGE", "ghcr.io/mfahsold/montage-ai:latest"))
-        namespace = self.namespace
+        pull_secret = image_pull_secret or settings.cluster.image_pull_secret
+
+        # Architecture targeting (default to amd64 as per latest-amd64 tag)
+        if node_selector is None:
+            node_selector = {"kubernetes.io/arch": "amd64"}
         
-        # Build env vars
-        env_section = ""
+        # Build Job Manifest using library objects (SOTA approach)
+        env_vars = [
+            client.V1EnvVar(name="SHARD_INDEX", value_from=client.V1EnvVarSource(
+                field_ref=client.V1ObjectFieldSelector(field_path="metadata.annotations['batch.kubernetes.io/job-completion-index']")
+            )),
+            client.V1EnvVar(name="SHARD_COUNT", value=str(completions)),
+            client.V1EnvVar(name="PYTHONUNBUFFERED", value="1"),
+            client.V1EnvVar(name="CLUSTER_MODE", value="true"),
+        ]
+        
         if env:
             for key, value in env.items():
-                env_section += f"""
-            - name: {key}
-              value: "{value}" """
+                env_vars.append(client.V1EnvVar(name=key, value=str(value)))
 
-        # Kubernetes Job Manifest
-        job_yaml = f"""
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: {job_id}
-  namespace: {namespace}
-  labels:
-    app.kubernetes.io/name: montage-ai
-    app.kubernetes.io/component: {component}
-    montage-ai.fluxibri.dev/job-id: "{job_id}"
-spec:
-  completionMode: Indexed
-  completions: {completions}
-  parallelism: {parallelism}
-  backoffLimit: 2
-  ttlSecondsAfterFinished: 1800
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-        - name: worker
-          image: {image_var}
-          imagePullPolicy: IfNotPresent
-          command: {json.dumps(command)}
-          env:
-            - name: SHARD_INDEX
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
-            - name: SHARD_COUNT
-              value: "{completions}"
-            - name: PYTHONUNBUFFERED
-              value: "1"
-            - name: CLUSTER_MODE
-              value: "true" {env_section}
-          resources:
-            requests:
-              cpu: "{resources.get('requests_cpu', '1') if resources else '1'}"
-              memory: "{resources.get('requests_memory', '2Gi') if resources else '2Gi'}"
-            limits:
-              cpu: "{resources.get('limits_cpu', '2') if resources else '2'}"
-              memory: "{resources.get('limits_memory', '4Gi') if resources else '4Gi'}"
-          volumeMounts:
-            - name: input
-              mountPath: /data/input
-              readOnly: true
-            - name: output
-              mountPath: /data/output
-      volumes:
-        - name: input
-          persistentVolumeClaim:
-            claimName: montage-input
-        - name: output
-          persistentVolumeClaim:
-            claimName: montage-output
-"""
+        # Resource limits/requests (Use tier-based defaults if not specfied)
+        if not resources:
+            tier_config = settings.cluster.tiers.get(tier, settings.cluster.tiers["small"])
+            req_cpu = tier_config["requests"]["cpu"]
+            req_mem = tier_config["requests"]["memory"]
+            lim_cpu = tier_config["limits"]["cpu"]
+            lim_mem = tier_config["limits"]["memory"]
+        else:
+            req_cpu = resources.get("requests_cpu", "1")
+            req_mem = resources.get("requests_memory", "2Gi")
+            lim_cpu = resources.get("limits_cpu", "2")
+            lim_mem = resources.get("limits_memory", "4Gi")
 
-        result = subprocess.run(
-            ["kubectl", "apply", "-f", "-"],
-            input=job_yaml,
-            capture_output=True,
-            text=True
+        container = client.V1Container(
+            name="worker",
+            image=self.image,
+            image_pull_policy="IfNotPresent",
+            command=command,
+            env=env_vars,
+            resources=client.V1ResourceRequirements(
+                requests={"cpu": req_cpu, "memory": req_mem},
+                limits={"cpu": lim_cpu, "memory": lim_mem}
+            ),
+            volume_mounts=[
+                client.V1VolumeMount(name="data", mount_path="/data/input", sub_path="input", read_only=True),
+                client.V1VolumeMount(name="data", mount_path="/data/output", sub_path="output")
+            ]
         )
 
-        if result.returncode != 0:
-            raise RuntimeError(f"Job creation failed: {result.stderr}")
+        pod_spec = client.V1PodSpec(
+            restart_policy="Never",
+            containers=[container],
+            volumes=[
+                client.V1Volume(name="data", persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                    claim_name=settings.cluster.pvc_name
+                ))
+            ],
+            node_selector=node_selector,
+            affinity=affinity
+        )
+        
+        if pull_secret:
+            pod_spec.image_pull_secrets = [client.V1LocalObjectReference(name=pull_secret)]
 
-        logger.info(f"✅ Submitted {component} job: {job_id}")
-        return JobSpec(name=job_id, namespace=namespace, parallelism=parallelism, completions=completions)
+        job = client.V1Job(
+            api_version="batch/v1",
+            kind="Job",
+            metadata=client.V1ObjectMeta(
+                name=job_id,
+                labels={
+                    "app.kubernetes.io/name": "montage-ai",
+                    "app.kubernetes.io/component": component,
+                    "fluxibri.ai/project": "montage-ai",
+                    "fluxibri.ai/tier": tier,
+                    "fluxibri.ai/architecture": node_selector.get("kubernetes.io/arch", "amd64"),
+                    "montage-ai.fluxibri.dev/job-id": job_id
+                }
+            ),
+            spec=client.V1JobSpec(
+                completion_mode="Indexed",
+                completions=completions,
+                parallelism=parallelism,
+                backoff_limit=2,
+                ttl_seconds_after_finished=1800,
+                template=client.V1PodTemplateSpec(
+                    metadata=client.V1ObjectMeta(labels={
+                        "app.kubernetes.io/name": "montage-ai",
+                        "app.kubernetes.io/component": component,
+                        "fluxibri.ai/project": "montage-ai",
+                        "fluxibri.ai/tier": tier
+                    }),
+                    spec=pod_spec
+                )
+            )
+        )
+
+        try:
+            self.batch_v1.create_namespaced_job(self.namespace, job)
+            logger.info(f"Successfully submitted {component} job via API: {job_id}")
+            return JobSpec(name=job_id, namespace=self.namespace, parallelism=parallelism, completions=completions)
+        except ApiException as e:
+            logger.error(f"Failed to submit job: {e.body}")
+            raise RuntimeError(f"Job creation failed: {e}")
+
+    def submit_gpu_encoding(
+        self,
+        input_path: str,
+        output_path: str,
+        codec: str = "h264_amf",
+        quality: str = "standard"
+    ) -> JobSpec:
+        """
+        Submit GPU encoding job to specialized heavy nodes via K8s API.
+        """
+        job_id = self._generate_job_id("encode", input_path)
+        
+        # Build node affinity for GPUs (prefer nodes with GPUs)
+        affinity = client.V1Affinity(
+            node_affinity=client.V1NodeAffinity(
+                preferred_during_scheduling_ignored_during_execution=[
+                    client.V1PreferredSchedulingTerm(
+                        weight=100,
+                        preference=client.V1NodeSelectorTerm(
+                            match_expressions=[
+                                client.V1NodeSelectorRequirement(
+                                    key="fluxibri.ai/gpu-enabled",
+                                    operator="In",
+                                    values=["true", "present"]
+                                )
+                            ]
+                        )
+                    )
+                ]
+            )
+        )
+
+        return self.submit_generic_job(
+            job_id=job_id,
+            command=[
+                "python", "-m", "montage_ai.core.render_engine",
+                "--render-distributed", input_path, output_path,
+                "--codec", codec, "--quality", quality
+            ],
+            parallelism=1,
+            component="encoder",
+            tier="gpu",
+            affinity=affinity
+        )
