@@ -38,6 +38,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}hq${NC}              High quality render (1080p/4K)
   ${GREEN}download${NC} JOB_ID  Download job artifacts (video + timeline + logs)
   ${GREEN}export-to-nle${NC}   Export timeline to NLE formats (OTIO/EDL/Premiere/AAF)
+  ${GREEN}check-hw${NC}        Diagnose hardware acceleration (NVENC/VAAPI/QSV)
   ${GREEN}list${NC}            List available styles
   ${GREEN}build${NC}           Build Docker image
   ${GREEN}cgpu-start${NC}      Start cgpu serve (Gemini LLM API)
@@ -471,6 +472,11 @@ case "${1:-run}" in
         shift
         echo -e "${GREEN}📤 Exporting timeline to NLE formats...${NC}"
         python3 -m montage_ai.export.cli "$@"
+        exit $?
+        ;;
+    check-hw)
+        shift
+        python3 -m montage_ai.cli check-hw "$@"
         exit $?
         ;;
     help|--help|-h)

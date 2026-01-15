@@ -21,7 +21,7 @@ import os
 import sys
 import subprocess
 import shutil
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple, Union
 from dataclasses import dataclass
 
 from ..ffmpeg_utils import build_ffmpeg_cmd
@@ -416,7 +416,7 @@ def _has_adreno() -> bool:
     return False
 
 
-def check_encoder_works(hw_config: HWConfig) -> bool:
+def check_encoder_works(hw_config: HWConfig, return_error: bool = False) -> Union[bool, Tuple[bool, Optional[str]]]:
     """
     Test if an encoder actually works by doing a minimal encode.
 
@@ -427,7 +427,7 @@ def check_encoder_works(hw_config: HWConfig) -> bool:
 
     # CPU always works
     if hw_config.type == "cpu":
-        return True
+        return (True, None) if return_error else True
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -467,12 +467,13 @@ def check_encoder_works(hw_config: HWConfig) -> bool:
             )
 
             if result.returncode == 0 and os.path.exists(output_path):
-                return True
+                return (True, None) if return_error else True
             else:
-                return False
+                error_msg = result.stderr.strip() if result.stderr else f"Exit code {result.returncode}"
+                return (False, error_msg) if return_error else False
 
-    except Exception:
-        return False
+    except Exception as e:
+        return (False, str(e)) if return_error else False
 
 
 def get_best_hwaccel(preferred_codec: str = "h264") -> HWConfig:
@@ -525,3 +526,47 @@ def get_ffmpeg_hw_args(mode: str = "encode", preferred_codec: str = "h264") -> L
     if mode == "decode":
         return config.decoder_args
     return config.encoder_args
+
+
+def hwaccel_probe() -> Dict[str, Any]:
+    """
+    Probe all supported hardware accelerators and return a health report.
+    Used for diagnostics and CI environment verification.
+    """
+    results = {
+        "platform": sys.platform,
+        "ffmpeg": shutil.which("ffmpeg") is not None,
+        "accelerators": []
+    }
+
+    # Test all known types
+    for accel_type in ("nvenc", "nvmpi", "rocm", "videotoolbox", "vaapi", "qsv", "adreno"):
+        # Check if platform supports it and encoder exists in ffmpeg
+        config = get_hwaccel_by_type(accel_type)
+        if config:
+            is_functional, error = check_encoder_works(config, return_error=True)
+            results["accelerators"].append({
+                "type": accel_type,
+                "encoder": config.encoder,
+                "available": True,
+                "functional": is_functional,
+                "is_gpu": config.is_gpu,
+                "error": error
+            })
+        else:
+            results["accelerators"].append({
+                "type": accel_type,
+                "available": False,
+                "functional": False,
+                "is_gpu": True  # All of these are GPU-based
+            })
+
+    # Pick the best one as definitive "current" config
+    best = get_best_hwaccel()
+    results["best_available"] = {
+        "type": best.type,
+        "encoder": best.encoder,
+        "is_gpu": best.is_gpu
+    }
+
+    return results
