@@ -18,11 +18,13 @@ spec:
       imagePullSecrets:
         - name: ghcr-pull
       securityContext:
+        runAsUser: 0
         fsGroup: 992
         supplementalGroups: [44,992]
       initContainers:
         - name: cgpu-credentials-init
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: 192.168.1.12:30500/montage-ai:latest-amd64
+          imagePullPolicy: IfNotPresent
           resources:
             requests:
               cpu: "100m"
@@ -50,10 +52,14 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: 192.168.1.12:30500/montage-ai:latest-amd64
           imagePullPolicy: IfNotPresent
-          command: ["/app/montage-ai.sh"]
-          args: ["run", "documentary"]
+          command:
+            - /bin/bash
+            - -c
+            - |
+              apt-get update && apt-get install -y mesa-va-drivers libva-drm2
+              /app/montage-ai.sh run documentary
           env:
             - name: USE_GPU
               value: "prefer"
@@ -104,10 +110,24 @@ spec:
             - name: dev-dri
               mountPath: /dev/dri
               readOnly: true
+            - name: shm
+              mountPath: /dev/shm
             - name: script
               mountPath: /app/montage-ai.sh
               subPath: montage-ai.sh
+            - name: patch-segment-writer
+              mountPath: /app/src/montage_ai/segment_writer.py
+              subPath: segment_writer.py
+            - name: patch-clip-processor
+              mountPath: /app/src/montage_ai/core/clip_processor.py
+              subPath: clip_processor.py
       volumes:
+        - name: patch-segment-writer
+          configMap:
+            name: montage-ai-patch-segment-writer
+        - name: patch-clip-processor
+          configMap:
+            name: montage-ai-patch-clip-processor
         - name: script
           configMap:
             name: montage-ai-script
@@ -139,5 +159,14 @@ spec:
           hostPath:
             path: /dev/dri
             type: DirectoryOrCreate
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
       nodeSelector:
         kubernetes.io/hostname: codeai-fluxibriserver
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"

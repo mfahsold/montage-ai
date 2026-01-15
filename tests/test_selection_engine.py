@@ -15,13 +15,15 @@ class TestSelectionEngine(unittest.TestCase):
         
         # Style params
         self.ctx.creative.style_params = {
+            "name": "dynamic",
             "weights": {"action": 0.5, "face_count": 0.2},
             "scoring_rules": {
                 "fresh_clip_bonus": 50,
                 "jump_cut_penalty": 50,
             }
         }
-        self.ctx.creative.editing_instructions = {}
+        self.ctx.creative.editing_instructions = MagicMock()
+        self.ctx.creative.editing_instructions.style = None
         self.ctx.creative.semantic_query = None
         self.ctx.creative.broll_plan = None
         
@@ -33,14 +35,16 @@ class TestSelectionEngine(unittest.TestCase):
         # Scenes
         # Note: In real code, available_footage wraps these or refers to them. 
         # For mock, we'll setup available_footage appropriately.
-        self.scene1 = {'path': '/path/scene1.mp4', 'start': 0, 'duration': 5.0, 'meta': {'action': 'high', 'shot': 'close_up'}}
-        self.scene2 = {'path': '/path/scene2.mp4', 'start': 0, 'duration': 5.0, 'meta': {'action': 'low', 'shot': 'wide'}}
+        self.scene1 = {'path': '/path/scene1.mp4', 'start': 0, 'duration': 5.0, 'meta': {'action': 'high', 'shot': 'close_up', 'duration': 5.0}}
+        self.scene2 = {'path': '/path/scene2.mp4', 'start': 0, 'duration': 5.0, 'meta': {'action': 'low', 'shot': 'wide', 'duration': 5.0}}
         self.ctx.media.all_scenes_dicts = [self.scene1, self.scene2]
         
         # Timeline state
         self.ctx.timeline.last_used_path = None
         self.ctx.timeline.last_shot_type = None
         self.ctx.timeline.last_tags = []
+        self.ctx.timeline.clips_metadata = []
+        self.ctx.timeline.current_beat_duration = 1.0 # Default beat
         self.ctx.get_story_phase.return_value = "build"
 
         self.engine = SelectionEngine(self.ctx)

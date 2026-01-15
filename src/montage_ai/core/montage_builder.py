@@ -211,8 +211,29 @@ class MontageBuilder:
             # Phase 2: Analyze
             self.analyze_assets()
 
-            # Phase 3: Plan
-            self.plan_montage()
+            # Phase 3: Plan (Agentic Creative Loop)
+            iteration = 0
+            max_iters = self.settings.features.creative_loop_max_iterations if self.settings.features.creative_loop else 1
+            approved = False
+
+            while iteration < max_iters and not approved:
+                logger.info(f"\n   🔄 Planning Iteration {iteration + 1}/{max_iters}")
+                self.plan_montage()
+                
+                if max_iters > 1:
+                    # SOTA 2026: Agentic Review Pass (Plan-and-ReAct)
+                    evaluation = self._evaluate_current_plan(iteration)
+                    if evaluation.approve_for_render:
+                        logger.info("   ✅ Plan approved by Creative Evaluator!")
+                        approved = True
+                    else:
+                        logger.info(f"   💡 Refinement needed: {evaluation.summary}")
+                        self._apply_evaluator_refinements(evaluation)
+                        iteration += 1
+                        # Note: We don't need to clear EVERYTHING, just reset timeline state
+                        self.ctx.timeline.reset()
+                else:
+                    approved = True
 
             # Phase 4: Enhance (if enabled)
             if self.ctx.features.stabilize or self.ctx.features.upscale or self.ctx.features.enhance:
@@ -847,8 +868,18 @@ class MontageBuilder:
             min_dur = cut_duration * 0.5
             available_footage = self._footage_pool.get_available_clips(min_duration=min_dur)
 
+            # SOTA: Robust Edge Case Handler - "Empty Pool Recovery"
             if not available_footage:
-                logger.warning("   ⚠️ No more footage available. Stopping.")
+                logger.info("   🔄 Footage pool depleted. Relaxing constraints...")
+                # Try again without duration constraint or by enabling reuse if not already
+                available_footage = self._footage_pool.get_available_clips(min_duration=0.5)
+                if not available_footage and hasattr(self._footage_pool, 'reset_usage'):
+                    logger.info("   🔄 Enabling footage reuse as final fallback.")
+                    self._footage_pool.reset_usage() # Custom method to allow all clips again
+                    available_footage = self._footage_pool.get_available_clips(min_duration=0.5)
+
+            if not available_footage:
+                logger.warning("   ⚠️ No more footage available even after relaxation. Stopping.")
                 break
 
             # Score and select clip
@@ -1048,6 +1079,58 @@ class MontageBuilder:
     def _save_episodic_memory(self):
         """Delegate to Selection Engine."""
         self._selection_engine.save_episodic_memory()
+
+    def _evaluate_current_plan(self, iteration: int) -> "MontageEvaluation":
+        """
+        SOTA 2026: Agentic Review.
+        Invokes the CreativeEvaluator to analyze the proposed timeline.
+        """
+        from ..creative_evaluator import CreativeEvaluator
+        evaluator = CreativeEvaluator(
+            max_iterations=self.settings.features.creative_loop_max_iterations,
+            timeout=self.settings.llm.timeout
+        )
+        
+        # Build evaluation context from context
+        from .context import MontageResult
+        temp_result = MontageResult(
+            success=True,
+            output_path="",
+            duration=self.ctx.timeline.current_time,
+            cut_count=self.ctx.timeline.cut_number,
+            render_time=0.0
+        )
+        
+        # Pull clips from timeline (actual selected scenes)
+        return evaluator.evaluate(
+            result=temp_result,
+            original_instructions=self.ctx.creative.editing_instructions.model_dump() if self.ctx.creative.editing_instructions else {},
+            clips_metadata=self.ctx.timeline.clips,
+            audio_profile=None,
+            iteration=iteration
+        )
+
+    def _apply_evaluator_refinements(self, evaluation: "MontageEvaluation"):
+        """Apply adjustments suggested by the evaluator."""
+        if not evaluation.adjustments:
+            return
+            
+        logger.info(f"   🛠️ Applying {len(evaluation.adjustments)} adjustments back to AI Director...")
+        from ..creative_evaluator import CreativeEvaluator
+        evaluator = CreativeEvaluator()
+        
+        # Refine current instructions
+        if self.ctx.creative.editing_instructions:
+            refined_dict = evaluator.refine_instructions(
+                self.ctx.creative.editing_instructions.model_dump(),
+                evaluation
+            )
+            # Re-instantiate model
+            from .models import EditingInstructions
+            self.ctx.creative.editing_instructions = EditingInstructions(**refined_dict)
+            
+            # Re-apply affects (toggles/params)
+            self._apply_creative_director_effects()
 
 
 

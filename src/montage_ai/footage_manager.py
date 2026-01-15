@@ -242,6 +242,19 @@ class FootagePoolManager:
         
         # Story arc controller
         self.arc = StoryArcController()
+
+    def reset_usage(self):
+        """
+        SOTA: Reset all clips' usage status to allow reuse in case pool is depleted.
+        """
+        if self.verbose:
+            print("   🔄 Resetting footage pool usage (Final Fallback)")
+        for clip in self.clips.values():
+            clip.usage_status = UsageStatus.UNUSED
+            # We don't necessarily reset usage_count here, just allow them to be "found" again
+        self.used_clips.clear()
+        # Ensure strict mode is relaxed for subsequent calls
+        self.strict_once = False
     
     @classmethod
     def from_scenes(cls, scenes: List[Dict], strict_once: bool = True) -> 'FootagePoolManager':

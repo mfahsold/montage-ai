@@ -240,15 +240,11 @@ class SceneProvider:
 
     def _select_analysis_backend(self) -> str:
         """Select best available analysis backend."""
-        # Check for AI backends via centralized settings
+        # Check for any AI capability in centralized settings
         from ..config import get_settings
         llm = get_settings().llm
-        if llm.cgpu_enabled:
-            return "cgpu"
-        if llm.has_openai_backend:
-            return "openai"
-        if bool(llm.ollama_host):
-            return "ollama"
+        if llm.cgpu_enabled or llm.has_openai_backend or llm.has_google_backend or llm.ollama_host:
+            return "ai"
 
         # Local CV fallback
         return "local"
@@ -298,7 +294,7 @@ class SceneProvider:
         Returns:
             FrameAnalysis object
         """
-        if self._analysis_backend in ("cgpu", "openai", "ollama"):
+        if self._analysis_backend == "ai":
             return self._analyze_ai(video_path, time_point, semantic)
         else:
             return self._analyze_local(video_path, time_point)

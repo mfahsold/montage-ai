@@ -11,7 +11,7 @@ import random
 from typing import Optional, Any, Tuple, Dict, List
 from ..logger import logger
 from .context import MontageContext, ClipMetadata
-from ..segment_writer import SegmentWriter
+from ..segment_writer import SegmentWriter, ProgressiveRenderer, STANDARD_WIDTH, STANDARD_HEIGHT
 from .clip_processor import process_clip_task
 from ..enhancement_tracking import (
     EnhancementTracker,
@@ -68,6 +68,9 @@ class RenderEngine:
                 xfade_duration=self.ctx.timeline.xfade_duration,
                 ffmpeg_crf=self.settings.encoding.crf,
                 normalize_clips=self.settings.encoding.normalize_clips,
+                target_width=width if self.ctx.media.output_profile else STANDARD_WIDTH,
+                target_height=height if self.ctx.media.output_profile else STANDARD_HEIGHT,
+                target_fps=self.ctx.media.output_profile.fps if self.ctx.media.output_profile else 30.0,
             )
             logger.info(f"   ✅ Progressive Renderer initialized (batch={batch_size})")
             return self._progressive_renderer

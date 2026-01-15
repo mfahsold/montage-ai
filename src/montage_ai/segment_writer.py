@@ -246,6 +246,8 @@ def ffprobe_stream_params(video_path: str, use_cache: bool = True) -> Optional[S
 
 
 def normalize_clip_ffmpeg(input_path: str, output_path: str,
+                          target_width: int = STANDARD_WIDTH,
+                          target_height: int = STANDARD_HEIGHT,
                           target_fps: float = STANDARD_FPS,
                           target_pix_fmt: str = TARGET_PIX_FMT,
                           target_codec: str = TARGET_CODEC,
@@ -265,6 +267,8 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
     Args:
         input_path: Source video
         output_path: Normalized output
+        target_width: Target video width
+        target_height: Target video height
         target_fps: Target frame rate
         target_pix_fmt: Target pixel format
         crf: Quality setting
@@ -285,8 +289,8 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
         # 4. Optional normalize brightness for consistency
         # 5. Convert fps and pixel format
         vf_filters = [
-            f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease",
-            f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2",
+            f"scale={target_width}:{target_height}:force_original_aspect_ratio=decrease",
+            f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2",
         ]
         if apply_colorlevels:
             # Ensure RGB context for colorlevels if needed, but usually ffmpeg handles auto-conversion
@@ -642,7 +646,10 @@ class SegmentWriter:
                  ffmpeg_crf: int = 18,
                  cleanup_on_complete: bool = True,
                  enable_xfade: bool = False,
-                 xfade_duration: float = DEFAULT_XFADE_DURATION):
+                 xfade_duration: float = DEFAULT_XFADE_DURATION,
+                 target_width: int = STANDARD_WIDTH,
+                 target_height: int = STANDARD_HEIGHT,
+                 target_fps: float = STANDARD_FPS):
         """
         Initialize segment writer.
         
@@ -654,6 +661,9 @@ class SegmentWriter:
             cleanup_on_complete: Remove temp files after concatenation
             enable_xfade: Enable real crossfades between clips using xfade filter
             xfade_duration: Duration of crossfade transitions (seconds)
+            target_width: Target video width
+            target_height: Target video height
+            target_fps: Target frame rate
         """
         if output_dir is None:
             output_dir = str(get_settings().paths.temp_dir / "segments")
@@ -664,6 +674,9 @@ class SegmentWriter:
         self.cleanup_on_complete = cleanup_on_complete
         self.enable_xfade = enable_xfade
         self.xfade_duration = xfade_duration
+        self.target_width = target_width
+        self.target_height = target_height
+        self.target_fps = target_fps
         
         # State
         self.segments: List[SegmentInfo] = []
@@ -710,9 +723,9 @@ class SegmentWriter:
                             config: FFmpegConfig) -> List[str]:
         """Build FFmpeg command for segment re-encode."""
         vf_chain = (
-            f"scale={STANDARD_WIDTH}:{STANDARD_HEIGHT}:force_original_aspect_ratio=decrease,"
-            f"pad={STANDARD_WIDTH}:{STANDARD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
-            f"fps={STANDARD_FPS},format={TARGET_PIX_FMT}"
+            f"scale={self.target_width}:{self.target_height}:force_original_aspect_ratio=decrease,"
+            f"pad={self.target_width}:{self.target_height}:(ow-iw)/2:(oh-ih)/2,"
+            f"fps={self.target_fps},format={TARGET_PIX_FMT}"
         )
         vf_chain = _append_hwupload_vf(vf_chain, config)
 
@@ -784,7 +797,7 @@ class SegmentWriter:
                 codec=codec,
                 preset=self.ffmpeg_preset,
                 audio_codec="aac",
-                fps=STANDARD_FPS,
+                fps=self.target_fpsfps,
                 logger=None,  # Suppress MoviePy progress bar
                 threads=4,
                 ffmpeg_params=_moviepy_params(
@@ -1347,9 +1360,9 @@ class SegmentWriter:
                         crf=self.ffmpeg_crf,
                         preset=self.ffmpeg_preset,
                         target_codec="libx264",
-                        target_profile=TARGET_PROFILE,
+                        target_profile="high",  # Scale back to High profile for wide compatibility
                         target_level=TARGET_LEVEL,
-                        target_pix_fmt="yuv420p",
+                        target_pix_fmt="yuv420p", # Scale back to 8-bit for libx264 compatibility
                     ))
 
                     if audio_path and os.path.exists(audio_path):
@@ -1626,7 +1639,10 @@ class ProgressiveRenderer:
                  enable_xfade: bool = False,
                  xfade_duration: float = DEFAULT_XFADE_DURATION,
                  ffmpeg_crf: int = 18,
-                 normalize_clips: bool = False):
+                 normalize_clips: bool = False,
+                 target_width: int = STANDARD_WIDTH,
+                 target_height: int = STANDARD_HEIGHT,
+                 target_fps: float = STANDARD_FPS):
         """
         Initialize progressive renderer.
         
@@ -1639,6 +1655,9 @@ class ProgressiveRenderer:
             xfade_duration: Duration of crossfade transitions (seconds)
             ffmpeg_crf: Quality setting for encoding
             normalize_clips: Force normalize all clips before first flush
+            target_width: Target video width
+            target_height: Target video height
+            target_fps: Target frame rate
         """
         self.batch_size = batch_size
         if output_dir is None:
@@ -1649,13 +1668,19 @@ class ProgressiveRenderer:
         self.enable_xfade = enable_xfade
         self.xfade_duration = xfade_duration
         self.normalize_clips = normalize_clips
+        self.target_width = target_width
+        self.target_height = target_height
+        self.target_fps = target_fps
         
         self.segment_writer = SegmentWriter(
             output_dir=output_dir,
             segment_prefix=f"segment_{job_id}",
             enable_xfade=enable_xfade,
             xfade_duration=xfade_duration,
-            ffmpeg_crf=ffmpeg_crf
+            ffmpeg_crf=ffmpeg_crf,
+            target_width=target_width,
+            target_height=target_height,
+            target_fps=target_fps
         )
         
         # Track clip file paths (not MoviePy objects - more memory efficient)
@@ -1812,10 +1837,10 @@ class ProgressiveRenderer:
 
             needs_normalize = (
                 params is None or
-                abs(params.fps - STANDARD_FPS) >= 0.1 or
+                abs(params.fps - self.target_fps) >= 0.1 or
                 params.pix_fmt != STANDARD_PIX_FMT or
-                params.width != STANDARD_WIDTH or
-                params.height != STANDARD_HEIGHT
+                params.width != self.target_width or
+                params.height != self.target_height
             )
 
             if needs_normalize:
@@ -1824,6 +1849,9 @@ class ProgressiveRenderer:
                 success = normalize_clip_ffmpeg(
                     clip_path,
                     normalized_path,
+                    target_width=self.target_width,
+                    target_height=self.target_height,
+                    target_fps=self.target_fps,
                     crf=self.segment_writer.ffmpeg_crf
                 )
 

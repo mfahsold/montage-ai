@@ -155,6 +155,17 @@ class ClipSelectionParameters:
     match_cut_threshold: float = 0.7
     use_llm_ranking: bool = True
     llm_top_n: int = 5
+
+    # SOTA: Refined Algorithm Scores
+    shot_progression_bonus: int = 15
+    jarring_transition_penalty: int = 10
+    environmental_continuity_bonus: int = 10
+    variety_bonus: int = 15
+    
+    # SOTA 2025: Advanced Reasoning Weights
+    kuleshov_weight: float = 0.5
+    motion_continuity_weight: float = 0.4
+    graphic_match_weight: float = 0.3
     
     def validate(self) -> None:
         """Validate parameter ranges."""
@@ -218,6 +229,13 @@ class PacingParameters:
     respect_beats: bool = True
     energy_adaptive: bool = True
     phase_aware: bool = True
+    
+    # SOTA: Micro-timing parameters
+    micro_pacing_jitter: float = 0.02
+    pacing_breathing: bool = True
+    breathing_offset_ms: int = 40
+    momentum_weight: float = 0.1
+    
     fibonacci_sequences: List[List[int]] = field(default_factory=lambda: [[1, 1, 2, 3, 5], [8, 5, 3, 2, 1, 1]])
     override_beats_per_cut: Optional[int] = None
     

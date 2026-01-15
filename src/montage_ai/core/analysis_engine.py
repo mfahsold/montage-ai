@@ -369,6 +369,24 @@ class AssetAnalyzer:
         if not video_files:
             raise ValueError("No videos found in input directory")
 
+        # EDGE CASE: Massive footage influx (Intelligent Sampling)
+        # SOTA 2026: Prevents infrastructure overload by prioritizing key content
+        if len(video_files) > 100:
+            logger.info(f"   ⚠️ MASSIVE footage detected ({len(video_files)} clips). Switching to Intelligent Sampling...")
+            rng = random.Random(42)
+            # Sample: First 25, last 25, and scattered 25 in middle
+            if len(video_files) > 75:
+                sampled = video_files[:25] + video_files[-25:] + rng.sample(video_files[25:-25], 25)
+                # Deduplicate while preserving order
+                video_files_sampled = []
+                seen = set()
+                for v in sampled:
+                    if v not in seen:
+                        video_files_sampled.append(v)
+                        seen.add(v)
+                video_files = video_files_sampled
+                logger.info(f"   🎯 Sampled down to {len(video_files)} high-priority clips for analysis.")
+
         video_files = self._filter_supported_videos(video_files)
         if not video_files:
             raise ValueError("No supported videos found in input directory")

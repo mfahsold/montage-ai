@@ -29,6 +29,16 @@ import requests
 # - scenedetect
 # - scipy.spatial.KDTree
 
+# OPTIMIZATION: Scene detection backends
+try:
+    from scenedetect import open_video, SceneManager, ContentDetector
+    SCENEDETECT_AVAILABLE = True
+except ImportError:
+    SCENEDETECT_AVAILABLE = False
+    SceneManager = None
+    ContentDetector = None
+    open_video = None
+
 # OPTIMIZATION: K-D tree for fast scene similarity queries (sub-linear search)
 KDTREE_AVAILABLE = False
 try:
@@ -41,6 +51,7 @@ from .config import get_settings
 from .video_metadata import probe_metadata  # Expose for tests to patch
 from .logger import logger
 from .moviepy_compat import VideoFileClip
+from .prompts import get_vision_analysis_prompt, ActionLevel, ShotType
 
 # Import cgpu jobs for offloading
 try:
@@ -70,21 +81,8 @@ _HISTOGRAM_CACHE_SIZE = 2000
 
 
 # =============================================================================
-# Enums and Data Classes
+# Data Classes
 # =============================================================================
-
-class ActionLevel(Enum):
-    """Action/motion intensity level."""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-
-
-class ShotType(Enum):
-    """Camera shot type."""
-    CLOSE = "close"
-    MEDIUM = "medium"
-    WIDE = "wide"
 
 
 @dataclass
@@ -139,6 +137,8 @@ class SceneAnalysis:
     mood: str = "neutral"  # calm, energetic, dramatic, playful, tense, peaceful, mysterious
     setting: str = "unknown"  # indoor, outdoor, beach, city, nature, studio, street, home
     face_count: int = 0  # Number of detected faces
+    focus_center_x: float = 0.5 # Normalised X position of main subject (0.0=left, 1.0=right)
+    balance_score: float = 0.5  # Visual balance (0.0=unbalanced, 1.0=perfectly symmetric)
 
     @classmethod
     def default(cls) -> "SceneAnalysis":
@@ -154,6 +154,8 @@ class SceneAnalysis:
             mood="neutral",
             setting="unknown",
             face_count=0,
+            focus_center_x=0.5,
+            balance_score=0.5,
         )
 
     @classmethod
@@ -184,6 +186,8 @@ class SceneAnalysis:
             mood=data.get("mood", "neutral"),
             setting=data.get("setting", "unknown"),
             face_count=data.get("face_count", 0),
+            focus_center_x=data.get("focus_center_x", 0.5),
+            balance_score=data.get("balance_score", 0.5),
         )
 
     def to_dict(self) -> dict:
@@ -199,6 +203,8 @@ class SceneAnalysis:
             "mood": self.mood,
             "setting": self.setting,
             "face_count": self.face_count,
+            "focus_center_x": self.focus_center_x,
+            "balance_score": self.balance_score,
         }
 
 
@@ -380,8 +386,9 @@ class SceneDetector:
         except Exception as e:
             logger.warning(f"Could not check resolution for proxy/downsampling: {e}. Using original.")
 
-        from scenedetect import open_video, SceneManager
-        from scenedetect.detectors import ContentDetector
+        if not SCENEDETECT_AVAILABLE:
+            logger.error("PySceneDetect not installed. Scene detection unavailable.")
+            return [Scene(0, probe_metadata(video_path).duration, video_path)]
 
         video = open_video(effective_path)
         scene_manager = SceneManager()
@@ -576,23 +583,12 @@ class SceneContentAnalyzer:
 
     def analyze(self, video_path: str, time_point: float, semantic: bool = True) -> SceneAnalysis:
         """
-        Extract a frame and analyze it with AI.
-
-        Backend priority:
-        1. cgpu/Gemini (if CGPU_ENABLED=true) - fast, multimodal
-        2. OpenAI-compatible API
-        3. Ollama (local fallback)
-        4. Default (no AI)
-
-        Args:
-            video_path: Path to video file
-            time_point: Time in seconds to analyze
-            semantic: If True, extract semantic tags (default: True)
-
-        Returns:
-            SceneAnalysis with quality, description, action, shot, and semantic fields
+        Analyze a frame using AI-powered vision.
+        
+        Uses the centralized CreativeDirector to query available backends
+        (cgpu/Gemini, OpenAI, Ollama) with fallback support.
         """
-        # Always run basic CV face detection (fast, local)
+        # 1. Fast, local face detection (always run)
         face_count = detect_faces(video_path, time_point)
 
         if not self.enable_ai:
@@ -601,41 +597,40 @@ class SceneContentAnalyzer:
             return result
 
         try:
-            # Extract frame
+            # 2. Extract frame for AI vision
             frame_b64 = self._extract_frame_base64(video_path, time_point)
             if frame_b64 is None:
-                result = SceneAnalysis(
-                    quality="NO",
-                    description="read error",
-                    action=ActionLevel.LOW,
-                    shot=ShotType.MEDIUM,
+                return SceneAnalysis(
+                    quality="NO", description="read error",
+                    action=ActionLevel.LOW, shot=ShotType.MEDIUM,
                     face_count=face_count
                 )
-                return result
 
-            # Priority 1: cgpu/Gemini (fast, multimodal, cheap)
-            if semantic:
-                result = self._analyze_cgpu(frame_b64)
-                if result:
-                    result.face_count = face_count
-                    return result
+            # 3. Query centralized Creative Director (AI Analysis Agent)
+            from .creative_director import get_creative_director
+            director = get_creative_director()
+            
+            # Use structured vision prompt from prompts.py
+            system_prompt = get_vision_analysis_prompt()
+            
+            response_text = director.query(
+                prompt="Analyze this video frame.",
+                system_prompt=system_prompt,
+                image_b64=frame_b64,
+                json_mode=True,
+                temperature=0.2
+            )
 
-            # Priority 2: OpenAI-compatible API with semantic prompt
-            if self.openai_base and self.vision_model:
-                result = self._analyze_openai_semantic(frame_b64) if semantic else self._analyze_openai(frame_b64)
-                if result:
-                    result.face_count = face_count
-                    return result
-
-            # Priority 3: Ollama fallback
-            result = self._analyze_ollama_semantic(frame_b64) if semantic else self._analyze_ollama(frame_b64)
-            if result:
+            if response_text:
+                res_json = json.loads(response_text)
+                result = SceneAnalysis.from_dict(res_json)
                 result.face_count = face_count
                 return result
 
         except Exception as e:
-            logger.warning(f"AI Analysis failed: {e}")
+            logger.warning(f"AI Vision analysis failed: {e}")
 
+        # Fallback to defaults
         result = SceneAnalysis.default()
         result.face_count = face_count
         return result
@@ -660,270 +655,6 @@ class SceneContentAnalyzer:
             return base64.b64encode(buffer).decode('utf-8')
         except Exception:
             return None
-
-    def _analyze_openai(self, frame_b64: str) -> Optional[SceneAnalysis]:
-        """Analyze frame using OpenAI-compatible API."""
-        try:
-            if self._vision_client is None:
-                from openai import OpenAI
-                self._vision_client = OpenAI(
-                    base_url=self.openai_base,
-                    api_key=self.openai_key
-                )
-
-            prompt = (
-                "Analyze this image for a video editor. Return a JSON object with these keys: "
-                "quality (YES/NO), description (5 words), action (low/medium/high), shot (close/medium/wide). "
-                'Example: {"quality": "YES", "description": "Man running in park", "action": "high", "shot": "wide"}'
-            )
-
-            response = self._vision_client.chat.completions.create(
-                model=self.vision_model,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame_b64}"}}
-                    ]
-                }],
-                max_tokens=100,
-                temperature=0.2,
-                timeout=self.request_timeout
-            )
-
-            if response.choices and response.choices[0].message.content:
-                content = response.choices[0].message.content.strip()
-                # Clean markdown wrapping
-                if content.startswith("```json"):
-                    content = content[7:]
-                if content.startswith("```"):
-                    content = content[3:]
-                if content.endswith("```"):
-                    content = content[:-3]
-
-                res_json = json.loads(content.strip())
-                return SceneAnalysis.from_dict(res_json)
-
-        except Exception as e:
-            logger.warning(f"OpenAI Vision API failed, falling back to Ollama: {e}")
-
-        return None
-
-    def _analyze_ollama(self, frame_b64: str) -> Optional[SceneAnalysis]:
-        """Analyze frame using Ollama."""
-        if not self.ollama_host:
-            return None
-        try:
-            prompt = (
-                "Analyze this image for a video editor. Return a JSON object with these keys: "
-                "quality (YES/NO), description (5 words), action (low/medium/high), shot (close/medium/wide). "
-                'Example: {"quality": "YES", "description": "Man running in park", "action": "high", "shot": "wide"}'
-            )
-
-            payload = {
-                "model": self.ollama_model,
-                "prompt": prompt,
-                "images": [frame_b64],
-                "stream": False,
-                "format": "json"
-            }
-
-            response = requests.post(
-                f"{self.ollama_host}/api/generate",
-                json=payload,
-                timeout=self.request_timeout
-            )
-
-            if response.status_code == 200:
-                try:
-                    res_json = json.loads(response.json().get("response", "{}"))
-                    return SceneAnalysis.from_dict(res_json)
-                except json.JSONDecodeError:
-                    text = response.json().get("response", "")
-                    return SceneAnalysis(
-                        quality="YES",
-                        description=text[:50],
-                        action=ActionLevel.MEDIUM,
-                        shot=ShotType.MEDIUM
-                    )
-
-        except Exception:
-            pass
-
-        return None
-
-    # -------------------------------------------------------------------------
-    # Semantic Analysis Methods (Phase 2: Semantic Storytelling)
-    # -------------------------------------------------------------------------
-
-    def _build_semantic_prompt(self) -> str:
-        """Build prompt for semantic scene analysis with free-form tags."""
-        return '''Analyze this video frame for intelligent video editing. Return a JSON object with these keys:
-
-{
-  "quality": "YES" or "NO" (is the frame usable, not blurry or corrupted?),
-  "description": "5-word scene summary",
-  "action": "low" | "medium" | "high" (motion intensity),
-  "shot": "close" | "medium" | "wide" (camera shot type),
-  "tags": ["tag1", "tag2", ...],
-  "caption": "One detailed sentence describing what is happening in this frame",
-  "objects": ["object1", "object2", ...],
-  "mood": "calm" | "energetic" | "dramatic" | "playful" | "tense" | "peaceful" | "mysterious",
-  "setting": "indoor" | "outdoor" | "beach" | "city" | "nature" | "studio" | "street" | "home"
-}
-
-TAGS should include 3-8 relevant descriptive keywords covering:
-- Visual elements (colors, lighting, composition)
-- Scene content (what is happening)
-- Emotional/tonal descriptors
-- Motion characteristics (static, moving, fast, slow)
-- Searchable keywords for content matching
-
-Example:
-{"quality": "YES", "description": "Woman dancing on beach sunset", "action": "high", "shot": "wide", "tags": ["beach", "sunset", "dancing", "golden hour", "silhouette", "waves", "energetic", "freedom"], "caption": "A woman dances freely on a sandy beach during a vibrant sunset with waves in the background", "objects": ["woman", "beach", "ocean", "sun"], "mood": "energetic", "setting": "beach"}
-
-Return ONLY valid JSON, no markdown code blocks.'''
-
-    def _clean_json_response(self, content: str) -> str:
-        """Clean JSON response by removing markdown formatting."""
-        content = content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        return content.strip()
-
-    def _analyze_cgpu(self, frame_b64: str) -> Optional[SceneAnalysis]:
-        """
-        Analyze frame using cgpu/Gemini Vision API.
-
-        Uses the cgpu cloud GPU service with Gemini Flash for fast, cheap vision analysis.
-        This is the primary backend for semantic scene analysis.
-        """
-        try:
-            from .config import get_settings
-
-            llm = get_settings().llm
-            if not llm.cgpu_enabled:
-                return None
-            
-            # Skip local API key check if using cgpu-server (it handles auth)
-            # if not (
-            #     os.environ.get("GEMINI_API_KEY")
-            #     or os.environ.get("GOOGLE_API_KEY")
-            #     or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI")
-            #     or os.environ.get("GOOGLE_GENAI_USE_GCA")
-            # ):
-            #     return None
-
-            from openai import OpenAI
-
-            # cgpu serve exposes OpenAI-compatible Responses API at /v1
-            client = OpenAI(
-                base_url=f"http://{llm.cgpu_host}:{llm.cgpu_port}/v1",
-                api_key="unused"
-            )
-
-            response = client.responses.create(
-                model=llm.cgpu_model,
-                input=[{
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": self._build_semantic_prompt()},
-                        {"type": "input_image", "image_url": f"data:image/jpeg;base64,{frame_b64}"}
-                    ]
-                }],
-                max_output_tokens=400,
-                temperature=0.3,
-                timeout=self.request_timeout
-            )
-
-            content = getattr(response, "output_text", None)
-            if not content and getattr(response, "output", None):
-                for item in response.output:
-                    for part in getattr(item, "content", []) or []:
-                        if getattr(part, "type", "") == "output_text" and getattr(part, "text", None):
-                            content = part.text
-                            break
-                    if content:
-                        break
-
-            if content:
-                cleaned = self._clean_json_response(content)
-                res_json = json.loads(cleaned)
-                return SceneAnalysis.from_dict(res_json)
-
-        except ImportError:
-            pass  # cgpu_utils not available
-        except Exception as e:
-            print(f"   ⚠️ cgpu Vision failed: {e}")
-
-        return None
-
-    def _analyze_openai_semantic(self, frame_b64: str) -> Optional[SceneAnalysis]:
-        """Analyze frame using OpenAI-compatible API with semantic prompt."""
-        try:
-            if self._vision_client is None:
-                from openai import OpenAI
-                self._vision_client = OpenAI(
-                    base_url=self.openai_base,
-                    api_key=self.openai_key
-                )
-
-            response = self._vision_client.chat.completions.create(
-                model=self.vision_model,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": self._build_semantic_prompt()},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame_b64}"}}
-                    ]
-                }],
-                max_tokens=400,
-                temperature=0.3,
-                timeout=self.request_timeout
-            )
-
-            if response.choices and response.choices[0].message.content:
-                content = self._clean_json_response(response.choices[0].message.content)
-                res_json = json.loads(content)
-                return SceneAnalysis.from_dict(res_json)
-
-        except Exception as e:
-            print(f"   ⚠️ OpenAI Vision (semantic) failed: {e}")
-
-        return None
-
-    def _analyze_ollama_semantic(self, frame_b64: str) -> Optional[SceneAnalysis]:
-        """Analyze frame using Ollama with semantic prompt."""
-        if not self.ollama_host:
-            return None
-        try:
-            payload = {
-                "model": self.ollama_model,
-                "prompt": self._build_semantic_prompt(),
-                "images": [frame_b64],
-                "stream": False,
-                "format": "json"
-            }
-
-            response = requests.post(
-                f"{self.ollama_host}/api/generate",
-                json=payload,
-                timeout=self.request_timeout
-            )
-
-            if response.status_code == 200:
-                response_text = response.json().get("response", "{}")
-                res_json = json.loads(response_text)
-                return SceneAnalysis.from_dict(res_json)
-
-        except Exception as e:
-            print(f"   ⚠️ Ollama Vision (semantic) failed: {e}")
-
-        return None
 
 
 # =============================================================================

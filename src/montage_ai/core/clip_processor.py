@@ -280,9 +280,9 @@ def process_clip_task(
                 crf=settings.encoding.crf,
                 preset=settings.encoding.preset,
                 codec_override=output_profile.codec,
-                profile_override=output_profile.profile,
+                profile_override="high" if output_profile.codec == "libx264" else output_profile.profile,
                 level_override=output_profile.level,
-                pix_fmt_override=output_profile.pix_fmt,
+                pix_fmt_override="yuv420p" if output_profile.codec == "libx264" else output_profile.pix_fmt,
             )
             success = run_normalize(cpu_config, cpu_params, "cpu_fallback")
 

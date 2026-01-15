@@ -149,7 +149,323 @@ class CreativeDirector:
         styles_list = "\n".join(
             [f"- {name}: {get_style_template(name)['description']}" for name in available_styles]
         )
+        
+        # SOTA 2026: Directorial Memory (Experience-driven)
+        from .regisseur_memory import get_regisseur_memory
+        memory = get_regisseur_memory()
+        # Note: We'd ideally pass current style context here, but system prompt is global.
+        # We can add a generic advice or pull later.
+        
         self.system_prompt = get_director_prompt(persona, styles_list)
+
+    def query(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        image_b64: Optional[str] = None,
+        json_mode: bool = True,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        max_retries: int = 2,
+        timeout: Optional[int] = None
+    ) -> Optional[str]:
+        """
+        Unified query interface for all LLM/VLM tasks.
+        
+        Supports standard text prompts and vision (images).
+        Automatically falls back between backends.
+        
+        Args:
+            prompt: User prompt
+            system_prompt: Optional system prompt
+            image_b64: Base64 encoded JPEG image (optional)
+            json_mode: Whether to force/prefer JSON output
+            temperature: Sampling temperature
+            max_tokens: Max output tokens
+            max_retries: Number of retries per backend
+            timeout: Request timeout
+            
+        Returns:
+            Raw response text or None if all backends fail
+        """
+        if system_prompt is None:
+            system_prompt = "You are an expert AI assistant for video post-production."
+
+        # Support TEST_NO_LLM for CI
+        if os.environ.get("TEST_NO_LLM", "0").lower() in ("1", "true", "yes"):
+            logger.warning("TEST_NO_LLM is set; skipping LLM backends")
+            return None
+
+        formatted_prompt = self._format_user_prompt(prompt)
+        effective_timeout = timeout if timeout else self.timeout
+        
+        # Track attempted backends for fallback
+        backends_attempted = []
+        last_error = None
+        
+        # Define backends in priority order
+        backends = []
+        if self.use_openai_api and self.openai_client:
+            backends.append(("OpenAI API", self._query_openai_api_unified))
+        if self.use_cgpu and self.cgpu_client:
+            backends.append(("cgpu/Gemini", self._query_cgpu_unified))
+        if self.use_google_ai:
+            backends.append(("Google AI", self._query_google_ai_unified))
+        backends.append(("Ollama", self._query_ollama_unified))
+
+        for backend_name, query_fn in backends:
+            try:
+                backends_attempted.append(backend_name)
+                
+                # Use retry wrapper
+                response = self._query_with_retry(
+                    query_fn,
+                    system_prompt, formatted_prompt, image_b64, 
+                    json_mode, temperature, max_tokens,
+                    max_retries=max_retries,
+                    timeout=effective_timeout
+                )
+                
+                if response:
+                    logger.info(f"✅ {backend_name}: Success")
+                    return response
+            except Exception as e:
+                logger.warning(f"⚠️ {backend_name} failed: {e}")
+                last_error = e
+                continue
+        
+        logger.error(f"All LLM backends failed (attempted: {', '.join(backends_attempted)})")
+        return None
+
+    def _query_openai_api_unified(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_b64: Optional[str] = None,
+        json_mode: bool = True,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        timeout: Optional[int] = None
+    ) -> Optional[str]:
+        """Unified OpenAI query handling text and vision."""
+        content = [{"type": "text", "text": user_prompt}]
+        if image_b64:
+            content.append({
+                "type": "image_url", 
+                "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
+            })
+
+        kwargs = {
+            "model": self.llm_config.openai_model if not image_b64 else (self.llm_config.openai_vision_model or self.llm_config.openai_model),
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": content if image_b64 else user_prompt}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": timeout or self.timeout
+        }
+        
+        if json_mode and not image_b64: # Some v1 vision models don't support JSON mode
+            kwargs["response_format"] = {"type": "json_object"}
+
+        try:
+            response = self.openai_client.chat.completions.create(**kwargs)
+            if response.choices and response.choices[0].message.content:
+                return self._clean_llm_response(response.choices[0].message.content)
+            return None
+        except Exception as e:
+            if "response_format" in str(e).lower() and json_mode:
+                # Retry once without json_mode
+                kwargs.pop("response_format")
+                response = self.openai_client.chat.completions.create(**kwargs)
+                if response.choices and response.choices[0].message.content:
+                    return self._clean_llm_response(response.choices[0].message.content)
+            raise
+
+    def _query_cgpu_unified(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_b64: Optional[str] = None,
+        json_mode: bool = True,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        timeout: Optional[int] = None
+    ) -> Optional[str]:
+        """Unified cgpu query supporting chat/completions and vision if possible."""
+        # Use chat completions if no image, as it's more stable on cgpu serve
+        try:
+            if not image_b64:
+                response = self.cgpu_client.chat.completions.create(
+                    model=self.llm_config.cgpu_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout or self.timeout
+                )
+                if response.choices and response.choices[0].message.content:
+                    return self._clean_llm_response(response.choices[0].message.content)
+            else:
+                # cgpu serve vision via custom Responses API or generic input_image if supported
+                # Fallback to chat completions if possible, or try responses.create
+                try:
+                    # Try responses.create for vision (legacy/cgpu-specialized)
+                    response = self.cgpu_client.responses.create(
+                        model=self.llm_config.cgpu_model,
+                        instructions=system_prompt,
+                        input=[{
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": user_prompt},
+                                {"type": "input_image", "image_url": f"data:image/jpeg;base64,{image_b64}"}
+                            ]
+                        }],
+                        max_output_tokens=max_tokens,
+                        temperature=temperature,
+                        timeout=timeout or self.timeout
+                    )
+                    
+                    content = getattr(response, "output_text", None)
+                    if not content and hasattr(response, "choices"): # Try chat-like response
+                         content = response.choices[0].message.content
+                    
+                    return self._clean_llm_response(content) if content else None
+                except Exception:
+                    # Try standard Chat Completions with Vision formatting
+                    response = self.cgpu_client.chat.completions.create(
+                        model=self.llm_config.cgpu_model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {
+                                "role": "user", 
+                                "content": [
+                                    {"type": "text", "text": user_prompt},
+                                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
+                                ]
+                            }
+                        ],
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        timeout=timeout or self.timeout
+                    )
+                    if response.choices and response.choices[0].message.content:
+                        return self._clean_llm_response(response.choices[0].message.content)
+            return None
+        except Exception as e:
+            logger.warning(f"cgpu unified query error: {e}")
+            raise
+
+    def _query_google_ai_unified(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_b64: Optional[str] = None,
+        json_mode: bool = True,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        timeout: Optional[int] = None
+    ) -> Optional[str]:
+        """Unified Google AI query handling text and vision."""
+        try:
+            url = f"{self.llm_config.google_ai_endpoint}/{self.llm_config.google_ai_model}:generateContent"
+            
+            parts = [{"text": f"{system_prompt}\n\nUser request: {user_prompt}"}]
+            if image_b64:
+                parts.append({
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": image_b64
+                    }
+                })
+
+            payload = {
+                "contents": [{"parts": parts}],
+                "generationConfig": {
+                    "temperature": temperature,
+                    "maxOutputTokens": max_tokens,
+                    "responseMimeType": "application/json" if json_mode else "text/plain"
+                }
+            }
+            
+            headers = {
+                "Content-Type": "application/json",
+                "X-goog-api-key": self.llm_config.google_api_key
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=timeout or self.timeout)
+            
+            if response.status_code == 200:
+                result = response.json()
+                candidates = result.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        return self._clean_llm_response(parts[0].get("text", ""))
+            return None
+        except Exception as e:
+            logger.warning(f"Google AI unified query error: {e}")
+            raise
+
+    def _query_ollama_unified(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        image_b64: Optional[str] = None,
+        json_mode: bool = True,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        timeout: Optional[int] = None
+    ) -> Optional[str]:
+        """Unified Ollama query handling text and vision."""
+        if not self.ollama_host:
+            return None
+
+        try:
+            payload = {
+                "model": self.ollama_model if image_b64 else (self.llm_config.director_model or self.ollama_model),
+                "prompt": user_prompt,
+                "system": system_prompt,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": max_tokens
+                }
+            }
+            if json_mode:
+                payload["format"] = "json"
+            if image_b64:
+                payload["images"] = [image_b64]
+
+            response = requests.post(
+                f"{self.ollama_host}/api/generate",
+                json=payload,
+                timeout=timeout or self.timeout
+            )
+
+            if response.status_code == 200:
+                return response.json().get("response", "")
+            return None
+        except Exception as e:
+            logger.warning(f"Ollama unified query error: {e}")
+            raise
+
+    def _clean_llm_response(self, text: str) -> str:
+        """Helper to clean up markdown code blocks from LLM responses."""
+        if not text:
+            return ""
+        text = text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        elif text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        return text.strip()
+
     def _query_backend(
         self,
         prompt: str,
@@ -190,70 +506,19 @@ class CreativeDirector:
         if system_prompt is None:
             system_prompt = "You are an expert AI assistant for video post-production."
         
-        # Tests and CI can disable LLM usage by setting TEST_NO_LLM=1 which forces
-        # a quick failure to allow code paths that fall back to deterministic
-        # behavior to run quickly during infra tests.
-        if os.environ.get("TEST_NO_LLM", "0").lower() in ("1", "true", "yes"):
-            logger.warning("TEST_NO_LLM is set; skipping LLM backends for deterministic testing")
-            raise RuntimeError("LLM backends disabled via TEST_NO_LLM")
-
-        formatted_prompt = self._format_user_prompt(prompt)
-        effective_timeout = timeout_override if timeout_override else self.timeout
-        
-        # Track attempted backends for fallback
-        backends_attempted = []
-        last_error = None
-        
-        # Try backends in priority order with retry logic
-        for backend_name, query_fn in [
-            ("OpenAI API", lambda: self._query_with_retry(
-                self._query_openai_api_generic,
-                system_prompt, formatted_prompt, temperature, max_tokens,
-                max_retries, effective_timeout
-            )),
-            ("cgpu/Gemini", lambda: self._query_with_retry(
-                self._query_cgpu_generic,
-                system_prompt, formatted_prompt, temperature, max_tokens,
-                max_retries, effective_timeout
-            )),
-            ("Google AI", lambda: self._query_with_retry(
-                self._query_google_ai,
-                system_prompt, formatted_prompt,
-                max_retries, effective_timeout
-            )),
-            ("Ollama", lambda: self._query_with_retry(
-                self._query_ollama,
-                system_prompt, formatted_prompt,
-                max_retries, effective_timeout
-            ))
-        ]:
-            # Skip backends not enabled
-            if backend_name == "OpenAI API" and not (self.use_openai_api and self.openai_client):
-                continue
-            if backend_name == "cgpu/Gemini" and not (self.use_cgpu and self.cgpu_client):
-                continue
-            if backend_name == "Google AI" and not self.use_google_ai:
-                continue
-            
-            try:
-                backends_attempted.append(backend_name)
-                response = query_fn()
-                
-                if response:
-                    logger.info(f"✅ {backend_name}: Success")
-                    return response
-            except Exception as e:
-                logger.warning(f"⚠️ {backend_name} failed: {e}")
-                last_error = e
-                continue
-        
-        # All backends failed
-        error_msg = (
-            f"All LLM backends failed (attempted: {', '.join(backends_attempted)}). "
-            f"Last error: {last_error}"
+        response = self.query(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            max_retries=max_retries,
+            timeout=timeout_override
         )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg)
+        
+        if response:
+            return response
+            
+        raise RuntimeError(f"All LLM backends failed for query: {prompt[:50]}...")
 
     def _query_with_retry(
         self,
@@ -354,62 +619,6 @@ class CreativeDirector:
         logger.warning("Could not extract valid JSON from response")
         return None
     
-    def _query_openai_api_generic(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float,
-        max_tokens: int,
-        timeout: Optional[int] = None
-    ) -> Optional[str]:
-        """Generic OpenAI-compatible API query without JSON mode."""
-        try:
-            response = self.openai_client.chat.completions.create(
-                model=self.llm_config.openai_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout or self.timeout
-            )
-            
-            if response.choices and response.choices[0].message.content:
-                return response.choices[0].message.content.strip()
-            return None
-        except Exception as e:
-            logger.warning(f"OpenAI API generic query error: {e}")
-            raise
-    
-    def _query_cgpu_generic(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float,
-        max_tokens: int,
-        timeout: Optional[int] = None
-    ) -> Optional[str]:
-        """Generic cgpu query without JSON mode."""
-        try:
-            response = self.cgpu_client.chat.completions.create(
-                model="gemini-2.0-flash-exp",  # cgpu default model
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout or self.timeout
-            )
-            
-            if response.choices and response.choices[0].message.content:
-                return response.choices[0].message.content.strip()
-            return None
-        except Exception as e:
-            logger.warning(f"cgpu generic query error: {e}")
-            raise
-
     def interpret_prompt(self, user_prompt: str) -> Optional[Dict[str, Any]]:
         """
         Interpret natural language prompt and return editing instructions.
@@ -535,263 +744,15 @@ class CreativeDirector:
 
     def _query_llm(self, system_prompt: str, user_prompt: str) -> Optional[str]:
         """
-        Query LLM with user prompt (OpenAI-compatible, Google AI, cgpu, or Ollama).
-
-        Args:
-            system_prompt: System prompt/persona
-            user_prompt: User's natural language request
-
-        Returns:
-            LLM response text (should be JSON)
+        Query LLM with user prompt (centralized with auto-fallback).
         """
-        formatted_prompt = self._format_user_prompt(user_prompt)
-        
-        # Try backends in priority order with fallback
-        
-        # 1. OpenAI-compatible API (Primary)
-        if self.use_openai_api and self.openai_client:
-            response = self._query_openai_api(system_prompt, formatted_prompt)
-            if response:
-                return response
-            logger.warning("OpenAI API failed, attempting fallback...")
-
-        # 2. cgpu / Gemini (Secondary - Parallel Resource)
-        if self.use_cgpu and self.cgpu_client:
-            response = self._query_cgpu(system_prompt, formatted_prompt)
-            if response:
-                return response
-            logger.warning("cgpu failed, attempting fallback...")
-
-        # 3. Google AI (Tertiary)
-        if self.use_google_ai:
-            response = self._query_google_ai(system_prompt, formatted_prompt)
-            if response:
-                return response
-            logger.debug("Google AI unavailable, trying fallback")
-
-        # 4. Ollama (Local Fallback)
-        return self._query_ollama(system_prompt, formatted_prompt)
-
-    def _query_openai_api(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """
-        Query OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.).
-        
-        Uses standard /v1/chat/completions endpoint.
-        """
-        try:
-            response = self.openai_client.chat.completions.create(
-                model=self.llm_config.openai_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.3,
-                max_tokens=1024,
-                response_format={"type": "json_object"}  # Force JSON output
-            )
-            
-            if response.choices and response.choices[0].message.content:
-                content = response.choices[0].message.content
-                # Clean up response - some models wrap JSON in markdown
-                if content.startswith("```json"):
-                    content = content[7:]
-                if content.startswith("```"):
-                    content = content[3:]
-                if content.endswith("```"):
-                    content = content[:-3]
-                return content.strip()
-            else:
-                logger.warning("OpenAI API returned empty response")
-                return None
-                
-        except Exception as e:
-            error_str = str(e)
-            # Check if it's a model-not-found or similar error
-            if "response_format" in error_str.lower() or "json" in error_str.lower():
-                # Model doesn't support JSON mode, retry without it
-                logger.warning("Model doesn't support JSON mode, retrying without...")
-                return self._query_openai_api_no_json_mode(system_prompt, user_prompt)
-            logger.warning(f"OpenAI API error: {e}")
-            return None
-
-    def _query_openai_api_no_json_mode(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """
-        Query OpenAI-compatible API without JSON mode (for models that don't support it).
-        """
-        try:
-            response = self.openai_client.chat.completions.create(
-                model=self.llm_config.openai_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.3,
-                max_tokens=1024
-            )
-            
-            if response.choices and response.choices[0].message.content:
-                content = response.choices[0].message.content
-                # Clean up response
-                if content.startswith("```json"):
-                    content = content[7:]
-                if content.startswith("```"):
-                    content = content[3:]
-                if content.endswith("```"):
-                    content = content[:-3]
-                return content.strip()
-            else:
-                return None
-        except Exception as e:
-            logger.warning(f"OpenAI API error (no JSON mode): {e}")
-            return None
-
-    def _query_google_ai(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """
-        Query Google AI directly using API Key (no cgpu/gemini-cli).
-        
-        Uses the generativelanguage.googleapis.com REST API.
-        This bypasses cgpu serve and gemini-cli entirely.
-        """
-        try:
-            url = f"{self.llm_config.google_ai_endpoint}/{self.llm_config.google_ai_model}:generateContent"
-            
-            # Build request payload
-            payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": f"{system_prompt}\n\nUser request: {user_prompt}"}
-                        ]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.3,
-                    "topP": 0.9,
-                    "maxOutputTokens": 1024,
-                    "responseMimeType": "application/json"  # Force JSON output
-                }
-            }
-            
-            headers = {
-                "Content-Type": "application/json",
-                "X-goog-api-key": self.llm_config.google_api_key
-            }
-            
-            response = requests.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=self.timeout
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                # Extract text from Gemini response structure
-                candidates = result.get("candidates", [])
-                if candidates:
-                    content = candidates[0].get("content", {})
-                    parts = content.get("parts", [])
-                    if parts:
-                        text = parts[0].get("text", "")
-                        # Clean up response - Gemini sometimes wraps JSON in markdown
-                        if text.startswith("```json"):
-                            text = text[7:]
-                        if text.startswith("```"):
-                            text = text[3:]
-                        if text.endswith("```"):
-                            text = text[:-3]
-                        return text.strip()
-                logger.debug("Google AI returned empty response")
-                return None
-            else:
-                error_msg = response.json().get("error", {}).get("message", response.text)
-                logger.warning(f"Google AI error ({response.status_code}): {error_msg}")
-                return None
-                
-        except requests.exceptions.Timeout:
-            logger.warning(f"Google AI request timeout ({self.timeout}s)")
-            return None
-        except Exception as e:
-            logger.warning(f"Google AI error: {e}")
-            return None
-
-    def _query_cgpu(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """
-        Query cgpu/Gemini for creative direction.
-        
-        Uses OpenAI Responses API provided by `cgpu serve`.
-        """
-        try:
-            # cgpu serve (Gemini) via OpenAI Responses API
-            response = self.cgpu_client.responses.create(
-                model=self.llm_config.cgpu_model,
-                instructions=system_prompt,
-                input=user_prompt,
-            )
-            
-            if hasattr(response, 'output_text') and response.output_text:
-                content = response.output_text
-                # Clean up response - Gemini sometimes wraps JSON in markdown
-                if content.startswith("```json"):
-                    content = content[7:]
-                if content.startswith("```"):
-                    content = content[3:]
-                if content.endswith("```"):
-                    content = content[:-3]
-                return content.strip()
-            else:
-                logger.warning("cgpu/Gemini returned empty response")
-                return None
-                
-        except Exception as e:
-            logger.warning(f"cgpu/Gemini error: {e}")
-            return None
-
-    def _query_ollama(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """
-        Query Ollama LLM with user prompt (local fallback).
-        """
-        if not self.ollama_host:
-            logger.warning("Ollama host not configured, skipping fallback")
-            return None
-
-        try:
-            payload = {
-                "model": self.ollama_model,
-                "prompt": user_prompt,
-                "system": system_prompt,
-                "stream": False,
-                "format": "json",  # Force JSON output (Ollama native feature)
-                "options": {
-                    "temperature": 0.3,  # Low temp for consistent, reliable output
-                    "top_p": 0.9,
-                    "num_predict": 1024  # Max tokens for JSON response
-                }
-            }
-
-            response = requests.post(
-                f"{self.ollama_host}/api/generate",
-                json=payload,
-                timeout=self.timeout
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("response", "")
-            else:
-                logger.debug(f"Ollama API error: {response.status_code}")
-                return None
-
-        except requests.exceptions.Timeout:
-            logger.warning(f"Ollama request timeout ({self.timeout}s)")
-            return None
-        except requests.exceptions.ConnectionError:
-            logger.warning(f"Cannot connect to Ollama at {self.ollama_host}")
-            logger.warning(f"Make sure Ollama is running: ollama serve")
-            return None
-        except Exception as e:
-            logger.error(f"LLM query error: {e}")
-            return None
+        return self.query(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            json_mode=True,
+            temperature=0.3,
+            max_tokens=1024
+        )
 
     def _repair_json(self, text: str) -> str:
         """
@@ -849,7 +810,7 @@ class CreativeDirector:
         **Error recovery strategies:**
         1. Direct Pydantic parsing
         2. Extract from markdown code blocks
-        3. Extract first {...} structure
+        3. Extract JSON object using regex (find {...})
         4. Repair truncated JSON (auto-close unclosed braces)
         5. Return safe defaults if all parsing fails
         
@@ -862,15 +823,22 @@ class CreativeDirector:
         try:
             # Parse JSON (handle potential markdown wrapping)
             cleaned_response = llm_response.strip()
-            if cleaned_response.startswith("```json"):
-                cleaned_response = cleaned_response[7:]
-            if cleaned_response.startswith("```"):
-                cleaned_response = cleaned_response[3:]
-            if cleaned_response.endswith("```"):
-                cleaned_response = cleaned_response[:-3]
-            cleaned_response = cleaned_response.strip()
+            
+            # Step 1: Detect and extract markdown JSON blocks
+            if "```json" in cleaned_response:
+                cleaned_response = cleaned_response.split("```json")[1].split("```")[0].strip()
+            elif "```" in cleaned_response:
+                cleaned_response = cleaned_response.split("```")[1].split("```")[0].strip()
 
-            # Try to repair truncated/malformed JSON
+            # Step 2: More aggressive search for the JSON object if it still looks like text
+            if not cleaned_response.startswith("{") or not cleaned_response.endswith("}"):
+                import re
+                # Find the first { and the last }
+                match = re.search(r"(\{.*\})", cleaned_response, re.DOTALL)
+                if match:
+                    cleaned_response = match.group(1)
+
+            # Step 3: Try to repair truncated/malformed JSON
             cleaned_response = self._repair_json(cleaned_response)
 
             # Validate with Pydantic
@@ -884,9 +852,21 @@ class CreativeDirector:
             return self._merge_defaults(defaults, instructions)
 
         except (json.JSONDecodeError, ValidationError) as e:
-            logger.debug(f"First parse attempt failed: {e}")
+            logger.debug(f"First parse attempt failed: {str(e)[:100]}...")
             
-            # Fallback: try to extract JSON structure more aggressively
+            # Fallback: try to extract JSON structure more aggressively if we haven't already
+            try:
+                import re
+                match = re.search(r"(\{.*\})", llm_response, re.DOTALL)
+                if match:
+                    fallback_json = self._repair_json(match.group(1))
+                    output = DirectorOutput.model_validate_json(fallback_json)
+                    return self._merge_defaults(self.get_default_instructions(), output.model_dump())
+            except Exception as final_e:
+                logger.error(f"Unexpected LLM validation error: {final_e}")
+                logger.debug(f"Raw problematic response: {llm_response}")
+            
+            return None
             extracted = self._safe_parse_json_response(llm_response)
             if extracted and isinstance(extracted, dict):
                 try:
@@ -941,19 +921,25 @@ class CreativeDirector:
                 "type": "hero_journey",
                 "tension_target": 0.6,
                 "climax_position": 0.75,
+                "momentum_weight": 0.1,  # DEFAULT: Steady narrative build
             },
             "pacing": {
                 "speed": "dynamic",  # Position-aware (intro → build → climax → outro)
                 "variation": "moderate",
-                "intro_duration_beats": 8,
-                "climax_intensity": 0.7
+                "intro_duration_beats": 16,
+                "climax_intensity": 0.8,
+                "breathing_offset_ms": 40,  # DEFAULT: Professional 'groove'
+                "micro_pacing_jitter": 0.05,
             },
             "cinematography": {
-                "prefer_wide_shots": True,  # More elegant/cinematic
-                "prefer_high_action": False,  # Balanced
+                "prefer_wide_shots": False,
+                "prefer_high_action": False,
                 "match_cuts_enabled": True,
-                "invisible_cuts_enabled": True,
-                "shot_variation_priority": "medium"
+                "invisible_cuts_enabled": False,
+                "shot_variation_priority": "medium",
+                "continuity_weight": 0.4,    # PRIORITY: Smooth flow
+                "kuleshov_weight": 0.15,     # SUBTLE: Psychological connection
+                "variety_weight": 0.2,       # MODEST: Keep it interesting
             },
             "transitions": {
                 "type": "energy_aware",  # Smart crossfade on low energy
@@ -965,19 +951,31 @@ class CreativeDirector:
             },
             "effects": {
                 "color_grading": "neutral",
-                "stabilization": False,
+                "stabilization": True,
                 "upscale": False,
-                "sharpness_boost": True
+                "sharpness_boost": False
             },
             "constraints": {
                 "target_duration_sec": None,
-                "min_clip_duration_sec": 0.5,
-                "max_clip_duration_sec": 60.0,
+                "min_clip_duration_sec": 1.0,
+                "max_clip_duration_sec": 8.0,
             },
         }
 
 
 # Convenience function for direct usage
+_default_director = None
+
+def get_creative_director(**kwargs) -> CreativeDirector:
+    """
+    Get the default CreativeDirector instance.
+    Singleton pattern for resource efficiency.
+    """
+    global _default_director
+    if _default_director is None or kwargs:
+        _default_director = CreativeDirector(**kwargs)
+    return _default_director
+
 def interpret_natural_language(prompt: str) -> Dict[str, Any]:
     """
     Convenience function: Interpret natural language prompt.

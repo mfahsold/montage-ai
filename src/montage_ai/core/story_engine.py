@@ -127,7 +127,19 @@ class StoryEngine:
         else:
             arc = StoryArc.from_preset(style_name)
         
-        solver = StorySolver(arc, provider)
+        # Pull parameters from spec if available
+        fatigue_sensitivity = 0.4
+        momentum_weight = 0.1
+        if story_arc_spec:
+             fatigue_sensitivity = getattr(story_arc_spec, "fatigue_sensitivity", 0.4)
+             momentum_weight = getattr(story_arc_spec, "momentum_weight", 0.1)
+
+        solver = StorySolver(
+            arc, 
+            provider, 
+            fatigue_sensitivity=fatigue_sensitivity,
+            momentum_weight=momentum_weight
+        )
 
         # Build beat list
         duration = self.ctx.timeline.target_duration or self.ctx.media.audio_result.duration

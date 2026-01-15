@@ -37,6 +37,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}finalize${NC}        Finalize render (high quality, 1080p, stabilized)
   ${GREEN}hq${NC}              High quality render (1080p/4K)
   ${GREEN}download${NC} JOB_ID  Download job artifacts (video + timeline + logs)
+  ${GREEN}k8s-watch${NC}       Watch K8s for successful jobs and auto-download them
   ${GREEN}export-to-nle${NC}   Export timeline to NLE formats (OTIO/EDL/Premiere/AAF)
   ${GREEN}check-hw${NC}        Diagnose hardware acceleration (NVENC/VAAPI/QSV)
   ${GREEN}list${NC}            List available styles
@@ -355,34 +356,34 @@ run_montage() {
 }
 
 # Parse arguments
-STYLE="dynamic"
-PRESET="medium"
-QUALITY_PROFILE="standard"
-STABILIZE="false"
-ENHANCE="true"
-VARIANTS="1"
-CGPU_ENABLED="false"
-CGPU_GPU_ENABLED="false"
-STRICT_CLOUD_COMPUTE="false"
-EXPORT_TIMELINE="false"
-CAPTIONS="false"
-CAPTIONS_STYLE="youtube"
-VOICE_ISOLATION="false"
-STORY_ENGINE="false"
-SHORTS_MODE="false"
-UPSCALE="false"
-COLOR_GRADING=""
-COLOR_INTENSITY="0.7"
+STYLE="${STYLE:-dynamic}"
+PRESET="${PRESET:-medium}"
+QUALITY_PROFILE="${QUALITY_PROFILE:-standard}"
+STABILIZE="${STABILIZE:-false}"
+ENHANCE="${ENHANCE:-true}"
+VARIANTS="${VARIANTS:-1}"
+CGPU_ENABLED="${CGPU_ENABLED:-false}"
+CGPU_GPU_ENABLED="${CGPU_GPU_ENABLED:-false}"
+STRICT_CLOUD_COMPUTE="${STRICT_CLOUD_COMPUTE:-false}"
+EXPORT_TIMELINE="${EXPORT_TIMELINE:-false}"
+CAPTIONS="${CAPTIONS:-false}"
+CAPTIONS_STYLE="${CAPTIONS_STYLE:-youtube}"
+VOICE_ISOLATION="${VOICE_ISOLATION:-false}"
+STORY_ENGINE="${STORY_ENGINE:-false}"
+SHORTS_MODE="${SHORTS_MODE:-false}"
+UPSCALE="${UPSCALE:-false}"
+COLOR_GRADING="${COLOR_GRADING:-""}"
+COLOR_INTENSITY="${COLOR_INTENSITY:-0.7}"
 # New options
-DENOISE="false"
-SHARPEN="false"
-FILM_GRAIN="none"
-DIALOGUE_DUCK="false"
-AUDIO_NORMALIZE="false"
-STORY_ARC=""
-EXPORT_RECIPE="false"
-CLUSTER_MODE="false"
-CLUSTER_PARALLELISM="4"
+DENOISE="${DENOISE:-false}"
+SHARPEN="${SHARPEN:-false}"
+FILM_GRAIN="${FILM_GRAIN:-none}"
+DIALOGUE_DUCK="${DIALOGUE_DUCK:-false}"
+AUDIO_NORMALIZE="${AUDIO_NORMALIZE:-false}"
+STORY_ARC="${STORY_ARC:-""}"
+EXPORT_RECIPE="${EXPORT_RECIPE:-false}"
+CLUSTER_MODE="${CLUSTER_MODE:-false}"
+CLUSTER_PARALLELISM="${CLUSTER_PARALLELISM:-4}"
 
 case "${1:-run}" in
     run)
@@ -463,6 +464,11 @@ case "${1:-run}" in
         ;;
     cgpu-status)
         cgpu_status
+        exit 0
+        ;;
+    k8s-watch)
+        echo -e "${GREEN}🚀 Starting K8s Auto-Downloader...${NC}"
+        python3 scripts/k8s_auto_downloader.py
         exit 0
         ;;
     status)
