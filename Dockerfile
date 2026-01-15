@@ -1,8 +1,16 @@
 # Use a slim python image for smaller size and faster builds
 FROM python:3.10-slim-bookworm
 
-# Install system dependencies
+# Enable non-free repositories for Intel QSV drivers
+# Required for intel-media-va-driver-non-free (fixes issue #3299)
+RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list
+
+# Install system dependencies including Intel QSV hardware acceleration
+# Intel QSV packages fix MFX_ERR_DEVICE_FAILED (-9) error
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core dependencies
     ffmpeg \
     libsndfile1 \
     libgl1 \
@@ -11,6 +19,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     nodejs \
     npm \
+    # VA-API base libraries (Video Acceleration API)
+    vainfo \
+    libva2 \
+    libva-drm2 \
+    # Intel QSV drivers and runtime (non-free for full hardware support)
+    intel-media-va-driver-non-free \
+    # Intel Media SDK runtime library (required for MFX session creation)
+    libmfx1 \
+    # Intel Video Processing Library (VPL) - newer replacement for MFX
+    libvpl2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install cgpu CLI
@@ -57,6 +75,12 @@ ENV SERVICE_PORT=${SERVICE_PORT}
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=src/montage_ai/web_ui/app.py
 ENV NUMBA_CACHE_DIR=/tmp/numba_cache
+
+# Intel QSV hardware acceleration environment variables
+# LIBVA_DRIVER_NAME=iHD selects the Intel iHD driver for Quick Sync Video
+# MFX_IMPL_DEVICE specifies the render device for MFX session initialization
+ENV LIBVA_DRIVER_NAME=iHD
+ENV MFX_IMPL_DEVICE=/dev/dri/renderD128
 
 # Set PYTHONPATH to include the source directory
 ENV PYTHONPATH=/app/src
