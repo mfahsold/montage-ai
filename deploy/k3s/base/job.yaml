@@ -23,6 +23,13 @@ spec:
       initContainers:
         - name: cgpu-credentials-init
           image: ghcr.io/mfahsold/montage-ai:latest
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
           command:
             - bash
             - -c
@@ -45,6 +52,7 @@ spec:
         - name: montage-ai
           image: ghcr.io/mfahsold/montage-ai:latest
           imagePullPolicy: IfNotPresent
+          command: ["/app/montage-ai.sh"]
           args: ["run", "documentary"]
           env:
             - name: USE_GPU
@@ -67,12 +75,6 @@ spec:
               value: "true"
             - name: CLEAN_AUDIO
               value: "true"
-            - name: OUTPUT_CODEC
-              value: "libx265"
-            - name: OUTPUT_PIX_FMT
-              value: "yuv420p10le"
-            - name: OUTPUT_PROFILE
-              value: "main10"
             - name: XDG_RUNTIME_DIR
               value: "/tmp"
           resources:
@@ -102,19 +104,26 @@ spec:
             - name: dev-dri
               mountPath: /dev/dri
               readOnly: true
+            - name: script
+              mountPath: /app/montage-ai.sh
+              subPath: montage-ai.sh
       volumes:
+        - name: script
+          configMap:
+            name: montage-ai-script
+            defaultMode: 0755
         - name: input
           persistentVolumeClaim:
-            claimName: montage-ai-input-nfs
+            claimName: montage-input
         - name: music
           persistentVolumeClaim:
-            claimName: montage-ai-music-nfs
+            claimName: montage-music
         - name: assets
           persistentVolumeClaim:
-            claimName: montage-ai-assets-nfs
+            claimName: montage-assets
         - name: output
           persistentVolumeClaim:
-            claimName: montage-ai-output-nfs
+            claimName: montage-output
         - name: cgpu-config
           emptyDir: {}
         - name: cgpu-secrets

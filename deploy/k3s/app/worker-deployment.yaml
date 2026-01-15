@@ -29,8 +29,8 @@ spec:
         kubernetes.io/arch: amd64
       containers:
       - name: worker
-        image: ${REGISTRY_URL:-YOUR_REGISTRY:30500}/montage-ai:final
-        imagePullPolicy: Always
+        image: ghcr.io/mfahsold/montage-ai:latest
+        imagePullPolicy: IfNotPresent
         command: ["python", "-m", "montage_ai.worker"]
         env:
         - name: QUALITY_PROFILE

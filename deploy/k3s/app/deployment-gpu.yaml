@@ -35,10 +35,14 @@ spec:
                 values:
                 - codeaijetson-desktop
       
-      # NVIDIA GPU toleration
+      # GPU tolerations
       tolerations:
       - key: nvidia.com/gpu
         operator: Exists
+        effect: NoSchedule
+      - key: gpu
+        operator: Equal
+        value: amd-rocm
         effect: NoSchedule
       
       restartPolicy: Always
@@ -47,7 +51,7 @@ spec:
       containers:
       - name: montage-ai
         image: ghcr.io/mfahsold/montage-ai:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http

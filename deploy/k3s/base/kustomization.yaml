@@ -9,6 +9,7 @@ resources:
   - pvc.yaml
   - namespace.yaml
   - network-policy.yaml
+  - job.yaml
 
 # =============================================================================
 # Image Configuration
@@ -29,11 +30,6 @@ resources:
 # Use the helper script to set images across overlays:
 #   ./scripts/kustomize-set-image.sh <image>
 # or the Makefile target: `make cluster-deploy` which runs the script for you.
-
-images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newName: 192.168.1.12:30500/montage-ai
-    newTag: latest
 
 # ConfigMap for deployment settings (overlays can patch)
 configMapGenerator:

@@ -9,6 +9,11 @@ spec:
       # Target AMD GPU server
       nodeSelector:
         kubernetes.io/hostname: codeai-fluxibriserver
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"
       containers:
         - name: montage-ai
           env:

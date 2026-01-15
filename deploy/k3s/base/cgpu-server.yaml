@@ -43,7 +43,7 @@ spec:
       containers:
         - name: cgpu-server
           image: ghcr.io/mfahsold/montage-ai:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           command: ["cgpu", "serve", "--host", "0.0.0.0", "--port", "8080"]
           env:
             - name: CGPU_PORT

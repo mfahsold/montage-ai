@@ -10,7 +10,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 # Use REGISTRY_URL from config if not overridden
 REGISTRY="${REGISTRY:-${REGISTRY_URL}}"
 # 3. Pushing to local registry
-# 4. k3s pulls automatically with imagePullPolicy: Always
+# 4. Deployment uses imagePullPolicy: IfNotPresent to support WiFi-nodes with manual pre-load
 #
 # Usage:
 #   ./scripts/build-and-deploy.sh [quality=preview|standard|high]
@@ -163,7 +163,7 @@ else
       exit 1
   fi
 
-  # Delete old pods to force image pull
+  # Delete old pods to trigger restart
   echo "   Removing old worker pods..."
   kubectl delete pods -n "$NAMESPACE" -l component=worker --grace-period=30 2>/dev/null || true
   sleep 2

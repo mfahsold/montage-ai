@@ -5,13 +5,18 @@ kind: Kustomization
 
 resources:
   - ../../base
+  - ../../app/worker-deployment.yaml
 
 namespace: montage-ai
 
-# Use registry from config.env (via deploy.sh substitution)
+# Use registry from service for cluster-internal nodes
 images:
+  - name: ghcr.io/mfahsold/montage-ai
+    newName: registry.registry.svc.cluster.local:5000/montage-ai
+    newTag: latest-amd64
   - name: montage-ai
-    newTag: latest
+    newName: registry.registry.svc.cluster.local:5000/montage-ai
+    newTag: latest-amd64
 
 # Production deployment configuration
 patches:
@@ -25,41 +30,78 @@ patches:
       spec:
         template:
           spec:
+            tolerations:
+              - key: "gpu"
+                operator: "Equal"
+                value: "amd-rocm"
+                effect: "NoSchedule"
             affinity:
               nodeAffinity:
-                preferredDuringSchedulingIgnoredDuringExecution:
-                  # Strongly prefer AMD GPU nodes
-                  - weight: 100
-                    preference:
-                      matchExpressions:
-                        - key: accelerator
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                    - matchExpressions:
+                        - key: fluxibri.ai/gpu-enabled
                           operator: In
-                          values: ["amd-gpu"]
-                  # Fallback to high-perf compute
-                  - weight: 50
-                    preference:
-                      matchExpressions:
-                        - key: tier
-                          operator: In
-                          values: ["compute", "render"]
+                          values: ["true"]
             containers:
               - name: montage-ai
                 resources:
                   requests:
-                    cpu: "8"
-                    memory: "32Gi"
+                    cpu: "1"
+                    memory: "4Gi"
                   limits:
-                    cpu: "16"
-                    memory: "64Gi"
+                    cpu: "4"
+                    memory: "8Gi"
                 env:
                   - name: FFMPEG_HWACCEL
-                    value: "auto"
-                  - name: FFMPEG_PRESET
-                    value: "slow"
-                  - name: UPSCALE
-                    value: "true"
-                  - name: ENHANCE
-                    value: "true"
+                    value: "vaapi"
+                  - name: LIBVA_DRIVER_NAME
+                    value: "radeonsi"
+    target:
+      kind: Deployment
+      name: montage-ai-web
+  
+  # Ensure worker also uses GPU
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: montage-ai-worker
+      spec:
+        template:
+          spec:
+            tolerations:
+              - key: "gpu"
+                operator: "Equal"
+                value: "amd-rocm"
+                effect: "NoSchedule"
+            affinity:
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                    - matchExpressions:
+                        - key: fluxibri.ai/gpu-enabled
+                          operator: In
+                          values: ["true"]
+            containers:
+              - name: worker
+                resources:
+                  requests:
+                    cpu: "4"
+                    memory: "16Gi"
+                    amd.com/gpu: "1"
+                  limits:
+                    cpu: "8"
+                    memory: "32Gi"
+                    amd.com/gpu: "1"
+                env:
+                  - name: FFMPEG_HWACCEL
+                    value: "vaapi"
+                  - name: LIBVA_DRIVER_NAME
+                    value: "radeonsi"
+    target:
+      kind: Deployment
+      name: montage-ai-worker
 
 # Production config settings
 configMapGenerator:

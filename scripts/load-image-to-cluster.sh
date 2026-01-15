@@ -17,7 +17,8 @@ for ip in "${NODES[@]}"; do
   echo "Transferring to $ip..."
   scp $SSH_OPTS "$TAR_PATH" "$ip":/tmp/ || { echo "scp failed for $ip"; continue; }
   echo "Importing image on $ip..."
-  ssh $SSH_OPTS "$ip" "sudo ctr images import /tmp/$(basename $TAR_PATH) && sudo ctr images ls | grep montage-ai || true"
+  # Use K3s containerd socket and k8s.io namespace
+  ssh $SSH_OPTS "$ip" "sudo ctr --address /run/k3s/containerd/containerd.sock -n k8s.io images import /tmp/$(basename $TAR_PATH) && sudo ctr --address /run/k3s/containerd/containerd.sock -n k8s.io images ls | grep montage-ai || true"
   echo "Done for $ip"
 done
 

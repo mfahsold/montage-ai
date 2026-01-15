@@ -85,7 +85,7 @@ spec:
       containers:
       - name: montage-ai
         image: ghcr.io/mfahsold/montage-ai:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: web

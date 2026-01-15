@@ -62,7 +62,7 @@ spec:
       containers:
       - name: montage-ai
         image: ghcr.io/mfahsold/montage-ai:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         
         # ====================================================================
         # PORT & NETWORKING

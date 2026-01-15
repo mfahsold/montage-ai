@@ -5,8 +5,9 @@ resources:
   - ../../base
 
 images:
-  - name: montage-ai
-    newTag: latest
+  - name: ghcr.io/mfahsold/montage-ai
+    newName: registry.registry.svc.cluster.local:5000/montage-ai
+    newTag: latest-amd64
 
 patches:
   - path: patch-job-amd.yaml

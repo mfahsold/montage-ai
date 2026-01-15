@@ -23,7 +23,7 @@ spec:
       containers:
       - name: montage-ai
         image: ghcr.io/mfahsold/montage-ai:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         command: ["python", "-u", "-m", "montage_ai.web_ui.app"]
         ports:
         - name: http

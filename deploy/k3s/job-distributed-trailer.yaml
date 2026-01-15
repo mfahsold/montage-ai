@@ -23,7 +23,7 @@ spec:
       containers:
         - name: montage-ai
           image: ghcr.io/mfahsold/montage-ai:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           resources:
             requests:
               cpu: "2"
@@ -82,13 +82,13 @@ spec:
       volumes:
         - name: input
           persistentVolumeClaim:
-            claimName: montage-ai-input-nfs
+            claimName: montage-input
         - name: music
           persistentVolumeClaim:
-            claimName: montage-ai-music-nfs
+            claimName: montage-music
         - name: assets
           persistentVolumeClaim:
-            claimName: montage-ai-assets-nfs
+            claimName: montage-assets
         - name: output
           persistentVolumeClaim:
-            claimName: montage-ai-output-nfs
+            claimName: montage-output

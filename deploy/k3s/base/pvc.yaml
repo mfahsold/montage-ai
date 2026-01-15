@@ -67,3 +67,20 @@ spec:
     requests:
       storage: 100Gi
   storageClassName: local-path
+---
+# Cache for analysis (Beats, Scenes)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-cache
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: local-path

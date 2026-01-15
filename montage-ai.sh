@@ -273,6 +273,50 @@ run_montage() {
         CGPU_ENABLED="true"  # Enable cgpu if any feature needs it
     fi
 
+    # If we're already in a container (detected by /.dockerenv or if docker is missing)
+    # run python directly.
+    if [ -f /.dockerenv ] || [ "$IN_CONTAINER" = "true" ] || ! command -v docker &> /dev/null; then
+        echo "🚀 Running directly (container mode)..."
+        
+        # Export all variables that were passed to docker compose run
+        export CREATIVE_PROMPT="$STYLE"
+        export FFMPEG_PRESET="$PRESET"
+        export STABILIZE="$STABILIZE"
+        export ENHANCE="$ENHANCE"
+        export NUM_VARIANTS="$VARIANTS"
+        export CGPU_ENABLED="$CGPU_ENABLED"
+        export CGPU_PORT="${CGPU_PORT:-8090}"
+        export CGPU_MODEL="${CGPU_MODEL:-gemini-2.0-flash}"
+        export CGPU_GPU_ENABLED="$CGPU_GPU_ENABLED"
+        export STRICT_CLOUD_COMPUTE="$STRICT_CLOUD_COMPUTE"
+        export ENABLE_STORY_ENGINE="$STORY_ENGINE"
+        export STORY_ARC="$STORY_ARC"
+        export SHORTS_MODE="$SHORTS_MODE"
+        export EXPORT_TIMELINE="$EXPORT_TIMELINE"
+        export EXPORT_RECIPE="$EXPORT_RECIPE"
+        export CAPTIONS="$CAPTIONS"
+        export CAPTIONS_STYLE="$CAPTIONS_STYLE"
+        export VOICE_ISOLATION="$VOICE_ISOLATION"
+        export TARGET_DURATION="${TARGET_DURATION:-0}"
+        export MUSIC_START="${MUSIC_START:-0}"
+        export MUSIC_END="${MUSIC_END:-0}"
+        export QUALITY_PROFILE="${QUALITY_PROFILE:-standard}"
+        export COLOR_GRADING="${COLOR_GRADING:-}"
+        export COLOR_INTENSITY="${COLOR_INTENSITY:-0.7}"
+        export UPSCALE="${UPSCALE:-false}"
+        export CLUSTER_MODE="$CLUSTER_MODE"
+        export CLUSTER_PARALLELISM="$CLUSTER_PARALLELISM"
+        export DENOISE="$DENOISE"
+        export SHARPEN="$SHARPEN"
+        export FILM_GRAIN="$FILM_GRAIN"
+        export DIALOGUE_DUCK="$DIALOGUE_DUCK"
+        export AUDIO_NORMALIZE="$AUDIO_NORMALIZE"
+        
+        # Change to src directory where the python package is
+        cd "$(dirname "$0")/src"
+        exec python3 -m montage_ai
+    fi
+
     docker compose run --rm --user "$(id -u):$(id -g)" \
         -e CREATIVE_PROMPT="$STYLE" \
         -e FFMPEG_PRESET="$PRESET" \

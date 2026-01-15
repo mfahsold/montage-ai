@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libva-drm2 \
     # Intel QSV drivers and runtime (non-free for full hardware support)
     intel-media-va-driver-non-free \
+    # AMD VAAPI drivers (Mesa)
+    mesa-va-drivers \
     # Intel Media SDK runtime library (required for MFX session creation)
     libmfx1 \
     # Intel Video Processing Library (VPL) - newer replacement for MFX
