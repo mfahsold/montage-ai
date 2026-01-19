@@ -2,7 +2,7 @@
 
 Common issues and how to fix them.
 
-For Kubernetes/on-call fixes, see [KUBERNETES_RUNBOOK.md](KUBERNETES_RUNBOOK.md).
+For Kubernetes/on-call fixes, see the public stub at [KUBERNETES_RUNBOOK.md](KUBERNETES_RUNBOOK.md) or request access to the internal runbook.
 
 ---
 
@@ -25,19 +25,17 @@ Or offload processing to cloud GPU:
 ```bash
 CGPU_GPU_ENABLED=true ./montage-ai.sh run --upscale
 ```
+
 ---
 
 ## Slow Performance
 **Symptom:** Rendering takes forever
 
 **Fix:**
+```bash
 # Speed over quality
 PARALLEL_ENHANCE=true \
 UPSCALE=false \
-```
-
-
-```bash
 ./montage-ai.sh preview hitchcock
 ```
 
@@ -127,6 +125,7 @@ FFmpeg is included in the Docker image. If running locally:
 
 ```bash
 # Ubuntu/Debian
+sudo apt-get install ffmpeg
 
 # macOS
 brew install ffmpeg

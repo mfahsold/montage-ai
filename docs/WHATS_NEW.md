@@ -21,7 +21,7 @@ This update focuses on **scalability and extreme performance**, transitioning Mo
   - Seamless result aggregation back to the shared NFS store (`/data`).
 
 - **GPU Affinity & Reliability**
-  - Implemented Pod Affinity to ensure encode jobs land on high-performance GPU nodes (e.g., `fluxibri.ai/gpu-enabled: true`).
+- Implemented Pod Affinity to ensure encode jobs land on high-performance GPU nodes (e.g., `example.com/gpu-enabled: true`).
   - Resolved architecture blockers (`exec format error`) by standardizing on `latest-amd64` images and node selectors.
 
 ## How this helps contributors

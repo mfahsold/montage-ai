@@ -69,6 +69,7 @@ Media goes into `data/input/` and `data/music/`.
 ## Run Options
 
 ### Editing Styles
+```bash
 ./montage-ai.sh run                # dynamic (default)
 ./montage-ai.sh run hitchcock      # suspense
 ./montage-ai.sh run mtv            # fast cuts
@@ -89,6 +90,7 @@ Skip the presets and just describe what you want:
 
 ```bash
 CREATIVE_PROMPT="edit like a 90s skateboard video" ./montage-ai.sh run
+```
 
 ---
 
@@ -106,10 +108,6 @@ REDIS_PORT=6379
 ```
 
 If running in Kubernetes, use the provided manifests in `deploy/k3s`.
-CREATIVE_PROMPT="moody and slow, lots of wide shots" ./montage-ai.sh run
-```
-
----
 
 ## Docker Compose
 
@@ -130,9 +128,14 @@ docker compose up
 For cluster deployments:
 
 ```bash
-make deploy           # Default
-make deploy-prod      # Production overlay
-make deploy-dev       # Fast preview mode
+# Base deployment
+kubectl apply -k deploy/k3s/base/
+
+# Production overlay
+kubectl apply -k deploy/k3s/overlays/production/
+
+# Fast preview mode
+kubectl apply -k deploy/k3s/overlays/dev/
 ```
 
 Check job status:

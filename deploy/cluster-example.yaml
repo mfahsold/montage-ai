@@ -97,8 +97,17 @@ nodes:
     gpu_type: intel-qsv
     gpu_name: "Intel UHD Graphics"
     address: "192.168.1.106"
+
+  # Cloud GPU via cgpu
+  - name: cloud-cgpu
+    cpu_cores: 8
+    memory_gb: 32.0
+    architecture: x86_64
+    gpu_type: cgpu
+    gpu_name: "Google Colab T4/A100"
+    address: "colab.google.com"
     labels:
-      tier: compute
+      tier: cloud
 
 # Supported GPU types:
 #   - none: No GPU acceleration

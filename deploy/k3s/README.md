@@ -8,8 +8,13 @@
 # 1. Build & push multi-arch image
 make cluster
 
-# 2. Access Web UI
-open http://montage-ai.fluxibri.lan
+# 2. Access Web UI (choose one)
+# If you have ingress configured:
+open http://YOUR_MONTAGE_HOST
+
+# Or port-forward locally:
+kubectl port-forward -n montage-ai svc/montage-ai-web 5000:8080
+open http://localhost:5000
 ```
 
 That's it. For manual control, see sections below.
@@ -44,7 +49,7 @@ deploy/k3s/
 │   ├── gpu/                 # Generic NVIDIA GPU
 │   ├── distributed/         # Multi-node GPU with NFS
 │   └── distributed-parallel/# Indexed Job shards
-└── app/                     # Full app deployment (Fluxibri infra)
+└── app/                     # Full app deployment (ingress, monitoring)
     ├── deployment.yaml
     ├── service.yaml
     ├── ingress.yaml
@@ -97,7 +102,7 @@ kubectl apply -k deploy/k3s/base/
 # With overlay
 kubectl apply -k deploy/k3s/overlays/production/
 
-# Full Fluxibri app (includes ingress, monitoring)
+# Full app deployment (includes ingress, monitoring)
 kubectl apply -k deploy/k3s/app/
 ```
 
@@ -121,10 +126,10 @@ kubectl apply -k deploy/k3s/app/
 
 ### Available GPU Resources
 
-| Node | GPU Type | Resource Key | Encoder |
+| Node (example) | GPU Type | Resource Key | Encoder |
 |------|----------|--------------|---------|
-| codeaijetson-desktop | NVIDIA Jetson | `nvidia.com/gpu: 1` | NVENC |
-| codeai-fluxibriserver | AMD Radeon | `amd.com/gpu: 1` | VAAPI |
+| gpu-node-nvidia | NVIDIA Jetson | `nvidia.com/gpu: 1` | NVENC |
+| gpu-node-amd | AMD Radeon | `amd.com/gpu: 1` | VAAPI |
 
 ### Deploy with GPU
 
@@ -187,9 +192,9 @@ open http://localhost:5000
 
 ```bash
 # Ensure DNS/hosts entry exists
-echo "YOUR_CLUSTER_IP  montage-ai.fluxibri.lan" | sudo tee -a /etc/hosts
+echo "YOUR_CLUSTER_IP  montage-ai.local" | sudo tee -a /etc/hosts
 
-open http://montage-ai.fluxibri.lan
+open http://montage-ai.local
 ```
 
 ---
@@ -365,5 +370,5 @@ kubectl get networkpolicy -n montage-ai
 ## Related Documentation
 
 - **[Configuration Reference](../CONFIGURATION.md)** — Environment variables
-- **[Kubernetes Runbook](../../docs/KUBERNETES_RUNBOOK.md)** — Failure recovery & operations
+- **[Kubernetes Runbook](../../docs/KUBERNETES_RUNBOOK.md)** — Operations (public stub; internal runbook on request)
 - **[Getting Started](../../docs/getting-started.md)** — Local development setup

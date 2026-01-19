@@ -35,6 +35,13 @@ from enum import Enum
 from .logger import logger
 from .config import get_effective_cpu_count, get_settings
 
+# Re-use ClusterManager for advanced resource detection
+try:
+    from .cluster import get_cluster_manager, ClusterMode
+    CLUSTER_AVAILABLE = True
+except ImportError:
+    CLUSTER_AVAILABLE = False
+
 if TYPE_CHECKING:
     from .ffmpeg_config import FFmpegConfig
 
@@ -136,20 +143,52 @@ class ResourceManager:
         """
         status = ResourceStatus()
 
-        # Detect cgpu (cloud GPU)
-        status.cgpu_available, status.cgpu_gpu_info = self._detect_cgpu()
+        # 1. Use ClusterManager for unified detection if available
+        if CLUSTER_AVAILABLE:
+            try:
+                cluster = get_cluster_manager()
+                
+                # Check for cgpu in cluster
+                cgpu_node = cluster.get_node("cloud-cgpu")
+                if cgpu_node:
+                    status.cgpu_available = True
+                    status.cgpu_gpu_info = cgpu_node.gpu_name
+                else:
+                    # Fallback to direct detection
+                    status.cgpu_available, status.cgpu_gpu_info = self._detect_cgpu()
+                
+                # Detect cluster properties via kubectl (preserves legacy behavior)
+                status.k3s_available, status.k3s_nodes, status.k3s_ready_nodes = \
+                    self._detect_k3s()
+                
+                # Detect local GPU from cluster manager's local node
+                local = cluster.local_node
+                if local and local.is_gpu_node:
+                    status.local_gpu_available = True
+                    status.local_gpu_type = local.gpu_type.value
+                    status.local_gpu_info = local.gpu_name
+                else:
+                    # Fallback
+                    status.local_gpu_available, status.local_gpu_type, status.local_gpu_info = \
+                        self._detect_local_gpu()
+            except Exception as e:
+                logger.debug(f"ClusterManager-based detection failed: {e}")
+                # Fallback to manual detection
+                status.cgpu_available, status.cgpu_gpu_info = self._detect_cgpu()
+                status.local_gpu_available, status.local_gpu_type, status.local_gpu_info = \
+                    self._detect_local_gpu()
+                status.k3s_available, status.k3s_nodes, status.k3s_ready_nodes = \
+                    self._detect_k3s()
+        else:
+            # Traditional detection
+            status.cgpu_available, status.cgpu_gpu_info = self._detect_cgpu()
+            status.local_gpu_available, status.local_gpu_type, status.local_gpu_info = \
+                self._detect_local_gpu()
+            status.k3s_available, status.k3s_nodes, status.k3s_ready_nodes = \
+                self._detect_k3s()
+
         status.cgpu_serve_available = self._detect_cgpu_serve()
-
-        # Detect local GPU
-        status.local_gpu_available, status.local_gpu_type, status.local_gpu_info = \
-            self._detect_local_gpu()
-
-        # Detect CPU (respect cgroup affinity when available)
         status.cpu_cores = get_effective_cpu_count()
-
-        # Detect K3s cluster
-        status.k3s_available, status.k3s_nodes, status.k3s_ready_nodes = \
-            self._detect_k3s()
 
         self._status = status
         return status

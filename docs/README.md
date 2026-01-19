@@ -37,7 +37,7 @@ make cluster
 | ------ | ------------- |
 | [Deployment Guide](../deploy/README.md) | All deployment options |
 | [K8s Deployment](../deploy/k3s/README.md) | Kubernetes/K3s deployment |
-| [Kubernetes Runbook](KUBERNETES_RUNBOOK.md) | Operations & failure recovery |
+| [Kubernetes Runbook](KUBERNETES_RUNBOOK.md) | Operations (public stub; internal on request) |
 | [Troubleshooting](troubleshooting.md) | Common issues & fixes |
 
 ### Architecture
@@ -68,8 +68,7 @@ make cluster
 
 | Document | Description |
 | ------ | ------------- |
-| [Competitive Analysis](COMPETITIVE_ANALYSIS.md) | Market position |
-| [Roadmap 2026](roadmap/ROADMAP_2026.md) | Future plans |
+| [Roadmap](roadmap/README.md) | Public roadmap overview |
 
 ---
 
@@ -85,5 +84,5 @@ make cluster
 
 ---
 
-**Archive:** [archive/](archive/) — Historical docs
+**Archive:** Historical/internal notes live in the private docs set.
 **Contributing:** [CONTRIBUTING.md](../CONTRIBUTING.md)

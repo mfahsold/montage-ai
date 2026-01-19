@@ -196,7 +196,7 @@ QUALITY_PROFILE=preview ./montage-ai.sh run
 | [docs/configuration.md](docs/configuration.md) | Environment variables |
 | [docs/performance-tuning.md](docs/performance-tuning.md) | Optimization |
 | [docs/OPTIONAL_DEPENDENCIES.md](docs/OPTIONAL_DEPENDENCIES.md) | Installation options |
-| [docs/DEPENDENCY_AUDIT.md](docs/DEPENDENCY_AUDIT.md) | Dependency report |
+| [docs/DEPENDENCY_MANAGEMENT.md](docs/DEPENDENCY_MANAGEMENT.md) | Dependency policies |
 
 ## Common Scenarios
 

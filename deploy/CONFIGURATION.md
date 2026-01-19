@@ -29,8 +29,8 @@ deploy/
 
 ### Registry Configuration
 ```bash
-REGISTRY_HOST="192.168.1.12"               # Internal NodePort registry
-REGISTRY_PORT="30500"                      # Default port
+REGISTRY_HOST="registry.example.com"       # Registry host or IP
+REGISTRY_PORT="5000"                       # Registry port
 REGISTRY_URL="${REGISTRY_HOST}:${REGISTRY_PORT}"
 IMAGE_NAME="montage-ai"                    # Image name
 IMAGE_TAG="latest"                         # Image tag
@@ -41,7 +41,7 @@ IMAGE_FULL="${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```bash
 CLUSTER_NAMESPACE="montage-ai"             # K8s namespace
 CLUSTER_API_SERVER="https://YOUR_K8S_API:6443"
-APP_DOMAIN="montage-ai.fluxibri.local"     # Application domain
+APP_DOMAIN="montage.example.com"           # Application domain
 TLS_SECRET="montage-ai-tls"                # TLS secret name
 ```
 
@@ -138,23 +138,22 @@ MEMORY_LIMIT="8Gi"
 CPU_LIMIT="4000m"
 ```
 
-### Fluxibri Cluster (example)
+### Private/Enterprise Cluster (example)
 
-If deploying to the Fluxibri cluster, set the canonical registry to the cluster's registry and use in-cluster CI (Tekton) or node import fallbacks instead of GitHub Actions.
+If your organization provides an internal registry or cluster CI (Tekton, Jenkins, etc.), use those endpoints instead of public registries.
 
 ```bash
-# Example: Fluxibri local registry
-export REGISTRY_HOST="192.168.1.16"
-export REGISTRY_PORT="30500"
+export REGISTRY_HOST="registry.internal.example"
+export REGISTRY_PORT="5000"
 export CLUSTER_NAMESPACE="montage-ai"
 export IMAGE_TAG="${IMAGE_TAG:-latest}"
 # Full image reference used by scripts and manifests
 export IMAGE_FULL="${REGISTRY_HOST}:${REGISTRY_PORT}/montage-ai:${IMAGE_TAG}"
 ```
 
-# Recommended: Tekton task snippet (push to Fluxibri registry)
+### Recommended: Tekton task snippet (push to your registry)
 
-Below is a minimal Tekton snippet showing how a Kaniko or Kaniko-compatible task can push the built image to the Fluxibri registry (adapt to your Tekton setup):
+Below is a minimal Tekton snippet showing how a Kaniko or Kaniko-compatible task can push the built image to your registry (adapt to your Tekton setup):
 
 ```yaml
 # tekton snippet (example)
@@ -175,9 +174,8 @@ Below is a minimal Tekton snippet showing how a Kaniko or Kaniko-compatible task
 
 **Notes:**
 - Use `kubectl create secret docker-registry` to create the registry credential in the target namespace and reference it in your Tekton task or pipeline via `imagePullSecrets`/`taskrun` secret refs.
-- We intentionally avoid GitHub Actions for cluster image pushes in this organization; prefer Tekton/cluster-native CI or the node image import pattern as documented in `docs/cluster-deploy/montage-ai.md`.
+- Prefer cluster-native CI (Tekton/Jenkins) or a node image import pattern if your environment requires it.
 - The repository includes a Tekton Task that runs the hardcoded-registry scanner: `deploy/k3s/tekton/tasks/run-hardcoded-scan.yaml`. You can add a `Pipeline` or `PipelineRun` that mounts the source workspace and runs this task in your Tekton namespace.
-- If you want, I can add a full Tekton `PipelineRun` example as a follow-up commit.
 
 
 ## Migration from Hardcoded Values

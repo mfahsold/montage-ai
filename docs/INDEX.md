@@ -41,7 +41,7 @@ Quick navigation for users, developers, and operators.
 
 | Guide | Purpose |
 |-------|---------|
-| [Dependency Audit](DEPENDENCY_AUDIT.md) | Complete dependency analysis and security report |
+| [Dependency Management](DEPENDENCY_MANAGEMENT.md) | Dependency policies and update workflow |
 | [Security Policy](../SECURITY.md) | Vulnerability reporting (responsible disclosure) |
 | [Responsible AI](responsible-ai.md) | AI ethics and limitations |
 | [Privacy](privacy.md) | Data handling and privacy |

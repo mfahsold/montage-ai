@@ -18,7 +18,7 @@ make cluster
 |----------|---------|
 | **[k3s/README.md](k3s/README.md)** | Kubernetes deployment guide (K3s, K8s, EKS, GKE) |
 | **[CONFIGURATION.md](CONFIGURATION.md)** | Environment variables & config reference |
-| **[../docs/KUBERNETES_RUNBOOK.md](../docs/KUBERNETES_RUNBOOK.md)** | Operations runbook & failure recovery |
+| **[../docs/KUBERNETES_RUNBOOK.md](../docs/KUBERNETES_RUNBOOK.md)** | Operations runbook (public stub; internal on request) |
 
 ## Directory Structure
 

@@ -36,6 +36,7 @@ import platform
 import re
 import shutil
 import subprocess
+import threading
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import lru_cache
@@ -47,6 +48,11 @@ try:
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
+
+try:
+    from ..cgpu_utils import is_cgpu_available
+except ImportError:
+    def is_cgpu_available(*args, **kwargs): return False
 
 from ..logger import logger
 
@@ -65,6 +71,8 @@ class TaskType(Enum):
     THUMBNAIL_EXTRACTION = auto() # Quick thumbnail generation
     FINAL_RENDER = auto()         # Final concatenation with effects
     ML_INFERENCE = auto()         # LLM/VLM-based clip selection
+    CLOUD_UPSCALE = auto()        # Upscaling via cgpu/cloud
+    CLOUD_TRANSCRIPTION = auto()  # Transcription via cgpu/cloud
 
 
 class GPUType(Enum):
@@ -78,6 +86,7 @@ class GPUType(Enum):
     INTEL_VAAPI = ("intel-vaapi", "h264_vaapi", "vaapi")
     APPLE_VIDEOTOOLBOX = ("apple-vt", "h264_videotoolbox", "videotoolbox")
     QUALCOMM_ADRENO = ("qualcomm-adreno", None, None)
+    CGPU = ("cgpu", "h264_nvenc", "cuda")
 
     def __init__(self, id_: str, encoder: Optional[str], hwaccel: Optional[str]):
         self.id = id_
@@ -176,6 +185,12 @@ class NodeCapability:
         elif task == TaskType.ML_INFERENCE:
             return self.memory_gb >= 4
 
+        elif task == TaskType.CLOUD_UPSCALE:
+            return self.gpu_type == GPUType.CGPU
+
+        elif task == TaskType.CLOUD_TRANSCRIPTION:
+            return self.gpu_type == GPUType.CGPU
+
         return True
 
     def get_priority_for_task(self, task: TaskType, resolution: Tuple[int, int] = (1920, 1080)) -> int:
@@ -191,6 +206,8 @@ class NodeCapability:
                 score = 90  # Apple Silicon is very efficient
             elif self.gpu_type in (GPUType.INTEL_QSV, GPUType.INTEL_VAAPI, GPUType.AMD_VAAPI):
                 score = 50 + int(self.gpu_vram_gb * 2)
+            elif self.gpu_type == GPUType.CGPU:
+                score = 120  # Cloud GPUs are powerful but have latency
 
         elif task == TaskType.CPU_SCENE_DETECTION:
             score = self.cpu_cores * 8 + int(self.memory_gb)
@@ -201,6 +218,8 @@ class NodeCapability:
         elif task == TaskType.FINAL_RENDER:
             if self.is_gpu_node:
                 score = 100 + int(self.gpu_vram_gb * 2)
+                if self.gpu_type == GPUType.CGPU:
+                    score += 20
             else:
                 score = self.cpu_cores * 5
 
@@ -211,12 +230,22 @@ class NodeCapability:
             score = self.cpu_cores * 6 + int(self.memory_gb // 2)
 
         elif task == TaskType.ML_INFERENCE:
-            if self.is_gpu_node:
+            if self.gpu_type == GPUType.CGPU:
+                score = 200  # Preferred for ML tasks
+            elif self.is_gpu_node:
                 score = 100 + int(self.gpu_vram_gb * 3)
             elif self.is_arm:
                 score = 60 + int(self.memory_gb)
             else:
                 score = 40 + int(self.memory_gb // 2)
+
+        elif task == TaskType.CLOUD_UPSCALE:
+            if self.gpu_type == GPUType.CGPU:
+                score = 100
+
+        elif task == TaskType.CLOUD_TRANSCRIPTION:
+            if self.gpu_type == GPUType.CGPU:
+                score = 100
 
         # Prefer local node for single-machine setups
         if self.is_local:
@@ -448,10 +477,25 @@ def _detect_apple_gpu() -> Optional[Tuple[GPUType, float, str]]:
     return None
 
 
+def _detect_cgpu() -> Optional[Tuple[GPUType, float, str]]:
+    """Detect if cgpu cloud resource is available."""
+    if os.environ.get("MONTAGE_FORCE_CPU") == "1":
+        return None
+
+    # We use a try/except because cgpu_utils might not be fully configured
+    try:
+        if is_cgpu_available(require_gpu=True):
+            # cgpu usually provides T4 or A100 (16GB+)
+            return (GPUType.CGPU, 16.0, "Google Colab T4/A100")
+    except Exception:
+        pass
+    return None
+
+
 def _detect_gpu() -> Tuple[GPUType, float, str]:
     """Detect best available GPU."""
     # Try each GPU type in priority order
-    for detector in [_detect_nvidia_gpu, _detect_amd_gpu, _detect_intel_gpu, _detect_apple_gpu]:
+    for detector in [_detect_nvidia_gpu, _detect_amd_gpu, _detect_intel_gpu, _detect_apple_gpu, _detect_cgpu]:
         result = detector()
         if result:
             return result
@@ -573,9 +617,13 @@ def _parse_k8s_node(item: Dict[str, Any]) -> Optional[NodeCapability]:
         # Get address
         addresses = status.get("addresses", [])
         address = ""
-        for addr in addresses:
-            if addr.get("type") == "InternalIP":
-                address = addr.get("address", "")
+        # Priority 1: InternalIP, Priority 2: ExternalIP, Priority 3: Hostname
+        for addr_type in ["InternalIP", "ExternalIP", "Hostname"]:
+            for addr in addresses:
+                if addr.get("type") == addr_type:
+                    address = addr.get("address", "")
+                    break
+            if address:
                 break
 
         return NodeCapability(
@@ -643,6 +691,10 @@ def _detect_k8s_gpu(labels: Dict[str, str], capacity: Dict[str, str]) -> Tuple[G
     if labels.get("intel.feature.node.kubernetes.io/gpu") == "true":
         return (GPUType.INTEL_QSV, 0.0)
 
+    # Check for cgpu cloud resource via label
+    if labels.get("montage-ai/cgpu") == "true" or labels.get("cgpu") == "true":
+        return (GPUType.CGPU, 16.0)
+
     return (GPUType.NONE, 0.0)
 
 
@@ -705,6 +757,7 @@ class ClusterManager:
             mode: Discovery mode (defaults to AUTO)
             config_path: Path to cluster config YAML (for CONFIG mode)
         """
+        self._lock = threading.Lock()
         # Read from environment if not specified
         if mode is None:
             mode_str = os.environ.get("MONTAGE_CLUSTER_MODE", "auto").lower()
@@ -721,44 +774,72 @@ class ClusterManager:
 
     def _refresh_nodes(self):
         """Refresh node list based on mode."""
-        self._nodes.clear()
+        with self._lock:
+            self._nodes.clear()
 
-        if self.mode == ClusterMode.CONFIG and self.config_path:
-            nodes = _load_config_file(self.config_path)
-            for node in nodes:
-                self._nodes[node.name] = node
-
-        elif self.mode == ClusterMode.K8S:
-            if _is_k8s_available():
-                nodes = _discover_k8s_nodes()
+            if self.mode == ClusterMode.CONFIG and self.config_path:
+                nodes = _load_config_file(self.config_path)
                 for node in nodes:
                     self._nodes[node.name] = node
-            else:
-                logger.warning("K8s not available, falling back to local mode")
+
+            elif self.mode == ClusterMode.K8S:
+                if _is_k8s_available():
+                    nodes = _discover_k8s_nodes()
+                    for node in nodes:
+                        self._nodes[node.name] = node
+                else:
+                    logger.warning("K8s not available, falling back to local mode")
+                    self._add_local_node()
+
+            elif self.mode == ClusterMode.LOCAL:
                 self._add_local_node()
 
-        elif self.mode == ClusterMode.LOCAL:
-            self._add_local_node()
-
-        elif self.mode == ClusterMode.AUTO:
-            # Try K8s first
-            if _is_k8s_available():
-                nodes = _discover_k8s_nodes()
-                for node in nodes:
-                    self._nodes[node.name] = node
-                logger.info(f"Auto-detected K8s cluster with {len(nodes)} nodes")
-            else:
-                self._add_local_node()
-                logger.info("Running in local mode (no K8s cluster detected)")
+            elif self.mode == ClusterMode.AUTO:
+                # Try K8s first
+                if _is_k8s_available():
+                    nodes = _discover_k8s_nodes()
+                    for node in nodes:
+                        self._nodes[node.name] = node
+                    logger.info(f"Auto-detected K8s cluster with {len(nodes)} nodes")
+                else:
+                    self._add_local_node()
+                    logger.info("Running in local mode (no K8s cluster detected)")
 
         if not self._nodes:
             logger.warning("No nodes discovered, adding local node as fallback")
             self._add_local_node()
 
+        # Always try to add CGPU if available
+        self._add_cgpu_node()
+
     def _add_local_node(self):
         """Add the local machine as a node."""
         self._local_node = detect_local_hardware()
         self._nodes[self._local_node.name] = self._local_node
+
+    def _add_cgpu_node(self):
+        """Add a virtual cloud node if cgpu is available."""
+        # Only add if not already present (could be in config or k8s)
+        if "cloud-cgpu" in self._nodes:
+            return
+
+        try:
+            if is_cgpu_available(require_gpu=True):
+                node = NodeCapability(
+                    name="cloud-cgpu",
+                    cpu_cores=8,
+                    memory_gb=32.0,
+                    architecture="x86_64",
+                    gpu_type=GPUType.CGPU,
+                    gpu_vram_gb=16.0,
+                    gpu_name="Google Colab T4/A100",
+                    labels={"tier": "cloud", "purpose": "acceleration"},
+                    address="colab.google.com"
+                )
+                self._nodes[node.name] = node
+                logger.info("Added virtual cloud-cgpu node to cluster")
+        except Exception:
+            pass
 
     @property
     def nodes(self) -> List[NodeCapability]:
