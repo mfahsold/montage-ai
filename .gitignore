@@ -121,3 +121,6 @@ deploy/k3s/overlays/local/
 # Cluster-specific global config (contains internal IPs)
 deploy/config-global.yaml
 .venv-ci/
+
+# Local-only Docker variant (QSV experiments)
+Dockerfile.qsv
