@@ -133,7 +133,7 @@ git diff --cached --name-only | grep -E "(\.env|secrets|credentials|private)" &&
 
 3. **Documentation Alignment**: Confirm all user-facing docs describe public features only.
 
-* No mentions of "private/", "internal deployment", "business strategy"
+* No mentions of internal deployment paths or business strategy
 * No sensitive paths or credentials
 * Links point to public resources only
 
