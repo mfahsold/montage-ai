@@ -28,6 +28,7 @@ Environment Variables:
     MONTAGE_CLUSTER_MODE: "local", "k8s", "config", "auto" (default: "auto")
     MONTAGE_CLUSTER_CONFIG: Path to cluster config YAML
     MONTAGE_FORCE_CPU: Set to "1" to disable GPU detection
+    MONTAGE_BARE_METAL_ONLY: Set to "1" to prefer bare-metal nodes for local tasks
 """
 
 import json
@@ -124,6 +125,7 @@ class NodeCapability:
     hwaccel: Optional[str] = None  # FFmpeg hwaccel value
     is_control_plane: bool = False
     is_local: bool = False  # True if this is the current machine
+    benchmark_score: float = 1.0  # Performance multiplier from node benchmark
     labels: Dict[str, str] = field(default_factory=dict)
     address: str = ""  # IP or hostname for remote nodes
 
@@ -133,6 +135,11 @@ class NodeCapability:
             self.encoder = self.gpu_type.encoder
         if self.hwaccel is None and self.gpu_type != GPUType.NONE:
             self.hwaccel = self.gpu_type.hwaccel
+        try:
+            self.benchmark_score = float(self.benchmark_score)
+        except (TypeError, ValueError):
+            self.benchmark_score = 1.0
+        self.benchmark_score = max(0.1, min(self.benchmark_score, 10.0))
 
     @property
     def is_gpu_node(self) -> bool:
@@ -273,6 +280,10 @@ class NodeCapability:
         if task not in (TaskType.CLOUD_UPSCALE, TaskType.CLOUD_TRANSCRIPTION) and self.is_bare_metal:
             score += 8
 
+        # Apply benchmark multiplier (higher = faster)
+        if self.benchmark_score != 1.0:
+            score = int(round(score * self.benchmark_score))
+
         return score
 
     def to_dict(self) -> Dict[str, Any]:
@@ -288,6 +299,7 @@ class NodeCapability:
             "encoder": self.encoder,
             "hwaccel": self.hwaccel,
             "is_control_plane": self.is_control_plane,
+            "benchmark_score": self.benchmark_score,
             "labels": self.labels,
             "address": self.address,
         }
@@ -313,6 +325,7 @@ class NodeCapability:
             encoder=data.get("encoder"),
             hwaccel=data.get("hwaccel"),
             is_control_plane=data.get("is_control_plane", False),
+            benchmark_score=data.get("benchmark_score", 1.0),
             labels=data.get("labels", {}),
             address=data.get("address", ""),
         )
@@ -627,6 +640,7 @@ def _parse_k8s_node(item: Dict[str, Any]) -> Optional[NodeCapability]:
 
         # Detect GPU from labels and resources
         gpu_type, gpu_vram = _detect_k8s_gpu(labels, capacity)
+        benchmark_score = _parse_k8s_benchmark_score(labels)
 
         # Check if control plane
         is_control_plane = any(
@@ -656,6 +670,7 @@ def _parse_k8s_node(item: Dict[str, Any]) -> Optional[NodeCapability]:
             gpu_type=gpu_type,
             gpu_vram_gb=gpu_vram,
             is_control_plane=is_control_plane,
+            benchmark_score=benchmark_score,
             labels=labels,
             address=address,
         )
@@ -690,6 +705,24 @@ def _parse_k8s_memory(mem_str: str) -> float:
     }
 
     return value * multipliers.get(unit, 1 / (1024 ** 3))
+
+
+def _parse_k8s_benchmark_score(labels: Dict[str, str]) -> float:
+    """Parse benchmark score label from a node."""
+    for key in (
+        "montage-ai/bench-score",
+        "montage-ai/benchmark-score",
+        "bench-score",
+        "benchmark-score",
+    ):
+        value = labels.get(key)
+        if value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 1.0
+    return 1.0
 
 
 def _detect_k8s_gpu(labels: Dict[str, str], capacity: Dict[str, str]) -> Tuple[GPUType, float]:
@@ -924,6 +957,16 @@ class ClusterManager:
             if n.can_handle_task(task, resolution)
         ]
 
+        if self._is_bare_metal_only_mode(task):
+            bare_nodes = [n for n in capable if n.is_bare_metal]
+            if bare_nodes:
+                capable = bare_nodes
+            else:
+                logger.warning(
+                    "Bare-metal-only routing enabled for %s, but no bare-metal nodes are available; falling back.",
+                    task.name,
+                )
+
         # Sort by priority (descending)
         capable.sort(
             key=lambda n: n.get_priority_for_task(task, resolution),
@@ -933,6 +976,13 @@ class ClusterManager:
         if max_nodes:
             return capable[:max_nodes]
         return capable
+
+    def _is_bare_metal_only_mode(self, task: TaskType) -> bool:
+        """Return True when bare-metal-only routing is enabled for this task."""
+        if task in (TaskType.CLOUD_UPSCALE, TaskType.CLOUD_TRANSCRIPTION):
+            return False
+        value = os.environ.get("MONTAGE_BARE_METAL_ONLY", "").strip().lower()
+        return value in ("1", "true", "yes", "on")
 
     def get_best_node_for_task(
         self,

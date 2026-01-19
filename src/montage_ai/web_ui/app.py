@@ -26,11 +26,52 @@ from werkzeug.utils import secure_filename
 
 from ..cgpu_utils import is_cgpu_available, check_cgpu_gpu
 from ..core.hardware import get_best_hwaccel
-from ..auto_reframe import AutoReframeEngine
 from ..ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
 from ..ffmpeg_config import AUDIO_FILTERS
 from ..audio_analysis import remove_filler_words
-from ..transcriber import Transcriber
+
+# Lazy-load heavy components (OpenCV / cgpu). Keep symbols so tests can patch them
+AUTOREFRAME_AVAILABLE = False
+TRANSCRIBER_AVAILABLE = False
+
+def _load_auto_reframe_engine_class():
+    """Import the real AutoReframeEngine class on demand."""
+    try:
+        from ..auto_reframe import AutoReframeEngine as _AR
+        globals()['AUTOREFRAME_AVAILABLE'] = True
+        return _AR
+    except Exception:
+        # Propagate the original error when actually used so callers get a clear traceback
+        raise
+
+class AutoReframeEngine:
+    """Lightweight lazy factory for the real AutoReframeEngine.
+
+    - Importing this module no longer imports OpenCV at import-time.
+    - The symbol remains patchable by tests (e.g. @patch('montage_ai.web_ui.app.AutoReframeEngine')).
+    """
+    def __new__(cls, *args, **kwargs):
+        Real = _load_auto_reframe_engine_class()
+        return Real(*args, **kwargs)
+
+
+def _load_transcriber_class():
+    """Import the Transcriber class on demand."""
+    try:
+        from ..transcriber import Transcriber as _T
+        globals()['TRANSCRIBER_AVAILABLE'] = True
+        return _T
+    except Exception:
+        raise
+
+class Transcriber:
+    """Lazy factory for the Transcriber wrapper (keeps module import fast).
+
+    Tests may patch `montage_ai.web_ui.app.Transcriber` as before.
+    """
+    def __new__(cls, *args, **kwargs):
+        Real = _load_transcriber_class()
+        return Real(*args, **kwargs)
 
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
@@ -542,6 +583,8 @@ def analyze_crops():
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"File not found: {filename}")
 
+    # Instantiate the (lazy) AutoReframeEngine factory; the real implementation
+    # (and heavy deps like OpenCV) are imported only when this call executes.
     reframer = AutoReframeEngine()
 
     # Convert keyframes dicts to Keyframe objects

@@ -9,6 +9,7 @@
 #   MONTAGE_CLUSTER_MODE: "local", "k8s", "config", "auto" (default: "auto")
 #   MONTAGE_CLUSTER_CONFIG: Path to this config file
 #   MONTAGE_FORCE_CPU: Set to "1" to disable GPU detection
+#   MONTAGE_BARE_METAL_ONLY: Set to "1" to prefer bare-metal nodes for local tasks
 
 # Cluster configuration
 mode: config
@@ -23,6 +24,7 @@ nodes:
     gpu_type: nvidia-nvenc
     gpu_vram_gb: 24.0
     gpu_name: "RTX 4090"
+    benchmark_score: 1.25
     # encoder/hwaccel auto-populated from gpu_type if not specified
     # encoder: h264_nvenc
     # hwaccel: cuda
@@ -40,6 +42,7 @@ nodes:
     gpu_type: amd-rocm
     gpu_vram_gb: 16.0
     gpu_name: "RX 7800 XT"
+    benchmark_score: 1.1
     address: "192.168.1.101"
     labels:
       tier: gpu
@@ -52,6 +55,7 @@ nodes:
     architecture: x86_64
     gpu_type: none
     address: "192.168.1.102"
+    benchmark_score: 1.15
     labels:
       tier: compute
       purpose: analysis
@@ -125,3 +129,6 @@ nodes:
 #   - intel-vaapi: Intel VAAPI (h264_vaapi)
 #   - apple-vt: Apple VideoToolbox (h264_videotoolbox)
 #   - qualcomm-adreno: Qualcomm Adreno (no encoder)
+#
+# K8s label for benchmark weighting:
+#   montage-ai/bench-score: float multiplier (e.g., 1.15)

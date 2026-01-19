@@ -7,31 +7,34 @@ RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-fr
     echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
     echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list
 
-# Install system dependencies including Intel QSV hardware acceleration
+ARG TARGETARCH
+# Install system dependencies (Intel QSV packages only on amd64)
 # Intel QSV packages fix MFX_ERR_DEVICE_FAILED (-9) error
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Core dependencies
-    ffmpeg \
-    libsndfile1 \
-    libgl1 \
-    curl \
-    unzip \
-    build-essential \
-    nodejs \
-    npm \
-    # VA-API base libraries (Video Acceleration API)
-    vainfo \
-    libva2 \
-    libva-drm2 \
-    # Intel QSV drivers and runtime (non-free for full hardware support)
-    intel-media-va-driver-non-free \
-    # AMD VAAPI drivers (Mesa)
-    mesa-va-drivers \
-    # Intel Media SDK runtime library (required for MFX session creation)
-    libmfx1 \
-    # Intel Video Processing Library (VPL) - newer replacement for MFX
-    libvpl2 \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        QSV_PACKAGES="intel-media-va-driver-non-free libmfx1 libvpl2"; \
+    else \
+        QSV_PACKAGES=""; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        # Core dependencies
+        ffmpeg \
+        libsndfile1 \
+        libgl1 \
+        curl \
+        unzip \
+        build-essential \
+        nodejs \
+        npm \
+        # VA-API base libraries (Video Acceleration API)
+        vainfo \
+        libva2 \
+        libva-drm2 \
+        # AMD VAAPI drivers (Mesa)
+        mesa-va-drivers \
+        $QSV_PACKAGES; \
+    rm -rf /var/lib/apt/lists/*
 
 # Install cgpu CLI
 RUN npm install -g cgpu@latest
@@ -49,7 +52,6 @@ COPY requirements.txt .
 RUN pip install --default-timeout=600 --retries 5 --no-cache-dir --prefer-binary -r requirements.txt
 
 # Conditional download of Real-ESRGAN based on architecture
-ARG TARGETARCH
 RUN if [ "$TARGETARCH" = "amd64" ]; then         echo "Downloading Real-ESRGAN for AMD64..." &&         curl -L -o realesrgan.zip https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip &&         unzip -q realesrgan.zip -d realesrgan_temp &&         find realesrgan_temp -name "realesrgan-ncnn-vulkan" -exec mv {} /usr/local/bin/ \; &&         chmod +x /usr/local/bin/realesrgan-ncnn-vulkan &&         mkdir -p /usr/local/share/realesrgan-models &&         find realesrgan_temp -name "*.param" -exec mv {} /usr/local/share/realesrgan-models/ \; &&         find realesrgan_temp -name "*.bin" -exec mv {} /usr/local/share/realesrgan-models/ \; &&         rm -rf realesrgan.zip realesrgan_temp;     else         echo "Skipping Real-ESRGAN for $TARGETARCH (not supported or not needed)";     fi
 
 # Copy application code

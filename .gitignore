@@ -73,6 +73,7 @@ downloads/
 local_downloads/
 reproduce_*.py
 verify_*.py
+benchmark_results/cluster_benchmark.json
 
 # Redis
 dump.rdb

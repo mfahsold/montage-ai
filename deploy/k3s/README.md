@@ -297,6 +297,17 @@ kubectl top nodes
 
 ---
 
+## Node Benchmarking
+
+Use a lightweight benchmark job to label nodes with a performance multiplier
+for task routing (label: `montage-ai/bench-score`).
+
+```bash
+python3 scripts/benchmarks/run_cluster_benchmark.py --namespace montage-ai
+```
+
+---
+
 ## Troubleshooting
 
 ### Pod Not Starting
