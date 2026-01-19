@@ -521,12 +521,24 @@ class SelectionEngine:
                 score -= 20.0 # Accidental shake is bad for 'calm' styles
                 
         # Duration constraint (Edge case: too short for beat)
-        # We need duration from meta
         duration = meta.get('duration', 10.0)
-        target_len = self.ctx.timeline.current_beat_duration
+        target_len = getattr(self.ctx.timeline, "current_beat_duration", None)
+        if not target_len:
+            audio = self.ctx.media.audio_result
+            tempo = getattr(audio, "tempo", 0) if audio else 0
+            if tempo:
+                beat_duration = 60.0 / tempo
+                pattern = self.ctx.timeline.current_pattern or []
+                beats = 1.0
+                if pattern and self.ctx.timeline.pattern_idx > 0:
+                    idx = (self.ctx.timeline.pattern_idx - 1) % len(pattern)
+                    beats = pattern[idx]
+                target_len = beat_duration * beats
+            else:
+                target_len = 1.0
         if duration < target_len:
-             score -= 100.0 # Critical penalty: clip won't fit
-             
+            score -= 100.0 # Critical penalty: clip won't fit
+
         return score
 
     def _select_probabilistic(self, candidates: List[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], float]:
