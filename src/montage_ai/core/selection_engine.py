@@ -77,6 +77,14 @@ class SelectionEngine:
         candidates = valid_scenes[:top_n]
         
         scoring_rules = self._resolve_scoring_rules()
+        fresh_clip_bonus = scoring_rules.get("fresh_clip_bonus", 50)
+        jump_cut_penalty = scoring_rules.get("jump_cut_penalty", 50)
+        shot_variation_bonus = scoring_rules.get("shot_variation_bonus", 10)
+        shot_repetition_penalty = scoring_rules.get("shot_repetition_penalty", 10)
+        shot_progression_bonus = scoring_rules.get("shot_progression_bonus", 0)
+        jarring_transition_penalty = scoring_rules.get("jarring_transition_penalty", 10)
+        environmental_continuity_bonus = scoring_rules.get("environmental_continuity_bonus", 10)
+        variety_bonus = scoring_rules.get("variety_bonus", 15)
         current_section = self._get_current_music_section()
         clip_map = {c.clip_id: c for c in available_footage}
 
@@ -101,29 +109,29 @@ class SelectionEngine:
             score += self._score_usage_and_story_phase(
                 footage_clip,
                 current_energy,
-                fresh_clip_bonus=scoring_rules["fresh_clip_bonus"],
+                fresh_clip_bonus=fresh_clip_bonus,
             )
             score += self._score_jump_cut(
                 path_array[i],
                 unique_videos,
-                jump_cut_penalty=scoring_rules["jump_cut_penalty"],
+                jump_cut_penalty=jump_cut_penalty,
             )
             score += self._score_action_energy(meta, current_energy, current_section)
             score += self._score_style_preferences(meta)
             score += self._score_shot_variation(
                 shot,
-                shot_variation_bonus=scoring_rules["shot_variation_bonus"],
-                shot_repetition_penalty=scoring_rules["shot_repetition_penalty"],
-                progression_bonus=scoring_rules["shot_progression_bonus"],
-                jarring_penalty=scoring_rules["jarring_transition_penalty"],
+                shot_variation_bonus=shot_variation_bonus,
+                shot_repetition_penalty=shot_repetition_penalty,
+                progression_bonus=shot_progression_bonus,
+                jarring_penalty=jarring_transition_penalty,
             )
             if similarity_fn:
                 score += self._score_match_cut(scene, similarity_fn)
             
             score += self._score_semantic_match(
                 meta,
-                continuity_bonus=scoring_rules["environmental_continuity_bonus"],
-                variety_bonus=scoring_rules["variety_bonus"]
+                continuity_bonus=environmental_continuity_bonus,
+                variety_bonus=variety_bonus
             )
             score += self._score_broll_match(scene, meta)
             

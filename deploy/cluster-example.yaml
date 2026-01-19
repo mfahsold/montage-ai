@@ -30,6 +30,7 @@ nodes:
     labels:
       tier: gpu
       purpose: rendering
+      montage-ai/bare-metal: "true"
 
   # AMD GPU node
   - name: amd-server
@@ -42,6 +43,7 @@ nodes:
     address: "192.168.1.101"
     labels:
       tier: gpu
+      montage-ai/bare-metal: "true"
 
   # High-CPU node for scene detection and analysis
   - name: compute-server
@@ -53,6 +55,7 @@ nodes:
     labels:
       tier: compute
       purpose: analysis
+      montage-ai/bare-metal: "true"
 
   # Mac Studio with Apple Silicon
   - name: mac-studio
@@ -97,6 +100,9 @@ nodes:
     gpu_type: intel-qsv
     gpu_name: "Intel UHD Graphics"
     address: "192.168.1.106"
+    labels:
+      tier: compute
+      montage-ai/bare-metal: "true"
 
   # Cloud GPU via cgpu
   - name: cloud-cgpu

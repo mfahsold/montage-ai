@@ -1291,6 +1291,13 @@ class SegmentWriter:
             else:
                 # Just concatenate video
                 base_args = []
+                if _settings.encoding.normalize_clips and _ffmpeg_config.is_gpu_accelerated:
+                    gpu_type = _ffmpeg_config.gpu_encoder_type
+                    if gpu_type in ("vaapi", "rocm"):
+                        base_args.extend([
+                            "-init_hw_device", "vaapi=va:/dev/dri/renderD128",
+                            "-filter_hw_device", "va",
+                        ])
                 base_args.extend([
                     "-f", "concat",
                     "-safe", "0",
@@ -1341,7 +1348,7 @@ class SegmentWriter:
                     "nothing was written",
                 ]
 
-                if _ffmpeg_config.is_gpu_accelerated and any(ind in stderr for ind in gpu_error_indicators):
+                if any(ind in stderr for ind in gpu_error_indicators):
                     logger.warning(
                         "GPU encoding detected failure: '%s'. Retrying with software encoder (libx264)...",
                         first_line

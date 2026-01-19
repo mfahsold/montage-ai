@@ -150,6 +150,24 @@ class NodeCapability:
     def is_high_memory(self) -> bool:
         return self.memory_gb >= 16
 
+    @property
+    def is_bare_metal(self) -> bool:
+        """Heuristic for bare-metal nodes (prefers explicit labels)."""
+        label_value = (
+            self.labels.get("montage-ai/bare-metal")
+            or self.labels.get("bare-metal")
+            or self.labels.get("baremetal")
+        )
+        if isinstance(label_value, str) and label_value.lower() in ("true", "1", "yes"):
+            return True
+
+        instance_type = (
+            self.labels.get("node.kubernetes.io/instance-type")
+            or self.labels.get("beta.kubernetes.io/instance-type")
+            or ""
+        ).lower()
+        return "bare" in instance_type or "metal" in instance_type
+
     def can_handle_task(self, task: TaskType, resolution: Tuple[int, int] = (1920, 1080)) -> bool:
         """Check if this node can handle a specific task type."""
         pixels = resolution[0] * resolution[1]
@@ -250,6 +268,10 @@ class NodeCapability:
         # Prefer local node for single-machine setups
         if self.is_local:
             score += 5
+
+        # Prefer bare-metal resources for consistent throughput
+        if task not in (TaskType.CLOUD_UPSCALE, TaskType.CLOUD_TRANSCRIPTION) and self.is_bare_metal:
+            score += 8
 
         return score
 
