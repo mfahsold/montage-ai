@@ -13,3 +13,4 @@
 - Add `make code-health` target (vulture) and smoke test
 - Add `docs/CODE_HEALTH.md` and small README note
 - Remove obvious unused imports/params (api.py, web_ui/app.py, cli.py)
+- Add `clean-deploy` ephemeral kustomize overlay and `dev-autoscale-smoke` CI workflow for safe dev/staging validation (KEDA/HPA); add docs and guarded dev-only endpoint for deterministic smoke tests

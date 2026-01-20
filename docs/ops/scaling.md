@@ -23,7 +23,17 @@ Tuning pointers
 
 Runbook (staging validation)
 1. Apply staging overlay: `kubectl apply -k deploy/k3s/overlays/staging`
-2. Run smoke: `RUN_SCALE_TESTS=1 pytest -q tests/integration/test_queue_scaling.py -q`
-3. Observe: `kubectl -n montage-ai top pods --containers` and dashboard
+2. Quick dev validation (ephemeral, no production data):
+   - Prefer: run the smoke against the canonical overlay in a staging-like namespace (example uses `montage-ai-clean`):
+     - `./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/production`
+     - The helper will apply the overlay into an isolated namespace for validation (avoid touching prod PVCs).
+   - Optional: `deploy/k3s/overlays/clean-deploy/` remains available for quick local checks but is not canonical.
+   - Runner requirement (CI): self-hosted runner with label `scale-smoke`.
+3. Run smoke (integration): `RUN_SCALE_TESTS=1 pytest -q tests/integration/test_queue_scaling.py -q`
+4. Observe: `kubectl -n montage-ai top pods --containers` and dashboard
+
+Notes:
+- Use `clean-deploy` to validate KEDA/HPA behaviour without touching production PVCs.
+- CI smoke is gated and non-blocking for `main`; failures are diagnostic (do not auto-promote).
 
 For full tuning and production checklist see docs/ops/scale_tuning.md (TBD).

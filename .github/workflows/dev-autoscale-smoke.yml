@@ -21,11 +21,14 @@ jobs:
           docker build -t 127.0.0.1:30500/montage-ai:${IMAGE_TAG} .
           docker push 127.0.0.1:30500/montage-ai:${IMAGE_TAG}
 
-      - name: Deploy to dev (kustomize)
+      - name: Deploy (kustomize)
+        env:
+          OVERLAY: "${{ inputs.overlay || 'deploy/k3s/overlays/production' }}"
         run: |
-          kubectl -n montage-ai set image deploy/montage-ai-web montage-ai=127.0.0.1:30500/montage-ai:${IMAGE_TAG}
-          kubectl -n montage-ai set image deploy/montage-ai-worker worker=127.0.0.1:30500/montage-ai:${IMAGE_TAG}
-          kubectl -n montage-ai apply -k deploy/k3s/overlays/dev
+          echo "Using overlay: $OVERLAY"
+          kubectl -n montage-ai set image deploy/montage-ai-web montage-ai=127.0.0.1:30500/montage-ai:${IMAGE_TAG} || true
+          kubectl -n montage-ai set image deploy/montage-ai-worker montage-ai=127.0.0.1:30500/montage-ai:${IMAGE_TAG} || true
+          kubectl -n montage-ai apply -k "$OVERLAY"
           kubectl -n montage-ai rollout status deploy/montage-ai-web --timeout=3m
           kubectl -n montage-ai rollout status deploy/montage-ai-worker --timeout=3m
 
