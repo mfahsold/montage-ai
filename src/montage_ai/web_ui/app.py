@@ -295,11 +295,28 @@ def get_montage_queue(options: dict) -> ResilientQueue:
 
 def enqueue_montage(job_id: str, style: str, options: dict):
     queue = get_montage_queue(options)
-    # Set appropriate job timeout based on quality profile
-    # Preview: 5 minutes, Standard/Heavy: 30 minutes
+
+    # Prefer explicit override in options, otherwise derive from Settings (no hardcoded literals)
     quality = (options or {}).get("quality_profile", "standard")
-    job_timeout = 300 if quality == "preview" else 1800
-    return queue.enqueue(run_montage, job_id, style, options, job_timeout=job_timeout)
+    job_timeout = options.get(
+        "job_timeout",
+        _settings.processing.preview_job_timeout if quality == "preview" else _settings.processing.default_job_timeout,
+    )
+
+    # Defensive logging to make queue/timeout mismatches observable in CI/cluster
+    try:
+        queue_name = getattr(queue, "name", None) or getattr(queue, "queue_name", None)
+    except Exception:
+        queue_name = None
+    logger.info("Enqueuing job %s → queue=%s timeout=%s (quality=%s)", job_id, queue_name, job_timeout, quality)
+
+    rq_job = queue.enqueue(run_montage, job_id, style, options, job_timeout=job_timeout)
+    try:
+        rq_id = getattr(rq_job, "id", None) or str(rq_job)
+    except Exception:
+        rq_id = str(rq_job)
+    logger.info("Enqueue result for %s: %s", job_id, rq_id)
+    return rq_job
 
 def redis_listener():
     """Listen for updates from Redis and broadcast to SSE clients."""

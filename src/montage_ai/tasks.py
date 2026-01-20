@@ -143,15 +143,45 @@ def run_test_job(job_id: str, duration: int = 5):
     - Keeps the same job lifecycle semantics so callers can poll /api/jobs/<id>.
     """
     store = JobStore()
+
+    # Coerce/validate duration (defensive)
     try:
-        logger.info("[DevTestJob] Starting lightweight test job %s (duration=%ss)", job_id, duration)
-        store.update_job(job_id, {"status": "started", "phase": {"name": "running", "label": "Running test job"}})
-        time.sleep(int(duration))
-        store.update_job(job_id, {"status": "finished", "phase": {"name": "finished", "label": "Completed test job"}})
-        logger.info("[DevTestJob] Completed %s", job_id)
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("[DevTestJob] Failed %s: %s", job_id, exc)
-        store.update_job(job_id, {"status": "failed", "error": str(exc)})
+        duration = max(0, int(duration))
+    except Exception:
+        duration = 5
+
+    with telemetry.job_context(job_id, "dev-test"):
+        try:
+            logger.info("[DevTestJob] Starting lightweight test job %s (duration=%ss)", job_id, duration)
+            store.update_job(job_id, {"status": "started", "phase": {"name": "running", "label": "Running test job"}})
+
+            # Sleep in small increments so the job can be more responsive to interrupts
+            remaining = duration
+            while remaining > 0:
+                step = min(1, remaining)
+                try:
+                    time.sleep(step)
+                except KeyboardInterrupt:
+                    # Respect cancellations in interactive/dev runs
+                    logger.info("[DevTestJob] Interrupted %s", job_id)
+                    store.update_job(job_id, {"status": "failed", "error": "interrupted"})
+                    return
+                remaining -= step
+
+            store.update_job(job_id, {"status": "finished", "phase": {"name": "finished", "label": "Completed test job"}})
+            logger.info("[DevTestJob] Completed %s", job_id)
+            try:
+                telemetry.record_event("dev_test_job", {"status": "success", "job_id": job_id})
+            except Exception:
+                pass
+
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("[DevTestJob] Failed %s: %s", job_id, exc)
+            store.update_job(job_id, {"status": "failed", "error": str(exc)})
+            try:
+                telemetry.record_event("dev_test_job", {"status": "failure", "job_id": job_id, "error": str(exc)[:200]})
+            except Exception:
+                pass
 
 
 def run_shorts_reframe(job_id: str, options: dict):

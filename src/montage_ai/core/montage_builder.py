@@ -346,21 +346,90 @@ class MontageBuilder:
         if self.settings.features.story_engine:
             self._story_engine.ensure_analysis()
 
-        # OPTIMIZATION: Start proxy generation in background
+        # Preview fast-path: avoid expensive analysis for very large inputs
+        # - Skips files larger than PREVIEW_MAX_INPUT_SIZE_MB
+        # - Caps number of files to PREVIEW_MAX_FILES
+        # - Reduces parallel workers for scene detection
         proxy_futures = []
         if self.ctx.media.video_files:
+            # If running in preview mode, apply conservative limits to speed up time-to-preview
+            try:
+                quality = (self.settings.encoding.quality_profile or "").lower()
+            except Exception:
+                quality = ""
+
+            if quality == "preview":
+                max_size_mb = int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200"))
+                max_files = int(os.environ.get("PREVIEW_MAX_FILES", "3"))
+
+                logger.info(
+                    "   ⚡ Preview mode: applying fast-path — max_size=%dMB max_files=%d",
+                    max_size_mb,
+                    max_files,
+                )
+
+                filtered = []
+                skipped = []
+                for p in self.ctx.media.video_files:
+                    try:
+                        size_mb = os.path.getsize(p) / (1024 * 1024)
+                    except Exception:
+                        size_mb = 0
+                    if size_mb > max_size_mb:
+                        skipped.append((p, int(size_mb)))
+                        continue
+                    filtered.append(p)
+                    if len(filtered) >= max_files:
+                        break
+
+                if skipped:
+                    for sfile, sz in skipped:
+                        logger.info("   ⚠️ Skipping large file for preview: %s (%dMB)", os.path.basename(sfile), sz)
+                if len(filtered) < len(self.ctx.media.video_files):
+                    logger.info("   ℹ️ Preview-fast-path will analyze %d/%d files", len(filtered), len(self.ctx.media.video_files))
+
+                # Mutate the context for the duration of analysis (restore later)
+                original_video_files = list(self.ctx.media.video_files)
+                self.ctx.media.video_files = filtered
+
+                # Reduce workers for faster, deterministic preview runs
+                try:
+                    if self._executor:
+                        # best-effort: shrink pool by creating a new executor for analysis
+                        self._executor._shutdown(wait=False)
+                        from concurrent.futures import ThreadPoolExecutor
+                        self._executor = ThreadPoolExecutor(max_workers=1)
+                        logger.info("   ⚙️ Preview-mode: reduced worker pool to 1 for analysis")
+                except Exception:
+                    # non-fatal — proceed with existing executor
+                    pass
+            else:
+                original_video_files = None
+
             logger.info("   🎞️ Checking proxies...")
             proxy_dir = self.ctx.paths.input_dir / "Proxies"
             try:
                 proxy_dir.mkdir(parents=True, exist_ok=True)
             except (PermissionError, OSError):
                 proxy_dir = self.ctx.paths.temp_dir / "proxies"
-            
+
+            # Ensure we have an executor available for short-lived analysis tasks.
+            # Tests may instantiate MontageBuilder without calling setup_workspace();
+            # lazily create a minimal executor to keep analyze_assets robust.
+            if self._executor is None:
+                from concurrent.futures import ThreadPoolExecutor
+                self._executor = ThreadPoolExecutor(max_workers=1)
+                logger.info("   ⚙️ Lazily initialized executor for analysis (tests/preview)")
+
             generator = ProxyGenerator(proxy_dir)
+
+            # Submit proxies and track per-file start times so we can emit telemetry later
+            proxy_submissions = []  # list of (future, video_path, start_time)
             for video_path in self.ctx.media.video_files:
-                proxy_futures.append(
-                    self._executor.submit(generator.ensure_proxy, video_path)
-                )
+                # Skip proxy generation for preview if file is small enough (fast-path)
+                start_t = time.time()
+                fut = self._executor.submit(generator.ensure_proxy, video_path)
+                proxy_submissions.append((fut, video_path, start_t))
 
         # OPTIMIZATION: Start voice isolation in background while doing scene detection
         voice_isolation_future = None
@@ -388,7 +457,16 @@ class MontageBuilder:
                 )
 
         # Detect scenes using AnalysisEngine (blocking call that runs parallel internally)
+        t_scene_start = time.time()
         self._analyzer.detect_scenes(progress_callback=self.progress_callback)
+        t_scene_dur = time.time() - t_scene_start
+
+        # Emit scene-detection telemetry (best-effort)
+        try:
+            from montage_ai import telemetry
+            telemetry.record_event("scene_detection", {"duration_s": round(t_scene_dur, 3), "scene_count": len(self.ctx.features.detected_scenes) if self.ctx.features.detected_scenes else 0})
+        except Exception:
+            pass
         
         # Log scene detection completion
         scene_count = len(self.ctx.features.detected_scenes) if self.ctx.features.detected_scenes else 0
@@ -435,19 +513,45 @@ class MontageBuilder:
             logger.warning(f"   ⚠️ Failed to build similarity index: {e}")
             self.ctx.media.similarity_index = None
 
-        # Wait for proxies
-        if proxy_futures:
+        # Wait for proxies (capture per-file durations and emit telemetry)
+        if 'proxy_submissions' in locals() and proxy_submissions:
             logger.info("   ⏳ Waiting for proxy generation to complete...")
             completed = 0
-            for f in proxy_futures:
+            durations = []
+            for fut, video_path, start_t in proxy_submissions:
                 try:
-                    f.result()
-                    completed += 1
+                    result = fut.result()
+                    dur = time.time() - start_t
+                    durations.append(dur)
+
+                    # Emit telemetry per-file (best-effort)
+                    try:
+                        from montage_ai import telemetry
+                        telemetry.record_event(
+                            "proxy_generation",
+                            {"file": os.path.basename(video_path), "duration_s": round(dur, 3), "proxy_created": bool(result)}
+                        )
+                    except Exception:
+                        pass
+
+                    if result:
+                        completed += 1
                 except Exception:
-                    pass
+                    logger.debug("   ⚠️ Proxy future failed for %s", video_path)
+                    continue
+
             if completed > 0:
-                logger.info(f"   ✅ {completed} Proxies ready")
-        
+                avg = sum(durations) / len(durations) if durations else 0
+                logger.info(f"   ✅ {completed} Proxies ready (avg {avg:.2f}s)")
+
+        # Restore any context mutated by preview fast-path
+        try:
+            if 'original_video_files' in locals() and original_video_files is not None:
+                self.ctx.media.video_files = original_video_files
+                logger.info("   🔁 Restored original media file list after preview fast-path")
+        except Exception:
+            logger.warning("   ⚠️ Failed to restore original media file list (non-fatal)")
+
         self.progress.metadata_extraction_complete()
 
     def _setup_output_paths(self, style_name: str):

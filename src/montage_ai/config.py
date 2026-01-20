@@ -230,6 +230,10 @@ class ProcessingSettings:
     batch_size: int = field(default_factory=lambda: int(os.environ.get("BATCH_SIZE", "5")))
     max_input_resolution: int = field(default_factory=lambda: int(os.environ.get("MAX_INPUT_RESOLUTION", "8294400")))  # 4K default
     warn_threshold_resolution: int = 33177600  # 6K (6144x3160)
+
+    # Job timeouts (seconds) — configurable via env to avoid hardcoded values in code
+    preview_job_timeout: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300")))
+    default_job_timeout: int = field(default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800")))
     
     def get_adaptive_batch_size_for_resolution(
         self, width: int, height: int, low_memory: bool = False, memory_gb: Optional[float] = None
@@ -657,6 +661,10 @@ class ProcessingConfig:
     ffmpeg_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_TIMEOUT", 120))
     ffmpeg_long_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_LONG_TIMEOUT", 600))
     render_timeout: int = field(default_factory=ConfigParser.make_int_parser("RENDER_TIMEOUT", 3600))  # 1 hour default
+
+    # Job timeout (seconds) — configurable via env to avoid hardcoded values in code
+    preview_job_timeout: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300")))
+    default_job_timeout: int = field(default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800")))
 
     def get_adaptive_batch_size(self, low_memory: bool = False, memory_gb: Optional[float] = None) -> int:
         """Get batch size adjusted for memory constraints.
