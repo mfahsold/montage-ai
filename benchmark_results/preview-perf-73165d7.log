@@ -1,0 +1,28 @@
+--- preview-benchmark.sh (partial) - 2026-01-20T21:25:00Z ---
+Run 1
+  Job 20260120_211346 did not finish within timeout
+Run 2
+  Job 20260120_211516 did not finish within timeout
+Run 3
+  Job 20260120_211647 did not finish within timeout
+Run 4
+  Job 20260120_211817 did not finish within timeout
+Run 5
+  Job 20260120_211947 did not finish within timeout
+
+Controlled runs (manual sampling):
+- run 20260120_212444 -> finished (API observed) in 1.492s (worker log)
+- run 20260120_212243 -> timed out (API polling window) — worker may have completed but API returned transient state
+
+Worker log excerpts (scene detection + completion):
+[worker] 🎬 [Job 20260120_211346] ✓ Scene Detection completed in 0.9s
+[worker] 🎬 [Job 20260120_211346] ✓ Scene Detection completed in 0.9s
+[worker] 🎬 [Job 20260120_211346] Starting: Metadata Extraction
+[worker] Telemetry: Job 20260120_211346 completed (success=True, duration=1.9s)
+
+[worker] 🎬 [Job 20260120_212444] ✓ Scene Detection completed in 0.5s
+[worker] Telemetry: Job 20260120_212444 completed (success=True, duration=1.4s)
+
+Notes:
+- Analysis proxy and preview fast-path executed on the worker; scene detection is fast (sub-second) for the small benchmark clips.
+- The dominant reliability issue is API/job-store visibility shortly after worker completion (best-effort job-store updates sometimes not visible within the benchmark's polling window).
