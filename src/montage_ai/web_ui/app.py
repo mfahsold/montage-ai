@@ -17,6 +17,7 @@ import time
 import signal
 import zipfile
 import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from collections import deque
@@ -78,6 +79,7 @@ from ..config import get_settings, reload_settings
 from ..logger import logger
 from ..media_files import list_media_files, parse_inventory_descriptions, read_sidecar_description
 from .job_options import normalize_options, apply_preview_preset, apply_finalize_overrides
+from ..tasks import run_test_job
 
 # Job phase tracking models
 from .models import JobPhase, PIPELINE_PHASES
@@ -966,14 +968,14 @@ def api_create_test_job():
 
     ids = []
     for _ in range(count):
-        jid = create_job_id()
+        jid = f"devtest-{uuid.uuid4().hex[:8]}"
         job_store.create_job(jid, {
             'id': jid,
             'status': 'queued',
             'phase': {'name': 'queued', 'label': 'Waiting in queue', 'progress_percent': 0},
             'style': 'dev-test',
             'options': {'quality_profile': 'preview', '_dev_test': True, 'duration': duration},
-            'created_at': now_iso()
+            'created_at': datetime.now().isoformat()
         })
         # enqueue the lightweight test job so workers can process without full pipeline
         try:

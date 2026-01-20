@@ -5,6 +5,7 @@ kind: Kustomization
 
 resources:
   - ../../base
+  - ../../app/worker-deployment.yaml
   - worker-patch.yaml
   - keda-montage-worker.yaml
   - worker-hpa.yaml

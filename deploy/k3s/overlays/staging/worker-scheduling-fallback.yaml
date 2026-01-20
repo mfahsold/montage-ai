@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      # Staging fallback: use emptyDir for cache to avoid PVC node-affinity blocking
+      volumes:
+        - name: cache
+          emptyDir: {}
+      # Allow scheduling on nodes with non-critical taints in staging
+      tolerations:
+        - operator: "Exists"
+          effect: "NoSchedule"
+        - operator: "Exists"
+          effect: "NoExecute"
