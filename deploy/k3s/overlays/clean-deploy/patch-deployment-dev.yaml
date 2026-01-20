@@ -1,0 +1,57 @@
+# Patch Deployment to use ephemeral volumes and enable dev endpoints
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-web
+spec:
+  template:
+    spec:
+      containers:
+        - name: montage-ai
+          env:
+            - name: ENABLE_DEV_ENDPOINTS
+              value: "true"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+      volumes:
+        - name: data-input
+          emptyDir: {}
+        - name: data-output
+          emptyDir: {}
+        - name: data-music
+          emptyDir: {}
+        - name: data-assets
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: montage-ai
+          env:
+            - name: ENABLE_DEV_ENDPOINTS
+              value: "true"
+            - name: MAX_CONCURRENT_JOBS
+              value: "1"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+      volumes:
+        - name: cache
+          emptyDir: {}
+        - name: tmp-segments
+          emptyDir: {}
