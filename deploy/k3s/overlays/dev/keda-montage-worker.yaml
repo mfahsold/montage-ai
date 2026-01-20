@@ -13,7 +13,6 @@ spec:
   triggers:
     - type: redis
       metadata:
-        # staging: use REDIS_URL from staging configMap (keeps manifests DRY)
         addressFromEnv: "REDIS_URL"
         listName: "rq:queue:default"
-        listLength: "10" # KEDA requires a numeric value; change by patching this manifest or using a kustomize overlay for staging
+        listLength: "10"  # numeric value required by KEDA

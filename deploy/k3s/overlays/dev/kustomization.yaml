@@ -65,6 +65,8 @@ patches:
                 hostPath:
                   path: /dev/dri
                   type: DirectoryOrCreate
+  - path: worker-patch.yaml
+  - path: keda-montage-worker.yaml
 
 # Development configuration
 configMapGenerator:
