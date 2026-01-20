@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker
+  namespace: montage-ai
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: worker
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "1500m"
+              memory: "4Gi"
+          env:
+            - name: MAX_CONCURRENT_JOBS
+              value: "${MAX_CONCURRENT_JOBS_DEFAULT:-2}"
+            - name: MAX_PARALLEL_JOBS
+              value: "${MAX_PARALLEL_JOBS_DEFAULT:-2}"
+      # Dev-only: prefer RWX PVCs when available; fallback to emptyDir for cache to allow multi-node scheduling
+      volumes:
+        - name: data-input
+          persistentVolumeClaim:
+            claimName: montage-input-rwx
+        - name: data-output
+          persistentVolumeClaim:
+            claimName: montage-output-rwx
+        - name: data-music
+          persistentVolumeClaim:
+            claimName: montage-music-rwx
+        - name: data-assets
+          persistentVolumeClaim:
+            claimName: montage-assets-rwx
+        - name: cache
+          emptyDir: {}

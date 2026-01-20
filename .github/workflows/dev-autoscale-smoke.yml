@@ -1,0 +1,42 @@
+name: Dev — autoscale smoke (manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dev-autoscale-smoke:
+    name: Dev autoscale smoke (requires dev runner with cluster access)
+    runs-on: [self-hosted, linux, dev]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        run: |
+          echo "IMAGE_TAG=dev-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build and push image (runner must be able to reach cluster registry)
+        run: |
+          docker build -t 127.0.0.1:30500/montage-ai:${IMAGE_TAG} .
+          docker push 127.0.0.1:30500/montage-ai:${IMAGE_TAG}
+
+      - name: Deploy to dev (kustomize)
+        run: |
+          kubectl -n montage-ai set image deploy/montage-ai-web montage-ai=127.0.0.1:30500/montage-ai:${IMAGE_TAG}
+          kubectl -n montage-ai set image deploy/montage-ai-worker worker=127.0.0.1:30500/montage-ai:${IMAGE_TAG}
+          kubectl -n montage-ai apply -k deploy/k3s/overlays/dev
+          kubectl -n montage-ai rollout status deploy/montage-ai-web --timeout=3m
+          kubectl -n montage-ai rollout status deploy/montage-ai-worker --timeout=3m
+
+      - name: Run infra & smoke tests
+        env:
+          TEST_BASE_URL: http://127.0.0.1:8080
+        run: |
+          ./scripts/ci/run-dev-smoke.sh ${IMAGE_TAG}
+
+      - name: Collect logs (on failure)
+        if: failure()
+        run: |
+          kubectl -n montage-ai get pods -o wide
+          kubectl -n montage-ai logs -l app=montage-ai --tail=200

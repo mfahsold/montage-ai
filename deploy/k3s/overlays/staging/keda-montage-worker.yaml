@@ -1,0 +1,19 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: montage-ai-worker-scaledobject
+  namespace: montage-ai
+spec:
+  scaleTargetRef:
+    name: montage-ai-worker
+  minReplicaCount: 1
+  maxReplicaCount: 8
+  pollingInterval: 15
+  cooldownPeriod: 120
+  triggers:
+    - type: redis
+      metadata:
+        # staging: use REDIS_URL from staging configMap (keeps manifests DRY)
+        addressFromEnv: "REDIS_URL"
+        listName: "rq:queue:default"
+        listLength: "10" # KEDA requires a numeric value; change by patching this manifest or using a kustomize overlay for staging

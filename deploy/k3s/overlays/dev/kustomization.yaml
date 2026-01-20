@@ -49,6 +49,8 @@ patches:
                 env:
                   - name: FFMPEG_HWACCEL
                     value: "auto"
+                  - name: ENABLE_DEV_ENDPOINTS
+                    value: "true"
                 resources:
                   requests:
                     cpu: "500m"
@@ -65,6 +67,8 @@ patches:
                 hostPath:
                   path: /dev/dri
                   type: DirectoryOrCreate
+  - path: worker-patch.yaml
+  - path: keda-montage-worker.yaml
 
 # Development configuration
 configMapGenerator:

@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: montage-ai-web-clean-fallback
+  labels:
+    app.kubernetes.io/name: montage-ai
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: "web"
+spec:
+  rules:
+    - host: montage-ai.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: montage-ai-web
+                port:
+                  number: 80
+# NOTE: This is a dev-only fallback. Add an /etc/hosts entry to test: 127.0.0.1 montage-ai.local
