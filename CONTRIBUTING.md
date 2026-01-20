@@ -154,6 +154,18 @@ make deploy         # Deploy to cluster
 make logs           # Watch job logs
 ```
 
+Dev autoscale smoke (dev-only, safe)
+
+- Purpose: deterministic dev validation of KEDA/HPA + worker scaling using the `clean-deploy` overlay.
+- Local quick-run:
+```bash
+# Ensure KUBECONFIG points to a dev cluster
+./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/clean-deploy
+```
+- CI: provide a self-hosted runner with label `scale-smoke` and `kubectl` access. The workflow is `.github/workflows/dev-autoscale-smoke.yml`.
+
+Safety: `clean-deploy` uses `emptyDir` volumes and is safe to run in clusters without production data.
+
 ---
 
 ## Questions?

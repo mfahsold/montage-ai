@@ -131,8 +131,19 @@ mypy src/
 # Build & push to registry
 ./deploy/k3s/build-and-push.sh
 
-# Apply manifests
+# Apply base manifests
 kubectl apply -k deploy/k3s/base/
+
+# Canonical cluster overlay
+The canonical cluster overlay is `deploy/k3s/overlays/production` — use this for all cluster deployments (staging/production). Keep `deploy/config.env` as the single source of truth for environment overrides.
+
+# Ephemeral testing (dev-only)
+For safe, ephemeral validation (no production data) use the archived ephemeral overlay `deploy/k3s/overlays/clean-deploy` or the CI smoke helper. These are intended for manual/dev validation only and not the canonical deployment path.
+
+# Dev autoscale smoke (CI)
+# - CI default uses the canonical overlay in staging: `deploy/k3s/overlays/production`
+# - For manual/ephemeral testing you may still pass `--overlay deploy/k3s/overlays/clean-deploy` to the helper script
+./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/production
 
 # Check status
 kubectl get pods -n montage-ai
