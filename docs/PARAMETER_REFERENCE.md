@@ -260,6 +260,16 @@ Centralized preview settings used by Transcript/Shorts previews and internal pro
 | `PREVIEW_CRF`          | int   | `28`       | Quality factor for previews                     |
 | `PREVIEW_PRESET`       | str   | `ultrafast`| Encoder preset for previews                     |
 | `PREVIEW_MAX_DURATION` | float | `30.0`     | Max preview duration (seconds)                  |
+| `PREVIEW_MAX_INPUT_SIZE_MB` | int | `200` | Max input file size (MB) to include in preview fast-path |
+| `PREVIEW_MAX_FILES` | int | `3` | Max number of video files analyzed in preview fast-path |
+
+
+### Proxy cache parameters
+| Name | Type | Default | Description |
+|---|---:|---|---|
+| `PROXY_CACHE_TTL_SECONDS` | int | `86400` | How long (seconds) to consider a proxy fresh for reuse |
+| `PROXY_CACHE_MAX_BYTES` | int | `1073741824` | Target maximum proxy cache size (bytes) before eviction |
+| `PROXY_CACHE_MIN_AGE_SECONDS` | int | `60` | Minimum age (seconds) before a proxy file is eligible for eviction |
 | `PREVIEW_TIME_TARGET`  | int   | `180`      | KPI target for Time-to-First-Preview (seconds)  |
 
 Implementation notes:

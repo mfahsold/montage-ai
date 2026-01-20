@@ -2,6 +2,15 @@ name: Dev — autoscale smoke (manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      overlay:
+        description: 'Kustomize overlay to apply (defaults to canonical production overlay)'
+        required: false
+        default: 'deploy/k3s/overlays/production'
+      run_preview_slo:
+        description: 'Run the optional on-cluster preview SLO benchmark (self-hosted runner required)'
+        required: false
+        default: 'false'
 
 jobs:
   dev-autoscale-smoke:
@@ -37,6 +46,15 @@ jobs:
           TEST_BASE_URL: http://127.0.0.1:8080
         run: |
           ./scripts/ci/run-dev-smoke.sh ${IMAGE_TAG}
+
+      - name: Run on-cluster preview SLO benchmark (self-hosted only)
+        if: github.event.inputs.run_preview_slo == 'true'
+        env:
+          TEST_BASE_URL: http://127.0.0.1:8080
+          SLO_P50: 8
+          SLO_P95: 30
+        run: |
+          ./scripts/ci/preview-benchmark.sh ${TEST_BASE_URL}
 
       - name: Collect logs (on failure)
         if: failure()

@@ -20,13 +20,10 @@ def test_preview_skips_large_files(tmp_path, monkeypatch):
     b.ctx.paths.input_dir = tmp_path
     b.ctx.media.video_files = [str(small), str(large)]
 
-    # Force preview quality
-    monkeypatch.setenv("QUALITY_PROFILE", "preview")
-    monkeypatch.setenv("PREVIEW_MAX_INPUT_SIZE_MB", "200")
-    monkeypatch.setenv("PREVIEW_MAX_FILES", "2")
-
-    # Force preview quality on the builder settings (env is not read after instantiation)
+    # Force preview quality in settings (preferred over env)
     b.settings.encoding.quality_profile = "preview"
+    b.settings.processing.preview_max_input_size_mb = 200
+    b.settings.processing.preview_max_files = 2
 
     # Ensure workspace/executor are initialized (mirrors normal runtime)
     b.setup_workspace()
