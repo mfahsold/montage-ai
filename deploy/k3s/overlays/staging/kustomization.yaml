@@ -5,6 +5,9 @@ kind: Kustomization
 
 resources:
   - ../../base
+  - worker-patch.yaml
+  - keda-montage-worker.yaml
+  - worker-hpa.yaml
 
 namespace: montage-ai
 
@@ -57,3 +60,5 @@ configMapGenerator:
       - ENHANCE=false
       - FFMPEG_PRESET=medium
       - VERBOSE=false
+      - REDIS_URL=redis://redis:6379
+

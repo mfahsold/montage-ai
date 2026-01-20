@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker
+  namespace: montage-ai
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: worker
+          env:
+            - name: MAX_CONCURRENT_JOBS
+              value: "${MAX_CONCURRENT_JOBS_DEFAULT:-2}"
+            - name: MAX_PARALLEL_JOBS
+              value: "${MAX_PARALLEL_JOBS_DEFAULT:-2}"
