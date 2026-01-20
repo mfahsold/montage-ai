@@ -1,0 +1,38 @@
+{
+  "commit": "73165d7",
+  "branch": "perf/preview-proxy-cache-ttl",
+  "date": "2026-01-20T21:25:00Z",
+  "local_unit_tests": {
+    "tests_run": [
+      "tests/test_proxy_cache.py",
+      "tests/test_preview_input_limits.py"
+    ],
+    "result": "5 passed, 1 warning"
+  },
+  "on_cluster_preview_benchmark": {
+    "runs_requested": 5,
+    "successful_runs": 1,
+    "successful_run_ids": ["20260120_212444"],
+    "p50_s": 1.672,
+    "p95_s": 1.672,
+    "notes": "Worker-side processing for successful runs ~1.5-2s. Benchmark script observed intermittent API visibility issues causing some runs to be recorded as timeouts despite worker completion."
+  },
+  "observations": {
+    "proxy_cache_hit_rate": "N/A (no stable metric emitted during this short run)",
+    "scene_detection_duration_s": "0.5-0.9",
+    "end_to_end_worker_s": "1.4-1.9"
+  },
+  "recommendations": [
+    "Harden worker->JobStore persistence (make updates retriable/synchronous)",
+    "Make benchmark script more tolerant of transient API staleness (retry, warm-up)",
+    "Expose proxy-cache hit/miss as machine-readable metric for SLO validation"
+  ],
+  "reproducer": {
+    "commands": [
+      "kubectl -n montage-ai cp data/input_test/bunny_trailer.mp4 <web-pod>:/data/input/benchmark_clip_a.mp4",
+      "kubectl -n montage-ai cp data/input_test/bunny_trailer.mp4 <web-pod>:/data/input/benchmark_clip_b.mp4",
+      "kubectl -n montage-ai port-forward svc/montage-ai-web 8080:80",
+      "SLO_P50=8 SLO_P95=30 ./scripts/ci/preview-benchmark.sh http://127.0.0.1:8080"
+    ]
+  }
+}

@@ -234,7 +234,11 @@ class ProcessingSettings:
     # Job timeouts (seconds) — configurable via env to avoid hardcoded values in code
     preview_job_timeout: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300")))
     default_job_timeout: int = field(default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800")))
-    
+
+    # Preview fast-path knobs (make configurable via Settings instead of in-code env reads)
+    preview_max_input_size_mb: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200")))
+    preview_max_files: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_FILES", "3")))
+
     def get_adaptive_batch_size_for_resolution(
         self, width: int, height: int, low_memory: bool = False, memory_gb: Optional[float] = None
     ) -> int:
@@ -526,7 +530,15 @@ class ProxyConfig:
     
     # Reuse proxy for multiple analysis passes (e.g. scene detection + metadata)
     cache_proxies: bool = field(default_factory=lambda: os.environ.get("CACHE_PROXIES", "true").lower() == "true")
-    
+
+    # Proxy cache policy (TTL and size-based eviction)
+    proxy_cache_ttl_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_CACHE_TTL_SECONDS", "86400")))
+    proxy_cache_max_bytes: int = field(default_factory=lambda: int(os.environ.get("PROXY_CACHE_MAX_BYTES", str(1 * 1024 * 1024 * 1024))))  # 1 GiB
+    proxy_cache_min_age_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_CACHE_MIN_AGE_SECONDS", "60")))
+
+    # When true, prefer the lightweight analysis proxy for preview/analysis passes
+    prefer_analysis_proxy_for_preview: bool = field(default_factory=lambda: os.environ.get("PREFER_ANALYSIS_PROXY_FOR_PREVIEW", "true").lower() == "true")
+
     def should_use_proxy(self, duration_seconds: float, width: int, height: int) -> bool:
         """Determine if proxy should be used based on input characteristics."""
         if not self.enable_proxy_analysis:

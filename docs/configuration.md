@@ -440,6 +440,41 @@ Orientation and sizing:
 - Previews preserve the source orientation. Defaults (640x360) apply to landscape; portrait sources will map to 360x640 automatically.
 - Proxy generation preserves aspect ratio and typically limits by height (e.g., `scale=-2:PREVIEW_HEIGHT`), so final dimensions may be rounded by encoder constraints.
 
+### On-cluster preview SLO benchmark (self-hosted)
+
+We provide an opt‑in, non-destructive on‑cluster benchmark to validate end‑to‑end preview latency (web → queue → worker). Use it during rollouts on a self‑hosted runner that has cluster access.
+
+How to run (recommended):
+
+- From a self‑hosted runner with kubectl access to the target cluster:
+
+  - Trigger the dev autoscale smoke workflow (recommended):
+
+    - In GitHub Actions UI: run the `Dev — autoscale smoke` workflow and set `run_preview_slo` = `true`.
+    - Or with the `gh` CLI: `gh workflow run dev-autoscale-smoke.yml -f run_preview_slo=true -f overlay=deploy/k3s/overlays/production`
+
+  - The workflow will build/push the image, deploy it to the cluster, run smoke tests, and (optionally) execute the preview SLO benchmark.
+
+How to run locally (manual):
+
+1. Deploy the image or ensure the `montage-ai-web` service is reachable from the runner.
+2. Populate `/data/input` on the cluster with the benchmark clips (`benchmark_clip_a.mp4`, `benchmark_clip_b.mp4`).
+3. From the runner: `./scripts/ci/preview-benchmark.sh http://127.0.0.1:8080` (the script will POST preview jobs and assert p50/p95 SLOs).
+
+What it measures:
+- Time from job POST → preview ready (per-job). The script reports p50 and p95 and exits non‑zero if SLOs are violated.
+
+Configuration knobs:
+- `SLO_P50`, `SLO_P95` — override defaults when invoking the script (env or CLI). Example: `SLO_P50=8 SLO_P95=30 ./scripts/ci/preview-benchmark.sh http://127.0.0.1:8080`.
+- `PREVIEW_MAX_INPUT_SIZE_MB`, `PREVIEW_MAX_FILES` — preview fast‑path knobs (see `PARAMETER_REFERENCE.md`).
+
+Interpretation tips:
+- High p50 with low proxy cache hit-rate → tune proxy cache TTL/size or ensure proxies are pre-warmed.
+- High p95 with low variance in p50 → look for outliers (I/O or cold-starts); collect pod logs and `phase_timestamps` via `/api/jobs/<id>`.
+
+Safety:
+- Non‑destructive: benchmark uses preview profile and small test clips. Mark the workflow `run_preview_slo` as opt‑in to avoid unintended CI costs.
+
 
 ## Export Settings
 

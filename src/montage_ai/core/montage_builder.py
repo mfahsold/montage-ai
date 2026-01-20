@@ -359,8 +359,14 @@ class MontageBuilder:
                 quality = ""
 
             if quality == "preview":
-                max_size_mb = int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200"))
-                max_files = int(os.environ.get("PREVIEW_MAX_FILES", "3"))
+                # Prefer configured settings (tests and deploys should set these via config.Settings).
+                try:
+                    max_size_mb = int(self.settings.processing.preview_max_input_size_mb)
+                    max_files = int(self.settings.processing.preview_max_files)
+                except Exception:
+                    # Backwards-compatible fallback to legacy env vars
+                    max_size_mb = int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200"))
+                    max_files = int(os.environ.get("PREVIEW_MAX_FILES", "3"))
 
                 logger.info(
                     "   ⚡ Preview mode: applying fast-path — max_size=%dMB max_files=%d",
@@ -428,7 +434,18 @@ class MontageBuilder:
             for video_path in self.ctx.media.video_files:
                 # Skip proxy generation for preview if file is small enough (fast-path)
                 start_t = time.time()
-                fut = self._executor.submit(generator.ensure_proxy, video_path)
+
+                # When in preview fast-path prefer a small analysis proxy (faster to produce and cache)
+                try:
+                    prefer_analysis = bool(self.settings.proxy.prefer_analysis_proxy_for_preview) and quality == "preview"
+                except Exception:
+                    prefer_analysis = True if quality == "preview" else False
+
+                if prefer_analysis:
+                    fut = self._executor.submit(getattr(generator, "ensure_analysis_proxy"), video_path, self.settings.proxy.proxy_height)
+                else:
+                    fut = self._executor.submit(generator.ensure_proxy, video_path)
+
                 proxy_submissions.append((fut, video_path, start_t))
 
         # OPTIMIZATION: Start voice isolation in background while doing scene detection
@@ -467,7 +484,14 @@ class MontageBuilder:
             telemetry.record_event("scene_detection", {"duration_s": round(t_scene_dur, 3), "scene_count": len(self.ctx.features.detected_scenes) if self.ctx.features.detected_scenes else 0})
         except Exception:
             pass
-        
+
+        # Persist phase timestamp to job store (best-effort)
+        try:
+            from montage_ai.core.job_store import JobStore
+            js = JobStore()
+            js.update_job(self.ctx.job_id, {"phase_timestamps": {"scene_detection": datetime.now().isoformat()}})
+        except Exception:
+            pass
         # Log scene detection completion
         scene_count = len(self.ctx.features.detected_scenes) if self.ctx.features.detected_scenes else 0
         self.progress.scene_detection_complete(scenes=scene_count)
@@ -527,10 +551,16 @@ class MontageBuilder:
                     # Emit telemetry per-file (best-effort)
                     try:
                         from montage_ai import telemetry
-                        telemetry.record_event(
-                            "proxy_generation",
-                            {"file": os.path.basename(video_path), "duration_s": round(dur, 3), "proxy_created": bool(result)}
-                        )
+                        evt = {"file": os.path.basename(video_path), "duration_s": round(dur, 3), "proxy_created": bool(result)}
+                        telemetry.record_event("proxy_generation", evt)
+                    except Exception:
+                        pass
+
+                    # Persist phase timestamp to job store (best-effort)
+                    try:
+                        from montage_ai.core.job_store import JobStore
+                        js = JobStore()
+                        js.update_job(self.ctx.job_id, {"phase_timestamps": {"proxy_ready": (datetime.now().isoformat())}})
                     except Exception:
                         pass
 

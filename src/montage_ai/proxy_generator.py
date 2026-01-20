@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from typing import Optional, List, Dict, Union
 import logging
+import time
 
 from .ffmpeg_config import FFmpegConfig
 from .utils import get_video_duration
@@ -81,21 +82,78 @@ class ProxyGenerator:
             raise
 
     def ensure_proxy(self, source_path: Union[str, Path], format: str = "h264", force: bool = False) -> Optional[Path]:
-        """
-        Ensure a proxy exists for the given source file.
-        Returns path to proxy if successful/exists, None on failure.
-        
-        Formats: 'h264' (default), 'prores', 'dnxhr'
+        """Ensure a proxy exists for the given source file (with TTL + cache checks).
+
+        Behavior:
+        - Consults `settings.proxy` for cache TTL and size limits.
+        - Emits telemetry events: proxy_cache_hit / proxy_cache_miss / proxy_cache_evicted / proxy_generation.
+        - Keeps backwards-compatible semantics when settings are not available.
         """
         source = Path(source_path)
         proxy_path = self.get_proxy_path(source, format)
 
-        if proxy_path.exists() and not force:
-            logger.debug(f"Proxy exists: {proxy_path}")
-            return proxy_path
-
+        # Try to read cache policy from settings (fall back to safe defaults)
         try:
-            return self._generate(source, proxy_path, format)
+            from .config import get_settings
+            settings = get_settings()
+            ttl = int(settings.proxy.proxy_cache_ttl_seconds)
+            max_bytes = int(settings.proxy.proxy_cache_max_bytes)
+            min_age = int(settings.proxy.proxy_cache_min_age_seconds)
+        except Exception:
+            ttl = 86400
+            max_bytes = 1 * 1024 * 1024 * 1024
+            min_age = 60
+
+        # Fast-path: reuse existing proxy when fresh
+        try:
+            if proxy_path.exists() and not force:
+                src_mtime = source.stat().st_mtime
+                proxy_mtime = proxy_path.stat().st_mtime
+                proxy_size = proxy_path.stat().st_size
+
+                # TTL check
+                if (time.time() - proxy_mtime) <= ttl and proxy_mtime >= src_mtime and proxy_size > 0:
+                    logger.debug(f"Proxy cache hit: {proxy_path}")
+                    try:
+                        from montage_ai import telemetry
+                        telemetry.record_event("proxy_cache_hit", {"file": proxy_path.name, "size": proxy_size})
+                    except Exception:
+                        pass
+                    return proxy_path
+                else:
+                    try:
+                        from montage_ai import telemetry
+                        telemetry.record_event("proxy_cache_miss", {"file": proxy_path.name, "age_s": int(time.time() - proxy_mtime)})
+                    except Exception:
+                        pass
+        except OSError:
+            # Stat failed — fall back to (re)generate
+            pass
+
+        # Ensure cache size is within limits before generating (evict if necessary)
+        try:
+            self._enforce_cache_limits(max_bytes=max_bytes, min_age_seconds=min_age)
+        except Exception:
+            # Non-fatal — continue to attempt generation
+            pass
+
+        # Generate proxy
+        try:
+            out = self._generate(source, proxy_path, format)
+
+            # Emit telemetry and enforce cache limits after successful creation
+            try:
+                from montage_ai import telemetry
+                telemetry.record_event("proxy_generation", {"file": proxy_path.name, "size": proxy_path.stat().st_size})
+            except Exception:
+                pass
+
+            try:
+                self._enforce_cache_limits(max_bytes=max_bytes, min_age_seconds=min_age)
+            except Exception:
+                pass
+
+            return out
         except Exception as e:
             logger.error(f"Failed to generate proxy for {source}: {e}")
             return None
@@ -190,7 +248,99 @@ class ProxyGenerator:
 
         return output
 
-    @staticmethod
+    def _enforce_cache_limits(self, max_bytes: int, min_age_seconds: int = 60) -> None:
+        """Evict oldest accessed proxy files until total cache size is <= max_bytes.
+
+        - Respects a minimum age to avoid evicting very recently-created files.
+        - Emits `proxy_cache_evicted` telemetry with bytes_freed and files_removed.
+        """
+        try:
+            files = [p for p in self.proxy_dir.iterdir() if p.is_file()]
+        except Exception:
+            return
+
+        total = 0
+        entries = []  # (atime, path, size)
+        for p in files:
+            try:
+                st = p.stat()
+                entries.append((st.st_atime, p, st.st_size))
+                total += st.st_size
+            except Exception:
+                continue
+
+        if total <= max_bytes:
+            return
+
+        # Sort by access time (oldest first)
+        entries.sort(key=lambda e: e[0])
+        removed = 0
+        freed = 0
+        threshold_time = time.time() - min_age_seconds
+        for atime, p, sz in entries:
+            # Do not evict files younger than min_age_seconds
+            if atime > threshold_time:
+                continue
+            try:
+                p.unlink()
+                removed += 1
+                freed += sz
+                total -= sz
+            except Exception:
+                continue
+            if total <= max_bytes:
+                break
+
+        if removed:
+            try:
+                from montage_ai import telemetry
+                telemetry.record_event("proxy_cache_evicted", {"files_removed": removed, "bytes_freed": freed})
+            except Exception:
+                pass
+
+    def ensure_analysis_proxy(self, source_path: Union[str, Path], height: int = 360, force: bool = False) -> Optional[Path]:
+        """Ensure a small analysis proxy exists (cached) and return its path.
+
+        This is a convenience wrapper around `generate_analysis_proxy` that uses
+        the same filesystem cache as `ensure_proxy` but produces a much smaller
+        proxy optimized for scene-detection and metadata extraction.
+        """
+        src = Path(source_path)
+        # Analysis proxies use a distinct filename suffix so they can coexist with edit proxies
+        out = self.proxy_dir / f"{src.stem}_analysis_proxy.mp4"
+
+        # Fast reuse when present and not expired
+        try:
+            if out.exists() and not force:
+                if out.stat().st_size > 0:
+                    try:
+                        from .config import get_settings
+                        ttl = int(get_settings().proxy.proxy_cache_ttl_seconds)
+                    except Exception:
+                        ttl = 86400
+                    if (time.time() - out.stat().st_mtime) <= ttl:
+                        try:
+                            from montage_ai import telemetry
+                            telemetry.record_event("analysis_proxy_reuse", {"file": out.name})
+                        except Exception:
+                            pass
+                        return out
+        except Exception:
+            pass
+
+        # Create parent dir and generate
+        out.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.generate_analysis_proxy(str(src), str(out), height=height)
+            try:
+                from montage_ai import telemetry
+                telemetry.record_event("analysis_proxy_created", {"file": out.name, "height": height})
+            except Exception:
+                pass
+            return out
+        except Exception:
+            return None
+
     def generate_analysis_proxy(source_path: str, output_path: str, height: int = 720) -> bool:
         """
         Generate a lightweight proxy for fast analysis (scene detection, feature extraction).
