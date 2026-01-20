@@ -135,6 +135,24 @@ def run_transcript_render(_job_data: dict):
     pass
 
 
+def run_test_job(job_id: str, duration: int = 5):
+    """Lightweight dev-only job that sleeps for `duration` seconds and updates job status.
+
+    - Intended for dev/CI only. Does not run the full montage pipeline.
+    - Keeps the same job lifecycle semantics so callers can poll /api/jobs/<id>.
+    """
+    store = JobStore()
+    try:
+        logger.info("[DevTestJob] Starting lightweight test job %s (duration=%ss)", job_id, duration)
+        store.update_job(job_id, {"status": "started", "phase": {"name": "running", "label": "Running test job"}})
+        time.sleep(int(duration))
+        store.update_job(job_id, {"status": "finished", "phase": {"name": "finished", "label": "Completed test job"}})
+        logger.info("[DevTestJob] Completed %s", job_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("[DevTestJob] Failed %s: %s", job_id, exc)
+        store.update_job(job_id, {"status": "failed", "error": str(exc)})
+
+
 def run_shorts_reframe(job_id: str, options: dict):
     """Run shorts reframing in background (RQ worker)."""
     # Ensure directories

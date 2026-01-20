@@ -944,6 +944,47 @@ def api_create_job():
     return jsonify(job)
 
 
+# Dev-only testing endpoint: enqueue lightweight sleep jobs to exercise autoscaling.
+@app.route('/api/internal/testjob', methods=['POST'])
+def api_create_test_job():
+    """Enqueue a dev-only test job that sleeps for a given duration.
+
+    Guards:
+    - Only enabled when ENABLE_DEV_ENDPOINTS=true in the environment.
+    - Intended for dev clusters and CI only; does not run full montage pipeline.
+
+    Payload: {"count": 10, "duration": 5}
+    Returns: list of job ids
+    """
+    # Explicit guard to avoid accidental exposure in non-dev clusters
+    if os.environ.get('ENABLE_DEV_ENDPOINTS', '').lower() != 'true':
+        return jsonify({'error': 'dev endpoints disabled'}), 403
+
+    data = request.get_json() or {}
+    count = int(data.get('count', 1))
+    duration = int(data.get('duration', 5))
+
+    ids = []
+    for _ in range(count):
+        jid = create_job_id()
+        job_store.create_job(jid, {
+            'id': jid,
+            'status': 'queued',
+            'phase': {'name': 'queued', 'label': 'Waiting in queue', 'progress_percent': 0},
+            'style': 'dev-test',
+            'options': {'quality_profile': 'preview', '_dev_test': True, 'duration': duration},
+            'created_at': now_iso()
+        })
+        # enqueue the lightweight test job so workers can process without full pipeline
+        try:
+            queue_fast.enqueue(run_test_job, jid, duration, job_timeout=duration + 30)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning('Failed to enqueue dev test job: %s', exc)
+            job_store.update_job(jid, {'status': 'failed', 'error': str(exc)})
+        ids.append(jid)
+
+    return jsonify({'job_ids': ids}), 201
+
 @app.route('/api/stream')
 def stream():
     """Server-Sent Events for real-time updates (Hardware Nah: Zero polling overhead)."""
