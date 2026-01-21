@@ -1,5 +1,8 @@
 ## Unreleased
 
+### Fixes
+- Fix: audio-analysis — handle very short/flat audio energy profiles without crashing in `detect_music_sections` (prevents IndexError on mismatched times/rms). Added unit + opt-in integration tests and updated documentation (recommended workaround: use WAV >= 3–4s for smoke runs). Contributed-by: mfahsold
+
 ### 🧠 SOTA 2025 Algorithmic Refactor
 
 - **Reasoning Tree Selection**: Implemented "Tree-of-AdEditor" (ToAE) inspired branching decision logic in `ClipSelector`.

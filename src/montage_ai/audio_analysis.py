@@ -352,36 +352,59 @@ def detect_music_sections(profile: EnergyProfile, min_section_duration: float = 
     sections = []
     current_class = classes[0]
     start_idx = 0
-    
+
+    # Helper: map an index in the energy/rms domain to a time in profile.times.
+    # Energy-profile producers may occasionally produce times/rms arrays of
+    # different lengths (different hop-length handling across codepaths). Map
+    # indices proportionally and ALWAYS clamp to valid range to avoid
+    # IndexError (observed on very short / flat audio fixtures).
+    def _time_for_idx(idx: int) -> float:
+        if len(profile.times) == 0:
+            return 0.0
+        # If lengths match, use direct indexing (fast path)
+        if len(profile.times) == len(profile.rms):
+            return float(profile.times[min(idx, len(profile.times) - 1)])
+        # Otherwise scale proportionally and clamp
+        scaled = int(idx * (len(profile.times) - 1) / max(1, len(profile.rms) - 1))
+        return float(profile.times[min(scaled, len(profile.times) - 1)])
+
+    if len(profile.times) != len(profile.rms):
+        logger.debug(
+            "Energy/profile length mismatch: times=%d rms=%d — using proportional mapping",
+            len(profile.times), len(profile.rms)
+        )
+
     for i in range(1, len(classes)):
         if classes[i] != current_class:
-            # End of section
+            # End of section (map indices to times safely)
             end_idx = i
-            start_time = profile.times[start_idx]
-            end_time = profile.times[end_idx]
-            
+            start_time = _time_for_idx(start_idx)
+            end_time = _time_for_idx(end_idx)
+
             # Map class to string
             level_map = {0: "low", 1: "medium", 2: "high"}
-            
+
             sections.append(MusicSection(
                 start_time=float(start_time),
                 end_time=float(end_time),
                 energy_level=level_map[current_class],
-                avg_energy=float(np.mean(profile.rms[start_idx:end_idx]))
+                avg_energy=float(np.mean(profile.rms[start_idx:end_idx]) if end_idx > start_idx else profile.avg_energy)
             ))
-            
+
             current_class = classes[i]
             start_idx = i
-            
-    # Add final section
-    end_idx = len(classes) - 1
-    if start_idx < end_idx:
+
+    # Add final section — ensure we map indices safely and include the tail.
+    if start_idx < len(classes):
         level_map = {0: "low", 1: "medium", 2: "high"}
+        start_time = _time_for_idx(start_idx)
+        # Prefer the profile's last known time for the end boundary when available
+        end_time = float(profile.times[-1]) if len(profile.times) > 0 else _time_for_idx(len(classes) - 1)
         sections.append(MusicSection(
-            start_time=float(profile.times[start_idx]),
-            end_time=float(profile.times[end_idx]),
+            start_time=float(start_time),
+            end_time=float(end_time),
             energy_level=level_map[current_class],
-            avg_energy=float(np.mean(profile.rms[start_idx:end_idx]))
+            avg_energy=float(np.mean(profile.rms[start_idx:]) if start_idx < len(profile.rms) else profile.avg_energy)
         ))
         
     # 5. Merge short sections into neighbors

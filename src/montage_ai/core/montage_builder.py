@@ -678,9 +678,47 @@ class MontageBuilder:
         Phase 5: Render final output.
         """
         self.progress.rendering_start()
-        
+
         # Pass renderer to engine (if not already managed there in future)
         self._render_engine.set_renderer(self._progressive_renderer)
+
+        # SAFETY GUARD: prevent expensive local encodes on developer machines.
+        # If cluster-mode is disabled but a very large input is present, refuse
+        # to run the local FFmpeg-heavy path — this avoids accidentally
+        # saturating a developer laptop. Users can either enable cluster
+        # offload (CLUSTER_MODE=true) or reduce the input size / generate a
+        # proxy. We base the threshold on the preview fast-path knob so it's
+        # configurable without adding new env vars.
+        try:
+            video_files = getattr(self.ctx.media, "video_files", []) or []
+            if video_files:
+                sizes_mb = []
+                for p in video_files:
+                    try:
+                        sizes_mb.append(os.path.getsize(p) / (1024 * 1024))
+                    except Exception:
+                        # If we can't stat a file, be conservative and skip it
+                        continue
+                max_size_mb = max(sizes_mb) if sizes_mb else 0
+            else:
+                max_size_mb = 0
+
+            # Threshold: 4x the preview fast-path limit (configurable via env)
+            preview_limit = int(getattr(self.settings.processing, "preview_max_input_size_mb", 200))
+            threshold_mb = max(1024, preview_limit * 4)
+
+            if (not self.settings.features.cluster_mode) and max_size_mb > threshold_mb:
+                raise RuntimeError(
+                    f"Refusing to run local encode for large input ({int(max_size_mb)} MB) "
+                    f"with cluster-mode disabled.\n" 
+                    f"Immediate options: 1) Enable cluster offload (export CLUSTER_MODE=true) 2) Reduce input size or generate a proxy 3) Lower PREVIEW_MAX_INPUT_SIZE_MB to a temporary value.\n"
+                    f"See docs/CLI_REFERENCE.md and deploy/config.env for developer-safe defaults."
+                )
+        except RuntimeError:
+            raise
+        except Exception:
+            # Best-effort guard — don't fail-hard on stat errors
+            logger.debug("Unable to evaluate local-encode safety guard; continuing")
 
         # DISTRIBUTED MODE: Phase 2 (Distributed Rendering)
         if self.settings.features.cluster_mode:
@@ -688,7 +726,7 @@ class MontageBuilder:
             self._render_engine.render_distributed()
         else:
             self._render_engine.render_output()
-        
+
         self.progress.rendering_complete()
 
     def cleanup(self):

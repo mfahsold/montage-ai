@@ -15,6 +15,7 @@ from src.montage_ai.audio_analysis import (
     get_beat_times,
     calculate_dynamic_cut_length,
     analyze_audio,
+    detect_music_sections,
 )
 
 
@@ -344,3 +345,27 @@ class TestAnalyzeAudio:
 
         assert isinstance(beat_info, BeatInfo)
         assert isinstance(energy_profile, EnergyProfile)
+
+
+def make_profile(times_len: int, rms_len: int):
+    """Create an EnergyProfile where times and rms have different lengths."""
+    times = np.linspace(0, 4.0, times_len)
+    rms = np.zeros(rms_len) + 0.5
+    return EnergyProfile(times=times, rms=rms, sample_rate=44100, hop_length=512)
+
+
+def test_detect_music_sections_handles_mismatched_time_and_rms_lengths():
+    """Regression: detect_music_sections must not IndexError when lengths differ."""
+    profile = make_profile(times_len=40, rms_len=154)
+    sections = detect_music_sections(profile, min_section_duration=0.1)
+    assert isinstance(sections, list)
+    for s in sections:
+        assert 0.0 <= s.start_time <= s.end_time <= profile.times[-1]
+
+
+def test_detect_music_sections_short_flat_audio_returns_single_section():
+    profile = make_profile(times_len=10, rms_len=10)
+    sections = detect_music_sections(profile, min_section_duration=0.1)
+    assert len(sections) >= 1
+    total_dur = sum(s.duration for s in sections)
+    assert total_dur <= profile.times[-1] + 1e-3
