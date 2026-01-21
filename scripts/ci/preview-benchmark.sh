@@ -38,9 +38,16 @@ for i in $(seq 1 $RUNS); do
   if [ -z "${FINISH_TS:-}" ]; then
     echo "Job $JOBID did not finish within timeout" >&2
     echo "{\"job\":\"$JOBID\",\"post\":$POST_TS,\"finish\":null}" >> "$TMP_RESULTS"
+    # attempt to capture partial metrics/state
+    curl -sS "$BASE/api/jobs/$JOBID" > "$TMP_RESULTS.job.$JOBID.json" || true
+    curl -sS "$BASE/metrics" > "$TMP_RESULTS.metrics.run${i}.txt" || true
     continue
   fi
   echo "{\"job\":\"$JOBID\",\"post\":$POST_TS,\"finish\":$FINISH_TS}" >> "$TMP_RESULTS"
+
+  # capture job details and metrics for post-run analysis
+  curl -sS "$BASE/api/jobs/$JOBID" > "$TMP_RESULTS.job.$JOBID.json" || true
+  curl -sS "$BASE/metrics" > "$TMP_RESULTS.metrics.run${i}.txt" || true
   sleep 1
 done
 

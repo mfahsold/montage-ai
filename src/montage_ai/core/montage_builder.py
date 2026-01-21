@@ -489,7 +489,7 @@ class MontageBuilder:
         try:
             from montage_ai.core.job_store import JobStore
             js = JobStore()
-            js.update_job(self.ctx.job_id, {"phase_timestamps": {"scene_detection": datetime.now().isoformat()}})
+            js.update_job_with_retry(self.ctx.job_id, {"phase_timestamps": {"scene_detection": datetime.now().isoformat()}}, retries=3)
         except Exception:
             pass
         # Log scene detection completion
@@ -560,7 +560,7 @@ class MontageBuilder:
                     try:
                         from montage_ai.core.job_store import JobStore
                         js = JobStore()
-                        js.update_job(self.ctx.job_id, {"phase_timestamps": {"proxy_ready": (datetime.now().isoformat())}})
+                        js.update_job_with_retry(self.ctx.job_id, {"phase_timestamps": {"proxy_ready": (datetime.now().isoformat())}}, retries=3)
                     except Exception:
                         pass
 

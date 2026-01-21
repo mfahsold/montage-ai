@@ -239,6 +239,11 @@ class ProcessingSettings:
     preview_max_input_size_mb: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200")))
     preview_max_files: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_FILES", "3")))
 
+    # Per-file timeout for scene detection tasks (seconds). Bounded in preview mode to
+    # avoid a single bad input blocking the entire job. Configurable via env var
+    # SCENE_DETECTION_PER_FILE_TIMEOUT (default: 120s).
+    scene_detection_per_file_timeout_seconds: int = field(default_factory=lambda: int(os.environ.get("SCENE_DETECTION_PER_FILE_TIMEOUT", "120")))
+
     def get_adaptive_batch_size_for_resolution(
         self, width: int, height: int, low_memory: bool = False, memory_gb: Optional[float] = None
     ) -> int:

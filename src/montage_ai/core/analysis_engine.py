@@ -355,7 +355,7 @@ class AssetAnalyzer:
         Detect scenes in all video files with caching and parallel processing.
         Populates self.ctx.media.all_scenes and self.ctx.media.video_files.
         """
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
         from ..scene_analysis import detect_scenes, analyze_scene_content, clear_histogram_cache
         from .analysis_cache import get_analysis_cache
 
@@ -387,9 +387,55 @@ class AssetAnalyzer:
                 video_files = video_files_sampled
                 logger.info(f"   🎯 Sampled down to {len(video_files)} high-priority clips for analysis.")
 
+        # Apply preview fast-path filtering regardless of where the file list came from
+        video_files = self._apply_preview_input_limits(video_files)
+
         video_files = self._filter_supported_videos(video_files)
         if not video_files:
             raise ValueError("No supported videos found in input directory")
+
+    def _apply_preview_input_limits(self, video_files: List[str]) -> List[str]:
+        """Return a filtered list according to preview limits (size + count).
+
+        This helper centralizes preview fast-path logic so it can be tested
+        independently and reused by other callers.
+        """
+        try:
+            profile = (self.settings.encoding.quality_profile or "").lower()
+        except Exception:
+            profile = ""
+
+        if profile != "preview":
+            return list(video_files)
+
+        try:
+            max_size_mb = int(self.settings.processing.preview_max_input_size_mb)
+            max_files = int(self.settings.processing.preview_max_files)
+        except Exception:
+            max_size_mb = int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200"))
+            max_files = int(os.environ.get("PREVIEW_MAX_FILES", "3"))
+
+        filtered: List[str] = []
+        skipped: List[tuple[str, int]] = []
+        for p in video_files:
+            try:
+                size_mb = os.path.getsize(p) / (1024 * 1024)
+            except Exception:
+                size_mb = 0
+            if size_mb > max_size_mb:
+                skipped.append((p, int(size_mb)))
+                continue
+            filtered.append(p)
+            if len(filtered) >= max_files:
+                break
+
+        if skipped:
+            for sfile, sz in skipped:
+                logger.info("   ⚠️ Skipping large file for preview: %s (%dMB)", os.path.basename(sfile), sz)
+        if len(filtered) < len(video_files):
+            logger.info("   ℹ️ Preview-fast-path will analyze %d/%d files", len(filtered), len(video_files))
+
+        return filtered
 
         self.ctx.media.video_files = video_files
         self.ctx.media.all_scenes = []
@@ -448,14 +494,44 @@ class AssetAnalyzer:
 
             try:
                 # ProcessPoolExecutor for true parallelism (bypasses GIL)
+                per_file_timeout = int(getattr(self.settings.processing, "scene_detection_per_file_timeout_seconds", 120))
                 with ProcessPoolExecutor(max_workers=max_workers) as executor:
                     futures = {executor.submit(_detect_video_scenes_worker, v, threshold): v for v in uncached_videos}
 
                     for future in as_completed(futures):
-                        v_path, scenes = future.result()
+                        v = futures[future]
+                        try:
+                            # Bound waiting on individual futures to avoid a single hung task stalling the loop
+                            v_path, scenes = future.result(timeout=per_file_timeout)
+                        except TimeoutError:
+                            # Best-effort cancellation and mark as empty scenes
+                            try:
+                                future.cancel()
+                            except Exception:
+                                pass
+                            logger.warning("   ⚠️ Scene detection timed out for %s (>%ss); skipping", os.path.basename(v), per_file_timeout)
+                            try:
+                                from montage_ai import telemetry
+                                telemetry.record_event("scene_detection_timeout", {"file": os.path.basename(v), "timeout_s": per_file_timeout})
+                            except Exception:
+                                pass
+                            v_path, scenes = v, []
+                        except Exception as exc:
+                            # Record error and continue
+                            logger.warning("   ⚠️ Scene detection failed for %s: %s", os.path.basename(v), exc)
+                            try:
+                                from montage_ai import telemetry
+                                telemetry.record_event("scene_detection_failed", {"file": os.path.basename(v), "error": str(exc)[:200]})
+                            except Exception:
+                                pass
+                            v_path, scenes = v, []
+
                         detected_scenes[v_path] = scenes
                         # Save to cache
-                        cache.save_scenes(v_path, threshold, scenes)
+                        try:
+                            cache.save_scenes(v_path, threshold, scenes)
+                        except Exception:
+                            logger.debug("Failed to save scenes to cache for %s", v_path)
                         
                         # Update progress
                         completed_tasks += 1
@@ -559,31 +635,34 @@ class AssetAnalyzer:
         else:
             ai_workers = min(len(scenes_to_analyze), max(4, cpu_count // 2))
 
-        with ThreadPoolExecutor(max_workers=ai_workers) as executor:
-            futures = [executor.submit(analyze_scene, s) for s in scenes_to_analyze]
-            completed_ai = 0
-            total_ai = len(scenes_to_analyze)
-            start_time = time.time()
-            
-            for future in as_completed(futures):
-                scene, meta = future.result()
-                scene.meta = meta
-                
-                # Update progress
-                completed_ai += 1
-                if self.ctx.job_id:  # Only if we have a job context
-                    from ..monitoring import get_monitor
-                    monitor = get_monitor()
-                    
-                    elapsed = time.time() - start_time
-                    avg_dur = elapsed / completed_ai
-                    
-                    # Log to progress tracker if available via MontageBuilder
-                    # Since AssetAnalyzer doesn't have direct ref to progress, 
-                    # we use the monitor or just standard logging for now.
-                    # Actually, we can assume the caller (MontageBuilder) set up self.progress_callback
-                    if completed_ai % max(1, total_ai // 10) == 0:
-                        logger.info(f"   🤖 AI Analysis: {completed_ai}/{total_ai} ({int(completed_ai/total_ai*100)}%)")
+        total_ai = len(scenes_to_analyze)
+        if total_ai == 0:
+            logger.debug("   🤖 No scenes to run AI analysis on; skipping AI analysis")
+        else:
+            with ThreadPoolExecutor(max_workers=ai_workers) as executor:
+                futures = [executor.submit(analyze_scene, s) for s in scenes_to_analyze]
+                completed_ai = 0
+                start_time = time.time()
+
+                for future in as_completed(futures):
+                    scene, meta = future.result()
+                    scene.meta = meta
+
+                    # Update progress
+                    completed_ai += 1
+                    if self.ctx.job_id:  # Only if we have a job context
+                        from ..monitoring import get_monitor
+                        monitor = get_monitor()
+
+                        elapsed = time.time() - start_time
+                        avg_dur = elapsed / completed_ai
+
+                        # Log to progress tracker if available via MontageBuilder
+                        # Since AssetAnalyzer doesn't have direct ref to progress, 
+                        # we use the monitor or just standard logging for now.
+                        # Actually, we can assume the caller (MontageBuilder) set up self.progress_callback
+                        if completed_ai % max(1, total_ai // 10) == 0:
+                            logger.info(f"   🤖 AI Analysis: {completed_ai}/{total_ai} ({int(completed_ai/total_ai*100)}%)")
 
         # Shuffle for variety
         random.shuffle(self.ctx.media.all_scenes)

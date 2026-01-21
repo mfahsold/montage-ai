@@ -179,15 +179,21 @@ class VideoWorkflow(ABC):
             )
             
             # Persist result to JobStore
-            self.job_store.update_job(
-                self.options.job_id, 
-                {
-                    "result": self._result.to_dict(),
-                    "output_file": os.path.basename(output_path),
-                    "metadata": self.get_metadata() # Explicitly at top level for ease of access
-                }
-            )
-            
+            # Persist result to JobStore (retry to avoid transient visibility races)
+            try:
+                self.job_store.update_job_with_retry(
+                    self.options.job_id,
+                    {
+                        "result": self._result.to_dict(),
+                        "output_file": os.path.basename(output_path),
+                        "metadata": self.get_metadata(),
+                        "status": "finished",
+                    },
+                    retries=4,
+                )
+            except Exception:
+                logger.exception("Failed to persist workflow result for %s", self.options.job_id)
+
             logger.info(f"[{self.workflow_name}] Completed in {duration:.1f}s: {output_path}")
             return self._result
             
@@ -356,7 +362,10 @@ class VideoWorkflow(ABC):
         elif phase != WorkflowPhase.QUEUED:
             updates["status"] = "running"
         
-        self.job_store.update_job(self.options.job_id, updates)
+        try:
+            self.job_store.update_job_with_retry(self.options.job_id, updates, retries=3)
+        except Exception:
+            logger.exception("Failed to persist workflow phase update for %s", self.options.job_id)
     
     def _update_progress(
         self,
@@ -394,7 +403,16 @@ class VideoWorkflow(ABC):
         if memory_pressure:
             updates["memory_pressure"] = memory_pressure
 
-        self.job_store.update_job(self.options.job_id, updates)
+        # Use retry for high-value progress updates (near completion) to reduce visibility races.
+        try:
+            if percent >= 90:
+                # Persist high-value updates with a small retry budget to avoid API staleness.
+                self.job_store.update_job_with_retry(self.options.job_id, updates, retries=2)
+            else:
+                # Best-effort for frequent, low-value progress updates to avoid added latency.
+                self.job_store.update_job(self.options.job_id, updates)
+        except Exception:
+            logger.exception("Failed to persist progress update for %s", self.options.job_id)
 
 
 # =============================================================================

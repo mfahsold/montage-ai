@@ -18,6 +18,9 @@ def test_run_test_job_sleeps_and_updates_jobstore(monkeypatch):
     class DummyStore:
         def update_job(self, job_id, payload):
             calls["updates"].append((job_id, payload))
+        # Backwards-compatible shim for newer JobStore API used by tasks
+        def update_job_with_retry(self, job_id, updates, retries=1, backoff_base=0.01):
+            return self.update_job(job_id, updates) or True
 
     monkeypatch.setattr(tasks, "JobStore", lambda: DummyStore())
     monkeypatch.setattr(tasks.telemetry, "record_event", lambda *a, **k: None)

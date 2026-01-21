@@ -25,6 +25,7 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 from dataclasses import dataclass
 
 from ..ffmpeg_utils import build_ffmpeg_cmd
+from ..logger import logger  # local logger for hardware probing and warnings
 
 @dataclass
 class HWConfig:
@@ -481,12 +482,33 @@ def get_best_hwaccel(preferred_codec: str = "h264") -> HWConfig:
     Detect the best available hardware acceleration.
     Returns a HWConfig object with FFmpeg arguments.
 
-    Priority order (platform-aware):
-    - Jetson: NVMPI first (NVENC doesn't work on Jetson!)
-    - Adreno (Snapdragon): V4L2 encoder
-    - Desktop: NVENC → ROCm → VideoToolbox → VAAPI → QSV
-    - Fallback: CPU
+    Priority order (platform-aware). Respects the environment variable
+    `FFMPEG_HWACCEL` when set (explicit override). Uses a fast, deterministic
+    software fallback when hardware is unavailable or explicitly disabled.
     """
+    # Honor explicit override (env or settings) early for deterministic behavior
+    try:
+        env_override = os.environ.get("FFMPEG_HWACCEL", "").strip().lower()
+    except Exception:
+        env_override = ""
+
+    if env_override and env_override != "auto":
+        if env_override == "none":
+            logger.info("FFMPEG_HWACCEL=none -> forcing software-only (CPU)")
+            return get_hwaccel_by_type("cpu", preferred_codec=preferred_codec)
+        # Try the user-provided accelerator and fall back predictably
+        config = get_hwaccel_by_type(env_override, preferred_codec=preferred_codec)
+        if config:
+            ok = check_encoder_works(config)
+            if ok:
+                logger.info(f"FFMPEG_HWACCEL override: using {env_override}")
+                return config
+            else:
+                logger.warning(f"FFMPEG_HWACCEL override '{env_override}' not functional, falling back to CPU")
+                return get_hwaccel_by_type("cpu", preferred_codec=preferred_codec)
+        else:
+            logger.warning(f"FFMPEG_HWACCEL override '{env_override}' is unknown; falling back to auto-detect")
+
     # Jetson-specific: NVMPI is the only working encoder
     if _is_jetson():
         config = get_hwaccel_by_type("nvmpi", preferred_codec=preferred_codec)

@@ -341,70 +341,74 @@ class ProxyGenerator:
         except Exception:
             return None
 
-    def generate_analysis_proxy(source_path: str, output_path: str, height: int = 720) -> bool:
+    def generate_analysis_proxy(self, source_path: str, output_path: str, height: int = 720) -> bool:
         """
         Generate a lightweight proxy for fast analysis (scene detection, feature extraction).
+
+        FIXES / SAFEGUARDS:
+        - Corrected method signature (must accept `self`). A previous implementation
+          mistakenly declared this without `self` which caused `self` to be passed
+          into `source_path` and produced silently-broken ffmpeg invocations.
+        - Validate inputs early and fail-fast (clear error messages).
+        - Cap proxy-generation timeout for preview workloads to avoid long hangs.
         """
         import subprocess
         from .ffmpeg_config import FFmpegConfig
-        
-        # Use CPU for analysis proxy generation to avoid VAAPI filter format issues
-        # and because it's usually very small/fast anyway.
+        from .config import get_settings
+        from pathlib import Path
+
+        # Validate inputs early
+        src = Path(source_path)
+        if not src.exists():
+            logger.error("Analysis proxy requested for missing source: %s", source_path)
+            raise FileNotFoundError(f"Source not found: {source_path}")
+        try:
+            height = int(height)
+            if height <= 0 or height > 2160:
+                raise ValueError()
+        except Exception:
+            logger.error("Invalid analysis proxy height: %s", height)
+            raise ValueError("height must be a positive integer (reasonable range)")
+
+        # Use CPU for analysis proxy generation (robust & small)
         config = FFmpegConfig(hwaccel="none")
-        
+
         # Build FFmpeg command
         cmd = ["ffmpeg", "-y"]
         cmd.extend(config.hwaccel_input_params())
-        cmd.extend(["-i", str(source_path)])
-        
-        # Scale filter
+        cmd.extend(["-i", str(src)])
+
         vf_chain = [f"scale=-2:{height}"]
-        hw_filter = config.hwupload_filter
-        if hw_filter and config._hw_config.type != "nvenc":
-            # For VAAPI/QSV, we might need a more complex filter chain if we want to stay in GPU memory
-            # but for analysis proxy generation, stay simple and robust.
-            pass
-            
         cmd.extend(["-vf", ",".join(vf_chain)])
 
-        # Fast encoding using centralized config for encoder selection
-        # We use a high CRF (low quality) for analysis proxies to maximize speed
-        video_params = config.video_params(
-            crf=28,
-            preset="ultrafast"
-        )
+        video_params = config.video_params(crf=28, preset="ultrafast")
         cmd.extend(video_params)
-        
-        # Audio: Minimal for analysis
+
         cmd.extend(["-c:a", "aac", "-b:a", "64k"])
-        
-        # Output
         cmd.append(str(output_path))
-        
-        logger.info(f"Generating analysis proxy: {height}p ({source_path} → {output_path}) using {config.effective_codec}")
-        
+
+        logger.info("Generating analysis proxy: %sp (%s -> %s) using %s", height, src.name, Path(output_path).name, config.effective_codec)
+
+        # Respect configured timeout but bound it for preview so SLOs aren't blocked
+        settings = get_settings()
+        timeout = int(settings.analysis.proxy_generation_timeout_seconds)
         try:
-            from .config import get_settings
-            timeout = get_settings().analysis.proxy_generation_timeout_seconds
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
-            
+            if getattr(settings.encoding, "quality_profile", "") == "preview":
+                timeout = min(timeout, int(getattr(settings.processing, "preview_job_timeout", 120)))
+        except Exception:
+            # best-effort; keep configured timeout
+            pass
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
             if result.returncode != 0:
-                logger.error(f"Proxy generation failed: {result.stderr}")
-                raise RuntimeError(f"FFmpeg failed: {result.stderr}")
-            
-            logger.info(f"✓ Analysis proxy created: {output_path}")
+                logger.error("Proxy generation failed (rc=%s): %s", result.returncode, (result.stderr or "").strip()[:512])
+                raise RuntimeError(f"FFmpeg failed: rc={result.returncode}")
+            logger.info("✓ Analysis proxy created: %s", output_path)
             return True
-            
         except subprocess.TimeoutExpired:
-            timeout = get_settings().analysis.proxy_generation_timeout_seconds
-            logger.error(f"Proxy generation timeout after {timeout} seconds")
+            logger.error("Proxy generation timed out after %ss for %s", timeout, src)
             raise
         except Exception as e:
-            logger.error(f"Proxy generation error: {e}")
+            logger.error("Proxy generation error for %s: %s", src, e)
             raise

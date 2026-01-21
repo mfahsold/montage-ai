@@ -109,3 +109,38 @@ def test_cache_eviction_under_limit(tmp_path, monkeypatch):
     gen._enforce_cache_limits(max_bytes=250 * 1024, min_age_seconds=0)
     remaining = sum(p.stat().st_size for p in proxy_dir.iterdir() if p.is_file())
     assert remaining <= 250 * 1024
+
+
+def test_generate_analysis_proxy_instance_method_invocation(tmp_path, monkeypatch):
+    """Regression: ensure instance `generate_analysis_proxy` is callable and wired
+    correctly (previous bug passed `self` into source_path). We monkeypatch
+    subprocess.run so the test is fast and deterministic.
+    """
+    src = tmp_path / "clip.mp4"
+    src.write_bytes(b"0" * 1024)
+    proxy_dir = tmp_path / "proxies"
+    proxy_dir.mkdir()
+    out = proxy_dir / "clip_analysis_proxy.mp4"
+
+    gen = ProxyGenerator(proxy_dir)
+
+    # Capture the command and simulate successful ffmpeg
+    called = {}
+    class FakeCompleted:
+        def __init__(self):
+            self.returncode = 0
+            self.stdout = ""
+            self.stderr = ""
+
+    def fake_run(cmd, capture_output, text, timeout):
+        called['cmd'] = cmd
+        called['timeout'] = timeout
+        return FakeCompleted()
+
+    monkeypatch.setattr('subprocess.run', fake_run)
+
+    # Should not raise and should call subprocess.run with a scale filter containing 240
+    res = gen.ensure_analysis_proxy(str(src), height=240, force=True)
+    assert res is not None
+    assert any('scale=-2:240' in str(x) for x in called['cmd'])
+    assert isinstance(called['timeout'], int) and called['timeout'] > 0

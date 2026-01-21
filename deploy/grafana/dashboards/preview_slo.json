@@ -1,0 +1,27 @@
+{
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Preview — p50 (s)",
+      "targets": [ { "expr": "montage_time_to_preview_seconds_avg" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Proxy cache hit rate",
+      "targets": [ { "expr": "montage_proxy_cache_hit_rate" } ]
+    },
+    {
+      "type": "graph",
+      "title": "Jobstore update failures",
+      "targets": [ { "expr": "montage_jobstore_update_failed_total" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Scene detection timeouts",
+      "targets": [ { "expr": "montage_scene_detection_timeout_total" } ]
+    }
+  ],
+  "title": "Montage AI — Preview SLOs (basic)",
+  "schemaVersion": 16
+}

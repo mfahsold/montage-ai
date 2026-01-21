@@ -444,3 +444,79 @@ def get_kpis() -> Dict[str, Any]:
             "success_rate": "ok" if agg.success_rate >= 0.95 else "warning",
         }
     }
+
+
+def get_prometheus_metrics() -> str:
+    """Render a small Prometheus exposition text payload from local telemetry.
+
+    This is intentionally lightweight (no prometheus_client dependency) and
+    suitable for scraping by a sidecar or basic Prometheus job. It aggregates:
+    - aggregate job KPIs (counts / averages)
+    - event-based counters (scanned from events.jsonl)
+
+    The implementation is optimized for low-volume scraping and is best-effort.
+    """
+    agg = get_aggregate()
+    lines: list[str] = []
+
+    # Basic job-level metrics
+    lines.append(f"# HELP montage_jobs_total Total jobs tracked by Montage AI")
+    lines.append(f"# TYPE montage_jobs_total counter")
+    lines.append(f"montage_jobs_total {int(agg.total_jobs)}")
+
+    lines.append(f"# HELP montage_time_to_preview_seconds_avg Average time-to-preview (successes only)")
+    lines.append(f"# TYPE montage_time_to_preview_seconds_avg gauge")
+    if agg.avg_time_to_preview:
+        lines.append(f"montage_time_to_preview_seconds_avg {agg.avg_time_to_preview:.3f}")
+    else:
+        lines.append("montage_time_to_preview_seconds_avg NaN")
+
+    # Success rate
+    lines.append(f"# HELP montage_success_rate_percent Success rate percent (0-100)")
+    lines.append(f"# TYPE montage_success_rate_percent gauge")
+    lines.append(f"montage_success_rate_percent {round(agg.success_rate * 100, 2)}")
+
+    # Zero-initialized counters we will populate from events.jsonl
+    counters = {
+        'proxy_cache_hit': 0,
+        'proxy_cache_miss': 0,
+        'proxy_cache_evicted': 0,
+        'jobstore_update_attempt': 0,
+        'jobstore_update_failed': 0,
+        'scene_detection_timeout': 0,
+        'scene_detection_failed': 0,
+    }
+
+    try:
+        evfile = get_collector().storage_path / 'events.jsonl'
+        if evfile.exists():
+            with open(evfile, 'r') as f:
+                for line in f:
+                    try:
+                        ev = json.loads(line)
+                        et = ev.get('type')
+                        if et in counters:
+                            counters[et] += 1
+                    except Exception:
+                        continue
+    except Exception:
+        # Best-effort: do not fail scraping
+        pass
+
+    # Emit counters
+    for k, v in counters.items():
+        metric_name = f"montage_{k}_total"
+        lines.append(f"# HELP {metric_name} Event counter for {k}")
+        lines.append(f"# TYPE {metric_name} counter")
+        lines.append(f"{metric_name} {int(v)}")
+
+    # Proxy cache hit rate (derived)
+    hits = counters.get('proxy_cache_hit', 0)
+    misses = counters.get('proxy_cache_miss', 0)
+    total = hits + misses
+    hit_rate = (hits / total) if total > 0 else 0.0
+    lines.append(f"# HELP montage_proxy_cache_hit_rate Proxy cache hit ratio (0-1)")
+    lines.append(f"# TYPE montage_proxy_cache_hit_rate gauge")
+    lines.append(f"montage_proxy_cache_hit_rate {hit_rate:.3f}")
+
+    return "\n".join(lines) + "\n"

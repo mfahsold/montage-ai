@@ -121,7 +121,7 @@ def run_montage(job_id: str, style: str, options: dict):
         except Exception as e:
             logger.error(f"Critical error in run_montage: {e}")
             store = JobStore()
-            store.update_job(job_id, {"status": "failed", "error": str(e)})
+            store.update_job_with_retry(job_id, {"status": "failed", "error": str(e)}, retries=3)
             t.record_failure(str(e))
 
         finally:
@@ -153,7 +153,7 @@ def run_test_job(job_id: str, duration: int = 5):
     with telemetry.job_context(job_id, "dev-test"):
         try:
             logger.info("[DevTestJob] Starting lightweight test job %s (duration=%ss)", job_id, duration)
-            store.update_job(job_id, {"status": "started", "phase": {"name": "running", "label": "Running test job"}})
+            store.update_job_with_retry(job_id, {"status": "started", "phase": {"name": "running", "label": "Running test job"}}, retries=2)
 
             # Sleep in small increments so the job can be more responsive to interrupts
             remaining = duration
@@ -164,11 +164,11 @@ def run_test_job(job_id: str, duration: int = 5):
                 except KeyboardInterrupt:
                     # Respect cancellations in interactive/dev runs
                     logger.info("[DevTestJob] Interrupted %s", job_id)
-                    store.update_job(job_id, {"status": "failed", "error": "interrupted"})
+                    store.update_job_with_retry(job_id, {"status": "failed", "error": "interrupted"}, retries=2)
                     return
                 remaining -= step
 
-            store.update_job(job_id, {"status": "finished", "phase": {"name": "finished", "label": "Completed test job"}})
+            store.update_job_with_retry(job_id, {"status": "finished", "phase": {"name": "finished", "label": "Completed test job"}}, retries=3)
             logger.info("[DevTestJob] Completed %s", job_id)
             try:
                 telemetry.record_event("dev_test_job", {"status": "success", "job_id": job_id})
@@ -177,7 +177,7 @@ def run_test_job(job_id: str, duration: int = 5):
 
         except Exception as exc:  # noqa: BLE001
             logger.exception("[DevTestJob] Failed %s: %s", job_id, exc)
-            store.update_job(job_id, {"status": "failed", "error": str(exc)})
+            store.update_job_with_retry(job_id, {"status": "failed", "error": str(exc)}, retries=3)
             try:
                 telemetry.record_event("dev_test_job", {"status": "failure", "job_id": job_id, "error": str(exc)[:200]})
             except Exception:
@@ -226,7 +226,7 @@ def run_shorts_reframe(job_id: str, options: dict):
         except Exception as e:
             logger.error(f"Critical error in run_shorts_reframe: {e}")
             store = JobStore()
-            store.update_job(job_id, {"status": "failed", "error": str(e)})
+            store.update_job_with_retry(job_id, {"status": "failed", "error": str(e)}, retries=3)
             t.record_failure(str(e))
 
         finally:

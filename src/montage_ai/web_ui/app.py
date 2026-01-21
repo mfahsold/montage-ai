@@ -589,6 +589,22 @@ def api_telemetry():
         })
 
 
+@app.route('/metrics')
+def api_metrics():
+    """Prometheus text-format metrics for scraping/exporter use.
+
+    Lightweight: converts local telemetry (aggregate + events) into the
+    Prometheus exposition format so the cluster can scrape it without
+    adding a dedicated exporter process.
+    """
+    try:
+        from .. import telemetry
+        return Response(telemetry.get_prometheus_metrics(), mimetype='text/plain; version=0.0.4')
+    except Exception as e:
+        logger.warning(f"Failed to render /metrics: {e}")
+        return Response("# error\n", mimetype='text/plain')
+
+
 @app.route('/api/analyze-crops', methods=['POST'])
 @api_endpoint
 @require_json('filename')
@@ -999,7 +1015,10 @@ def api_create_test_job():
             queue_fast.enqueue(run_test_job, jid, duration, job_timeout=duration + 30)
         except Exception as exc:  # noqa: BLE001
             logger.warning('Failed to enqueue dev test job: %s', exc)
-            job_store.update_job(jid, {'status': 'failed', 'error': str(exc)})
+            try:
+                job_store.update_job_with_retry(jid, {'status': 'failed', 'error': str(exc)}, retries=3)
+            except Exception:
+                logger.exception('Failed to persist enqueue failure for %s', jid)
         ids.append(jid)
 
     return jsonify({'job_ids': ids}), 201
@@ -1095,16 +1114,20 @@ def api_cancel_job(job_id):
         return jsonify({"error": "Job not found"}), 404
     
     # Update status to cancelled
-    job_store.update_job(job_id, {
+    persisted = job_store.update_job_with_retry(job_id, {
         "status": "cancelled",
         "cancelled_at": datetime.now().isoformat()
-    })
-    
+    }, retries=3)
+
+    if not persisted:
+        logger.warning("Job %s marked cancelled locally but failed to persist cancellation", job_id)
+
     logger.info(f"Job {job_id} marked as cancelled")
-    
+
     return jsonify({
         "success": True,
-        "message": "Job cancelled (note: subprocess may continue until natural completion)"
+        "message": "Job cancelled (note: subprocess may continue until natural completion)",
+        "persisted": bool(persisted)
     })
 
 
