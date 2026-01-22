@@ -1,0 +1,11 @@
+# Example ResourceQuota bump required to allow distributed overlay PVC creation
+# Apply only after review by cluster SRE / infra
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storage-quota-bump
+  namespace: montage-ai
+spec:
+  hard:
+    persistentvolumeclaims: "16"    # increase from 10 -> 16
+    requests.storage: 1500Gi         # increase from 1Ti -> 1.5Ti

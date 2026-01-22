@@ -1,0 +1,31 @@
+# Example PV manifests to pre-provision NFS-backed storage for montage-ai distributed overlay
+# Replace server/path with cluster NFS export details before applying
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-montage-input-nfs
+spec:
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-client
+  nfs:
+    path: /exports/montage-input
+    server: 10.0.0.5
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-montage-output-nfs
+spec:
+  capacity:
+    storage: 500Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-client
+  nfs:
+    path: /exports/montage-output
+    server: 10.0.0.5

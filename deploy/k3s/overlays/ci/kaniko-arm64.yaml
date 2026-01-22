@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kaniko-build-arm64
+  namespace: montage-ai
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+      - name: kaniko
+        image: gcr.io/kaniko-project/executor:latest
+        args:
+          - "--dockerfile=/workspace/Dockerfile"
+          - "--context=/workspace"
+          - "--destination=192.168.1.12:30500/montage-ai:main-1c04af4-arm64"
+          - "--cache=true"
+          - "--cache-repo=192.168.1.12:30500/montage-ai/cache-arm64"
+          - "--snapshot-mode=redo"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+      initContainers:
+      - name: git-clone
+        image: alpine/git:latest
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
+        command: ["sh","-c","git clone --depth 1 https://github.com/mfahsold/montage-ai.git /workspace && ls -la /workspace"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - name: workspace
+          emptyDir:
+            sizeLimit: 2Gi
