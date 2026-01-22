@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Variant of the `distributed` overlay for clusters with strict PVC ResourceQuota.
+# Usage: `kubectl apply -k deploy/k3s/overlays/distributed-quota-constrained`
+resources:
+  - ../distributed
+patches:
+  - path: remove-nfs-pvcs.yaml
+    target:
+      kind: PersistentVolumeClaim
+
+# This overlay removes NFS PVCs that require pre-provisioned PVs so you can run
+# short-lived smoke tests against existing RWX PVCs. Do NOT use for production.

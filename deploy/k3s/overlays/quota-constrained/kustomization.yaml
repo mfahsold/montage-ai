@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Overlay to deploy montage-ai in clusters with strict PVC ResourceQuota
+# Removes large NFS-backed PVCs so smoke-tests can run using existing RWX PVCs.
+resources:
+  - ../../base
+patches:
+  - path: remove-nfs-pvcs.yaml
+    target:
+      kind: PersistentVolumeClaim
+
+# NOTE: intentionally minimal — this overlay is for short-lived smoke / dev validation

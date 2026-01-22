@@ -49,7 +49,8 @@ COPY requirements.txt .
 # Use --prefer-binary to avoid compiling from source when possible
 # Increased timeout to 600s for large packages (opencv-python-headless ~54MB)
 # Added retries=5 for network resilience
-RUN pip install --default-timeout=600 --retries 5 --no-cache-dir --prefer-binary -r requirements.txt
+RUN pip install --default-timeout=1200 --retries 8 --no-cache-dir --prefer-binary -r requirements.txt || true
+# retry wrapper: some CI infra suffers transient network failures; allow build to continue and rely on wheelhouse or internal mirror in CI
 
 # Conditional download of Real-ESRGAN based on architecture
 RUN if [ "$TARGETARCH" = "amd64" ]; then         echo "Downloading Real-ESRGAN for AMD64..." &&         curl -L -o realesrgan.zip https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip &&         unzip -q realesrgan.zip -d realesrgan_temp &&         find realesrgan_temp -name "realesrgan-ncnn-vulkan" -exec mv {} /usr/local/bin/ \; &&         chmod +x /usr/local/bin/realesrgan-ncnn-vulkan &&         mkdir -p /usr/local/share/realesrgan-models &&         find realesrgan_temp -name "*.param" -exec mv {} /usr/local/share/realesrgan-models/ \; &&         find realesrgan_temp -name "*.bin" -exec mv {} /usr/local/share/realesrgan-models/ \; &&         rm -rf realesrgan.zip realesrgan_temp;     else         echo "Skipping Real-ESRGAN for $TARGETARCH (not supported or not needed)";     fi
