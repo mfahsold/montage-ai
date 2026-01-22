@@ -7,7 +7,7 @@ resources:
 # Use local cluster registry (development)
 images:
   - name: montage-ai
-    newTag: latest
+    newTag: main-7ebbcbf
 
 # Patches for development environment
 patches:
@@ -48,7 +48,7 @@ patches:
                   allowPrivilegeEscalation: true
                 env:
                   - name: FFMPEG_HWACCEL
-                    value: "auto"
+                    value: "none"
                   - name: ENABLE_DEV_ENDPOINTS
                     value: "true"
                 resources:

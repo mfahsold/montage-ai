@@ -21,6 +21,8 @@ spec:
               value: "${MAX_CONCURRENT_JOBS_DEFAULT:-2}"
             - name: MAX_PARALLEL_JOBS
               value: "${MAX_PARALLEL_JOBS_DEFAULT:-2}"
+            - name: FFMPEG_HWACCEL
+              value: "none"
       # Dev-only: prefer RWX PVCs when available; fallback to emptyDir for cache to allow multi-node scheduling
       volumes:
         - name: data-input
