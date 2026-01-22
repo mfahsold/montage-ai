@@ -515,8 +515,64 @@ def get_prometheus_metrics() -> str:
     misses = counters.get('proxy_cache_miss', 0)
     total = hits + misses
     hit_rate = (hits / total) if total > 0 else 0.0
+    # Expose hit/miss counters and total requests for infra
+    lines.append(f"# HELP montage_proxy_cache_hit_total Number of proxy cache hits")
+    lines.append(f"# TYPE montage_proxy_cache_hit_total counter")
+    lines.append(f"montage_proxy_cache_hit_total {int(hits)}")
+    lines.append(f"# HELP montage_proxy_cache_miss_total Number of proxy cache misses")
+    lines.append(f"# TYPE montage_proxy_cache_miss_total counter")
+    lines.append(f"montage_proxy_cache_miss_total {int(misses)}")
+    lines.append(f"# HELP montage_proxy_cache_request_total Number of proxy cache requests (hits+misses)")
+    lines.append(f"# TYPE montage_proxy_cache_request_total counter")
+    lines.append(f"montage_proxy_cache_request_total {int(total)}")
+
     lines.append(f"# HELP montage_proxy_cache_hit_rate Proxy cache hit ratio (0-1)")
     lines.append(f"# TYPE montage_proxy_cache_hit_rate gauge")
     lines.append(f"montage_proxy_cache_hit_rate {hit_rate:.3f}")
+
+    # ------------------------------------------------------------------
+    # Histogram: time-to-preview (derive from stored job files)
+    # Buckets chosen to align with SLOs and infra guidance
+    buckets = [0.25, 0.5, 1, 2, 4, 8, 16, 32, 64]
+    samples = []
+    try:
+        storage = get_collector().storage_path
+        for jf in storage.glob('job_*.json'):
+            try:
+                with open(jf) as f:
+                    jd = json.load(f)
+                if jd.get('success') and jd.get('time_to_preview') is not None:
+                    samples.append(float(jd['time_to_preview']))
+            except Exception:
+                continue
+    except Exception:
+        samples = []
+
+    # Emit histogram only if we have samples (best-effort)
+    if samples:
+        samples_sorted = sorted(samples)
+        cum_counts = []
+        for b in buckets:
+            cum_counts.append(len([s for s in samples_sorted if s <= b]))
+        total_count = len(samples_sorted)
+        total_sum = sum(samples_sorted)
+
+        lines.append('# HELP montage_time_to_preview_seconds Histogram of time-to-first-preview')
+        lines.append('# TYPE montage_time_to_preview_seconds histogram')
+        for b, c in zip(buckets, cum_counts):
+            lines.append(f'montage_time_to_preview_seconds_bucket{{le="{b}"}} {c}')
+        # +Inf bucket
+        lines.append(f'montage_time_to_preview_seconds_bucket{{le="+Inf"}} {total_count}')
+        lines.append(f'montage_time_to_preview_seconds_sum {total_sum:.6f}')
+        lines.append(f'montage_time_to_preview_seconds_count {total_count}')
+    else:
+        # Emit empty histogram (count=0) so dashboards don't fail
+        lines.append('# HELP montage_time_to_preview_seconds Histogram of time-to-first-preview')
+        lines.append('# TYPE montage_time_to_preview_seconds histogram')
+        for b in buckets:
+            lines.append(f'montage_time_to_preview_seconds_bucket{{le="{b}"}} 0')
+        lines.append('montage_time_to_preview_seconds_bucket{le="+Inf"} 0')
+        lines.append('montage_time_to_preview_seconds_sum 0.0')
+        lines.append('montage_time_to_preview_seconds_count 0')
 
     return "\n".join(lines) + "\n"
