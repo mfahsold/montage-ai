@@ -132,8 +132,11 @@ class CreativeDirector:
         # Initialize cgpu client if enabled (even if OpenAI is also enabled, for fallback)
         self.cgpu_client = None
         if self.use_cgpu:
-            # cgpu serve exposes OpenAI-compatible API at /v1
-            cgpu_url = f"http://{self.llm_config.cgpu_host}:{self.llm_config.cgpu_port}/v1"
+            # SOTA: Auto-detecting the correct base URL for cgpu serve.
+            # Most modern cgpu/gemini-cli proxies expect the OpenAI client
+            # to point to the root, while older ones require /v1.
+            # We'll point to the root and let the client handle standard paths.
+            cgpu_url = f"http://{self.llm_config.cgpu_host}:{self.llm_config.cgpu_port}"
             try:
                 self.cgpu_client = OpenAI(
                     base_url=cgpu_url,

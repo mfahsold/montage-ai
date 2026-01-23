@@ -341,7 +341,8 @@ class ProxyGenerator:
         except Exception:
             return None
 
-    def generate_analysis_proxy(self, source_path: str, output_path: str, height: int = 720) -> bool:
+    @staticmethod
+    def generate_analysis_proxy(source_path: str, output_path: str, height: int = 720) -> bool:
         """
         Generate a lightweight proxy for fast analysis (scene detection, feature extraction).
 
