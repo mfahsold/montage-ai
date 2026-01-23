@@ -23,7 +23,7 @@ spec:
         supplementalGroups: [44,992]
       initContainers:
         - name: cgpu-credentials-init
-          image: 192.168.1.12:30500/montage-ai:latest-amd64
+          image: ghcr.io/mfahsold/montage-ai:latest
           imagePullPolicy: IfNotPresent
           resources:
             requests:
@@ -52,14 +52,14 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: 192.168.1.12:30500/montage-ai:latest-amd64
+          image: ghcr.io/mfahsold/montage-ai:latest
           imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
             - -c
             - |
               apt-get update && apt-get install -y mesa-va-drivers libva-drm2
-              /app/montage-ai.sh run documentary
+              /app/montage-ai.sh run documentary --music /data/music/techno-nature/2022-03-16_-_Groovin_-_www.FesliyanStudios.com.mp3 --duration 30
           env:
             - name: USE_GPU
               value: "prefer"
@@ -121,7 +121,31 @@ spec:
             - name: patch-clip-processor
               mountPath: /app/src/montage_ai/core/clip_processor.py
               subPath: clip_processor.py
+            - name: patch-analysis-engine
+              mountPath: /app/src/montage_ai/core/analysis_engine.py
+              subPath: analysis_engine.py
+            - name: patch-hardware
+              mountPath: /app/src/montage_ai/core/hardware.py
+              subPath: hardware.py
+            - name: patch-creative-director
+              mountPath: /app/src/montage_ai/creative_director.py
+              subPath: creative_director.py
+            - name: patch-proxy-generator
+              mountPath: /app/src/montage_ai/proxy_generator.py
+              subPath: proxy_generator.py
       volumes:
+        - name: patch-proxy-generator
+          configMap:
+            name: montage-ai-patch-proxy-generator
+        - name: patch-hardware
+          configMap:
+            name: montage-ai-patch-hardware
+        - name: patch-creative-director
+          configMap:
+            name: montage-ai-patch-creative-director
+        - name: patch-analysis-engine
+          configMap:
+            name: montage-ai-patch-analysis-engine
         - name: patch-segment-writer
           configMap:
             name: montage-ai-patch-segment-writer

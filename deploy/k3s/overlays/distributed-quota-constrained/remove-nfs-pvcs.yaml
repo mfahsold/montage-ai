@@ -1,0 +1,28 @@
+# strategic merge patch to delete NFS PVCs (copied for use by distributed-quota-constrained overlay)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-input-nfs
+  namespace: montage-ai
+  $patch: delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-music-nfs
+  namespace: montage-ai
+  $patch: delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-assets-nfs
+  namespace: montage-ai
+  $patch: delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-output-nfs
+  namespace: montage-ai
+  $patch: delete

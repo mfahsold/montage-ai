@@ -73,8 +73,6 @@ spec:
           volumeMounts:
             - name: cgpu-config
               mountPath: /root/.config/cgpu
-      nodeSelector:
-        kubernetes.io/hostname: codeai-fluxibriserver
       volumes:
         - name: cgpu-config
           emptyDir: {}

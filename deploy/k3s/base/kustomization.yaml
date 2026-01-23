@@ -5,6 +5,7 @@ namespace: montage-ai
 
 resources:
   - deployment.yaml
+  - cgpu-server.yaml
   - service-ingress.yaml
   - pvc.yaml
   - namespace.yaml
@@ -40,3 +41,31 @@ configMapGenerator:
       - STABILIZE=false
       - UPSCALE=false
       - ENHANCE=false
+      - OLLAMA_HOST=http://localhost:11434
+      - CGPU_ENABLED=true
+      - CGPU_HOST=cgpu-server
+      - CGPU_PORT=8080
+      - PREVIEW_MAX_INPUT_SIZE_MB=10000
+      - PREVIEW_MAX_FILES=50
+
+  - name: montage-ai-script
+    files:
+      - montage-ai.sh=../../../montage-ai.sh
+  - name: montage-ai-patch-segment-writer
+    files:
+      - segment_writer.py=../../../src/montage_ai/segment_writer.py
+  - name: montage-ai-patch-clip-processor
+    files:
+      - clip_processor.py=../../../src/montage_ai/core/clip_processor.py
+  - name: montage-ai-patch-analysis-engine
+    files:
+      - analysis_engine.py=../../../src/montage_ai/core/analysis_engine.py
+  - name: montage-ai-patch-hardware
+    files:
+      - hardware.py=../../../src/montage_ai/core/hardware.py
+  - name: montage-ai-patch-creative-director
+    files:
+      - creative_director.py=../../../src/montage_ai/creative_director.py
+  - name: montage-ai-patch-proxy-generator
+    files:
+      - proxy_generator.py=../../../src/montage_ai/proxy_generator.py

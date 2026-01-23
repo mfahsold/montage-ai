@@ -12,8 +12,7 @@ spec:
   resources:
     requests:
       storage: 100Gi
-  volumeName: montage-ai-input-nfs
-  storageClassName: ""  # Use pre-provisioned PV
+  storageClassName: nfs-client
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -26,8 +25,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  volumeName: montage-ai-music-nfs
-  storageClassName: ""
+  storageClassName: nfs-client
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -40,8 +38,7 @@ spec:
   resources:
     requests:
       storage: 100Gi
-  volumeName: montage-ai-output-nfs
-  storageClassName: ""
+  storageClassName: nfs-client
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -53,6 +50,5 @@ spec:
     - ReadWriteMany
   resources:
     requests:
-      storage: 10Gi
-  volumeName: montage-ai-assets-nfs
-  storageClassName: ""
+      storage: 50Gi
+  storageClassName: nfs-client

@@ -394,49 +394,6 @@ class AssetAnalyzer:
         if not video_files:
             raise ValueError("No supported videos found in input directory")
 
-    def _apply_preview_input_limits(self, video_files: List[str]) -> List[str]:
-        """Return a filtered list according to preview limits (size + count).
-
-        This helper centralizes preview fast-path logic so it can be tested
-        independently and reused by other callers.
-        """
-        try:
-            profile = (self.settings.encoding.quality_profile or "").lower()
-        except Exception:
-            profile = ""
-
-        if profile != "preview":
-            return list(video_files)
-
-        try:
-            max_size_mb = int(self.settings.processing.preview_max_input_size_mb)
-            max_files = int(self.settings.processing.preview_max_files)
-        except Exception:
-            max_size_mb = int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200"))
-            max_files = int(os.environ.get("PREVIEW_MAX_FILES", "3"))
-
-        filtered: List[str] = []
-        skipped: List[tuple[str, int]] = []
-        for p in video_files:
-            try:
-                size_mb = os.path.getsize(p) / (1024 * 1024)
-            except Exception:
-                size_mb = 0
-            if size_mb > max_size_mb:
-                skipped.append((p, int(size_mb)))
-                continue
-            filtered.append(p)
-            if len(filtered) >= max_files:
-                break
-
-        if skipped:
-            for sfile, sz in skipped:
-                logger.info("   ⚠️ Skipping large file for preview: %s (%dMB)", os.path.basename(sfile), sz)
-        if len(filtered) < len(video_files):
-            logger.info("   ℹ️ Preview-fast-path will analyze %d/%d files", len(filtered), len(video_files))
-
-        return filtered
-
         self.ctx.media.video_files = video_files
         self.ctx.media.all_scenes = []
         self.ctx.media.all_scenes_dicts = []
@@ -671,6 +628,49 @@ class AssetAnalyzer:
         self.ctx.media.all_scenes_dicts = [s.to_dict() for s in self.ctx.media.all_scenes]
 
         logger.info(f"   📹 Found {len(self.ctx.media.all_scenes)} scenes in {len(video_files)} videos")
+
+    def _apply_preview_input_limits(self, video_files: List[str]) -> List[str]:
+        """Return a filtered list according to preview limits (size + count).
+
+        This helper centralizes preview fast-path logic so it can be tested
+        independently and reused by other callers.
+        """
+        try:
+            profile = (self.settings.encoding.quality_profile or "").lower()
+        except Exception:
+            profile = ""
+
+        if profile != "preview":
+            return list(video_files)
+
+        try:
+            max_size_mb = int(self.settings.processing.preview_max_input_size_mb)
+            max_files = int(self.settings.processing.preview_max_files)
+        except Exception:
+            max_size_mb = int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200"))
+            max_files = int(os.environ.get("PREVIEW_MAX_FILES", "3"))
+
+        filtered: List[str] = []
+        skipped: List[tuple[str, int]] = []
+        for p in video_files:
+            try:
+                size_mb = os.path.getsize(p) / (1024 * 1024)
+            except Exception:
+                size_mb = 0
+            if size_mb > max_size_mb:
+                skipped.append((p, int(size_mb)))
+                continue
+            filtered.append(p)
+            if len(filtered) >= max_files:
+                break
+
+        if skipped:
+            for sfile, sz in skipped:
+                logger.info("   ⚠️ Skipping large file for preview: %s (%dMB)", os.path.basename(sfile), sz)
+        if len(filtered) < len(video_files):
+            logger.info("   ℹ️ Preview-fast-path will analyze %d/%d files", len(filtered), len(video_files))
+
+        return filtered
 
     def _detect_scenes_distributed(self, video_paths: List[str], threshold: float, progress_callback: Optional[Any] = None) -> Dict[str, List]:
         """

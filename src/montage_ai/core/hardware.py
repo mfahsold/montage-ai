@@ -171,10 +171,14 @@ def get_hwaccel_by_type(hwaccel: str, preferred_codec: str = "h264") -> Optional
         encoder = _pick_encoder("h264_nvenc", "hevc_nvenc", codec_pref)
         if not encoder:
             return None
+        # Optimization: Use '-hwaccel auto' instead of '-hwaccel cuda' for decoding.
+        # This is more robust as it allows FFmpeg to gracefully fallback to software
+        # for codecs not supported by the specific GPU/driver (like AV1 on older cards)
+        # while still using hardware acceleration for supported codecs like H.264/HEVC.
         return HWConfig(
             type="nvenc",
             encoder=encoder,
-            decoder_args=["-hwaccel", "cuda"],
+            decoder_args=["-hwaccel", "auto"],
             encoder_args=["-c:v", encoder],
             is_gpu=True
         )

@@ -235,10 +235,6 @@ class ProcessingSettings:
     preview_job_timeout: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300")))
     default_job_timeout: int = field(default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800")))
 
-    # Preview fast-path knobs (make configurable via Settings instead of in-code env reads)
-    preview_max_input_size_mb: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200")))
-    preview_max_files: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_FILES", "3")))
-
     # Per-file timeout for scene detection tasks (seconds). Bounded in preview mode to
     # avoid a single bad input blocking the entire job. Configurable via env var
     # SCENE_DETECTION_PER_FILE_TIMEOUT (default: 120s).
@@ -361,7 +357,7 @@ class LLMConfig:
     openai_vision_model: str = field(default_factory=lambda: os.environ.get("OPENAI_VISION_MODEL", ""))
 
     # Ollama (local fallback)
-    ollama_host: str = field(default_factory=lambda: os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434"))
+    ollama_host: str = field(default_factory=lambda: os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
     ollama_model: str = field(default_factory=lambda: os.environ.get("OLLAMA_MODEL", "llava"))
     director_model: str = field(default_factory=lambda: os.environ.get("DIRECTOR_MODEL", "llama3.1:70b"))
 
@@ -374,7 +370,7 @@ class LLMConfig:
     cgpu_enabled: bool = field(default_factory=lambda: os.environ.get("CGPU_ENABLED", "false").lower() == "true")
     cgpu_gpu_enabled: bool = field(default_factory=lambda: os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true")
     cgpu_host: str = field(default_factory=lambda: os.environ.get("CGPU_HOST", "127.0.0.1"))
-    cgpu_port: int = field(default_factory=lambda: int(os.environ.get("CGPU_PORT", "5021")))
+    cgpu_port: int = field(default_factory=lambda: int(os.environ.get("CGPU_PORT", "8090")))
     cgpu_model: str = field(default_factory=lambda: os.environ.get("CGPU_MODEL", "gemini-2.0-flash"))
     cgpu_output_dir: str = field(default_factory=lambda: os.environ.get("CGPU_OUTPUT_DIR", ""))
     cgpu_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_TIMEOUT", "1200")))
@@ -682,6 +678,10 @@ class ProcessingConfig:
     # Job timeout (seconds) — configurable via env to avoid hardcoded values in code
     preview_job_timeout: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300")))
     default_job_timeout: int = field(default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800")))
+
+    # Preview fast-path knobs (make configurable via Settings instead of in-code env reads)
+    preview_max_input_size_mb: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200")))
+    preview_max_files: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_FILES", "3")))
 
     def get_adaptive_batch_size(self, low_memory: bool = False, memory_gb: Optional[float] = None) -> int:
         """Get batch size adjusted for memory constraints.

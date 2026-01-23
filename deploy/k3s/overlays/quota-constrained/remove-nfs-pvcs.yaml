@@ -1,0 +1,25 @@
+# strategic merge patch to delete NFS PVCs that require pre-provisioned PVs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-input-nfs
+  # instruct kustomize to delete this resource when this patch is applied
+  $patch: delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-music-nfs
+  $patch: delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-assets-nfs
+  $patch: delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: montage-ai-output-nfs
+  $patch: delete

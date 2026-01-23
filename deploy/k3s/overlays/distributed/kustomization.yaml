@@ -13,8 +13,9 @@ namespace: montage-ai
 
 # Use internal registry
 images:
-  - name: montage-ai
-    newTag: latest
+  - name: ghcr.io/mfahsold/montage-ai
+    newName: 192.168.1.12:30500/montage-ai
+    newTag: main-1c04af4
 
 resources:
   - ../../base
@@ -70,6 +71,60 @@ patches:
                   path: config.json
                 - key: session.json
                   path: session.json
+          - name: dev-dri
+            hostPath:
+              path: /dev/dri
+              type: DirectoryOrCreate
+          - name: shm
+            emptyDir:
+              medium: Memory
+              sizeLimit: 1Gi
+          - name: script
+            configMap:
+              name: montage-ai-script
+              defaultMode: 0755
+          - name: patch-segment-writer
+            configMap:
+              name: montage-ai-patch-segment-writer
+          - name: patch-clip-processor
+            configMap:
+              name: montage-ai-patch-clip-processor
+          - name: patch-analysis-engine
+            configMap:
+              name: montage-ai-patch-analysis-engine
+          - name: patch-hardware
+            configMap:
+              name: montage-ai-patch-hardware
+          - name: patch-creative-director
+            configMap:
+              name: montage-ai-patch-creative-director
+          - name: patch-proxy-generator
+            configMap:
+              name: montage-ai-patch-proxy-generator
+
+  - target:
+      kind: Deployment
+      name: montage-ai-web
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/nodeSelector
+        value:
+          kubernetes.io/hostname: codeai
+      - op: replace
+        path: /spec/template/spec/volumes
+        value:
+          - name: data-input
+            persistentVolumeClaim:
+              claimName: montage-ai-input-nfs
+          - name: data-music
+            persistentVolumeClaim:
+              claimName: montage-ai-music-nfs
+          - name: data-assets
+            persistentVolumeClaim:
+              claimName: montage-ai-assets-nfs
+          - name: data-output
+            persistentVolumeClaim:
+              claimName: montage-ai-output-nfs
           - name: dev-dri
             hostPath:
               path: /dev/dri

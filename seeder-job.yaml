@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-seeder
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      containers:
+        - name: seeder
+          image: busybox
+          command: ["/bin/sh", "-c", "cp -rv /host/data/input/* /data/input/ && cp -rv /host/data/music/* /data/music/"]
+          volumeMounts:
+            - name: input
+              mountPath: /data/input
+            - name: music
+              mountPath: /data/music
+            - name: host-data
+              mountPath: /host/data
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: codeai-worker-amd64
+      volumes:
+        - name: host-data
+          hostPath:
+            path: /home/codeai/montage-ai/data
+            type: Directory
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs

@@ -341,14 +341,13 @@ class ProxyGenerator:
         except Exception:
             return None
 
-    def generate_analysis_proxy(self, source_path: str, output_path: str, height: int = 720) -> bool:
+    @staticmethod
+    def generate_analysis_proxy(source_path: str, output_path: str, height: int = 720) -> bool:
         """
         Generate a lightweight proxy for fast analysis (scene detection, feature extraction).
 
         FIXES / SAFEGUARDS:
-        - Corrected method signature (must accept `self`). A previous implementation
-          mistakenly declared this without `self` which caused `self` to be passed
-          into `source_path` and produced silently-broken ffmpeg invocations.
+        - Implementation is a static method (no 'self') for easier access across modules.
         - Validate inputs early and fail-fast (clear error messages).
         - Cap proxy-generation timeout for preview workloads to avoid long hangs.
         """
