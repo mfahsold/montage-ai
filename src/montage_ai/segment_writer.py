@@ -688,6 +688,10 @@ class SegmentWriter:
     def get_segment_path(self, index: int) -> str:
         """Get path for segment file at given index."""
         return str(self.output_dir / f"{self.segment_prefix}_{index:04d}.mp4")
+    def _get_xfade_temp_path(self, segment_index: int, clip_index: int) -> str:
+        """Generate a unique temp path for xfade intermediates."""
+        pid = os.getpid()
+        return str(self.output_dir / f"xfade_temp_{segment_index}_{clip_index}_{pid}.mp4")
 
     def _write_ffmpeg_log(self,
                           step: str,
@@ -990,8 +994,6 @@ class SegmentWriter:
             cmd = self._build_reencode_cmd(concat_list_path, segment_path, config)
             result = run_command(
                 cmd,
-                capture_output=True,
-                timeout=_settings.processing.ffmpeg_long_timeout,
                 check=False,
                 log_output=False
             )
@@ -1110,7 +1112,7 @@ class SegmentWriter:
                 for i, next_clip in enumerate(clip_paths[1:], start=1):
                     # Create temp output for intermediate xfade result
                     if i < len(clip_paths) - 1:
-                        temp_output = str(self.output_dir / f"xfade_temp_{segment_index}_{i}.mp4")
+                        temp_output = self._get_xfade_temp_path(segment_index, i)
                         temp_files.append(temp_output)
                     else:
                         # Last clip - output to final segment path

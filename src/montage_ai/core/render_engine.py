@@ -8,6 +8,8 @@ Handles progressive rendering finalization and FFmpeg concatenation.
 import os
 import time
 import random
+import shutil
+import uuid
 from typing import Optional, Any, Tuple, Dict, List
 from ..logger import logger
 from .context import MontageContext, ClipMetadata
@@ -96,7 +98,7 @@ class RenderEngine:
         """Submit clip processing task and create initial metadata."""
         
         # Generate temp paths
-        temp_clip_name = f"temp_clip_{beat_idx}_{random.randint(0, 9999)}.mp4"
+        temp_clip_name = f"temp_clip_{self.ctx.job_id}_{beat_idx}_{uuid.uuid4().hex}.mp4"
         
         # Submit task
         if executor:
@@ -188,11 +190,15 @@ class RenderEngine:
 
                 # Cleanup intermediate temp files
                 for tf in temp_files:
-                    if tf != final_path and os.path.exists(tf):
-                        try:
+                    if tf == final_path or not os.path.exists(tf):
+                        continue
+                    try:
+                        if os.path.isdir(tf):
+                            shutil.rmtree(tf, ignore_errors=True)
+                        else:
                             os.remove(tf)
-                        except Exception:
-                            pass
+                    except Exception:
+                        pass
         except Exception as e:
             logger.error(f"Error processing clip {meta.source_path}: {e}")
     

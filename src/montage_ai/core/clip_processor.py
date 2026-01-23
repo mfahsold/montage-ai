@@ -13,6 +13,8 @@ This function is designed to be run in a separate thread/process.
 import os
 import shutil
 import subprocess
+import uuid
+from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 
 from ..logger import logger
@@ -42,8 +44,12 @@ def process_clip_task(
     Executed in a thread pool.
     """
     
-    temp_clip_path = os.path.join(temp_dir, temp_clip_name)
-    temp_files = [temp_clip_path]
+    base_temp_dir = Path(temp_dir)
+    clip_temp_dir = base_temp_dir / f"clip_{uuid.uuid4().hex}"
+    clip_temp_dir.mkdir(parents=True, exist_ok=True)
+
+    temp_clip_path = str(clip_temp_dir / temp_clip_name)
+    temp_files = [temp_clip_path, str(clip_temp_dir)]
     
     # 1. Extract subclip
     if settings.encoding.extract_reencode:
@@ -117,7 +123,7 @@ def process_clip_task(
 
     if enhancer:
         if ctx_stabilize:
-            stab_path = os.path.join(temp_dir, f"stab_{temp_clip_name}")
+            stab_path = str(clip_temp_dir / f"stab_{temp_clip_name}")
             result = enhancer.stabilize(current_path, stab_path)
             if result != current_path:
                 current_path = result
@@ -125,7 +131,7 @@ def process_clip_task(
                 stabilize_applied = True
 
         if ctx_upscale:
-            upscale_path = os.path.join(temp_dir, f"upscale_{temp_clip_name}")
+            upscale_path = str(clip_temp_dir / f"upscale_{temp_clip_name}")
             result = enhancer.upscale(current_path, upscale_path)
             if result != current_path:
                 current_path = result
@@ -133,7 +139,7 @@ def process_clip_task(
                 upscale_applied = True
 
         if ctx_enhance:
-            enhance_path = os.path.join(temp_dir, f"enhance_{temp_clip_name}")
+            enhance_path = str(clip_temp_dir / f"enhance_{temp_clip_name}")
             result = enhancer.enhance(current_path, enhance_path, color_grade=ctx_color_grade)
             if result != current_path:
                 current_path = result
@@ -142,7 +148,7 @@ def process_clip_task(
 
         # 2b. Denoise (NEW)
         if ctx_denoise:
-            denoise_path = os.path.join(temp_dir, f"denoise_{temp_clip_name}")
+            denoise_path = str(clip_temp_dir / f"denoise_{temp_clip_name}")
             result = enhancer.denoise(current_path, denoise_path)
             if result != current_path:
                 current_path = result
@@ -151,7 +157,7 @@ def process_clip_task(
 
         # 2c. Sharpen (NEW)
         if ctx_sharpen:
-            sharpen_path = os.path.join(temp_dir, f"sharpen_{temp_clip_name}")
+            sharpen_path = str(clip_temp_dir / f"sharpen_{temp_clip_name}")
             result = enhancer.sharpen(current_path, sharpen_path)
             if result != current_path:
                 current_path = result
@@ -160,7 +166,7 @@ def process_clip_task(
 
         # 2d. Film Grain (NEW)
         if ctx_film_grain and ctx_film_grain != "none":
-            grain_path = os.path.join(temp_dir, f"grain_{temp_clip_name}")
+            grain_path = str(clip_temp_dir / f"grain_{temp_clip_name}")
             result = enhancer.add_film_grain(current_path, grain_path, preset=ctx_film_grain)
             if result != current_path:
                 current_path = result
@@ -174,14 +180,14 @@ def process_clip_task(
         if not file_exists_and_valid(final_clip_path):
             raise RuntimeError("source clip missing before normalize")
     elif not output_profile:
-        final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
+        final_clip_path = str(clip_temp_dir / f"norm_{temp_clip_name}")
         if not file_exists_and_valid(current_path):
             raise RuntimeError("source clip missing before normalize")
         shutil.copy(current_path, final_clip_path)
         if not file_exists_and_valid(final_clip_path):
             raise RuntimeError("failed to write normalized clip")
     else:
-        final_clip_path = os.path.join(temp_dir, f"norm_{temp_clip_name}")
+        final_clip_path = str(clip_temp_dir / f"norm_{temp_clip_name}")
         # Get optimal encoder
         encoder_config = None
         if resource_manager:

@@ -16,6 +16,7 @@ import json
 import random
 import base64
 import tempfile
+from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
@@ -349,6 +350,7 @@ class SceneDetector:
         # Downsampling 6K→1080p maintains accuracy while achieving 4-9x speedup.
         effective_path = video_path
         use_proxy = False
+        cleanup_proxy = False
         
         if max_resolution is None:
             max_resolution = 1080  # Default: downsample anything above 1080p
@@ -361,9 +363,12 @@ class SceneDetector:
             
             # Auto-enable proxy mode for large/long videos
             if _settings.proxy.should_use_proxy(metadata.duration, metadata.width, metadata.height):
-                logger.info(f"🎬 Large input detected (duration={metadata.duration:.0f}s, "
-                           f"resolution={metadata.width}x{metadata.height}). "
-                           f"Enabling proxy analysis mode ({_settings.proxy.proxy_height}p)...")
+                logger.info(
+                    "🎬 Large input detected (duration=%0.fs, resolution=%sx%s). Enabling proxy analysis mode...",
+                    metadata.duration,
+                    metadata.width,
+                    metadata.height,
+                )
                 
                 # Generate proxy video for analysis
                 proxy_path = self._generate_analysis_proxy(video_path)
@@ -371,10 +376,12 @@ class SceneDetector:
                     effective_path = proxy_path
                     use_proxy = True
                     logger.info(f"✓ Using proxy for analysis: {os.path.basename(proxy_path)}")
+                    cleanup_proxy = self._should_cleanup_proxy(proxy_path)
                 else:
                     logger.warning("Proxy generation failed. Falling back to downsampling.")
                     if metadata and metadata.height > max_resolution:
                         effective_path = self._create_downsampled_proxy(video_path, max_resolution)
+                        cleanup_proxy = True
                     else:
                         effective_path = video_path
             
@@ -383,6 +390,7 @@ class SceneDetector:
                 logger.info(f"⚡ High-res input detected ({metadata.width}x{metadata.height}). "
                            f"Downsampling to {max_resolution}p for scene analysis (4-9x faster).")
                 effective_path = self._create_downsampled_proxy(video_path, max_resolution)
+                cleanup_proxy = True
         except Exception as e:
             logger.warning(f"Could not check resolution for proxy/downsampling: {e}. Using original.")
 
@@ -429,7 +437,7 @@ class SceneDetector:
                 return []
 
         # Cleanup proxy if we created one
-        if use_proxy and effective_path != video_path:
+        if use_proxy and cleanup_proxy and effective_path != video_path:
             try:
                 os.unlink(effective_path)
                 logger.debug(f"Cleaned up analysis proxy: {effective_path}")
@@ -437,6 +445,26 @@ class SceneDetector:
                 logger.debug(f"Could not cleanup proxy {effective_path}: {e}")
 
         return scenes
+
+    def _should_cleanup_proxy(self, proxy_path: str) -> bool:
+        """Return True when the proxy should be cleaned up after analysis."""
+        try:
+            settings = get_settings()
+        except Exception:
+            return True
+
+        if not settings.proxy.cache_proxies:
+            return True
+
+        try:
+            proxy_dir = None
+            if settings.proxy.proxy_cache_dir:
+                proxy_dir = Path(settings.proxy.proxy_cache_dir)
+            else:
+                proxy_dir = settings.paths.metadata_cache_dir / "proxy_cache"
+            return not str(proxy_path).startswith(str(proxy_dir))
+        except Exception:
+            return True
     
     def _generate_analysis_proxy(self, video_path: str) -> Optional[str]:
         """
@@ -451,36 +479,42 @@ class SceneDetector:
         Returns:
             Path to analysis proxy file, or None on failure
         """
-        import subprocess
-        
         try:
             from .proxy_generator import ProxyGenerator
+            from .config import get_settings
+            from pathlib import Path
             
-            # Create temp file for proxy
-            ext = os.path.splitext(video_path)[1]
-            proxy_fd, proxy_path = tempfile.mkstemp(
-                suffix=f"_analysis_proxy{ext}", 
-                prefix="scene_detect_"
-            )
+            settings = get_settings()
+
+            # Determine proxy cache dir (prefer shared volume when configured)
+            proxy_cache_dir = settings.proxy.proxy_cache_dir
+            if proxy_cache_dir:
+                proxy_dir = Path(proxy_cache_dir)
+            else:
+                proxy_dir = settings.paths.metadata_cache_dir / "proxy_cache"
+
+            proxy_dir.mkdir(parents=True, exist_ok=True)
+            generator = ProxyGenerator(proxy_dir)
+
+            # Adaptive proxy height based on size when enabled
+            size_mb = None
             try:
-                os.close(proxy_fd)
+                size_mb = os.path.getsize(video_path) / (1024 * 1024)
             except OSError:
                 pass
-            
-            # Get proxy height from config
-            proxy_height = _settings.proxy.proxy_height
-            
+            proxy_height = settings.proxy.select_proxy_height(size_mb)
+
             logger.info(f"📹 Generating analysis proxy ({proxy_height}p) for large video...")
-            
-            # Use the static method from ProxyGenerator
-            ProxyGenerator.generate_analysis_proxy(
+
+            proxy_path = generator.ensure_analysis_proxy(
                 source_path=video_path,
-                output_path=proxy_path,
-                height=proxy_height
+                height=proxy_height,
             )
-            
-            logger.info(f"✓ Analysis proxy created: {proxy_path}")
-            return proxy_path
+
+            if proxy_path and os.path.exists(proxy_path):
+                logger.info(f"✓ Analysis proxy created: {proxy_path}")
+                return str(proxy_path)
+            return None
             
         except Exception as e:
             logger.warning(f"Proxy generation failed: {e}. Falling back to downsampling.")
@@ -499,8 +533,6 @@ class SceneDetector:
         Returns:
             Path to temporary downsampled proxy file
         """
-        import subprocess
-        
         # Create temp file with same extension
         ext = os.path.splitext(video_path)[1]
         proxy_fd, proxy_path = tempfile.mkstemp(suffix=f"_proxy{ext}", prefix="scene_detect_")

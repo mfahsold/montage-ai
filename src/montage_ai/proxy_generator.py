@@ -306,31 +306,59 @@ class ProxyGenerator:
         proxy optimized for scene-detection and metadata extraction.
         """
         src = Path(source_path)
-        # Analysis proxies use a distinct filename suffix so they can coexist with edit proxies
-        out = self.proxy_dir / f"{src.stem}_analysis_proxy.mp4"
+
+        try:
+            from .config import get_settings
+            cache_enabled = bool(get_settings().proxy.cache_proxies)
+        except Exception:
+            cache_enabled = True
+
+        # Analysis proxies use a distinct filename suffix and height to avoid mismatches
+        safe_height = int(height) if height else 360
+        out = self.proxy_dir / f"{src.stem}_analysis_proxy_{safe_height}p.mp4"
 
         # Fast reuse when present and not expired
-        try:
-            if out.exists() and not force:
-                if out.stat().st_size > 0:
-                    try:
-                        from .config import get_settings
-                        ttl = int(get_settings().proxy.proxy_cache_ttl_seconds)
-                    except Exception:
-                        ttl = 86400
-                    if (time.time() - out.stat().st_mtime) <= ttl:
+        if cache_enabled:
+            try:
+                if out.exists() and not force:
+                    if out.stat().st_size > 0:
                         try:
-                            from montage_ai import telemetry
-                            telemetry.record_event("analysis_proxy_reuse", {"file": out.name})
+                            from .config import get_settings
+                            ttl = int(get_settings().proxy.proxy_cache_ttl_seconds)
                         except Exception:
-                            pass
-                        return out
-        except Exception:
-            pass
+                            ttl = 86400
+                        if (time.time() - out.stat().st_mtime) <= ttl:
+                            try:
+                                from montage_ai import telemetry
+                                telemetry.record_event("analysis_proxy_reuse", {"file": out.name})
+                            except Exception:
+                                pass
+                            return out
+            except Exception:
+                pass
 
-        # Create parent dir and generate
+        # Create parent dir and generate (guarded by lock when cache is enabled)
         out.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = out.with_suffix(out.suffix + ".lock")
         try:
+            lock_timeout = None
+            try:
+                from .config import get_settings
+                lock_timeout = int(get_settings().proxy.proxy_lock_timeout_seconds)
+            except Exception:
+                lock_timeout = 900
+
+            if cache_enabled:
+                if not self._acquire_lock(lock_path, timeout_seconds=lock_timeout):
+                    # Another worker is generating; try to reuse if it appears
+                    if out.exists() and out.stat().st_size > 0:
+                        return out
+                    return None
+
+                # Re-check after acquiring lock in case another worker finished
+                if out.exists() and out.stat().st_size > 0 and not force:
+                    return out
+
             self.generate_analysis_proxy(str(src), str(out), height=height)
             try:
                 from montage_ai import telemetry
@@ -340,6 +368,42 @@ class ProxyGenerator:
             return out
         except Exception:
             return None
+        finally:
+            if cache_enabled:
+                try:
+                    self._release_lock(lock_path)
+                except Exception:
+                    pass
+
+    @staticmethod
+    def _acquire_lock(lock_path: Path, timeout_seconds: int = 900) -> bool:
+        """Acquire a filesystem lock for proxy generation."""
+        start = time.monotonic()
+        while True:
+            try:
+                fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                with os.fdopen(fd, "w") as f:
+                    f.write(f"{os.getpid()}\n{int(time.time())}\n")
+                return True
+            except FileExistsError:
+                try:
+                    # Break stale locks
+                    mtime = lock_path.stat().st_mtime
+                    if (time.time() - mtime) > timeout_seconds:
+                        lock_path.unlink(missing_ok=True)
+                        continue
+                except Exception:
+                    pass
+                if time.monotonic() - start > timeout_seconds:
+                    return False
+                time.sleep(0.5)
+
+    @staticmethod
+    def _release_lock(lock_path: Path) -> None:
+        try:
+            lock_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
     @staticmethod
     def generate_analysis_proxy(source_path: str, output_path: str, height: int = 720) -> bool:
@@ -384,7 +448,9 @@ class ProxyGenerator:
         cmd.extend(video_params)
 
         cmd.extend(["-c:a", "aac", "-b:a", "64k"])
-        cmd.append(str(output_path))
+        output = Path(output_path)
+        tmp_output = output.with_suffix(output.suffix + f".tmp.{os.getpid()}")
+        cmd.append(str(tmp_output))
 
         logger.info("Generating analysis proxy: %sp (%s -> %s) using %s", height, src.name, Path(output_path).name, config.effective_codec)
 
@@ -403,6 +469,10 @@ class ProxyGenerator:
             if result.returncode != 0:
                 logger.error("Proxy generation failed (rc=%s): %s", result.returncode, (result.stderr or "").strip()[:512])
                 raise RuntimeError(f"FFmpeg failed: rc={result.returncode}")
+            try:
+                tmp_output.replace(output)
+            except Exception:
+                tmp_output.rename(output)
             logger.info("✓ Analysis proxy created: %s", output_path)
             return True
         except subprocess.TimeoutExpired:
@@ -411,3 +481,9 @@ class ProxyGenerator:
         except Exception as e:
             logger.error("Proxy generation error for %s: %s", src, e)
             raise
+        finally:
+            try:
+                if tmp_output.exists():
+                    tmp_output.unlink(missing_ok=True)
+            except Exception:
+                pass

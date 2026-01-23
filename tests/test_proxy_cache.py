@@ -65,7 +65,7 @@ def test_analysis_proxy_ttl_and_reuse(tmp_path, monkeypatch):
     proxy_dir.mkdir()
 
     gen = ProxyGenerator(proxy_dir)
-    out = proxy_dir / "long_analysis_proxy.mp4"
+    out = proxy_dir / "long_analysis_proxy_240p.mp4"
     out.write_bytes(b"x")
 
     # Make the proxy fresh -> ensure_analysis_proxy should reuse
@@ -135,6 +135,9 @@ def test_generate_analysis_proxy_instance_method_invocation(tmp_path, monkeypatc
     def fake_run(cmd, capture_output, text, timeout):
         called['cmd'] = cmd
         called['timeout'] = timeout
+        # create the temp output file that ffmpeg would write
+        tmp_out = Path(cmd[-1])
+        tmp_out.write_bytes(b"proxy")
         return FakeCompleted()
 
     monkeypatch.setattr('subprocess.run', fake_run)

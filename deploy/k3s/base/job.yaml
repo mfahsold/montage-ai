@@ -9,6 +9,8 @@ metadata:
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
+  parallelism: 3
+  completions: 3
   template:
     metadata:
       labels:
@@ -85,11 +87,11 @@ spec:
               value: "/tmp"
           resources:
             requests:
-              cpu: "2"
-              memory: "8Gi"
+              cpu: "500m"
+              memory: "2Gi"
             limits:
-              cpu: "6"
-              memory: "24Gi"
+              cpu: "8"
+              memory: "32Gi"
           envFrom:
             - configMapRef:
                 name: montage-ai-config

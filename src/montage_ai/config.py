@@ -568,6 +568,12 @@ class ProxyConfig:
     proxy_cache_max_bytes: int = field(default_factory=lambda: int(os.environ.get("PROXY_CACHE_MAX_BYTES", str(1 * 1024 * 1024 * 1024))))  # 1 GiB
     proxy_cache_min_age_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_CACHE_MIN_AGE_SECONDS", "60")))
 
+    # Optional shared proxy cache directory (prefer a shared volume in cluster)
+    proxy_cache_dir: str = field(default_factory=lambda: os.environ.get("PROXY_CACHE_DIR", ""))
+
+    # File-lock timeout to avoid proxy generation races
+    proxy_lock_timeout_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_LOCK_TIMEOUT_SECONDS", "900")))
+
     # When true, prefer the lightweight analysis proxy for preview/analysis passes
     prefer_analysis_proxy_for_preview: bool = field(default_factory=lambda: os.environ.get("PREFER_ANALYSIS_PROXY_FOR_PREVIEW", "true").lower() == "true")
 
@@ -575,6 +581,17 @@ class ProxyConfig:
     distributed_proxy_generation: bool = field(default_factory=lambda: os.environ.get("PROXY_DISTRIBUTED_ENABLED", "false").lower() == "true")
     distributed_proxy_min_files: int = field(default_factory=lambda: int(os.environ.get("PROXY_DISTRIBUTED_MIN_FILES", "8")))
     distributed_proxy_min_total_mb: int = field(default_factory=lambda: int(os.environ.get("PROXY_DISTRIBUTED_MIN_TOTAL_MB", "2048")))
+
+    def select_proxy_height(self, size_mb: Optional[float] = None) -> int:
+        """Select proxy height based on file size and adaptive settings."""
+        if not self.adaptive_proxy_height or size_mb is None:
+            return self.proxy_height
+
+        if size_mb <= self.proxy_height_small_max_mb:
+            return self.proxy_height_small
+        if size_mb <= self.proxy_height_medium_max_mb:
+            return self.proxy_height_medium
+        return self.proxy_height_large
 
     def should_use_proxy(self, duration_seconds: float, width: int, height: int) -> bool:
         """Determine if proxy should be used based on input characteristics."""
