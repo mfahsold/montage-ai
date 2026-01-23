@@ -429,9 +429,45 @@ class MontageBuilder:
 
             generator = ProxyGenerator(proxy_dir)
 
+            proxy_video_files = list(self.ctx.media.video_files)
+            try:
+                if self.settings.features.cluster_mode and self.settings.proxy.distributed_proxy_generation:
+                    total_mb = 0.0
+                    for p in proxy_video_files:
+                        try:
+                            total_mb += os.path.getsize(p) / (1024 * 1024)
+                        except Exception:
+                            pass
+
+                    min_files = int(self.settings.proxy.distributed_proxy_min_files)
+                    min_total_mb = int(self.settings.proxy.distributed_proxy_min_total_mb)
+
+                    if len(proxy_video_files) >= min_files or total_mb >= min_total_mb:
+                        from montage_ai.config import get_cluster_shard_index, get_cluster_shard_count
+
+                        shard_index = get_cluster_shard_index()
+                        shard_count = get_cluster_shard_count()
+                        if shard_count > 1:
+                            proxy_video_files = [
+                                p for i, p in enumerate(proxy_video_files)
+                                if (i % shard_count) == shard_index
+                            ]
+                            logger.info(
+                                "   🧩 Proxy sharding enabled: shard %d/%d handles %d/%d files (%.1f MB total)",
+                                shard_index + 1,
+                                shard_count,
+                                len(proxy_video_files),
+                                len(self.ctx.media.video_files),
+                                total_mb,
+                            )
+                        else:
+                            logger.info("   🧩 Proxy sharding skipped (single shard)")
+            except Exception:
+                logger.debug("Proxy sharding unavailable; continuing with local proxy generation")
+
             # Submit proxies and track per-file start times so we can emit telemetry later
             proxy_submissions = []  # list of (future, video_path, start_time)
-            for video_path in self.ctx.media.video_files:
+            for video_path in proxy_video_files:
                 # Skip proxy generation for preview if file is small enough (fast-path)
                 start_t = time.time()
 
@@ -442,7 +478,8 @@ class MontageBuilder:
                     prefer_analysis = True if quality == "preview" else False
 
                 if prefer_analysis:
-                    fut = self._executor.submit(getattr(generator, "ensure_analysis_proxy"), video_path, self.settings.proxy.proxy_height)
+                    proxy_height = self._select_proxy_height(video_path, self.settings.proxy.proxy_height)
+                    fut = self._executor.submit(getattr(generator, "ensure_analysis_proxy"), video_path, proxy_height)
                 else:
                     fut = self._executor.submit(generator.ensure_proxy, video_path)
 
@@ -938,6 +975,22 @@ class MontageBuilder:
     def _get_files(self, directory: Path, extensions: Iterable[str]) -> List[str]:
         """Get files with given extensions from directory."""
         return [str(path) for path in list_media_files(directory, extensions)]
+
+    def _select_proxy_height(self, video_path: str, default_height: int) -> int:
+        """Select an adaptive proxy height based on file size."""
+        try:
+            proxy_settings = self.settings.proxy
+            if not proxy_settings.adaptive_proxy_height:
+                return int(default_height)
+
+            size_mb = os.path.getsize(video_path) / (1024 * 1024)
+            if size_mb <= int(proxy_settings.proxy_height_small_max_mb):
+                return int(proxy_settings.proxy_height_small)
+            if size_mb <= int(proxy_settings.proxy_height_medium_max_mb):
+                return int(proxy_settings.proxy_height_medium)
+            return int(proxy_settings.proxy_height_large)
+        except Exception:
+            return int(default_height)
 
     def _get_output_file_size(self) -> float:
         """Get output file size in MB."""

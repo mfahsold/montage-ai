@@ -520,6 +520,14 @@ class ProxyConfig:
     # 720p = Good balance; maintains features while 2-3x speedup
     # Options: 360, 540, 720, 1080
     proxy_height: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT", "720")))
+
+    # Adaptive proxy height (dynamic per-file sizing)
+    adaptive_proxy_height: bool = field(default_factory=lambda: os.environ.get("ADAPTIVE_PROXY_HEIGHT", "true").lower() == "true")
+    proxy_height_small: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_SMALL", "360")))
+    proxy_height_medium: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_MEDIUM", "540")))
+    proxy_height_large: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_LARGE", "720")))
+    proxy_height_small_max_mb: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_SMALL_MAX_MB", "512")))
+    proxy_height_medium_max_mb: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_MEDIUM_MAX_MB", "2048")))
     
     # Auto-enable threshold: if video is larger than this duration, use proxy
     # (in seconds: 600s = 10 minutes)
@@ -539,6 +547,11 @@ class ProxyConfig:
 
     # When true, prefer the lightweight analysis proxy for preview/analysis passes
     prefer_analysis_proxy_for_preview: bool = field(default_factory=lambda: os.environ.get("PREFER_ANALYSIS_PROXY_FOR_PREVIEW", "true").lower() == "true")
+
+    # Distributed proxy generation (cluster sharding)
+    distributed_proxy_generation: bool = field(default_factory=lambda: os.environ.get("PROXY_DISTRIBUTED_ENABLED", "false").lower() == "true")
+    distributed_proxy_min_files: int = field(default_factory=lambda: int(os.environ.get("PROXY_DISTRIBUTED_MIN_FILES", "8")))
+    distributed_proxy_min_total_mb: int = field(default_factory=lambda: int(os.environ.get("PROXY_DISTRIBUTED_MIN_TOTAL_MB", "2048")))
 
     def should_use_proxy(self, duration_seconds: float, width: int, height: int) -> bool:
         """Determine if proxy should be used based on input characteristics."""
