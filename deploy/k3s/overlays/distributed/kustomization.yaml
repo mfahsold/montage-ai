@@ -13,209 +13,126 @@ namespace: montage-ai
 
 # Use internal registry
 images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newName: 192.168.1.12:30500/montage-ai
-    newTag: main-1c04af4
+- name: ghcr.io/mfahsold/montage-ai
+  newName: 192.168.1.12:30500/montage-ai
+  newTag: latest-amd64
 
+  # NFS PVCs are expected to exist in the cluster already
 resources:
-  - ../../base
-  - nfs-pvc.yaml
+- ../../base
+- ../../distributed/worker-daemonset.yaml
+
+  # Use JSON 6902 patch to REPLACE volumes (not add)
 
 patches:
-  # Use JSON 6902 patch to REPLACE volumes (not add)
-  - target:
-      kind: Job
-      name: montage-ai-render
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/nodeSelector
-        value: null
-      - op: replace
-        path: /spec/template/spec/affinity
-        value:
-          nodeAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-              - weight: 100
-                preference:
-                  matchExpressions:
-                    - key: nvidia.com/gpu
-                      operator: Exists
-              - weight: 90
-                preference:
-                  matchExpressions:
-                    - key: amd.com/gpu
-                      operator: Exists
-      - op: replace
-        path: /spec/template/spec/volumes
-        value:
-          - name: input
-            persistentVolumeClaim:
-              claimName: montage-ai-input-nfs
-          - name: music
-            persistentVolumeClaim:
-              claimName: montage-ai-music-nfs
-          - name: assets
-            persistentVolumeClaim:
-              claimName: montage-ai-assets-nfs
-          - name: output
-            persistentVolumeClaim:
-              claimName: montage-ai-output-nfs
-          - name: cgpu-config
-            emptyDir: {}
-          - name: cgpu-secrets
-            secret:
-              secretName: cgpu-credentials
-              optional: true
-              items:
-                - key: config.json
-                  path: config.json
-                - key: session.json
-                  path: session.json
-          - name: dev-dri
-            hostPath:
-              path: /dev/dri
-              type: DirectoryOrCreate
-          - name: shm
-            emptyDir:
-              medium: Memory
-              sizeLimit: 1Gi
-          - name: script
-            configMap:
-              name: montage-ai-script
-              defaultMode: 0755
-          - name: patch-segment-writer
-            configMap:
-              name: montage-ai-patch-segment-writer
-          - name: patch-clip-processor
-            configMap:
-              name: montage-ai-patch-clip-processor
-          - name: patch-analysis-engine
-            configMap:
-              name: montage-ai-patch-analysis-engine
-          - name: patch-hardware
-            configMap:
-              name: montage-ai-patch-hardware
-          - name: patch-creative-director
-            configMap:
-              name: montage-ai-patch-creative-director
-          - name: patch-proxy-generator
-            configMap:
-              name: montage-ai-patch-proxy-generator
-
-  - target:
-      kind: Deployment
-      name: montage-ai-web
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/nodeSelector
-        value:
-          kubernetes.io/hostname: codeai
-      - op: replace
-        path: /spec/template/spec/volumes
-        value:
-          - name: data-input
-            persistentVolumeClaim:
-              claimName: montage-ai-input-nfs
-          - name: data-music
-            persistentVolumeClaim:
-              claimName: montage-ai-music-nfs
-          - name: data-assets
-            persistentVolumeClaim:
-              claimName: montage-ai-assets-nfs
-          - name: data-output
-            persistentVolumeClaim:
-              claimName: montage-ai-output-nfs
-          - name: dev-dri
-            hostPath:
-              path: /dev/dri
-              type: DirectoryOrCreate
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: FFMPEG_HWACCEL
-          value: "auto"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: USE_GPU
-          value: "prefer"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: CGPU_ENABLED
-          value: "true"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: CGPU_TIMEOUT
-          value: "1800"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: QUALITY_PROFILE
-          value: "master"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: CUT_STYLE
-          value: "documentary"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: CREATIVE_PROMPT
-          value: "Create a cinematic documentary trailer. Use slow pacing, dramatic music, and focus on visual storytelling. Color grade for a cinematic look."
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: OUTPUT_CODEC
-          value: "libx265"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: OUTPUT_PIX_FMT
-          value: "yuv420p10le"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: OUTPUT_PROFILE
-          value: "main10"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: UPSCALE
-          value: "true"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: STABILIZE
-          value: "true"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: ENHANCE
-          value: "true"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: COLORLEVELS
-          value: "true"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: LUMA_NORMALIZE
-          value: "true"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: CLEAN_AUDIO
-          value: "true"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: EXPORT_WIDTH
-          value: "3840"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: EXPORT_HEIGHT
-          value: "2160"
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value: null
+    - op: replace
+      path: /spec/template/spec/affinity
+      value:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+            - weight: 90
+              preference:
+                matchExpressions:
+                  - key: amd.com/gpu
+                    operator: Exists
+    - op: replace
+      path: /spec/template/spec/volumes
+      value:
+        - name: input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+        - name: output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+        - name: cgpu-config
+          emptyDir: {}
+        - name: cgpu-secrets
+          secret:
+            secretName: cgpu-credentials
+            optional: true
+            items:
+              - key: config.json
+                path: config.json
+              - key: session.json
+                path: session.json
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: DirectoryOrCreate
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: script
+          configMap:
+            name: montage-ai-script
+            defaultMode: 0755
+        - name: patch-segment-writer
+          configMap:
+            name: montage-ai-patch-segment-writer
+        - name: patch-clip-processor
+          configMap:
+            name: montage-ai-patch-clip-processor
+        - name: patch-analysis-engine
+          configMap:
+            name: montage-ai-patch-analysis-engine
+        - name: patch-hardware
+          configMap:
+            name: montage-ai-patch-hardware
+        - name: patch-creative-director
+          configMap:
+            name: montage-ai-patch-creative-director
+        - name: patch-proxy-generator
+          configMap:
+            name: montage-ai-patch-proxy-generator
+    - op: replace
+      path: /spec/template/spec/containers/0/imagePullPolicy
+      value: Always
+    - op: replace
+      path: /spec/template/spec/initContainers/0/imagePullPolicy
+      value: Always
+  target:
+    kind: Job
+    name: montage-ai-render
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/nodeSelector
+      value:
+        kubernetes.io/hostname: codeai
+    - op: replace
+      path: /spec/template/spec/volumes
+      value:
+        - name: data-input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: data-music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: data-assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+        - name: data-output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: DirectoryOrCreate
+  target:
+    kind: Deployment
+    name: montage-ai-web

@@ -28,6 +28,8 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       # Run on worker nodes only (not control plane)
       affinity:
         nodeAffinity:
@@ -53,7 +55,7 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/mfahsold/montage-ai:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
           env:
             - name: WORKER_MODE
@@ -85,11 +87,11 @@ spec:
               protocol: TCP
           resources:
             requests:
-              cpu: "1"
-              memory: "2Gi"
+              cpu: "2"
+              memory: "4Gi"
             limits:
-              cpu: "4"
-              memory: "8Gi"
+              cpu: "8"
+              memory: "16Gi"
           volumeMounts:
             - name: input
               mountPath: /data/input
@@ -106,39 +108,26 @@ spec:
               mountPath: /data/cache
             - name: tmp
               mountPath: /tmp
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 9090
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /ready
-              port: 9090
-            initialDelaySeconds: 10
-            periodSeconds: 10
 
       volumes:
         - name: input
           persistentVolumeClaim:
-            claimName: montage-input
+            claimName: montage-ai-input-nfs
         - name: output
           persistentVolumeClaim:
-            claimName: montage-output
+            claimName: montage-ai-output-nfs
         - name: music
           persistentVolumeClaim:
-            claimName: montage-music
+            claimName: montage-ai-music-nfs
         - name: assets
           persistentVolumeClaim:
-            claimName: montage-assets
+            claimName: montage-ai-assets-nfs
         - name: cache
-          persistentVolumeClaim:
-            claimName: montage-cache
+          emptyDir:
+            sizeLimit: 50Gi
         - name: tmp
           emptyDir:
-            sizeLimit: 20Gi
+            sizeLimit: 50Gi
 ---
 # GPU Worker Deployment - Dedicated GPU node workers
 # Separate from DaemonSet for explicit GPU scheduling
@@ -167,11 +156,12 @@ spec:
     spec:
       nodeSelector:
         amd.com/gpu: "present"
+        kubernetes.io/arch: amd64
 
       containers:
         - name: worker
           image: ghcr.io/mfahsold/montage-ai:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
           env:
             - name: WORKER_MODE
@@ -190,11 +180,11 @@ spec:
               value: "1"
           resources:
             requests:
-              cpu: "4"
-              memory: "8Gi"
+              cpu: "6"
+              memory: "12Gi"
             limits:
-              cpu: "8"
-              memory: "24Gi"
+              cpu: "12"
+              memory: "32Gi"
               amd.com/gpu: "1"
           volumeMounts:
             - name: input
@@ -211,13 +201,13 @@ spec:
       volumes:
         - name: input
           persistentVolumeClaim:
-            claimName: montage-input
+            claimName: montage-ai-input-nfs
         - name: output
           persistentVolumeClaim:
-            claimName: montage-output
+            claimName: montage-ai-output-nfs
         - name: music
           persistentVolumeClaim:
-            claimName: montage-music
+            claimName: montage-ai-music-nfs
         - name: tmp
           emptyDir:
             sizeLimit: 50Gi
@@ -248,11 +238,12 @@ spec:
     spec:
       nodeSelector:
         accelerator: nvidia
+        kubernetes.io/arch: amd64
 
       containers:
         - name: worker
           image: ghcr.io/mfahsold/montage-ai:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
           env:
             - name: WORKER_MODE
@@ -271,11 +262,11 @@ spec:
               value: "1"
           resources:
             requests:
-              cpu: "2"
-              memory: "4Gi"
+              cpu: "4"
+              memory: "8Gi"
             limits:
-              cpu: "6"
-              memory: "7Gi"
+              cpu: "10"
+              memory: "16Gi"
               nvidia.com/gpu: "1"
           volumeMounts:
             - name: input
@@ -292,13 +283,13 @@ spec:
       volumes:
         - name: input
           persistentVolumeClaim:
-            claimName: montage-input
+            claimName: montage-ai-input-nfs
         - name: output
           persistentVolumeClaim:
-            claimName: montage-output
+            claimName: montage-ai-output-nfs
         - name: music
           persistentVolumeClaim:
-            claimName: montage-music
+            claimName: montage-ai-music-nfs
         - name: tmp
           emptyDir:
             sizeLimit: 20Gi

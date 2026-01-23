@@ -25,6 +25,11 @@ else
   exit 1
 fi
 
+# Auto-detect cluster registry when defaults are used
+if [ -f "${SCRIPT_DIR}/registry-detect.sh" ]; then
+  source "${SCRIPT_DIR}/registry-detect.sh"
+fi
+
 echo "════════════════════════════════════════════════════════════"
 echo "Deploying ${APP_NAME} to Kubernetes (Overlay: ${OVERLAY})"
 echo "════════════════════════════════════════════════════════════"
@@ -54,7 +59,17 @@ echo "Building manifests from overlay '${OVERLAY}'..."
 MANIFEST_FILE=$(mktemp)
 trap "rm -f ${MANIFEST_FILE}" EXIT
 
-kustomize build "${SCRIPT_DIR}/overlays/${OVERLAY}" > "${MANIFEST_FILE}"
+# Jobs are immutable; delete render job before re-apply when needed
+if [[ "${OVERLAY}" == "distributed" ]]; then
+  kubectl delete job montage-ai-render -n "${CLUSTER_NAMESPACE}" --ignore-not-found > /dev/null 2>&1 || true
+fi
+
+# Ensure image reference matches the configured registry/tag
+pushd "${SCRIPT_DIR}/overlays/${OVERLAY}" > /dev/null
+kustomize edit set image "ghcr.io/mfahsold/montage-ai=${IMAGE_FULL}"
+popd > /dev/null
+
+kustomize build --load-restrictor LoadRestrictionsNone "${SCRIPT_DIR}/overlays/${OVERLAY}" > "${MANIFEST_FILE}"
 
 # Apply manifests
 echo "Applying manifests to namespace ${CLUSTER_NAMESPACE}..."

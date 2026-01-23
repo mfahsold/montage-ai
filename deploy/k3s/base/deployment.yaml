@@ -29,6 +29,9 @@ spec:
         - name: http
           containerPort: 8080
           protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: montage-ai-config
         env:
         - name: FLASK_ENV
           value: "production"
@@ -40,28 +43,18 @@ spec:
           value: "/data/output"
         - name: ASSETS_DIR
           value: "/data/assets"
-        - name: OPENAI_API_BASE
-          value: "http://kubeai.kubeai-system.svc.cluster.local/openai/v1"
-        - name: OPENAI_MODEL
-          value: "gemma3-4b"
-        - name: OPENAI_VISION_MODEL
-          value: "moondream2"
-        - name: LLM_TIMEOUT_SECONDS
-          value: "120"
-        - name: OLLAMA_HOST
-          value: "http://ollama.kubeai-system.svc.cluster.local:11434"
         - name: VERBOSE
           value: "true"
         - name: MAX_CONCURRENT_JOBS
-          value: "1"
+          value: "4"
         - name: ENHANCE
           value: "true"
         - name: PARALLEL_ENHANCE
           value: "false"
         - name: MAX_PARALLEL_JOBS
-          value: "2"
+          value: "8"
         - name: FFMPEG_THREADS
-          value: "4"
+          value: "0"
         - name: CUT_STYLE
           value: "dynamic"
         - name: REDIS_HOST
@@ -82,11 +75,11 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "4Gi"
-            cpu: "1"
+            memory: "8Gi"
+            cpu: "2"
           limits:
-            memory: "16Gi"
-            cpu: "4"
+            memory: "32Gi"
+            cpu: "8"
         livenessProbe:
           httpGet:
             path: /api/status

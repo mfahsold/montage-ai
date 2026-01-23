@@ -17,6 +17,11 @@ else
   exit 1
 fi
 
+# Auto-detect cluster registry when defaults are used
+if [ -f "${SCRIPT_DIR}/registry-detect.sh" ]; then
+  source "${SCRIPT_DIR}/registry-detect.sh"
+fi
+
 echo "════════════════════════════════════════════════════════════"
 echo "Building and Pushing ${APP_NAME} Docker Image"
 echo "════════════════════════════════════════════════════════════"

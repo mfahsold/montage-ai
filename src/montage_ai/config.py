@@ -16,6 +16,7 @@ import os
 import multiprocessing
 import hashlib
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set, Tuple, List
@@ -27,6 +28,28 @@ from montage_ai.config_parser import ConfigParser
 # =============================================================================
 # Path Configuration
 # =============================================================================
+def _select_temp_dir() -> Path:
+    env_override = os.environ.get("TEMP_DIR")
+    if env_override:
+        return Path(env_override)
+
+    shm_path = Path("/dev/shm")
+    if shm_path.exists() and shm_path.is_dir():
+        raw_min_free = os.environ.get("TEMP_DIR_MIN_FREE_MB", "512")
+        try:
+            min_free_mb = int(raw_min_free)
+        except ValueError:
+            min_free_mb = 512
+        try:
+            usage = shutil.disk_usage(shm_path)
+            if usage.free >= min_free_mb * 1024 * 1024:
+                return shm_path
+        except OSError:
+            pass
+
+    return Path("/tmp")
+
+
 @dataclass
 class PathConfig:
     """All filesystem paths used by Montage AI."""
@@ -36,8 +59,8 @@ class PathConfig:
     output_dir: Path = field(default_factory=lambda: Path(os.environ.get("OUTPUT_DIR", "/data/output")))
     assets_dir: Path = field(default_factory=lambda: Path(os.environ.get("ASSETS_DIR", "/data/assets")))
     # OPTIMIZATION: Use RAM disk on Linux for 30-40% faster temp file I/O
-    # /dev/shm is tmpfs mounted in RAM, falls back to /tmp if not available
-    temp_dir: Path = field(default_factory=lambda: Path(os.environ.get("TEMP_DIR") or ("/dev/shm" if Path("/dev/shm").exists() and Path("/dev/shm").is_dir() else "/tmp")))
+    # /dev/shm is tmpfs mounted in RAM; fallback to /tmp when low on space
+    temp_dir: Path = field(default_factory=_select_temp_dir)
     lut_dir: Path = field(default_factory=lambda: Path(os.environ.get("LUT_DIR", "/data/luts")))
     session_dir: Path = field(default_factory=lambda: Path(os.environ.get("SESSION_DIR", "/tmp/montage_sessions")))
     transcript_dir: Path = field(default_factory=lambda: Path(os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_transcript")))

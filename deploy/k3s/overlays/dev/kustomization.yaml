@@ -2,99 +2,114 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - ../../base
+- ../../base
 
 # Use local cluster registry (development)
 images:
-  - name: montage-ai
-    newTag: main-7ebbcbf
+- name: ghcr.io/mfahsold/montage-ai
+  newName: 192.168.1.12:30500/montage-ai
+  newTag: latest-amd64
 
 # Patches for development environment
 patches:
-  - patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: montage-ai-web
-        namespace: montage-ai
-      spec:
-        template:
-          spec:
-            affinity:
-              nodeAffinity:
-                preferredDuringSchedulingIgnoredDuringExecution:
-                  - weight: 100
-                    preference:
-                      matchExpressions:
-                        - key: accelerator
-                          operator: In
-                          values: ["amd-gpu"]
-                  - weight: 90
-                    preference:
-                      matchExpressions:
-                        - key: accelerator
-                          operator: In
-                          values: ["nvidia-jetson"]
-                  - weight: 50
-                    preference:
-                      matchExpressions:
-                        - key: tier
-                          operator: In
-                          values: ["render", "compute"]
-      initContainers:
-        - name: fix-data-perms
-          image: busybox:1.36
-          command: ["/bin/sh","-c","chown -R 1000:1000 /data || true; chmod -R g+rwX /data || true"]
-          securityContext:
-            runAsUser: 0
-            runAsGroup: 0
-          volumeMounts:
+- patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: montage-ai-web
+      namespace: montage-ai
+    spec:
+      strategy:
+        type: Recreate
+      template:
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: codeai
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  preference:
+                    matchExpressions:
+                      - key: accelerator
+                        operator: In
+                        values: ["amd-gpu"]
+                - weight: 90
+                  preference:
+                    matchExpressions:
+                      - key: accelerator
+                        operator: In
+                        values: ["nvidia-jetson"]
+                - weight: 50
+                  preference:
+                    matchExpressions:
+                      - key: tier
+                        operator: In
+                        values: ["render", "compute"]
+          initContainers:
+            - name: fix-data-perms
+              image: busybox:1.36
+              command: ["/bin/sh","-c","chown -R 1000:1000 /data || true; chmod -R g+rwX /data || true"]
+              securityContext:
+                runAsUser: 0
+                runAsGroup: 0
+              volumeMounts:
+                - name: data-input
+                  mountPath: /data/input
+                - name: data-output
+                  mountPath: /data/output
+                - name: data-music
+                  mountPath: /data/music
+                - name: data-assets
+                  mountPath: /data/assets
+                - name: dev-dri
+                  mountPath: /dev/dri
+          containers:
+            - name: montage-ai
+              securityContext:
+                privileged: true
+                allowPrivilegeEscalation: true
+              env:
+                - name: FFMPEG_HWACCEL
+                  value: "none"
+                - name: ENABLE_DEV_ENDPOINTS
+                  value: "true"
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "2Gi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+              volumeMounts:
+                - name: dev-dri
+                  mountPath: /dev/dri
+                  readOnly: true
+          volumes:
+            - name: dev-dri
+              hostPath:
+                path: /dev/dri
+                type: DirectoryOrCreate
             - name: data-input
-              mountPath: /data/input
+              persistentVolumeClaim:
+                claimName: montage-ai-input-nfs
             - name: data-output
-              mountPath: /data/output
+              persistentVolumeClaim:
+                claimName: montage-ai-output-nfs
             - name: data-music
-              mountPath: /data/music
+              persistentVolumeClaim:
+                claimName: montage-ai-music-nfs
             - name: data-assets
-              mountPath: /data/assets
-            - name: dev-dri
-              mountPath: /dev/dri
-      containers:
-        - name: montage-ai
-          securityContext:
-            privileged: true
-            allowPrivilegeEscalation: true
-          env:
-            - name: FFMPEG_HWACCEL
-              value: "none"
-            - name: ENABLE_DEV_ENDPOINTS
-              value: "true"
-          resources:
-            requests:
-              cpu: "500m"
-              memory: "2Gi"
-            limits:
-              cpu: "2"
-              memory: "4Gi"
-          volumeMounts:
-            - name: dev-dri
-              mountPath: /dev/dri
-              readOnly: true
-            volumes:
-              - name: dev-dri
-                hostPath:
-                  path: /dev/dri
-                  type: DirectoryOrCreate
-  - path: worker-patch.yaml
-  - path: keda-montage-worker.yaml
+              persistentVolumeClaim:
+                claimName: montage-ai-assets-nfs
 
 # Development configuration
 configMapGenerator:
-  - name: montage-ai-config
-    behavior: merge
-    literals:
-      - CUT_STYLE=dynamic
-      - STABILIZE=false
-      - UPSCALE=false
-      - FFMPEG_PRESET=ultrafast
-      - VERBOSE=true
+- behavior: merge
+  literals:
+  - CUT_STYLE=dynamic
+  - STABILIZE=false
+  - UPSCALE=false
+  - FFMPEG_PRESET=ultrafast
+  - VERBOSE=true
+  name: montage-ai-config

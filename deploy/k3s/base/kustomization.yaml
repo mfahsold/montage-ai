@@ -7,6 +7,7 @@ resources:
   - deployment.yaml
   - cgpu-server.yaml
   - service-ingress.yaml
+  - redis.yaml
   - pvc.yaml
   - namespace.yaml
   - network-policy.yaml
@@ -41,7 +42,11 @@ configMapGenerator:
       - STABILIZE=false
       - UPSCALE=false
       - ENHANCE=false
-      - OLLAMA_HOST=http://localhost:11434
+      - OPENAI_API_BASE=http://llama-rpc-api.llama-box-system.svc.cluster.local:8080/v1
+      - OPENAI_MODEL=qwen
+      - OPENAI_VISION_MODEL=moondream2
+      - OLLAMA_HOST=http://llama-box-api.llama-box-system.svc.cluster.local:8080
+      - LLM_TIMEOUT=120
       - CGPU_ENABLED=true
       - CGPU_HOST=cgpu-server
       - CGPU_PORT=8080
