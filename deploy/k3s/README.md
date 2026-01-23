@@ -17,6 +17,31 @@ kubectl port-forward -n montage-ai svc/montage-ai-web 5000:8080
 open http://localhost:5000
 ```
 
+## Clean Deploy (Fluxibri-core aligned)
+
+Use the canonical, simplified deploy flow (build + push + apply overlay):
+
+```bash
+# Pick a tag for this build
+export IMAGE_TAG=main-$(git rev-parse --short HEAD)
+
+# Point to the cluster registry (NodePort)
+export REGISTRY_HOST=192.168.1.12
+export REGISTRY_PORT=30500
+
+# Build & push
+cd deploy/k3s
+./build-and-push.sh
+
+# Deploy dev overlay
+./deploy.sh dev
+```
+
+Notes:
+
+- The registry host/port can be overridden per environment via `REGISTRY_HOST` and `REGISTRY_PORT`.
+- `IMAGE_TAG` controls the deployment image tag without editing `deploy/config.env`.
+
 That's it. For manual control, see sections below.
 
 ---
