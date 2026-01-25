@@ -9,6 +9,6 @@ if ./scripts/check-hardcoded-registries.sh; then
   echo "Registry scan passed."
   exit 0
 else
-  echo "ERROR: Hardcoded registry references detected. Fix them or update deploy/config.env and re-run the scan." >&2
+  echo "ERROR: Hardcoded registry references detected. Fix them or update deploy/k3s/config-global.yaml and re-run the scan." >&2
   exit 1
 fi

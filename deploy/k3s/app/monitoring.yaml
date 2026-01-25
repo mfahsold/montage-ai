@@ -131,7 +131,7 @@ data:
             ]
           },
           {
-            "title": "Disk Space (codeai-worker-amd64)",
+            "title": "Disk Space (storage-primary)",
             "targets": [
               {
                 "expr": "node_filesystem_avail_bytes{mountpoint=\"/var/montage-ai\"} / 1024 / 1024 / 1024"

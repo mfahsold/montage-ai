@@ -4,12 +4,6 @@ kind: Kustomization
 resources:
 - ../../base
 
-# Use local cluster registry (development)
-images:
-- name: ghcr.io/mfahsold/montage-ai
-  newName: 192.168.1.12:30500/montage-ai
-  newTag: latest-amd64
-
 # Patches for development environment
 patches:
 - patch: |-
@@ -23,8 +17,6 @@ patches:
         type: Recreate
       template:
         spec:
-          nodeSelector:
-            kubernetes.io/hostname: codeai
           affinity:
             nodeAffinity:
               preferredDuringSchedulingIgnoredDuringExecution:
@@ -46,6 +38,15 @@ patches:
                       - key: tier
                         operator: In
                         values: ["render", "compute"]
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: montage-ai
+                      app.kubernetes.io/component: web-ui
+                  topologyKey: kubernetes.io/hostname
           initContainers:
             - name: fix-data-perms
               image: busybox:1.36

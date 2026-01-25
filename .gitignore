@@ -120,7 +120,8 @@ tmp-kubeconfig
 deploy/k3s/overlays/local/
 
 # Cluster-specific global config (contains internal IPs)
-deploy/config-global.yaml
+deploy/k3s/config-global.yaml
+deploy/k3s/base/cluster-config.env
 .venv-ci/
 
 # Local-only Docker variant (QSV experiments)

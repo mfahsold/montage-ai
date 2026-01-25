@@ -28,11 +28,11 @@ spec:
             - "--dockerfile=/workspace/Dockerfile"
             - "--context=/workspace"
             # Update destination for your registry:
-            - "--destination=ghcr.io/mfahsold/montage-ai:latest"
+            - "--destination=$(REGISTRY_URL)/$(IMAGE_NAME):$(IMAGE_TAG)"
             # For insecure registries, uncomment: --insecure
             # - "--insecure"
             - "--cache=true"
-            - "--cache-repo=ghcr.io/mfahsold/montage-ai/cache"
+            - "--cache-repo=$(REGISTRY_URL)/$(IMAGE_NAME)/cache"
             - "--snapshot-mode=redo"
             - "--use-new-run"
             # Speed optimizations
@@ -41,6 +41,9 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+          envFrom:
+            - configMapRef:
+                name: cluster-config
           resources:
             requests:
               memory: "4Gi"

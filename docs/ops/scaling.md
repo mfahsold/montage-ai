@@ -6,7 +6,7 @@ for scaling background workers and media encoders.
 Principles
 - Queue‑driven autoscaling (KEDA) is primary; HPA (CPU/memory) is a safety net.
 - Keep Web (API) and Worker responsibilities separated (one process per role).
-- Avoid hardcoded values in base manifests — use `deploy/config.env` and overlays for environment overrides.
+- Avoid hardcoded values in base manifests — use `deploy/k3s/config-global.yaml` and overlays for environment overrides.
 
 Quick checklist
 - [ ] KEDA installed and configured (staging first)

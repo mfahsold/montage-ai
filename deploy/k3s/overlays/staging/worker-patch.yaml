@@ -37,3 +37,43 @@ spec:
             claimName: montage-assets-rwx
         - name: cache
           emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker-heavy
+  namespace: montage-ai
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: worker
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "4Gi"
+            limits:
+              cpu: "2500m"
+              memory: "6Gi"
+          env:
+            - name: MAX_CONCURRENT_JOBS
+              value: "${MAX_CONCURRENT_JOBS_DEFAULT:-1}"
+            - name: MAX_PARALLEL_JOBS
+              value: "${MAX_PARALLEL_JOBS_DEFAULT:-1}"
+      # Staging-only volume remap: use RWX PVCs so workers can schedule across nodes.
+      volumes:
+        - name: data-input
+          persistentVolumeClaim:
+            claimName: montage-input-rwx
+        - name: data-output
+          persistentVolumeClaim:
+            claimName: montage-output-rwx
+        - name: data-music
+          persistentVolumeClaim:
+            claimName: montage-music-rwx
+        - name: data-assets
+          persistentVolumeClaim:
+            claimName: montage-assets-rwx
+        - name: cache
+          emptyDir: {}

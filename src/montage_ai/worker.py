@@ -7,8 +7,21 @@ from rq import Worker, Queue
 from montage_ai.config import get_settings
 from montage_ai.logger import logger
 
-# Listen to both queues (preview jobs on 'default', heavy/standard jobs on 'heavy')
-listen = ['default', 'heavy']
+
+def _parse_queue_list(raw: str) -> list:
+    return [name.strip() for name in raw.split(",") if name.strip()]
+
+
+def _resolve_queues(settings) -> list:
+    override = os.environ.get("WORKER_QUEUES", "").strip()
+    if override:
+        queues = _parse_queue_list(override)
+        if queues:
+            return queues
+
+    fast = settings.session.queue_fast_name or "default"
+    heavy = settings.session.queue_heavy_name or "heavy"
+    return [fast, heavy]
 
 def start_worker():
     """
@@ -16,6 +29,7 @@ def start_worker():
     Based on fluxibri_core proven architecture.
     """
     settings = get_settings()
+    listen = _resolve_queues(settings)
     redis_host = settings.session.redis_host or 'localhost'
     redis_port = settings.session.redis_port
     

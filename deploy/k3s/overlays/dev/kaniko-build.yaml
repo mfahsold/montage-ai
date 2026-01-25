@@ -9,7 +9,7 @@ spec:
     spec:
       restartPolicy: Never
       nodeSelector:
-        kubernetes.io/hostname: codeai-fluxibriserver
+        fluxibri.ai/registry-access: "true"
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
@@ -18,9 +18,12 @@ spec:
           args:
             - --context=git://github.com/mfahsold/montage-ai.git#main
             - --dockerfile=Dockerfile
-            - --destination=localhost:5001/montage-ai:latest
+            - --destination=$(REGISTRY_URL)/$(IMAGE_NAME):$(IMAGE_TAG)
             - --snapshot-mode=time
             - --verbosity=info
             - --custom-platform=linux/amd64
             - --insecure
-            - --insecure-registry=localhost:5001
+            - --insecure-registry=$(REGISTRY_URL)
+          envFrom:
+            - configMapRef:
+                name: cluster-config

@@ -19,13 +19,14 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-pull
+      priorityClassName: montage-ai-batch
       securityContext:
         runAsUser: 0
         fsGroup: 992
         supplementalGroups: [44,992]
       initContainers:
         - name: cgpu-credentials-init
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           resources:
             requests:
@@ -54,7 +55,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
@@ -189,10 +190,14 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 1Gi
-      nodeSelector:
-        kubernetes.io/hostname: codeai-fluxibriserver
       tolerations:
         - key: "gpu"
           operator: "Equal"
           value: "amd-rocm"
+          effect: "NoSchedule"
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "amd.com/gpu"
+          operator: "Exists"
           effect: "NoSchedule"

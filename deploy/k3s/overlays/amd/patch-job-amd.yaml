@@ -6,9 +6,9 @@ metadata:
 spec:
   template:
     spec:
-      # Target AMD GPU server
+      # Target AMD GPU nodes (label required)
       nodeSelector:
-        kubernetes.io/hostname: codeai-fluxibriserver
+        accelerator: amd-gpu
       tolerations:
         - key: "gpu"
           operator: "Equal"

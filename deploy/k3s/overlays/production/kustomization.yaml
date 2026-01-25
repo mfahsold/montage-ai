@@ -9,15 +9,6 @@ resources:
 
 namespace: montage-ai
 
-# Use registry from service for cluster-internal nodes
-images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newName: registry.registry.svc.cluster.local:5000/montage-ai
-    newTag: latest-amd64
-  - name: montage-ai
-    newName: registry.registry.svc.cluster.local:5000/montage-ai
-    newTag: latest-amd64
-
 # Production deployment configuration
 patches:
   # High-quality production settings
@@ -31,6 +22,12 @@ patches:
         template:
           spec:
             tolerations:
+              - key: "nvidia.com/gpu"
+                operator: "Exists"
+                effect: "NoSchedule"
+              - key: "amd.com/gpu"
+                operator: "Exists"
+                effect: "NoSchedule"
               - key: "gpu"
                 operator: "Equal"
                 value: "amd-rocm"
@@ -43,6 +40,15 @@ patches:
                         - key: fluxibri.ai/gpu-enabled
                           operator: In
                           values: ["true"]
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    podAffinityTerm:
+                      labelSelector:
+                        matchLabels:
+                          app.kubernetes.io/name: montage-ai
+                          app.kubernetes.io/component: web-ui
+                      topologyKey: kubernetes.io/hostname
             containers:
               - name: montage-ai
                 resources:
@@ -71,6 +77,12 @@ patches:
         template:
           spec:
             tolerations:
+              - key: "nvidia.com/gpu"
+                operator: "Exists"
+                effect: "NoSchedule"
+              - key: "amd.com/gpu"
+                operator: "Exists"
+                effect: "NoSchedule"
               - key: "gpu"
                 operator: "Equal"
                 value: "amd-rocm"
@@ -83,6 +95,15 @@ patches:
                         - key: fluxibri.ai/gpu-enabled
                           operator: In
                           values: ["true"]
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    podAffinityTerm:
+                      labelSelector:
+                        matchLabels:
+                          app: montage-ai
+                          component: worker
+                      topologyKey: kubernetes.io/hostname
             containers:
               - name: worker
                 resources:
@@ -114,3 +135,20 @@ configMapGenerator:
       - ENHANCE=true
       - FFMPEG_PRESET=slow
       - VERBOSE=true
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.IMAGE_FULL
+    targets:
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
+      - select:
+          kind: Deployment
+          name: montage-ai-worker-heavy
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image

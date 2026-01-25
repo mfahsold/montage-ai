@@ -22,7 +22,7 @@ spec:
         - name: ghcr-pull
       initContainers:
         - name: cgpu-credentials-init
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           command:
             - /bin/bash
             - -c
@@ -42,7 +42,7 @@ spec:
               readOnly: true
       containers:
         - name: cgpu-server
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           command: ["cgpu", "serve", "--host", "0.0.0.0", "--port", "8080"]
           env:

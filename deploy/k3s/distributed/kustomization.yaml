@@ -14,10 +14,43 @@ labels:
       montage-ai.fluxibri.dev/mode: distributed
     includeSelectors: false
 
-# Image configuration - override in production
-images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newTag: latest
+configMapGenerator:
+  - name: cluster-config
+    behavior: create
+    envs:
+      - ../base/cluster-config.env
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.IMAGE_FULL
+    targets:
+      - select:
+          kind: Job
+          name: scene-detect
+        fieldPaths:
+          - spec.template.spec.containers.[name=scene-detect].image
+      - select:
+          kind: Job
+          name: gpu-encode
+        fieldPaths:
+          - spec.template.spec.containers.[name=encoder].image
+      - select:
+          kind: DaemonSet
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
+      - select:
+          kind: Deployment
+          name: montage-ai-worker-gpu-amd
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
+      - select:
+          kind: Deployment
+          name: montage-ai-worker-gpu-nvidia
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
 
 # Patches for environment-specific configs
 patches:

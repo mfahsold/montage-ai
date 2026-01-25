@@ -19,7 +19,7 @@ spec:
               mountPath: /host/data
       restartPolicy: Never
       nodeSelector:
-        kubernetes.io/hostname: codeai-worker-amd64
+        fluxibri.ai/storage-primary: "true"
       volumes:
         - name: host-data
           hostPath:

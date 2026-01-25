@@ -3,8 +3,3 @@ kind: Kustomization
 
 resources:
   - ../../k3s/base
-
-images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newName: 10.43.173.243:5000/montage-ai
-    newTag: latest

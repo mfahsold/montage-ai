@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Simple registry health checks (defaults from deploy/config.env if present)
+# Simple registry health checks (defaults from deploy/k3s/config-global.yaml if present)
 # Usage: ./scripts/registry_check.sh [registry-host]
 # Default: use REGISTRY_HOST env var or 'localhost'
 REGISTRY_HOST=${1:-${REGISTRY_HOST:-localhost}}

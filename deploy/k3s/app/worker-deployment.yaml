@@ -25,16 +25,19 @@ spec:
         component: worker
     spec:
       terminationGracePeriodSeconds: 120  # Allow time for job completion
+      priorityClassName: montage-ai-worker
       nodeSelector:
         kubernetes.io/arch: amd64
       containers:
       - name: worker
-        image: ghcr.io/mfahsold/montage-ai:latest
+        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
         imagePullPolicy: IfNotPresent
         command: ["python", "-m", "montage_ai.worker"]
         env:
         - name: QUALITY_PROFILE
           value: "standard"
+        - name: WORKER_QUEUES
+          value: "default"
         - name: CGPU_ENABLED
           value: "false"
         - name: PYTHONUNBUFFERED
@@ -69,6 +72,143 @@ spec:
             memory: "8Gi"
             cpu: "4000m"
             ephemeral-storage: "30Gi"
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  # Signal worker to finish current job
+                  sleep 110
+      volumes:
+      - name: data-input
+        persistentVolumeClaim:
+          claimName: montage-input
+      - name: data-output
+        persistentVolumeClaim:
+          claimName: montage-output
+      - name: data-music
+        persistentVolumeClaim:
+          claimName: montage-music
+      - name: data-assets
+        persistentVolumeClaim:
+          claimName: montage-assets
+      - name: cache
+        persistentVolumeClaim:
+          claimName: montage-cache
+      - name: tmp-segments
+        emptyDir:
+          sizeLimit: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker-heavy
+  namespace: montage-ai
+  labels:
+    app: montage-ai
+    component: worker-heavy
+    montage-ai.fluxibri.dev/queue: heavy
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: montage-ai
+      component: worker-heavy
+      montage-ai.fluxibri.dev/queue: heavy
+  template:
+    metadata:
+      labels:
+        app: montage-ai
+        component: worker-heavy
+        montage-ai.fluxibri.dev/queue: heavy
+    spec:
+      terminationGracePeriodSeconds: 120  # Allow time for job completion
+      priorityClassName: montage-ai-worker
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: fluxibri.ai/gpu-enabled
+                operator: In
+                values: ["true"]
+          - weight: 80
+            preference:
+              matchExpressions:
+              - key: amd.com/gpu
+                operator: In
+                values: ["present", "true"]
+          - weight: 60
+            preference:
+              matchExpressions:
+              - key: accelerator
+                operator: In
+                values: ["nvidia"]
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "amd.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "gpu"
+        operator: "Equal"
+        value: "amd-rocm"
+        effect: "NoSchedule"
+      containers:
+      - name: worker
+        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-m", "montage_ai.worker"]
+        env:
+        - name: QUALITY_PROFILE
+          value: "standard"
+        - name: WORKER_QUEUES
+          value: "heavy"
+        - name: CGPU_ENABLED
+          value: "false"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: TEMP_DIR
+          value: "/tmp"  # Avoid /dev/shm 64MB limit
+        volumeMounts:
+        - name: data-input
+          mountPath: /data/input
+        - name: data-output
+          mountPath: /data/output
+        - name: data-music
+          mountPath: /data/music
+        - name: data-assets
+          mountPath: /data/assets
+        - name: cache
+          mountPath: /data/cache
+        - name: tmp-segments
+          mountPath: /tmp/segments
+        resources:
+          requests:
+            memory: "6Gi"
+            cpu: "3000m"
+            ephemeral-storage: "30Gi"
+          limits:
+            memory: "12Gi"
+            cpu: "6000m"
+            ephemeral-storage: "60Gi"
         lifecycle:
           preStop:
             exec:

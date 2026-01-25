@@ -16,9 +16,8 @@ service: montage-ai
 version: "0.5.0"
 
 # Registry configuration
-# Default: GitHub Container Registry (public)
-# Override with REGISTRY env var for self-hosted registries
-registry: ghcr.io/mfahsold
+# Default: cluster registry (override via REGISTRY env var)
+registry: registry.registry.svc.cluster.local:5000
 image: montage-ai
 
 # Build settings
@@ -33,7 +32,7 @@ platforms:
 builder: default
 cache:
   enabled: true
-  ref: "ghcr.io/mfahsold/montage-ai:buildcache"
+  ref: "registry.registry.svc.cluster.local:5000/montage-ai:buildcache"
   mode: max
 
 # Build arguments

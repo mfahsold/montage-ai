@@ -4,7 +4,7 @@ This document outlines how hardcoded values have been centralized to support mul
 
 ## Overview
 
-All deployment-related hardcoded values have been moved to `deploy/config.env`, which serves as the single source of truth for:
+All deployment-related hardcoded values have been moved to `deploy/k3s/config-global.yaml`, which serves as the single source of truth for:
 - Registry URLs and credentials
 - Kubernetes configuration (namespace, domain, storage)
 - Service endpoints and ports
@@ -15,12 +15,13 @@ All deployment-related hardcoded values have been moved to `deploy/config.env`, 
 
 ```
 deploy/
-├── config.env                 # ← Centralized configuration (environment-specific)
 ├── k3s/
-│   ├── deploy.sh             # Uses deploy/config.env
-│   ├── build-and-push.sh     # Uses deploy/config.env
-│   ├── undeploy.sh           # Uses deploy/config.env
-│   └── montage-ai.yaml       # Kubernetes manifests
+│   ├── config-global.yaml     # ← Canonical config (environment-specific)
+│   ├── base/cluster-config.env# ← Generated from config-global.yaml
+│   ├── Makefile               # Cluster operations (deploy, diff, validate)
+│   ├── deploy.sh              # Uses cluster-config.env
+│   ├── build-and-push.sh      # Uses config-global.yaml via scripts/common.sh
+│   └── montage-ai.yaml        # Kubernetes manifests (legacy)
 ├── local/                     # (Optional) Local development overlays
 └── prod/                      # (Optional) Production overlays
 ```
@@ -29,27 +30,24 @@ deploy/
 
 ### Registry Configuration
 ```bash
-REGISTRY_HOST="registry.example.com"       # Registry host or IP
-REGISTRY_PORT="5000"                       # Registry port
-REGISTRY_URL="${REGISTRY_HOST}:${REGISTRY_PORT}"
+REGISTRY_URL="registry.registry.svc.cluster.local:5000"
 IMAGE_NAME="montage-ai"                    # Image name
-IMAGE_TAG="latest"                         # Image tag
+IMAGE_TAG="latest-amd64"                   # Image tag
 IMAGE_FULL="${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
 ### Kubernetes Configuration
 ```bash
 CLUSTER_NAMESPACE="montage-ai"             # K8s namespace
-CLUSTER_API_SERVER="https://YOUR_K8S_API:6443"
-APP_DOMAIN="montage.example.com"           # Application domain
-TLS_SECRET="montage-ai-tls"                # TLS secret name
+K3S_CLUSTER_DOMAIN="cluster.local"
 ```
 
 ### Storage Configuration
 ```bash
-STORAGE_CLASS="local-path"                 # StorageClass name
-PVC_NAME="montage-data"                    # PersistentVolumeClaim name
-PVC_SIZE="50Gi"                            # PVC size
+STORAGE_CLASS_DEFAULT="local-path"         # StorageClass name
+STORAGE_CLASS_NFS="nfs-client"
+NFS_SERVER="10.0.0.10"                     # Optional NFS server IP
+NFS_PATH="/mnt/nfs-montage"
 ```
 
 ### Testing Configuration
@@ -60,25 +58,21 @@ TEST_UPLOAD_URL="http://localhost:5001/api/upload"
 
 ## Usage
 
-**Hardcoded values policy:** Do not commit new hardcoded values (IPs, paths, registry URLs, resource limits, or credentials) into the codebase. Add new deployment or runtime settings to `deploy/config.env` (for k8s/cluster settings) or the appropriate `config`/`settings` module for runtime defaults. Run `./scripts/check-hardcoded-registries.sh` and the pre-push hook to detect accidental literals.
+**Hardcoded values policy:** Do not commit new hardcoded values (IPs, paths, registry URLs, resource limits, or credentials) into the codebase. Add new deployment or runtime settings to `deploy/k3s/config-global.yaml` (for k8s/cluster settings) or the appropriate `config`/`settings` module for runtime defaults. Run `./scripts/check-hardcoded-registries.sh` and the pre-push hook to detect accidental literals.
 
 ### 1. Deployment Scripts
 
-All deployment scripts automatically source `deploy/config.env` (preferred) and respect environment overrides. The `Dockerfile` also accepts a build-arg `SERVICE_PORT` and sets `ENV SERVICE_PORT` so the web UI listen port can be configured at build time.
+All deployment scripts read `deploy/k3s/config-global.yaml` (preferred) and/or `deploy/k3s/base/cluster-config.env` (generated). The `Dockerfile` also accepts a build-arg `SERVICE_PORT` and sets `ENV SERVICE_PORT` so the web UI listen port can be configured at build time.
 
 ```bash
 # deploy.sh
-source "${DEPLOY_ROOT}/config.env"
-kubectl apply -f montage-ai.yaml
+source "${DEPLOY_ROOT}/k3s/base/cluster-config.env"
+kubectl apply -k deploy/k3s/overlays/production
 
 # build-and-push.sh
-source "${DEPLOY_ROOT}/config.env"
+source "${DEPLOY_ROOT}/k3s/base/cluster-config.env"
 docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" --build-arg SERVICE_PORT="${SERVICE_PORT:-5000}"
 docker push "${IMAGE_FULL}"
-
-# undeploy.sh
-source "${DEPLOY_ROOT}/config.env"
-kubectl delete -n ${CLUSTER_NAMESPACE} -f montage-ai.yaml
 ```
 
 ### 2. Environment Overrides
@@ -86,15 +80,11 @@ kubectl delete -n ${CLUSTER_NAMESPACE} -f montage-ai.yaml
 Override default values via environment variables:
 
 ```bash
-# Override registry
-export REGISTRY_HOST="registry.prod.example.com"
-export REGISTRY_PORT="443"
+# Point to an alternate config-global.yaml
+export CONFIG_GLOBAL="/path/to/config-global.prod.yaml"
 
-# Override Kubernetes settings
-export CLUSTER_NAMESPACE="montage-prod"
-export APP_DOMAIN="montage.example.com"
-
-# Run deployment
+# Render env + run deployment
+make -C deploy/k3s config
 ./deploy/k3s/deploy.sh
 ```
 
@@ -119,36 +109,42 @@ make test
 
 ### Local Development
 
-```bash
-# deploy/config.env (for local)
-REGISTRY_HOST="localhost"
-REGISTRY_PORT="5000"
-CLUSTER_NAMESPACE="montage-dev"
+```yaml
+# deploy/k3s/config-global.yaml (local)
+registry:
+  url: "registry.registry.svc.cluster.local:5000"
+cluster:
+  namespace: "montage-dev"
+images:
+  montage_ai:
+    tag: "latest-amd64"
 ```
 
 ### Production
 
-```bash
-# deploy/config.env (for production)
-REGISTRY_HOST="registry.example.com"
-REGISTRY_PORT="443"
-CLUSTER_NAMESPACE="montage-prod"
-APP_DOMAIN="montage.example.com"
-MEMORY_LIMIT="8Gi"
-CPU_LIMIT="4000m"
+```yaml
+# deploy/k3s/config-global.yaml (production)
+registry:
+  url: "registry.example.com:443"
+cluster:
+  namespace: "montage-prod"
+images:
+  montage_ai:
+    tag: "main-<sha>"
 ```
 
 ### Private/Enterprise Cluster (example)
 
 If your organization provides an internal registry or cluster CI (Tekton, Jenkins, etc.), use those endpoints instead of public registries.
 
-```bash
-export REGISTRY_HOST="registry.internal.example"
-export REGISTRY_PORT="5000"
-export CLUSTER_NAMESPACE="montage-ai"
-export IMAGE_TAG="${IMAGE_TAG:-latest}"
-# Full image reference used by scripts and manifests
-export IMAGE_FULL="${REGISTRY_HOST}:${REGISTRY_PORT}/montage-ai:${IMAGE_TAG}"
+```yaml
+registry:
+  url: "registry.internal.example:5000"
+cluster:
+  namespace: "montage-ai"
+images:
+  montage_ai:
+    tag: "latest"
 ```
 
 ### Recommended: Tekton task snippet (push to your registry)
@@ -162,7 +158,7 @@ Below is a minimal Tekton snippet showing how a Kaniko or Kaniko-compatible task
     name: kaniko-build-cached
   params:
   - name: IMAGE
-    value: "${REGISTRY_HOST}:${REGISTRY_PORT}/montage-ai:${IMAGE_TAG}"
+    value: "${REGISTRY_URL}/montage-ai:${IMAGE_TAG}"
   - name: CONTEXT
     value: "$(resources.inputs.workspace.path)"
   - name: DOCKERFILE
@@ -192,7 +188,7 @@ docker push "YOUR_REGISTRY:5000/montage-ai:latest"
 
 ### After (Centralized)
 ```bash
-# In deploy/config.env
+# In deploy/k3s/config-global.yaml (rendered to cluster-config.env)
 REGISTRY_URL="YOUR_REGISTRY:5000"
 IMAGE_FULL="${REGISTRY_URL}/montage-ai:latest"
 
@@ -205,18 +201,15 @@ export TEST_BASE_URL="${BACKEND_API_URL}"
 
 ## Adding New Configuration Variables
 
-1. **Add to `deploy/config.env`**:
-   ```bash
-   NEW_SETTING="${NEW_SETTING:-default_value}"
-   ```
+1. **Add to `deploy/k3s/config-global.yaml`** (and update the `.example` file).
 
-2. **Use in scripts**:
+2. **Export via `scripts/ops/render_cluster_config_env.sh`** (and optionally `scripts/ops/lib/config_global.sh`).
+
+3. **Use in scripts/manifests**:
    ```bash
-   source "${DEPLOY_ROOT}/config.env"
+   source "${DEPLOY_ROOT}/k3s/base/cluster-config.env"
    echo "Using: ${NEW_SETTING}"
    ```
-
-3. **Document** the new variable in this file.
 
 ## Pre-Push Hook Integration
 
@@ -224,8 +217,8 @@ The pre-push hook validates that no new hardcoded values are committed:
 ```bash
 # .git/hooks/pre-push checks for:
 # - Hardcoded IPs/domains not using env vars
-# - Registry URLs not in config.env
-# - Namespace names not in config.env
+# - Registry URLs not in config-global.yaml
+# - Namespace names not in config-global.yaml
 ```
 
 ## Benefits

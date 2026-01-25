@@ -23,9 +23,10 @@ spec:
             app.kubernetes.io/component: renderer
         spec:
           restartPolicy: Never
+          priorityClassName: montage-ai-batch
           containers:
               - name: montage-ai
-                image: ghcr.io/mfahsold/montage-ai:latest
+                image: registry.registry.svc.cluster.local:5000/montage-ai:latest
               imagePullPolicy: IfNotPresent
               resources:
                 requests:

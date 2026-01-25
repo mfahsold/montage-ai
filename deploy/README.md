@@ -9,7 +9,8 @@
 make dev && make dev-test
 
 # Kubernetes cluster
-make cluster
+make -C deploy/k3s config
+make -C deploy/k3s deploy-production
 ```
 
 ## Documentation Map
@@ -26,9 +27,9 @@ make cluster
 deploy/
 ├── README.md              ← You are here
 ├── CONFIGURATION.md       ← Config reference
-├── config.env             ← Environment template
-├── config-global.yaml     ← Global config (K8s ConfigMap source)
 └── k3s/
+    ├── config-global.yaml ← Global config (K8s ConfigMap source)
+    ├── base/cluster-config.env ← Generated from config-global.yaml
     ├── README.md          ← Main K8s deployment guide
     ├── base/              ← Base manifests
     ├── overlays/          ← Environment-specific configs
@@ -56,8 +57,9 @@ docker-compose up
 ### 2. Single-Node K3s
 
 ```bash
-# Build + push + deploy
-make cluster
+# Render config + deploy
+make -C deploy/k3s config
+make -C deploy/k3s deploy-production
 
 # Or step by step:
 ./deploy/k3s/build-and-push.sh
@@ -81,26 +83,13 @@ kubectl apply -k deploy/k3s/overlays/amd/
 kubectl apply -k deploy/k3s/overlays/jetson/
 ```
 
-## Make Targets
+## K3s Make Targets
 
 ```bash
-make help          # Show all available commands
-
-# Local development
-make dev           # Build base image with cache
-make dev-test      # Run with volume mounts
-make dev-shell     # Interactive shell
-
-# Cluster deployment
-make cluster       # Build + push + deploy (all-in-one)
-
-# Web UI
-make web           # Start web UI locally
-make web-deploy    # Deploy to K8s
-
-# Maintenance
-make test          # Run tests
-make clean         # Clean caches
+make -C deploy/k3s help
+make -C deploy/k3s deploy-dev
+make -C deploy/k3s deploy-staging
+make -C deploy/k3s deploy-production
 ```
 
 ## Environment Configuration
@@ -108,16 +97,18 @@ make clean         # Clean caches
 Copy and customize:
 
 ```bash
-cp deploy/config.env.example deploy/config.env
-# Edit with your values
+cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
+# Edit with your values, then render:
+make -C deploy/k3s config
 ```
 
 Key variables:
 
-```bash
-REGISTRY_HOST="YOUR_REGISTRY"     # Container registry
-REGISTRY_PORT="5000"              # Registry port
-CLUSTER_NAMESPACE="montage-ai"    # K8s namespace
+```yaml
+registry:
+  url: "registry.registry.svc.cluster.local:5000"
+cluster:
+  namespace: "montage-ai"
 ```
 
 See **[CONFIGURATION.md](CONFIGURATION.md)** for full reference.

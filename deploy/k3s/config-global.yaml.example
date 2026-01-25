@@ -1,0 +1,80 @@
+---
+# Global Configuration Values for Montage-AI K3s/K8s
+# Copy to deploy/k3s/config-global.yaml and update for your environment.
+# DRY: single source of truth for registry, cluster, storage, and image defaults.
+
+registry:
+  host: "<REGISTRY_HOST>"
+  port: 30500
+  url: "registry.registry.svc.cluster.local:5000"
+  nodePort: 30500
+  namespace: "registry"
+  images:
+    montage_ai: "registry.registry.svc.cluster.local:5000/montage-ai"
+
+cluster:
+  namespace: "montage-ai"
+  clusterDomain: "cluster.local"
+  hostnames:
+    montage: "montage-ai.<YOUR_DOMAIN>"
+  nodes:
+    - name: "control-plane"
+      ip: "<CONTROL_PLANE_IP>"
+      arch: "arm64"
+      role: "control-plane"
+    - name: "gpu-node"
+      ip: "<GPU_NODE_IP>"
+      arch: "amd64"
+      gpu: "amd-rocm"
+      role: "worker"
+
+storage:
+  classes:
+    default: "local-path"
+    nfs: "nfs-client"
+  nfs:
+    server: "<NFS_SERVER_IP>"
+    path: "/mnt/nfs-montage"
+
+images:
+  montage_ai:
+    name: "montage-ai"
+    tag: "latest-amd64"
+
+resources:
+  tiers:
+    minimal:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+    small:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+    medium:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    large:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "8"
+        memory: "16Gi"
+    gpu:
+      requests:
+        cpu: "1"
+        memory: "4Gi"
+      limits:
+        cpu: "16"
+        memory: "32Gi"

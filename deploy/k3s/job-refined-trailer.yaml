@@ -20,7 +20,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           resources:
             requests:
@@ -103,6 +103,6 @@ spec:
           persistentVolumeClaim:
             claimName: montage-output
       nodeSelector:
-        # kubernetes.io/hostname: codeai-fluxibriserver
+        # fluxibri.ai/storage-primary: "true"
         # Allow scheduling on any node with GPU (if available) or fallback
         # kubernetes.io/arch: amd64  # Prefer amd64 for GPU jobs usually, but let scheduler decide if not strict

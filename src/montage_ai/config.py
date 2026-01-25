@@ -437,10 +437,10 @@ class ClusterConfig:
     """
     Kubernetes cluster and registry configuration.
     
-    Syncs with deploy/config.env values for distributed processing.
+    Syncs with deploy/k3s/config-global.yaml values for distributed processing.
     """
-    registry_host: str = field(default_factory=lambda: os.environ.get("REGISTRY_HOST", "192.168.1.12"))
-    registry_port: str = field(default_factory=lambda: os.environ.get("REGISTRY_PORT", "30500"))
+    registry_host: str = field(default_factory=lambda: os.environ.get("REGISTRY_HOST", "registry.registry.svc.cluster.local"))
+    registry_port: str = field(default_factory=lambda: os.environ.get("REGISTRY_PORT", "5000"))
     image_name: str = field(default_factory=lambda: os.environ.get("IMAGE_NAME", "montage-ai"))
     image_tag: str = field(default_factory=lambda: os.environ.get("IMAGE_TAG", "latest-amd64"))
     namespace: str = field(default_factory=lambda: os.environ.get("CLUSTER_NAMESPACE", "montage-ai"))

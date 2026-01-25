@@ -17,9 +17,9 @@ spec:
         args:
           - "--dockerfile=/workspace/Dockerfile"
           - "--context=/workspace"
-          - "--destination=192.168.1.12:30500/montage-ai:main-1c04af4-arm64"
+          - "--destination=$(REGISTRY_URL)/$(IMAGE_NAME):$(IMAGE_TAG)"
           - "--cache=true"
-          - "--cache-repo=192.168.1.12:30500/montage-ai/cache-arm64"
+          - "--cache-repo=$(REGISTRY_URL)/$(IMAGE_NAME)/cache-arm64"
           - "--snapshot-mode=redo"
         volumeMounts:
           - name: workspace
@@ -31,6 +31,9 @@ spec:
           limits:
             memory: "8Gi"
             cpu: "4"
+        envFrom:
+          - configMapRef:
+              name: cluster-config
       initContainers:
       - name: git-clone
         image: alpine/git:latest

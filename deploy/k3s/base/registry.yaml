@@ -15,9 +15,9 @@ spec:
       labels:
         app: montage-ai-registry
     spec:
-      # Pin to fluxibriserver for reliable access
+      # Pin to node labeled for registry hosting
       nodeSelector:
-        kubernetes.io/hostname: codeai-fluxibriserver
+        fluxibri.ai/registry-host: "true"
       hostNetwork: false
       dnsPolicy: ClusterFirst
       containers:

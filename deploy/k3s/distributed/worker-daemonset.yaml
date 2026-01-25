@@ -50,16 +50,19 @@ spec:
           operator: "Exists"
           effect: "NoSchedule"
 
+      priorityClassName: montage-ai-worker
       terminationGracePeriodSeconds: 300  # 5 min for job completion
 
       containers:
         - name: worker
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
           env:
             - name: WORKER_MODE
               value: "true"
+            - name: WORKER_QUEUES
+              value: "default,heavy"
             - name: REDIS_HOST
               value: "redis.montage-ai.svc.cluster.local"
             - name: REDIS_PORT
@@ -157,10 +160,11 @@ spec:
       nodeSelector:
         amd.com/gpu: "present"
         kubernetes.io/arch: amd64
+      priorityClassName: montage-ai-worker
 
       containers:
         - name: worker
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
           env:
@@ -168,6 +172,8 @@ spec:
               value: "true"
             - name: GPU_WORKER
               value: "true"
+            - name: WORKER_QUEUES
+              value: "default,heavy"
             - name: FFMPEG_HWACCEL
               value: "amf"
             - name: OUTPUT_CODEC
@@ -239,10 +245,11 @@ spec:
       nodeSelector:
         accelerator: nvidia
         kubernetes.io/arch: amd64
+      priorityClassName: montage-ai-worker
 
       containers:
         - name: worker
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
           env:
@@ -250,6 +257,8 @@ spec:
               value: "true"
             - name: GPU_WORKER
               value: "true"
+            - name: WORKER_QUEUES
+              value: "default,heavy"
             - name: FFMPEG_HWACCEL
               value: "cuda"
             - name: OUTPUT_CODEC

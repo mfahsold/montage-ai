@@ -4,7 +4,7 @@
 # 
 # Solves Docker layer caching issues by:
 # 1. Building with BuildKit (better cache invalidation)
-# 2. Tagging for local registry (use `deploy/config.env` to configure registry)
+# 2. Tagging for local registry (use deploy/k3s/config-global.yaml to configure registry)
 # shellcheck disable=SC1090
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 # Use REGISTRY_URL from config if not overridden
@@ -27,16 +27,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-# Load centralized deployment config if present
-if [ -f "deploy/config.env" ]; then
-  # shellcheck disable=SC1091
-  source "deploy/config.env"
-fi
-
-# REGISTRY can come from deploy/config.env (REGISTRY_URL) or environment overrides
-REGISTRY="${REGISTRY_URL:-${REGISTRY:-localhost:30500}}"
+# REGISTRY can come from config-global (REGISTRY_URL) or environment overrides
+REGISTRY="${REGISTRY_URL:-${REGISTRY:-registry.registry.svc.cluster.local:5000}}"
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
+IMAGE_TAG="${IMAGE_TAG:-latest-amd64}"
 LOCAL_TAG="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 BUILD_QUALITY="${1:-standard}"
 NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"

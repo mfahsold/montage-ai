@@ -5,12 +5,26 @@
 set -euo pipefail
 
 NODE_IP=${1:-}
-IMAGE_NAME=${2:-ghcr.io/mfahsold/montage-ai:latest}
+IMAGE_NAME=${2:-}
 SSH_OPTS=${3:-}
-WORKER_NODE="codeai-worker-amd64" # Default worker that has registry access
+WORKER_NODE="${WORKER_NODE:-${REGISTRY_ACCESS_NODE:-}}"
 
 if [ -z "$NODE_IP" ]; then
   echo "Usage: $0 <NODE_IP> [IMAGE_NAME] [TARGET_NAME] [SSH_OPTS]"
+  echo "Set WORKER_NODE or REGISTRY_ACCESS_NODE to a node with registry access."
+  exit 1
+fi
+
+if [ -z "$IMAGE_NAME" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  if [ -x "${REPO_ROOT}/scripts/resolve-image.sh" ]; then
+    IMAGE_NAME="$("${REPO_ROOT}/scripts/resolve-image.sh")"
+  fi
+fi
+
+if [ -z "$WORKER_NODE" ]; then
+  echo "ERROR: WORKER_NODE or REGISTRY_ACCESS_NODE must be set."
   exit 1
 fi
 

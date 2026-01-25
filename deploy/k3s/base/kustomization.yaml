@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: montage-ai
 
 resources:
+  - priority-classes.yaml
   - deployment.yaml
   - cgpu-server.yaml
   - service-ingress.yaml
@@ -12,29 +13,22 @@ resources:
   - namespace.yaml
   - network-policy.yaml
   - job.yaml
+  - pdb.yaml
 
 # =============================================================================
-# Image Configuration
+# Image Configuration (config-global.yaml -> cluster-config.env)
 # =============================================================================
-# Default: ghcr.io/mfahsold/montage-ai (GitHub Container Registry)
-# For self-hosted registries, use an overlay or edit this file.
-#
-# Update tag after build:
-#   kustomize edit set image ghcr.io/mfahsold/montage-ai=ghcr.io/mfahsold/montage-ai:v1.0.0
-#
-# For local/private registries, create an overlay:
-#   overlays/local/kustomization.yaml:
-#     images:
-#       - name: ghcr.io/mfahsold/montage-ai
-#         newName: your-registry:30500/montage-ai
-#         newTag: latest
-# =============================================================================
-# Use the helper script to set images across overlays:
-#   ./scripts/kustomize-set-image.sh <image>
-# or the Makefile target: `make cluster-deploy` which runs the script for you.
+# Render deploy/k3s/base/cluster-config.env via:
+#   make -C deploy/k3s config
+# Images are updated via replacements using IMAGE_FULL.
 
 # ConfigMap for deployment settings (overlays can patch)
 configMapGenerator:
+  - name: cluster-config
+    behavior: create
+    envs:
+      - cluster-config.env
+
   - name: montage-ai-config
     behavior: create
     literals:
@@ -52,6 +46,8 @@ configMapGenerator:
       - CGPU_PORT=8080
       - PREVIEW_MAX_INPUT_SIZE_MB=10000
       - PREVIEW_MAX_FILES=50
+      - QUEUE_FAST_NAME=default
+      - QUEUE_HEAVY_NAME=heavy
 
   - name: montage-ai-script
     files:
@@ -74,3 +70,57 @@ configMapGenerator:
   - name: montage-ai-patch-proxy-generator
     files:
       - proxy_generator.py=../../../src/montage_ai/proxy_generator.py
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.IMAGE_FULL
+    targets:
+      - select:
+          kind: Deployment
+          name: montage-ai-web
+        fieldPaths:
+          - spec.template.spec.containers.[name=montage-ai].image
+      - select:
+          kind: Deployment
+          name: cgpu-server
+        fieldPaths:
+          - spec.template.spec.initContainers.[name=cgpu-credentials-init].image
+          - spec.template.spec.containers.[name=cgpu-server].image
+      - select:
+          kind: Job
+          name: montage-ai-render
+        fieldPaths:
+          - spec.template.spec.initContainers.[name=cgpu-credentials-init].image
+          - spec.template.spec.containers.[name=montage-ai].image
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.STORAGE_CLASS_DEFAULT
+    targets:
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-input
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-music
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-assets
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-output
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-cache
+        fieldPaths:
+          - spec.storageClassName

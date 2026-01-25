@@ -8,10 +8,9 @@ spec:
     spec:
       initContainers:
         - name: cgpu-credentials-init
-          image: montage-ai:arm64
       # Target Jetson for NVENC/NVMPI hardware encoding
       nodeSelector:
-        kubernetes.io/hostname: codeaijetson-desktop
+        accelerator: nvidia-jetson
       runtimeClassName: nvidia
       tolerations:
         - key: "nvidia.com/gpu"
@@ -19,7 +18,6 @@ spec:
           effect: "NoSchedule"
       containers:
         - name: montage-ai
-          image: montage-ai:arm64
           # Wait for data upload before starting
           command: ["/bin/bash", "-c", "echo 'Waiting for data...' && sleep 60 && python -u -m montage_ai.editor"]
           securityContext:

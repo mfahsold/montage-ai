@@ -5,10 +5,14 @@
 ## Quick Start
 
 ```bash
-# 1. Build & push multi-arch image
-make cluster
+# 1. Render cluster config
+make -C deploy/k3s config
 
-# 2. Access Web UI (choose one)
+# 2. Build & push multi-arch image
+cd deploy/k3s
+./build-and-push.sh
+
+# 3. Access Web UI (choose one)
 # If you have ingress configured:
 open http://YOUR_MONTAGE_HOST
 
@@ -22,12 +26,12 @@ open http://localhost:5000
 Use the canonical, simplified deploy flow (build + push + apply overlay):
 
 ```bash
-# Pick a tag for this build
-export IMAGE_TAG=main-$(git rev-parse --short HEAD)
+# Copy and edit canonical config
+cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
+$EDITOR deploy/k3s/config-global.yaml
 
-# Point to the cluster registry (NodePort)
-export REGISTRY_HOST=192.168.1.12
-export REGISTRY_PORT=30500
+# Render cluster-config.env
+make -C deploy/k3s config
 
 # Build & push
 cd deploy/k3s
@@ -39,8 +43,8 @@ cd deploy/k3s
 
 Notes:
 
-- The registry host/port can be overridden per environment via `REGISTRY_HOST` and `REGISTRY_PORT`.
-- `IMAGE_TAG` controls the deployment image tag without editing `deploy/config.env`.
+- Update `deploy/k3s/config-global.yaml` to change registry, tag, or storage defaults.
+- `make -C deploy/k3s config` regenerates `deploy/k3s/base/cluster-config.env`.
 
 That's it. For manual control, see sections below.
 
@@ -88,14 +92,15 @@ deploy/k3s/
 ### Option 1: Makefile (Recommended)
 
 ```bash
-# Build multi-arch + push + deploy (all-in-one)
-make cluster
-
-# Just build locally
-make dev
+# Render cluster config
+make -C deploy/k3s config
 
 # Deploy specific overlay
-kubectl apply -k deploy/k3s/overlays/production/
+make -C deploy/k3s deploy-production
+
+# Other overlays
+make -C deploy/k3s deploy-dev
+make -C deploy/k3s deploy-staging
 ```
 
 ### Option 2: Shell Scripts
@@ -121,6 +126,9 @@ cd deploy/k3s
 ### Option 3: kubectl/kustomize Direct
 
 ```bash
+# Render cluster-config.env first
+make -C deploy/k3s config
+
 # Base deployment
 kubectl apply -k deploy/k3s/base/
 
@@ -200,6 +208,25 @@ sudo exportfs -a
 # 2. Update nfs-pv.yaml with your NFS server IP
 # 3. Deploy distributed overlay
 kubectl apply -k deploy/k3s/overlays/distributed/
+```
+
+---
+
+## Node Labels (Required)
+
+Apply these labels so overlays can schedule without hardcoded hostnames:
+
+```bash
+# Storage (hostPath PVs)
+kubectl label node <node> fluxibri.ai/storage-primary=true
+
+# Registry hosting + build access
+kubectl label node <node> fluxibri.ai/registry-host=true
+kubectl label node <node> fluxibri.ai/registry-access=true
+
+# GPU classes (overlays/amd, overlays/jetson)
+kubectl label node <node> accelerator=amd-gpu
+kubectl label node <node> accelerator=nvidia-jetson
 ```
 
 ---

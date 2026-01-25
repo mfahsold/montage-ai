@@ -3,7 +3,7 @@
 # Strategy: HostPath volumes with explicit node pinning
 # This avoids iSCSI/NFS complexity while maintaining data persistence
 
-# Create directories on primary worker node (codeai-worker-amd64)
+# Create directories on the node labeled fluxibri.ai/storage-primary=true
 # These must exist before PV creation:
 # sudo mkdir -p /var/montage-ai/{input,output,music,assets,cache}
 # sudo chmod 777 /var/montage-ai/{input,output,music,assets,cache}
@@ -36,10 +36,10 @@ spec:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: kubernetes.io/hostname
+        - key: fluxibri.ai/storage-primary
           operator: In
           values:
-          - codeai-worker-amd64  # Pin to primary rendering node
+          - "true"  # Pin to primary storage node
 
 ---
 # PersistentVolume: Output Videos
@@ -61,10 +61,10 @@ spec:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: kubernetes.io/hostname
+        - key: fluxibri.ai/storage-primary
           operator: In
           values:
-          - codeai-worker-amd64
+          - "true"
 
 ---
 # PersistentVolume: Music Library
@@ -86,10 +86,10 @@ spec:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: kubernetes.io/hostname
+        - key: fluxibri.ai/storage-primary
           operator: In
           values:
-          - codeai-worker-amd64
+          - "true"
 
 ---
 # PersistentVolume: Assets (Logos, overlays)
@@ -111,10 +111,10 @@ spec:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: kubernetes.io/hostname
+        - key: fluxibri.ai/storage-primary
           operator: In
           values:
-          - codeai-worker-amd64
+          - "true"
 
 ---
 # PersistentVolume: Cache (Beats, Scenes, Analysis)
@@ -136,10 +136,10 @@ spec:
     required:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: kubernetes.io/hostname
+        - key: fluxibri.ai/storage-primary
           operator: In
           values:
-          - codeai-worker-amd64
+          - "true"
 
 ---
 # PersistentVolumeClaim: Input

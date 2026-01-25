@@ -4,10 +4,5 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Use local cluster registry
-images:
-  - name: montage-ai
-    newTag: latest
-
 patches:
   - path: patch-job-jetson.yaml

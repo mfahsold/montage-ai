@@ -12,11 +12,6 @@ resources:
 
 namespace: montage-ai
 
-# Image configuration - uses local registry
-images:
-  - name: montage-ai
-    newTag: latest
-
 # Replicas for staging
 replicas:
   - name: montage-ai-web
@@ -63,3 +58,19 @@ configMapGenerator:
       - VERBOSE=false
       - REDIS_URL=redis://redis:6379
 
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.IMAGE_FULL
+    targets:
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
+      - select:
+          kind: Deployment
+          name: montage-ai-worker-heavy
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image

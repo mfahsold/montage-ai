@@ -38,6 +38,15 @@ spec:
       terminationGracePeriodSeconds: 60
       dnsPolicy: ClusterFirst
       restartPolicy: Always
+      priorityClassName: montage-ai-critical
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: montage-ai
+            component: web
       
       # ========================================================================
       # SCHEDULING & AFFINITY
@@ -45,23 +54,43 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
       affinity:
-        # Prefer to schedule on primary storage node
-        nodeAffinity:
+      # Prefer to schedule on primary storage node (label required)
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+            - key: fluxibri.ai/storage-primary
+              operator: In
+              values:
+              - "true"
+        podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
-            preference:
-              matchExpressions:
-              - key: kubernetes.io/hostname
-                operator: In
-                values:
-                - codeai-worker-amd64
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: montage-ai
+                  component: web
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "amd.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "gpu"
+        operator: "Equal"
+        value: "amd-rocm"
+        effect: "NoSchedule"
       
       # ========================================================================
       # CONTAINERS
       # ========================================================================
       containers:
       - name: montage-ai
-        image: ghcr.io/mfahsold/montage-ai:latest
+        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
         imagePullPolicy: IfNotPresent
         
         # ====================================================================

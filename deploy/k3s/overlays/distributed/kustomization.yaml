@@ -11,12 +11,6 @@ kind: Kustomization
 
 namespace: montage-ai
 
-# Use internal registry
-images:
-- name: ghcr.io/mfahsold/montage-ai
-  newName: 192.168.1.12:30500/montage-ai
-  newTag: latest-amd64
-
   # NFS PVCs are expected to exist in the cluster already
 resources:
 - ../../base
@@ -26,9 +20,6 @@ resources:
 
 patches:
 - patch: |-
-    - op: replace
-      path: /spec/template/spec/nodeSelector
-      value: null
     - op: replace
       path: /spec/template/spec/affinity
       value:
@@ -116,10 +107,6 @@ patches:
     name: montage-ai-render
 - patch: |-
     - op: replace
-      path: /spec/template/spec/nodeSelector
-      value:
-        kubernetes.io/hostname: codeai
-    - op: replace
       path: /spec/template/spec/volumes
       value:
         - name: data-input
@@ -141,3 +128,25 @@ patches:
   target:
     kind: Deployment
     name: montage-ai-web
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.IMAGE_FULL
+    targets:
+      - select:
+          kind: DaemonSet
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
+      - select:
+          kind: Deployment
+          name: montage-ai-worker-gpu-amd
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
+      - select:
+          kind: Deployment
+          name: montage-ai-worker-gpu-nvidia
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image

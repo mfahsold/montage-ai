@@ -16,9 +16,21 @@ spec:
         app.kubernetes.io/component: renderer
     spec:
       restartPolicy: Never
+      priorityClassName: montage-ai-batch
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "amd.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "gpu"
+        operator: "Equal"
+        value: "amd-rocm"
+        effect: "NoSchedule"
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           resources:
             requests:

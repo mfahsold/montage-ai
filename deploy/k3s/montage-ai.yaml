@@ -11,8 +11,6 @@ kind: PersistentVolumeClaim
 metadata:
   name: montage-data
   namespace: montage-ai
-  annotations:
-    volume.kubernetes.io/selected-node: codeai-worker-amd64
 spec:
   accessModes:
     - ReadWriteOnce
@@ -84,7 +82,7 @@ spec:
       - operator: Exists
       containers:
       - name: montage-ai
-        image: ghcr.io/mfahsold/montage-ai:latest
+        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080

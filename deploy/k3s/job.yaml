@@ -20,7 +20,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           # Hardware Nah: Use IfNotPresent to avoid unnecessary network traffic
           imagePullPolicy: IfNotPresent
           resources:

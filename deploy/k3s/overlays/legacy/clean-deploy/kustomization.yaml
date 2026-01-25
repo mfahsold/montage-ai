@@ -5,10 +5,6 @@ resources:
   - ../../base
   - keda-montage-worker.yaml
 
-images:
-  - name: ghcr.io/mfahsold/montage-ai
-    newTag: dev-884030f-1
-
 patchesStrategicMerge:
   - patch-deployment-dev.yaml
   - ingress-fallback.yaml
@@ -20,4 +16,3 @@ configMapGenerator:
       - RUN_SCALE_TESTS=1
 
 namespace: montage-ai
-

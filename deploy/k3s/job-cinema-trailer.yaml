@@ -20,7 +20,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           resources:
             requests:
@@ -96,5 +96,3 @@ spec:
         - name: output
           persistentVolumeClaim:
             claimName: montage-output
-      nodeSelector:
-        kubernetes.io/hostname: codeai-fluxibriserver

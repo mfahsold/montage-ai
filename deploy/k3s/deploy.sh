@@ -1,12 +1,13 @@
 #!/bin/bash
 # Deploy Montage AI to Kubernetes using Kustomize
 # Supports multiple environments: dev, staging, production
-# Sources centralized configuration from deploy/config.env
+# Sources centralized configuration from deploy/k3s/config-global.yaml
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_ROOT="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "${DEPLOY_ROOT}/.." && pwd)"
 OVERLAY="${1:-dev}"  # Default to dev overlay
 
 # Validate overlay exists
@@ -18,17 +19,25 @@ if [ ! -d "${SCRIPT_DIR}/overlays/${OVERLAY}" ]; then
 fi
 
 # Source centralized configuration
-if [ -f "${DEPLOY_ROOT}/config.env" ]; then
-  source "${DEPLOY_ROOT}/config.env"
+CONFIG_GLOBAL="${CONFIG_GLOBAL:-${SCRIPT_DIR}/config-global.yaml}"
+CONFIG_ENV_SCRIPT="${REPO_ROOT}/scripts/ops/render_cluster_config_env.sh"
+CONFIG_ENV_OUT="${SCRIPT_DIR}/base/cluster-config.env"
+
+if [ -x "${CONFIG_ENV_SCRIPT}" ]; then
+  CONFIG_GLOBAL="${CONFIG_GLOBAL}" ENV_OUT="${CONFIG_ENV_OUT}" bash "${CONFIG_ENV_SCRIPT}"
+fi
+
+if [ -f "${CONFIG_ENV_OUT}" ]; then
+  # shellcheck disable=SC1090
+  source "${CONFIG_ENV_OUT}"
 else
-  echo "❌ ERROR: Configuration file not found at ${DEPLOY_ROOT}/config.env"
+  echo "❌ ERROR: Configuration file not found at ${CONFIG_ENV_OUT}"
   exit 1
 fi
 
-# Auto-detect cluster registry when defaults are used
-if [ -f "${SCRIPT_DIR}/registry-detect.sh" ]; then
-  source "${SCRIPT_DIR}/registry-detect.sh"
-fi
+CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+APP_NAME="${APP_NAME:-montage-ai-web}"
+APP_LABEL="${APP_LABEL:-app.kubernetes.io/name=montage-ai}"
 
 echo "════════════════════════════════════════════════════════════"
 echo "Deploying ${APP_NAME} to Kubernetes (Overlay: ${OVERLAY})"
@@ -36,10 +45,9 @@ echo "════════════════════════�
 echo ""
 echo "Configuration:"
 echo "  Overlay: ${OVERLAY}"
-echo "  Namespace: ${CLUSTER_NAMESPACE}"
-echo "  Registry: ${REGISTRY_URL}"
-echo "  Image: ${IMAGE_FULL}"
-echo "  Domain: ${APP_DOMAIN}"
+echo "  Namespace: ${CLUSTER_NAMESPACE:-montage-ai}"
+echo "  Registry: ${REGISTRY_URL:-}"
+echo "  Image: ${IMAGE_FULL:-}"
 echo ""
 
 # Check kubectl connectivity
@@ -63,11 +71,6 @@ trap "rm -f ${MANIFEST_FILE}" EXIT
 if [[ "${OVERLAY}" == "distributed" ]]; then
   kubectl delete job montage-ai-render -n "${CLUSTER_NAMESPACE}" --ignore-not-found > /dev/null 2>&1 || true
 fi
-
-# Ensure image reference matches the configured registry/tag
-pushd "${SCRIPT_DIR}/overlays/${OVERLAY}" > /dev/null
-kustomize edit set image "ghcr.io/mfahsold/montage-ai=${IMAGE_FULL}"
-popd > /dev/null
 
 kustomize build --load-restrictor LoadRestrictionsNone "${SCRIPT_DIR}/overlays/${OVERLAY}" > "${MANIFEST_FILE}"
 

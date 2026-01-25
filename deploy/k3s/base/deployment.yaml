@@ -20,9 +20,39 @@ spec:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: web-ui
     spec:
+      priorityClassName: montage-ai-critical
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: montage-ai
+            app.kubernetes.io/component: web-ui
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: montage-ai
+                  app.kubernetes.io/component: web-ui
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "amd.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "gpu"
+        operator: "Equal"
+        value: "amd-rocm"
+        effect: "NoSchedule"
       containers:
       - name: montage-ai
-        image: ghcr.io/mfahsold/montage-ai:latest
+        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
         imagePullPolicy: IfNotPresent
         command: ["python", "-u", "-m", "montage_ai.web_ui.app"]
         ports:

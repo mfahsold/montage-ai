@@ -20,7 +20,7 @@ spec:
         supplementalGroups: [44,992]
       initContainers:
         - name: cgpu-credentials-init
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           command:
             - bash
             - -c
@@ -41,7 +41,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: montage-ai
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: CUT_STYLE
@@ -117,5 +117,3 @@ spec:
           hostPath:
             path: /dev/dri
             type: DirectoryOrCreate
-      nodeSelector:
-        kubernetes.io/hostname: codeai-fluxibriserver

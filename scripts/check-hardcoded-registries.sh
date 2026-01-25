@@ -17,7 +17,7 @@ for p in "${PATTERNS[@]}"; do
 done
 
 if [ "$FOUND" -eq 1 ]; then
-  echo "WARNING: Found potential hardcoded registry strings in public files. Consider centralizing to deploy/config.env" >&2
+  echo "WARNING: Found potential hardcoded registry strings in public files. Consider centralizing to deploy/k3s/config-global.yaml" >&2
   exit 1
 else
   echo "No obvious hardcoded registry strings found in public files."

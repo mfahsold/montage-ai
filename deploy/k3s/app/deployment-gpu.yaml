@@ -23,21 +23,33 @@ spec:
         app: montage-ai
         component: web-gpu
     spec:
-      # Pin to Jetson Orin for GPU acceleration
+      priorityClassName: montage-ai-critical
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: montage-ai
+            component: web-gpu
+      # Prefer Jetson-class GPU nodes (label required)
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
             preference:
               matchExpressions:
-              - key: kubernetes.io/hostname
+              - key: accelerator
                 operator: In
                 values:
-                - codeaijetson-desktop
+                - nvidia-jetson
       
       # GPU tolerations
       tolerations:
       - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      - key: amd.com/gpu
         operator: Exists
         effect: NoSchedule
       - key: gpu
@@ -50,7 +62,7 @@ spec:
       
       containers:
       - name: montage-ai
-        image: ghcr.io/mfahsold/montage-ai:latest
+        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080

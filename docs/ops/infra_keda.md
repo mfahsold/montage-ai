@@ -6,7 +6,7 @@ Purpose
 Prereqs
 - kubectl context with cluster-admin rights for the staging namespace
 - Helm 3 installed
-- `deploy/config.env` configured for your local registry and namespace
+- `deploy/k3s/config-global.yaml` configured for your local registry and namespace
 
 1) Metrics Server (required for HPA CPU)
 - Install (k3s: metrics-server may already be present):
@@ -49,4 +49,4 @@ Notes & safety
 - Install into `keda` / `monitoring` namespaces in staging first. Do not apply to production until smoke tests are green.
 - Use conservative thresholds and set `cooldownPeriod` to 120s+ to avoid flapping.
 
-Commands are intentionally parameterized; do not hardcode registry/namespace values — use `deploy/config.env` for environment overrides.
+Commands are intentionally parameterized; do not hardcode registry/namespace values — use `deploy/k3s/config-global.yaml` for environment overrides.

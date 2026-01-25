@@ -7,7 +7,7 @@ Scope
 - Deploy `deploy/k3s/overlays/distributed` and run smoke
 
 Assumptions
-- Internal registry: `192.168.1.12:30500` is reachable from cluster nodes
+- Internal registry from `deploy/k3s/config-global.yaml` is reachable from cluster nodes
 - SRE will provision (or bump) PVC quota when requested
 
 Steps (summary)
@@ -18,12 +18,12 @@ Steps (summary)
 
 2) Build & mirror images (canonical/in-cluster preferred)
 - Preferred (canonical): run kaniko in-cluster (deploy/k3s/base/kaniko-build-job.yaml)
-  - For amd64: kaniko job -> `192.168.1.12:30500/montage-ai:main-<sha>-amd64`
-  - For arm64: kaniko (nodeSelector: arm64) -> `...:main-<sha>-arm64`
+  - For amd64: kaniko job -> `${REGISTRY_URL}/montage-ai:main-<sha>-amd64`
+  - For arm64: kaniko (nodeSelector: arm64) -> `${REGISTRY_URL}/montage-ai:main-<sha>-arm64`
 - Create manifest list (multi-arch):
-  - docker buildx imagetools create --tag 192.168.1.12:30500/montage-ai:main-<sha> \
-      192.168.1.12:30500/montage-ai:main-<sha>-amd64 \
-      192.168.1.12:30500/montage-ai:main-<sha>-arm64
+  - docker buildx imagetools create --tag ${REGISTRY_URL}/montage-ai:main-<sha> \
+      ${REGISTRY_URL}/montage-ai:main-<sha>-amd64 \
+      ${REGISTRY_URL}/montage-ai:main-<sha>-arm64
 
 3) Mirror 3rd-party images used in overlay (avoid Docker Hub rate limits)
 - Example: docker pull redis:6.2-alpine && docker tag/push to internal registry

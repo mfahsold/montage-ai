@@ -26,6 +26,7 @@ spec:
         app.kubernetes.io/component: scene-detection
     spec:
       restartPolicy: Never
+      priorityClassName: montage-ai-batch
 
       # Spread across nodes to maximize parallelism
       affinity:
@@ -40,7 +41,7 @@ spec:
 
       containers:
         - name: scene-detect
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           command:
             - python
@@ -122,6 +123,7 @@ spec:
         app.kubernetes.io/component: encoder
     spec:
       restartPolicy: Never
+      priorityClassName: montage-ai-batch
 
       # GPU node affinity - prefer AMD (fastest), fallback to NVIDIA
       affinity:
@@ -140,11 +142,22 @@ spec:
                 matchExpressions:
                   - key: accelerator
                     operator: In
-                    values: ["nvidia"]
+                values: ["nvidia"]
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "amd.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "gpu"
+        operator: "Equal"
+        value: "amd-rocm"
+        effect: "NoSchedule"
 
       containers:
         - name: encoder
-          image: ghcr.io/mfahsold/montage-ai:latest
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
           imagePullPolicy: IfNotPresent
           command:
             - python

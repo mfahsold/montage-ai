@@ -14,7 +14,7 @@
 #   TAG=v1.0.0 ./scripts/build-distributed.sh   # Override via env
 #
 # Environment Variables:
-#   REGISTRY            - Registry host (default: ${REGISTRY_HOST:-192.168.1.12}:${REGISTRY_PORT:-30500} for cluster)
+#   REGISTRY            - Registry host (default: ${REGISTRY_URL:-registry.registry.svc.cluster.local:5000} for cluster)
 #   CACHE_REF           - Cache reference (default: $REGISTRY/montage-ai:buildcache)
 #   BUILDER             - Buildx builder name (default: distributed-builder)
 #   PLATFORMS           - Target platforms (default: linux/amd64,linux/arm64)
@@ -25,7 +25,7 @@
 #   GOPRIVATE           - If set, passed as a build-arg (useful for Go private modules)
 #
 # For public releases (GitHub Container Registry):
-#   REGISTRY=ghcr.io/mfahsold ./scripts/build-distributed.sh
+#   REGISTRY=ghcr.io/your-org ./scripts/build-distributed.sh
 #
 # Distributed Builder Setup (parallel native ARM64 + AMD64):
 #   docker buildx create --name distributed-builder --driver docker-container

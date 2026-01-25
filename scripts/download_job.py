@@ -10,7 +10,7 @@ Features:
 
 Usage:
     # Download from API (cluster/remote)
-    python scripts/download_job.py --job-id 20260112_114010 --api http://192.168.1.16:30080
+    python scripts/download_job.py --job-id 20260112_114010 --api http://<MONTAGE_API_HOST>
 
     # Download from local output dir
     python scripts/download_job.py --job-id 20260112_114010 --local /data/output
@@ -250,7 +250,7 @@ def main():
         epilog="""
 Examples:
   # Download from remote API
-  python scripts/download_job.py --job-id 20260112_114010 --api http://192.168.1.16:30080
+  python scripts/download_job.py --job-id 20260112_114010 --api http://<MONTAGE_API_HOST>
 
   # Download from local output dir
   python scripts/download_job.py --job-id 20260112_114010 --local /data/output

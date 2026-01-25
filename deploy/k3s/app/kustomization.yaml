@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: montage-ai
 
 resources:
+  - ../base/priority-classes.yaml
   - namespace.yaml
   - pvcs.yaml
   - deployment.yaml
@@ -15,3 +16,51 @@ commonLabels:
   app.kubernetes.io/part-of: fluxibri-v2
   app.kubernetes.io/managed-by: kustomize
   app.kubernetes.io/name: montage-ai
+
+configMapGenerator:
+  - name: cluster-config
+    behavior: create
+    envs:
+      - ../base/cluster-config.env
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.IMAGE_FULL
+    targets:
+      - select:
+          kind: Deployment
+          name: montage-ai-web
+        fieldPaths:
+          - spec.template.spec.containers.[name=montage-ai].image
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.STORAGE_CLASS_DEFAULT
+    targets:
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-input
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-output
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-music
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-assets
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-cache
+        fieldPaths:
+          - spec.storageClassName

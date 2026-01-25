@@ -9,8 +9,3 @@ patches:
   - path: patch-job-gpu.yaml
   # Optional: GPU for web UI (usually not required, kept minimal)
   - path: patch-web-gpu.yaml
-
-images:
-  # Override to your registry if needed
-  - name: montage-ai
-    newTag: latest
