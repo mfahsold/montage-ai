@@ -23,8 +23,8 @@ Complete reference for all environment variables and settings.
 
 - **Video (containers/codecs via FFmpeg):** mp4, mov, avi, mkv, webm, m4v, mxf, mts, m2ts, ts
 - **Audio:** mp3, wav, flac, aac, m4a, ogg
-- **Images:** png, jpg, jpeg, gif, webp, bmp
-- **Notes:** ProRes/DNxHR/DNxHD typically arrive in mov/mxf; AVCHD/HDV arrive as mts/m2ts/ts. Formats rely on the FFmpeg build shipped with the container; verify with `ffprobe sample.mxf` if in doubt. Upload validation uses these lists in both the Flask UI and FastAPI uploader.
+- **Images:** png, jpg, jpeg, gif, webp, bmp, svg (SVG overlays require `rsvg-convert`, `inkscape`, or ImageMagick.)
+- **Notes:** ProRes/DNxHR/DNxHD typically arrive in mov/mxf; AVCHD/HDV arrive as mts/m2ts/ts. Formats rely on the FFmpeg build shipped with the container; verify with `ffprobe sample.mxf` if in doubt. Upload validation uses `FileTypeConfig` from `src/montage_ai/config.py`, shared by the web UI and API handlers.
 
 ---
 

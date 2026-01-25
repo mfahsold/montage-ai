@@ -124,12 +124,12 @@ spec:
                 - sh
                 - -c
                 - |
-                  curl -s -X POST http://localhost:8080/api/shutdown || true
+                  curl -s -X POST "http://127.0.0.1:${PORT:-8080}/api/shutdown" || true
                   sleep 50
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: http
           initialDelaySeconds: 45      # Increased from 30
           periodSeconds: 15            # Decreased from 10 (less aggressive)
           timeoutSeconds: 5
@@ -138,7 +138,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: http
             httpHeaders:
               - name: X-Readiness-Check
                 value: "true"
@@ -150,7 +150,7 @@ spec:
         startupProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: http
           initialDelaySeconds: 0
           periodSeconds: 5
           timeoutSeconds: 3

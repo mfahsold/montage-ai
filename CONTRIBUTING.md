@@ -129,7 +129,7 @@ def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
 
 ### Programming style & AI assistants
 
-- **Config-first**: Do NOT hardcode config values (IPs, registry URLs, paths, resource limits). Add settings to `deploy/config.env` or `config.Settings`. 
+- **Config-first**: Do NOT hardcode config values (IPs, registry URLs, paths, resource limits). Add settings to `deploy/k3s/config-global.yaml` or `config.Settings`.
 - Run `./scripts/check-hardcoded-registries.sh` before committing. You can install a helper pre-push hook: `cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push`.
 - Run `make ci-local` and attach the logs to PRs.
 - When using AI assistants (VS Code Copilot, OpenAI Codex), follow `.github/copilot-instructions.md` and `docs/llm-agents.md`. Our agent persona: **Senior Creative Technologist** — prioritize stability, make small, well-tested changes, and document reasoning in PRs.
@@ -156,7 +156,7 @@ make logs           # Watch job logs
 
 Dev autoscale smoke (dev-only, safe)
 
-- Purpose: deterministic dev validation of KEDA/HPA + worker scaling using the `clean-deploy` overlay.
+- Purpose: deterministic dev validation of KEDA/HPA + worker scaling using the `legacy/clean-deploy` overlay.
 - Local quick-run:
 ```bash
 # Ensure KUBECONFIG points to a dev cluster

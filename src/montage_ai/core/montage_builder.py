@@ -635,7 +635,7 @@ class MontageBuilder:
 
         # Check for logo
         logo_files = self._get_files(self.ctx.paths.assets_dir, self.settings.file_types.image_extensions)
-        self.ctx.render.logo_path = logo_files[0] if logo_files else None
+        self.ctx.render.logo_path = self._select_logo_file(logo_files)
 
     def plan_montage(self):
         """
@@ -975,6 +975,19 @@ class MontageBuilder:
     def _get_files(self, directory: Path, extensions: Iterable[str]) -> List[str]:
         """Get files with given extensions from directory."""
         return [str(path) for path in list_media_files(directory, extensions)]
+
+    def _select_logo_file(self, logo_files: List[str]) -> Optional[str]:
+        """Prefer raster formats over SVG for logo overlays."""
+        if not logo_files:
+            return None
+        priority = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".svg"]
+        priority_index = {ext: idx for idx, ext in enumerate(priority)}
+
+        def sort_key(path: str) -> Tuple[int, str]:
+            ext = Path(path).suffix.lower()
+            return (priority_index.get(ext, len(priority)), Path(path).name.lower())
+
+        return sorted(logo_files, key=sort_key)[0]
 
     def _select_proxy_height(self, video_path: str, default_height: int) -> int:
         """Select an adaptive proxy height based on file size."""

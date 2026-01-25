@@ -10,7 +10,7 @@ def test_enqueue_preview_and_produce_artifact_on_dev_cluster(k8s_client):
     """Opt-in: enqueue a small preview job on a dev cluster and assert preview appears on PVC.
     Requires: RUN_DEV_E2E=true and a running DEV overlay with montage-input-rwx / montage-output-rwx PVCs.
     """
-    namespace = os.getenv("MONTAGE_NAMESPACE", "montage-ai")
+    namespace = os.getenv("MONTAGE_NAMESPACE") or os.getenv("CLUSTER_NAMESPACE", "montage-ai")
     job_name = f"e2e-preview-smoke-{int(time.time())}"
 
     # Use the project's Job manifest generator if available; otherwise skip
@@ -19,11 +19,17 @@ def test_enqueue_preview_and_produce_artifact_on_dev_cluster(k8s_client):
     except Exception:
         pytest.skip("job_submitter not available in this test environment")
 
+    registry_url = os.getenv("REGISTRY_URL", "127.0.0.1:30500")
+    image_name = os.getenv("IMAGE_NAME", "montage-ai")
+    image_tag = os.getenv("MONTAGE_TEST_IMAGE_TAG", "dev")
+    default_image = f"{registry_url}/{image_name}:{image_tag}"
+    image_ref = os.getenv("MONTAGE_TEST_IMAGE", default_image)
+
     manifest = {
         "metadata": {"name": job_name, "namespace": namespace},
         "spec": {"template": {"spec": {"containers": [{
             "name": "runner",
-            "image": os.getenv("MONTAGE_TEST_IMAGE", "127.0.0.1:30500/montage-ai:dev"),
+            "image": image_ref,
             "env": [{"name": "QUALITY_PROFILE", "value": "preview"}],
             "volumeMounts": [{"name": "data-input", "mountPath": "/data/input"}, {"name": "data-output", "mountPath": "/data/output"}]
         }]}}}

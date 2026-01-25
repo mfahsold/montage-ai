@@ -37,6 +37,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}finalize${NC}        Finalize render (high quality, 1080p, stabilized)
   ${GREEN}hq${NC}              High quality render (1080p/4K)
   ${GREEN}download${NC} JOB_ID  Download job artifacts (video + timeline + logs)
+  ${GREEN}jobs${NC}            Submit/manage jobs via API (/api/jobs)
   ${GREEN}k8s-watch${NC}       Watch K8s for successful jobs and auto-download them
   ${GREEN}export-to-nle${NC}   Export timeline to NLE formats (OTIO/EDL/Premiere/AAF)
   ${GREEN}check-hw${NC}        Diagnose hardware acceleration (NVENC/VAAPI/QSV)
@@ -103,6 +104,10 @@ ${YELLOW}Examples:${NC}
   ./montage-ai.sh download 20260112_114010 --zip                 # Download as ZIP
   ./montage-ai.sh download 20260112_114010 --api http://host:30080  # From cluster API
   ./montage-ai.sh download 20260112_114010 --output ./my_project # Custom output dir
+
+  ${YELLOW}API Jobs (same endpoints as Web UI):${NC}
+  MONTAGE_API_BASE="http://localhost:${WEB_PORT:-8080}" ./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser"
+  ./montage-ai.sh jobs status <JOB_ID>
 
   ${YELLOW}Export to NLE:${NC}
   ./montage-ai.sh export-to-nle --manifest /data/output/manifest.json
@@ -523,6 +528,11 @@ case "${1:-run}" in
         shift
         echo -e "${GREEN}📤 Exporting timeline to NLE formats...${NC}"
         python3 -m montage_ai.export.cli "$@"
+        exit $?
+        ;;
+    jobs)
+        shift
+        python3 -m montage_ai.cli jobs "$@"
         exit $?
         ;;
     check-hw)

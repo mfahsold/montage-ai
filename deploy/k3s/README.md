@@ -23,6 +23,13 @@ kubectl port-forward -n "$CLUSTER_NAMESPACE" svc/montage-ai-web "${LOCAL_PORT}:8
 open "http://localhost:${LOCAL_PORT}"
 ```
 
+Set defaults used throughout this guide:
+
+```bash
+export CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+export MONTAGE_HOSTNAME="${MONTAGE_HOSTNAME:-montage-ai.local}"
+```
+
 ## Clean Deploy (Fluxibri-core aligned)
 
 Use the canonical, simplified deploy flow (build + push + apply overlay):
@@ -263,10 +270,10 @@ open "http://<MONTAGE_HOSTNAME>"
 # Create job from template
 kubectl create job montage-render-$(date +%s) \
   --from=job/montage-ai-render \
-  -n montage-ai
+  -n "$CLUSTER_NAMESPACE"
 
 # Watch progress
-kubectl logs -n montage-ai -f job/montage-render-*
+kubectl logs -n "$CLUSTER_NAMESPACE" -f job/montage-render-*
 ```
 
 ### With Custom Settings
@@ -278,7 +285,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: montage-ai-config
-  namespace: montage-ai
+  namespace: "<CLUSTER_NAMESPACE>"
 data:
   CUT_STYLE: "hitchcock"
   STABILIZE: "true"
@@ -288,14 +295,14 @@ EOF
 
 kubectl create job montage-custom-$(date +%s) \
   --from=job/montage-ai-render \
-  -n montage-ai
+  -n "$CLUSTER_NAMESPACE"
 ```
 
 ### Scheduled (CronJob)
 
 ```bash
 kubectl apply -f deploy/k3s/base/cronjob.yaml
-kubectl get cronjobs -n montage-ai
+kubectl get cronjobs -n "$CLUSTER_NAMESPACE"
 ```
 
 ---
@@ -319,35 +326,35 @@ kubectl get cronjobs -n montage-ai
 ### View Logs
 
 ```bash
-kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai -f
+kubectl logs -n "$CLUSTER_NAMESPACE" -l app.kubernetes.io/name=montage-ai -f
 ```
 
 ### Restart Deployment
 
 ```bash
-kubectl rollout restart deployment/montage-ai-web -n montage-ai
+kubectl rollout restart deployment/montage-ai-web -n "$CLUSTER_NAMESPACE"
 ```
 
 ### Scale
 
 ```bash
 # Stop
-kubectl scale deployment montage-ai-web -n montage-ai --replicas=0
+kubectl scale deployment montage-ai-web -n "$CLUSTER_NAMESPACE" --replicas=0
 
 # Start
-kubectl scale deployment montage-ai-web -n montage-ai --replicas=1
+kubectl scale deployment montage-ai-web -n "$CLUSTER_NAMESPACE" --replicas=1
 ```
 
 ### Shell Access
 
 ```bash
-kubectl exec -it -n montage-ai deployment/montage-ai-web -- /bin/bash
+kubectl exec -it -n "$CLUSTER_NAMESPACE" deployment/montage-ai-web -- /bin/bash
 ```
 
 ### Check Resource Usage
 
 ```bash
-kubectl top pods -n montage-ai
+kubectl top pods -n "$CLUSTER_NAMESPACE"
 kubectl top nodes
 ```
 
@@ -359,7 +366,7 @@ Use a lightweight benchmark job to label nodes with a performance multiplier
 for task routing (label: `montage-ai/bench-score`).
 
 ```bash
-python3 scripts/benchmarks/run_cluster_benchmark.py --namespace montage-ai
+python3 scripts/benchmarks/run_cluster_benchmark.py --namespace "$CLUSTER_NAMESPACE"
 ```
 
 ---
@@ -370,40 +377,40 @@ python3 scripts/benchmarks/run_cluster_benchmark.py --namespace montage-ai
 
 ```bash
 # Check events
-kubectl describe pod -n montage-ai -l app.kubernetes.io/name=montage-ai
+kubectl describe pod -n "$CLUSTER_NAMESPACE" -l app.kubernetes.io/name=montage-ai
 
 # Check logs
-kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai --previous
+kubectl logs -n "$CLUSTER_NAMESPACE" -l app.kubernetes.io/name=montage-ai --previous
 ```
 
 ### Image Pull Errors
 
 ```bash
 # Verify image exists in registry
-curl http://YOUR_REGISTRY:5000/v2/montage-ai/tags/list
+curl "http://<REGISTRY_URL>/v2/<IMAGE_NAME>/tags/list"
 
 # Check pod image
-kubectl get pod -n montage-ai -o jsonpath='{.items[0].spec.containers[0].image}'
+kubectl get pod -n "$CLUSTER_NAMESPACE" -o jsonpath='{.items[0].spec.containers[0].image}'
 ```
 
 ### Storage Issues
 
 ```bash
 # Check PVC status (all should be "Bound")
-kubectl get pvc -n montage-ai
+kubectl get pvc -n "$CLUSTER_NAMESPACE"
 
 # Check disk usage in pod
-kubectl exec -n montage-ai deployment/montage-ai-web -- df -h /data/
+kubectl exec -n "$CLUSTER_NAMESPACE" deployment/montage-ai-web -- df -h /data/
 ```
 
 ### Network Issues
 
 ```bash
 # Test DNS from pod
-kubectl exec -n montage-ai deployment/montage-ai-web -- nslookup google.com
+kubectl exec -n "$CLUSTER_NAMESPACE" deployment/montage-ai-web -- nslookup google.com
 
 # Check network policies
-kubectl get networkpolicy -n montage-ai
+kubectl get networkpolicy -n "$CLUSTER_NAMESPACE"
 ```
 
 ---

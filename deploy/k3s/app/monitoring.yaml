@@ -1,7 +1,7 @@
 ---
 # Prometheus Service Monitor for Montage-AI metrics
 # Install: kubectl apply -f monitoring.yaml
-# Then access Prometheus: http://prometheus.fluxibri.lan
+# Then access Prometheus: <PROMETHEUS_URL>
 # Query examples:
 #   - container_memory_usage_bytes{pod="montage-ai-web-*"}
 #   - container_cpu_usage_seconds_total{pod="montage-ai-web-*"}

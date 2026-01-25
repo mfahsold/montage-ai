@@ -201,7 +201,7 @@ spec:
                 # Give active jobs 50 seconds to finish, then graceful exit
                 - |
                   echo "🔄 Pre-stop: Signaling graceful shutdown..."
-                  curl -s -X POST http://localhost:8080/api/shutdown || echo "Graceful shutdown failed, continuing..."
+                  curl -s -X POST "http://127.0.0.1:${PORT:-8080}/api/shutdown" || echo "Graceful shutdown failed, continuing..."
                   sleep 50
                   echo "✅ Pre-stop complete, container terminating"
           postStart:
@@ -218,7 +218,7 @@ spec:
         startupProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: http
             scheme: HTTP
           initialDelaySeconds: 0
           periodSeconds: 5
@@ -230,7 +230,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: http
             scheme: HTTP
             httpHeaders:
             - name: X-Readiness-Check
@@ -245,7 +245,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: http
             scheme: HTTP
           initialDelaySeconds: 45  # More time for sustained operation
           periodSeconds: 15        # Reduce frequency to avoid false positives

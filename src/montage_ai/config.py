@@ -1001,7 +1001,7 @@ class FileTypeConfig:
 
     video_extensions: Set[str] = field(default_factory=lambda: {'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'mxf', 'mts', 'm2ts', 'ts'})
     audio_extensions: Set[str] = field(default_factory=lambda: {'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg'})
-    image_extensions: Set[str] = field(default_factory=lambda: {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'})
+    image_extensions: Set[str] = field(default_factory=lambda: {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'})
 
     def is_video(self, filename: str) -> bool:
         """Check if filename has a video extension."""

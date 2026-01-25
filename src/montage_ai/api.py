@@ -15,11 +15,8 @@ Architecture:
 """
 
 import os
-import shutil
 from datetime import datetime
-from pathlib import Path
 from typing import List, Optional
-import uuid
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
@@ -28,23 +25,20 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from .config import get_settings
+from .file_ops import build_safe_path, format_extensions
 
 # Get settings instance (fresh instantiation, avoids cached dataclass issue)
 settings = get_settings()
 
 # Directories (from centralized config)
-INPUT_DIR = str(settings.paths.input_dir)
-MUSIC_DIR = str(settings.paths.music_dir)
-ASSETS_DIR = str(settings.paths.assets_dir)
-OUTPUT_DIR = str(settings.paths.output_dir)
+INPUT_DIR = settings.paths.input_dir
+MUSIC_DIR = settings.paths.music_dir
+ASSETS_DIR = settings.paths.assets_dir
+OUTPUT_DIR = settings.paths.output_dir
+FILE_TYPES = settings.file_types
 
 # Ensure directories exist
 settings.paths.ensure_directories()
-
-# Allowed file extensions
-VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".mxf", ".mts", ".m2ts", ".ts"}
-AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac"}
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg"}
 
 app = FastAPI(
     title="Montage AI API",
@@ -71,21 +65,25 @@ async def upload_video(files: List[UploadFile] = File(...)):
     """
     Upload one or more video files.
 
-    Accepts: .mp4, .mov, .avi, .mkv, .webm
+    Accepts: see FileTypeConfig.video_extensions
     """
     uploaded = []
 
     for file in files:
         # Validate extension
-        ext = Path(file.filename).suffix.lower()
-        if ext not in VIDEO_EXTENSIONS:
+        if not FILE_TYPES.allowed_file(file.filename, FILE_TYPES.video_extensions):
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid video format: {ext}. Allowed: {', '.join(VIDEO_EXTENSIONS)}"
+                detail=(
+                    "Invalid video format. Allowed: "
+                    f"{format_extensions(FILE_TYPES.video_extensions)}"
+                )
             )
 
         # Save to input directory
-        file_path = os.path.join(INPUT_DIR, file.filename)
+        file_path = build_safe_path(INPUT_DIR, file.filename)
+        if not file_path:
+            raise HTTPException(status_code=400, detail="Invalid filename")
 
         with open(file_path, "wb") as f:
             content = await file.read()
@@ -95,7 +93,7 @@ async def upload_video(files: List[UploadFile] = File(...)):
         uploaded.append({
             "filename": file.filename,
             "size_mb": round(file_size_mb, 2),
-            "path": file_path
+            "path": str(file_path)
         })
 
     return {
@@ -110,21 +108,25 @@ async def upload_music(files: List[UploadFile] = File(...)):
     """
     Upload one or more music files.
 
-    Accepts: .mp3, .wav, .m4a, .aac, .flac
+    Accepts: see FileTypeConfig.audio_extensions
     """
     uploaded = []
 
     for file in files:
         # Validate extension
-        ext = Path(file.filename).suffix.lower()
-        if ext not in AUDIO_EXTENSIONS:
+        if not FILE_TYPES.allowed_file(file.filename, FILE_TYPES.audio_extensions):
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid audio format: {ext}. Allowed: {', '.join(AUDIO_EXTENSIONS)}"
+                detail=(
+                    "Invalid audio format. Allowed: "
+                    f"{format_extensions(FILE_TYPES.audio_extensions)}"
+                )
             )
 
         # Save to music directory
-        file_path = os.path.join(MUSIC_DIR, file.filename)
+        file_path = build_safe_path(MUSIC_DIR, file.filename)
+        if not file_path:
+            raise HTTPException(status_code=400, detail="Invalid filename")
 
         with open(file_path, "wb") as f:
             content = await file.read()
@@ -134,7 +136,7 @@ async def upload_music(files: List[UploadFile] = File(...)):
         uploaded.append({
             "filename": file.filename,
             "size_mb": round(file_size_mb, 2),
-            "path": file_path
+            "path": str(file_path)
         })
 
     return {
@@ -149,21 +151,25 @@ async def upload_logo(files: List[UploadFile] = File(...)):
     """
     Upload logo/watermark images.
 
-    Accepts: .png, .jpg, .jpeg, .svg
+    Accepts: see FileTypeConfig.image_extensions
     """
     uploaded = []
 
     for file in files:
         # Validate extension
-        ext = Path(file.filename).suffix.lower()
-        if ext not in IMAGE_EXTENSIONS:
+        if not FILE_TYPES.allowed_file(file.filename, FILE_TYPES.image_extensions):
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid image format: {ext}. Allowed: {', '.join(IMAGE_EXTENSIONS)}"
+                detail=(
+                    "Invalid image format. Allowed: "
+                    f"{format_extensions(FILE_TYPES.image_extensions)}"
+                )
             )
 
         # Save to assets directory
-        file_path = os.path.join(ASSETS_DIR, file.filename)
+        file_path = build_safe_path(ASSETS_DIR, file.filename)
+        if not file_path:
+            raise HTTPException(status_code=400, detail="Invalid filename")
 
         with open(file_path, "wb") as f:
             content = await file.read()
@@ -173,7 +179,7 @@ async def upload_logo(files: List[UploadFile] = File(...)):
         uploaded.append({
             "filename": file.filename,
             "size_mb": round(file_size_mb, 2),
-            "path": file_path
+            "path": str(file_path)
         })
 
     return {
@@ -193,13 +199,12 @@ async def list_files():
 
     def scan_dir(directory, file_type):
         files = []
-        if os.path.exists(directory):
-            for filename in os.listdir(directory):
-                path = os.path.join(directory, filename)
-                if os.path.isfile(path):
-                    stat = os.stat(path)
+        if directory.exists():
+            for path in directory.iterdir():
+                if path.is_file():
+                    stat = path.stat()
                     files.append({
-                        "filename": filename,
+                        "filename": path.name,
                         "size_mb": round(stat.st_size / (1024 * 1024), 2),
                         "type": file_type,
                         "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
@@ -228,12 +233,14 @@ async def delete_file(file_type: str, filename: str):
     if file_type not in dir_map:
         raise HTTPException(status_code=400, detail=f"Invalid file type: {file_type}")
 
-    file_path = os.path.join(dir_map[file_type], filename)
+    file_path = build_safe_path(dir_map[file_type], filename)
+    if not file_path:
+        raise HTTPException(status_code=400, detail="Invalid filename")
 
-    if not os.path.exists(file_path):
+    if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
-    os.remove(file_path)
+    file_path.unlink()
 
     return {"status": "success", "message": f"Deleted {filename}"}
 
@@ -255,11 +262,10 @@ async def clear_directory(file_type: str):
     directory = dir_map[file_type]
     removed_count = 0
 
-    if os.path.exists(directory):
-        for filename in os.listdir(directory):
-            file_path = os.path.join(directory, filename)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+    if directory.exists():
+        for file_path in directory.iterdir():
+            if file_path.is_file():
+                file_path.unlink()
                 removed_count += 1
 
     return {
@@ -276,13 +282,15 @@ async def clear_directory(file_type: str):
 async def download_output(filename: str):
     """Download a generated montage or timeline export."""
 
-    file_path = os.path.join(OUTPUT_DIR, filename)
+    file_path = build_safe_path(OUTPUT_DIR, filename)
+    if not file_path:
+        raise HTTPException(status_code=400, detail="Invalid filename")
 
-    if not os.path.exists(file_path):
+    if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(
-        file_path,
+        str(file_path),
         media_type="application/octet-stream",
         filename=filename
     )
@@ -554,10 +562,10 @@ async def health_check():
         "status": "healthy",
         "version": "0.1.0",
         "directories": {
-            "input": os.path.exists(INPUT_DIR),
-            "music": os.path.exists(MUSIC_DIR),
-            "assets": os.path.exists(ASSETS_DIR),
-            "output": os.path.exists(OUTPUT_DIR)
+            "input": INPUT_DIR.exists(),
+            "music": MUSIC_DIR.exists(),
+            "assets": ASSETS_DIR.exists(),
+            "output": OUTPUT_DIR.exists()
         }
     }
 

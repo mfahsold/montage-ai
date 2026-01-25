@@ -123,6 +123,59 @@ def _append_hwupload_filter_complex(
     return filter_complex, input_label
 
 
+def _convert_svg_to_png(svg_path: str, temp_dir: Path) -> Optional[str]:
+    """Convert an SVG logo to PNG using available system tools."""
+    converters = []
+    if shutil.which("rsvg-convert"):
+        converters.append(("rsvg-convert", ["rsvg-convert", svg_path]))
+    if shutil.which("inkscape"):
+        converters.append(("inkscape", ["inkscape", svg_path]))
+    if shutil.which("magick"):
+        converters.append(("magick", ["magick", svg_path]))
+    if shutil.which("convert"):
+        converters.append(("convert", ["convert", svg_path]))
+
+    if not converters:
+        logger.warning("No SVG converter found (rsvg-convert/inkscape/magick). Skipping SVG logo.")
+        return None
+
+    try:
+        fd, output_path = tempfile.mkstemp(prefix="montage_logo_", suffix=".png", dir=str(temp_dir))
+        os.close(fd)
+    except OSError as exc:
+        logger.warning("Failed to create temp logo output: %s", exc)
+        return None
+
+    for name, base_cmd in converters:
+        cmd = list(base_cmd)
+        if name == "rsvg-convert":
+            cmd.extend(["-o", output_path])
+        elif name == "inkscape":
+            cmd.extend(["--export-type=png", f"--export-filename={output_path}"])
+        else:
+            cmd.append(output_path)
+
+        result = run_command(
+            cmd,
+            capture_output=True,
+            timeout=_settings.processing.ffmpeg_short_timeout,
+            check=False,
+            log_output=False,
+        )
+        if result.returncode == 0 and os.path.exists(output_path):
+            logger.info("Converted SVG logo using %s", name)
+            return output_path
+
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
+
+    logger.warning("SVG logo conversion failed; skipping logo overlay.")
+    return None
+
+
 @dataclass
 class StreamParams:
     """Video stream parameters for validation."""
@@ -1409,17 +1462,26 @@ class SegmentWriter:
                     return False
 
             # Apply logo overlay if requested (requires re-encode)
-            if logo_path and os.path.exists(logo_path) and os.path.exists(actual_output):
-                logger.info(f"   🏷️ Adding logo overlay...")
-                logo_success = self._apply_logo_overlay(actual_output, output_path, logo_path, logo_position)
+            logo_input = None
+            logo_cleanup = None
+            if logo_path and os.path.exists(logo_path):
+                logo_input, logo_cleanup = self._prepare_logo_path(logo_path)
+                if not logo_input:
+                    logger.warning("   ⚠️ Logo conversion failed; skipping overlay")
+
+            if logo_input and os.path.exists(actual_output):
+                logger.info("   🏷️ Adding logo overlay...")
+                logo_success = self._apply_logo_overlay(actual_output, output_path, logo_input, logo_position)
                 # Cleanup temp file
                 if os.path.exists(actual_output):
                     os.remove(actual_output)
+                if logo_cleanup and os.path.exists(logo_cleanup):
+                    os.remove(logo_cleanup)
                 if not logo_success:
-                    logger.warning(f"   ⚠️ Logo overlay failed")
+                    logger.warning("   ⚠️ Logo overlay failed")
                     return False
-            elif not logo_path:
-                # Atomic rename for non-logo case
+            else:
+                # Atomic rename for non-logo or failed logo prep case
                 if os.path.exists(output_path):
                     os.remove(output_path)
                 os.rename(actual_output, output_path)
@@ -1539,6 +1601,20 @@ class SegmentWriter:
             if 'temp_output' in locals() and os.path.exists(temp_output):
                 os.remove(temp_output)
             return False
+
+    def _prepare_logo_path(self, logo_path: str) -> Tuple[Optional[str], Optional[str]]:
+        """Return a logo path ready for FFmpeg and an optional temp file to cleanup."""
+        if not logo_path:
+            return None, None
+
+        suffix = Path(logo_path).suffix.lower()
+        if suffix != ".svg":
+            return logo_path, None
+
+        converted = _convert_svg_to_png(logo_path, _settings.paths.temp_dir)
+        if not converted:
+            return None, None
+        return converted, converted
     
     def cleanup_segments(self) -> int:
         """

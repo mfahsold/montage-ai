@@ -159,10 +159,10 @@ spec:
   ingressClassName: traefik
   tls:
   - hosts:
-    - montage-ai.fluxibri.local
+    - montage-ai.local
     secretName: montage-ai-tls
   rules:
-  - host: montage-ai.fluxibri.local
+  - host: montage-ai.local
     http:
       paths:
       - path: /

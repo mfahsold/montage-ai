@@ -319,6 +319,8 @@ The Web UI communicates with the backend via REST API endpoints. All endpoints a
 | `/api/upload` | POST | Upload video/music files |
 | `/api/download/<filename>` | GET | Download output file |
 
+Upload validation uses `FileTypeConfig` in `src/montage_ai/config.py` (see docs/configuration.md).
+
 ### Session-Based Workflows
 | Endpoint | Method | Description |
 |----------|--------|-------------|

@@ -6,14 +6,14 @@
 registry:
   host: "<REGISTRY_HOST>"
   port: 30500
-  url: "registry.registry.svc.cluster.local:5000"
+  url: "<REGISTRY_URL>"
   nodePort: 30500
   namespace: "registry"
   images:
-    montage_ai: "registry.registry.svc.cluster.local:5000/montage-ai"
+    montage_ai: "<REGISTRY_URL>/montage-ai"
 
 cluster:
-  namespace: "montage-ai"
+  namespace: "<CLUSTER_NAMESPACE>"
   clusterDomain: "cluster.local"
   hostnames:
     montage: "montage-ai.<YOUR_DOMAIN>"

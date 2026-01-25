@@ -51,6 +51,7 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 | `text-edit` | Transcript-based editing (remove filler words) |
 | `build` | Build Docker image locally |
 | `status` | Check running job status and logs |
+| `jobs` | Submit/manage jobs via the Web API (`/api/jobs`) |
 | `cgpu-start` | Start cgpu Gemini server (port 8090) |
 | `cgpu-stop` | Stop cgpu server |
 | `cgpu-status` | Check cgpu installation & status |
@@ -59,6 +60,30 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 | `help` | Show full help message |
 
 Note: for local runs, `./montage-ai.sh web` uses `WEB_PORT` (default 8080).
+
+---
+
+## API Jobs (CLI → Web API)
+
+Use the same `/api/jobs` endpoints as the Web UI, but from the CLI.
+
+```bash
+# Submit a job
+MONTAGE_API_BASE="http://<MONTAGE_API_HOST>" ./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser"
+
+# Submit with extra options
+./montage-ai.sh jobs submit --style hitchcock --option stabilize=true --option quality_profile=preview
+
+# Fetch status
+./montage-ai.sh jobs status <JOB_ID>
+
+# Cancel a job
+./montage-ai.sh jobs cancel <JOB_ID>
+```
+
+Notes:
+- `MONTAGE_API_BASE` is the server base URL (no `/api` suffix required).
+- Use `--option options.<key>=...` to set nested `options` fields in the payload.
 
 ---
 

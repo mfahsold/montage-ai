@@ -8,7 +8,7 @@ When to use
 - Manual validation before promoting RWX migration to staging
 
 Prerequisites
-- Cluster access (kubeconfig) with namespace `montage-ai`
+- Cluster access (kubeconfig) with your target namespace (`CLUSTER_NAMESPACE`)
 - A self-hosted runner (for CI) with label `scale-smoke` and tools: kubectl, kustomize, docker
 - `ENABLE_DEV_ENDPOINTS=true` enabled in the deployment overlay
 
@@ -20,6 +20,7 @@ How it works (high level)
 
 Quick commands (local)
 
+```bash
 # apply clean/dev overlay
 CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
 LOCAL_PORT="${LOCAL_PORT:-8080}"
@@ -36,6 +37,7 @@ curl -s -X POST -H 'Content-Type: application/json' \
 
 # watch worker logs
 kubectl -n "$CLUSTER_NAMESPACE" logs deployment/montage-ai-worker -f
+```
 
 CI (recommended)
 - Use the workflow `/.github/workflows/dev-autoscale-smoke.yml` on a self-hosted runner labeled `scale-smoke`.

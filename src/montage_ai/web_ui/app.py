@@ -77,6 +77,7 @@ class Transcriber:
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings, reload_settings
 from ..logger import logger
+from ..file_ops import build_safe_path, format_extensions, safe_filename
 from ..media_files import list_media_files, parse_inventory_descriptions, read_sidecar_description
 from .job_options import normalize_options, apply_preview_preset, apply_finalize_overrides
 from ..tasks import run_test_job
@@ -363,11 +364,6 @@ start_redis_listener_if_available()
 # active_jobs = 0 # Removed
 MAX_CONCURRENT_JOBS = _settings.processing.max_concurrent_jobs
 MIN_MEMORY_GB = 2  # Minimum memory required to start a job
-
-
-def allowed_file(filename: str, allowed_extensions: set) -> bool:
-    """Check if file extension is allowed."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
 
 def bool_to_env(value: bool) -> str:
@@ -877,8 +873,9 @@ def api_detect_fillers():
 @app.route('/api/video/<filename>', methods=['GET'])
 def api_serve_video(filename):
     """Serve video file for preview."""
-    filename = secure_filename(filename)
-    file_path = INPUT_DIR / filename
+    file_path = build_safe_path(INPUT_DIR, filename)
+    if not file_path:
+        return jsonify({"error": "Invalid filename"}), 400
     if not file_path.exists():
         return jsonify({"error": "File not found"}), 404
     return send_file(file_path)
@@ -901,12 +898,12 @@ def api_upload():
     music_extensions = _settings.file_types.audio_extensions
 
     if file_type == 'video':
-        if not allowed_file(file.filename, video_extensions):
-            return jsonify({"error": f"Invalid video format. Allowed: {video_extensions}"}), 400
+        if not _settings.file_types.allowed_file(file.filename, video_extensions):
+            return jsonify({"error": f"Invalid video format. Allowed: {format_extensions(video_extensions)}"}), 400
         target_dir = INPUT_DIR
     elif file_type == 'music':
-        if not allowed_file(file.filename, music_extensions):
-            return jsonify({"error": f"Invalid music format. Allowed: {music_extensions}"}), 400
+        if not _settings.file_types.allowed_file(file.filename, music_extensions):
+            return jsonify({"error": f"Invalid music format. Allowed: {format_extensions(music_extensions)}"}), 400
         target_dir = MUSIC_DIR
     else:
         return jsonify({"error": "Invalid file type"}), 400
@@ -918,24 +915,15 @@ def api_upload():
         return jsonify({"error": "Upload directory not available"}), 500
 
     # Save file with path traversal protection
-    filename = secure_filename(file.filename)
-    if not filename:
-        return jsonify({"error": "Invalid filename after sanitization"}), 400
-    
-    # Resolve paths and validate
-    target_dir_resolved = target_dir.resolve()
-    filepath = (target_dir_resolved / filename).resolve()
-    
-    # Prevent path traversal attacks
-    if not str(filepath).startswith(str(target_dir_resolved)):
-        logger.warning(f"Path traversal attempt detected: {filepath}")
-        return jsonify({"error": "Invalid upload path"}), 400
-    
+    filepath = build_safe_path(target_dir, file.filename)
+    if not filepath:
+        return jsonify({"error": "Invalid filename"}), 400
+
     file.save(filepath)
 
     return jsonify({
         "success": True,
-        "filename": filename,
+        "filename": filepath.name,
         "size": filepath.stat().st_size
     })
 
@@ -1180,23 +1168,22 @@ def api_job_download(job_id):
 @app.route('/api/download/<filename>', methods=['GET'])
 def api_download(filename):
     """Download output file with proper MIME type."""
-    # secure_filename sanitizes but preserves the base name
-    safe_filename = secure_filename(filename)
-    filepath = OUTPUT_DIR / safe_filename
-
+    filepath = build_safe_path(OUTPUT_DIR, filename)
+    if not filepath:
+        return jsonify({"error": "Invalid filename"}), 400
     if not filepath.exists():
         # Debug: log what we're looking for
         print(f"⚠️ Download requested but file not found: {filepath}")
         print(f"   Available files: {list(OUTPUT_DIR.glob('*.mp4'))[:5]}")
-        return jsonify({"error": f"File not found: {safe_filename}"}), 404
+        return jsonify({"error": f"File not found: {filepath.name}"}), 404
 
     # Explicit MIME type for video files
-    mimetype = 'video/mp4' if safe_filename.endswith('.mp4') else None
+    mimetype = 'video/mp4' if filepath.name.endswith('.mp4') else None
     
     return send_file(
         filepath,
         as_attachment=True,
-        download_name=safe_filename,  # Explicit filename for download
+        download_name=filepath.name,  # Explicit filename for download
         mimetype=mimetype
     )
 
@@ -2096,31 +2083,27 @@ def api_transcript_upload():
     if file.filename == '':
         return jsonify({"error": "No file selected"}), 400
     
-    if not allowed_file(file.filename, {'mp4', 'mov', 'avi', 'mkv', 'webm', 'mp3', 'wav'}):
-        return jsonify({"error": "Invalid file type"}), 400
-    
-    filename = secure_filename(file.filename)
+    transcript_extensions = _settings.file_types.video_extensions | _settings.file_types.audio_extensions
+    if not _settings.file_types.allowed_file(file.filename, transcript_extensions):
+        return jsonify({"error": f"Invalid file type. Allowed: {format_extensions(transcript_extensions)}"}), 400
+
+    filename = safe_filename(file.filename)
     if not filename:
         return jsonify({"error": "Invalid filename after sanitization"}), 400
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_filename = f"{timestamp}_{filename}"
     
-    # Resolve paths and validate
-    upload_dir_resolved = TRANSCRIPT_UPLOAD_DIR.resolve()
-    filepath = (upload_dir_resolved / unique_filename).resolve()
-    
-    # Prevent path traversal attacks
-    if not str(filepath).startswith(str(upload_dir_resolved)):
-        logger.warning(f"Path traversal attempt detected: {filepath}")
+    filepath = build_safe_path(TRANSCRIPT_UPLOAD_DIR, unique_filename)
+    if not filepath:
         return jsonify({"error": "Invalid upload path"}), 400
-    
+
     file.save(filepath)
     
     return jsonify({
         "success": True,
         "path": str(filepath),
-        "filename": unique_filename
+        "filename": filepath.name
     })
 
 
@@ -2130,7 +2113,9 @@ def api_transcript_upload():
 @app.route('/api/transcript/video/<filename>')
 def api_transcript_video(filename):
     """Serve uploaded video for preview."""
-    filepath = TRANSCRIPT_UPLOAD_DIR / secure_filename(filename)
+    filepath = build_safe_path(TRANSCRIPT_UPLOAD_DIR, filename)
+    if not filepath:
+        return jsonify({"error": "Invalid filename"}), 400
     if not filepath.exists():
         return jsonify({"error": "File not found"}), 404
     return send_file(filepath)
@@ -2378,31 +2363,27 @@ def api_shorts_upload():
     if file.filename == '':
         return jsonify({"error": "No file selected"}), 400
     
-    if not allowed_file(file.filename, {'mp4', 'mov', 'avi', 'mkv', 'webm'}):
-        return jsonify({"error": "Invalid file type"}), 400
-    
-    filename = secure_filename(file.filename)
+    shorts_extensions = _settings.file_types.video_extensions
+    if not _settings.file_types.allowed_file(file.filename, shorts_extensions):
+        return jsonify({"error": f"Invalid file type. Allowed: {format_extensions(shorts_extensions)}"}), 400
+
+    filename = safe_filename(file.filename)
     if not filename:
         return jsonify({"error": "Invalid filename after sanitization"}), 400
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_filename = f"{timestamp}_{filename}"
     
-    # Resolve paths and validate
-    upload_dir_resolved = SHORTS_UPLOAD_DIR.resolve()
-    filepath = (upload_dir_resolved / unique_filename).resolve()
-    
-    # Prevent path traversal attacks
-    if not str(filepath).startswith(str(upload_dir_resolved)):
-        logger.warning(f"Path traversal attempt detected: {filepath}")
+    filepath = build_safe_path(SHORTS_UPLOAD_DIR, unique_filename)
+    if not filepath:
         return jsonify({"error": "Invalid upload path"}), 400
-    
+
     file.save(filepath)
     
     return jsonify({
         "success": True,
         "path": str(filepath),
-        "filename": unique_filename
+        "filename": filepath.name
     })
 
 
