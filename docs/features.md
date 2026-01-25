@@ -495,7 +495,7 @@ Minimal schema:
 
 ```bash
 make web              # or: docker compose -f docker-compose.web.yml up
-# open http://localhost:5001
+# open <MONTAGE_WEB_URL>
 ```
 
 
@@ -642,7 +642,8 @@ The Web UI exposes a REST API for automation:
 
 **Example: Create a job via API**
 ```bash
-curl -X POST http://localhost:8080/api/jobs \
+MONTAGE_API_BASE="http://<MONTAGE_API_HOST>"
+curl -X POST "${MONTAGE_API_BASE}/api/jobs" \
   -H "Content-Type: application/json" \
   -d '{
     "style": "hitchcock",
@@ -654,7 +655,7 @@ curl -X POST http://localhost:8080/api/jobs \
 
 **Example: Clean audio**
 ```bash
-curl -X POST http://localhost:8080/api/audio/clean \
+curl -X POST "${MONTAGE_API_BASE}/api/audio/clean" \
   -H "Content-Type: application/json" \
   -d '{
     "audio_path": "/data/output/my_video.mp4",
@@ -665,7 +666,7 @@ curl -X POST http://localhost:8080/api/audio/clean \
 
 **Example: Detect highlights**
 ```bash
-curl -X POST http://localhost:8080/api/shorts/highlights \
+curl -X POST "${MONTAGE_API_BASE}/api/shorts/highlights" \
   -H "Content-Type: application/json" \
   -d '{
     "video_path": "/data/output/my_video.mp4",

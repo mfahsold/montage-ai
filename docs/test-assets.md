@@ -133,19 +133,23 @@ export RUN_DEV_E2E=true
 pytest tests/integration/test_preview_e2e_dev.py -q
 ```
 
-##### Canonical preview curl (for smoke/manual verification)
+##### Preview curl (quick smoke)
+
+For full preview SLO checks and benchmark steps, see docs/operations/preview-slo.md.
 
 ```bash
+MONTAGE_API_BASE="https://<DEV_HOST>"
+
 # Upload your clips to the DEV PVC (or use test fixtures)
-curl -sS -X POST https://dev.montage.lan/api/jobs \
+curl -sS -X POST "${MONTAGE_API_BASE}/api/jobs" \
   -H 'Content-Type: application/json' \
   -d '{"video_files":["benchmark_clip_a.mp4"], "quality_profile":"preview"}' | jq
 
 # Poll job
-curl -sS https://dev.montage.lan/api/jobs/<JOB_ID> | jq
+curl -sS "${MONTAGE_API_BASE}/api/jobs/<JOB_ID>" | jq
 
 # Fetch metrics
-curl -sS https://dev.montage.lan/metrics | grep montage_time_to_preview_seconds
+curl -sS "${MONTAGE_API_BASE}/metrics" | grep montage_time_to_preview_seconds
 ```
 
 #### Short-audio note / workaround ⚠️

@@ -34,6 +34,8 @@ Quick navigation for users, developers, and operators.
 |-------|---------|
 | [CI/CD Setup](ci.md) | Vendor-agnostic CI pipeline (local, Jenkins, Drone) |
 | [Cloud GPU Setup](cgpu-setup.md) | Optional: Google Cloud GPU integration |
+| [Preview SLO (canonical)](operations/preview-slo.md) | Preview SLOs, metrics, and benchmark steps |
+| [Preview Worker Sizing](operations/montage.yaml) | Sample CPU/memory/affinity for preview workers |
 
 ---
 

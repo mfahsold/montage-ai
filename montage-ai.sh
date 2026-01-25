@@ -129,7 +129,8 @@ run_web() {
     # Auto-start cgpu serve (since Web UI defaults to using it)
     cgpu_start || echo -e "${YELLOW}⚠️ Continuing without cgpu...${NC}"
 
-    echo -e "   Open ${BLUE}http://localhost:8080${NC} in your browser"
+    local web_port="${WEB_PORT:-8080}"
+    echo -e "   Open ${BLUE}http://localhost:${web_port}${NC} in your browser"
     echo -e "   ℹ️  If using Ollama on Linux, run: ${CYAN}OLLAMA_HOST=0.0.0.0 ollama serve${NC}"
     # Pass arguments like --build to docker compose
     docker compose -f docker-compose.web.yml up "$@"

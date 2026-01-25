@@ -107,8 +107,10 @@ CREATIVE_PROMPT="noir thriller, slow build, dramatic reveal at the end" \
 ```python
 import requests
 
+API_BASE = "http://<MONTAGE_API_HOST>"
+
 # Create a job
-response = requests.post('http://localhost:8080/api/jobs', json={
+response = requests.post(f'{API_BASE}/api/jobs', json={
     'style': 'dynamic',
     'quality_profile': 'high',
     'export_timeline': True,
@@ -117,10 +119,10 @@ response = requests.post('http://localhost:8080/api/jobs', json={
 job_id = response.json()['id']
 
 # Poll for completion
-status = requests.get(f'http://localhost:8080/api/jobs/{job_id}').json()
+status = requests.get(f'{API_BASE}/api/jobs/{job_id}').json()
 while status['status'] != 'completed':
     time.sleep(5)
-    status = requests.get(f'http://localhost:8080/api/jobs/{job_id}').json()
+    status = requests.get(f'{API_BASE}/api/jobs/{job_id}').json()
 
 # Download result
 output_url = status['output_url']
@@ -130,17 +132,17 @@ output_url = status['output_url']
 
 ```python
 # Start transcription
-response = requests.post('http://localhost:8080/api/transcript', json={
+response = requests.post(f'{API_BASE}/api/transcript', json={
     'video_id': 'video123',
     'language': 'en'
 })
 transcript_id = response.json()['id']
 
 # Get transcript with word timestamps
-transcript = requests.get(f'http://localhost:8080/api/transcript/{transcript_id}').json()
+transcript = requests.get(f'{API_BASE}/api/transcript/{transcript_id}').json()
 
 # Apply edits (delete words 5-10)
-requests.post(f'http://localhost:8080/api/transcript/{transcript_id}/edit', json={
+requests.post(f'{API_BASE}/api/transcript/{transcript_id}/edit', json={
     'operations': [
         {'type': 'delete', 'start_word': 5, 'end_word': 10}
     ]

@@ -70,7 +70,7 @@ Includes all optional groups (equivalent to `pip install -r requirements.txt`)
 | **Color Matching** | — | ✅ | ✅ | ✅ | ✅ |
 | **Advanced Audio Analysis** | — | ✅ | ✅ | ✅ | ✅ |
 | | | | | | |
-| **Web UI (localhost:8080)** | — | — | ✅ | ✅ | ✅ |
+| **Web UI (default port 8080)** | — | — | ✅ | ✅ | ✅ |
 | **Async Job Queue** | — | — | ✅ | ✅ | ✅ |
 | **REST API** | — | — | ✅ | ✅ | ✅ |
 | | | | | | |

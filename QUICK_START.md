@@ -40,13 +40,13 @@ cp *.mp4 data/input/
 ./montage-ai.sh web
 
 # Open in browser
-open http://localhost:8080
+open <MONTAGE_WEB_URL>
 ```
 
 ### Docker (Reproducible)
 ```bash
 docker-compose up -d
-# Web UI at http://localhost:8080
+# Web UI at <MONTAGE_WEB_URL>
 ```
 
 ## Configuration
@@ -133,21 +133,24 @@ mypy src/
 
 # Apply base manifests
 kubectl apply -k deploy/k3s/base/
+```
 
-# Canonical cluster overlay
-The canonical cluster overlay is `deploy/k3s/overlays/production` — use this for all cluster deployments (staging/production). Keep `deploy/config.env` as the single source of truth for environment overrides.
+The canonical cluster overlay is `deploy/k3s/overlays/production` — use this for all cluster deployments (staging/production). Keep `deploy/k3s/config-global.yaml` as the single source of truth for environment overrides.
 
 # Ephemeral testing (dev-only)
-For safe, ephemeral validation (no production data) use the archived ephemeral overlay `deploy/k3s/overlays/clean-deploy` or the CI smoke helper. These are intended for manual/dev validation only and not the canonical deployment path.
+For safe, ephemeral validation (no production data) use the archived overlay `deploy/k3s/overlays/legacy/clean-deploy` or the CI smoke helper. These are intended for manual/dev validation only and not the canonical deployment path.
 
 # Dev autoscale smoke (CI)
 # - CI default uses the canonical overlay in staging: `deploy/k3s/overlays/production`
-# - For manual/ephemeral testing you may still pass `--overlay deploy/k3s/overlays/clean-deploy` to the helper script
+# - For manual/ephemeral testing you may still pass `--overlay deploy/k3s/overlays/legacy/clean-deploy` to the helper script
+
+```bash
 ./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/production
 
 # Check status
-kubectl get pods -n montage-ai
-kubectl logs -n montage-ai -l app=montage-ai -f
+CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+kubectl get pods -n "$CLUSTER_NAMESPACE"
+kubectl logs -n "$CLUSTER_NAMESPACE" -l app=montage-ai -f
 ```
 
 ### Docker Registry

@@ -106,9 +106,9 @@ Key variables:
 
 ```yaml
 registry:
-  url: "registry.registry.svc.cluster.local:5000"
+  url: "<REGISTRY_URL>"
 cluster:
-  namespace: "montage-ai"
+  namespace: "<CLUSTER_NAMESPACE>"
 ```
 
 See **[CONFIGURATION.md](CONFIGURATION.md)** for full reference.

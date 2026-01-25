@@ -65,6 +65,7 @@ data:
   PROXY_LOCK_TIMEOUT_SECONDS: "900"
   PARALLEL_ENHANCE: "true"
   MAX_PARALLEL_JOBS: "8"
+  MONTAGE_PREVIEW_CPU_LIMIT: ""  # Optional: clamp effective CPU for preview SLO runs
   USE_GPU: "auto"
   MONITOR_MEM_INTERVAL: "5"
   MAX_SCENE_REUSE: "3"

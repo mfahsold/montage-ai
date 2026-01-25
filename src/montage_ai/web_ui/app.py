@@ -298,6 +298,12 @@ def enqueue_montage(job_id: str, style: str, options: dict):
 
     # Prefer explicit override in options, otherwise derive from Settings (no hardcoded literals)
     quality = (options or {}).get("quality_profile", "standard")
+    if quality == "preview":
+        try:
+            from .. import telemetry
+            telemetry.record_event("preview_requests", {"job_id": job_id})
+        except Exception:
+            logger.debug("Failed to record preview request", exc_info=True)
     job_timeout = options.get(
         "job_timeout",
         _settings.processing.preview_job_timeout if quality == "preview" else _settings.processing.default_job_timeout,

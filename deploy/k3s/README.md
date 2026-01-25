@@ -14,11 +14,13 @@ cd deploy/k3s
 
 # 3. Access Web UI (choose one)
 # If you have ingress configured:
-open http://YOUR_MONTAGE_HOST
+open "https://<MONTAGE_HOSTNAME>"
 
 # Or port-forward locally:
-kubectl port-forward -n montage-ai svc/montage-ai-web 5000:8080
-open http://localhost:5000
+CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+LOCAL_PORT="${LOCAL_PORT:-5000}"
+kubectl port-forward -n "$CLUSTER_NAMESPACE" svc/montage-ai-web "${LOCAL_PORT}:8080"
+open "http://localhost:${LOCAL_PORT}"
 ```
 
 ## Clean Deploy (Fluxibri-core aligned)
@@ -236,17 +238,19 @@ kubectl label node <node> accelerator=nvidia-jetson
 ### Port Forward (Development)
 
 ```bash
-kubectl port-forward -n montage-ai svc/montage-ai-web 5000:8080
-open http://localhost:5000
+CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+LOCAL_PORT="${LOCAL_PORT:-5000}"
+kubectl port-forward -n "$CLUSTER_NAMESPACE" svc/montage-ai-web "${LOCAL_PORT}:8080"
+open "http://localhost:${LOCAL_PORT}"
 ```
 
 ### Ingress (Production)
 
 ```bash
 # Ensure DNS/hosts entry exists
-echo "YOUR_CLUSTER_IP  montage-ai.local" | sudo tee -a /etc/hosts
+echo "YOUR_CLUSTER_IP  <MONTAGE_HOSTNAME>" | sudo tee -a /etc/hosts
 
-open http://montage-ai.local
+open "http://<MONTAGE_HOSTNAME>"
 ```
 
 ---

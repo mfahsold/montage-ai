@@ -38,8 +38,9 @@ Prereqs
 - Apply staging overlay (we keep a DRY overlay):
   kubectl apply -k deploy/k3s/overlays/staging
 - Create a ScaledObject smoke (already in repo). Verify:
-  kubectl -n montage-ai get scaledobject
-  kubectl -n montage-ai describe scaledobject montage-ai-worker-scaledobject
+  CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+  kubectl -n "$CLUSTER_NAMESPACE" get scaledobject
+  kubectl -n "$CLUSTER_NAMESPACE" describe scaledobject montage-ai-worker-scaledobject
 
 6) Rollback (if needed)
 - helm uninstall keda -n keda

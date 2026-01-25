@@ -7,7 +7,20 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-NAMESPACE="montage-ai"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_LIB="${REPO_ROOT}/scripts/ops/lib/config_global.sh"
+
+if [ -f "${CONFIG_LIB}" ]; then
+    # shellcheck disable=SC1090
+    source "${CONFIG_LIB}"
+fi
+if command -v config_global_export >/dev/null 2>&1; then
+    eval "$(config_global_export)"
+fi
+
+CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+NAMESPACE="${NAMESPACE:-$CLUSTER_NAMESPACE}"
 
 echo -e "${GREEN}Starting idempotent cluster setup for Montage AI...${NC}"
 

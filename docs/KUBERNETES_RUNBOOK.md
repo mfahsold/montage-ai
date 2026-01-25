@@ -9,30 +9,31 @@ This public runbook contains basic, non-environment-specific checks. The full op
 ```bash
 # Namespaces and pods
 kubectl get ns
-kubectl get pods -n montage-ai
+kubectl get pods -n "${CLUSTER_NAMESPACE:-montage-ai}"
 
 # Recent events
-kubectl get events -n montage-ai --sort-by=.lastTimestamp
+kubectl get events -n "${CLUSTER_NAMESPACE:-montage-ai}" --sort-by=.lastTimestamp
 ```
 
 ## Common Diagnostics
 
 ```bash
 # Pod details
-kubectl describe pod -n montage-ai -l app.kubernetes.io/name=montage-ai
+kubectl describe pod -n "${CLUSTER_NAMESPACE:-montage-ai}" -l app.kubernetes.io/name=montage-ai
 
 # Logs
-kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai --tail=200
+kubectl logs -n "${CLUSTER_NAMESPACE:-montage-ai}" -l app.kubernetes.io/name=montage-ai --tail=200
 ```
 
 ## Service Access
 
 ```bash
 # Port-forward for local access
-kubectl port-forward -n montage-ai svc/montage-ai-web 5000:8080
+LOCAL_PORT="${LOCAL_PORT:-5000}"
+kubectl port-forward -n "${CLUSTER_NAMESPACE:-montage-ai}" svc/montage-ai-web "${LOCAL_PORT}:8080"
 ```
 
-Open `http://localhost:5000` in your browser.
+Open `http://localhost:${LOCAL_PORT}` in your browser.
 
 If you have ingress configured, use your own domain, for example:
 
@@ -51,15 +52,12 @@ When validating the **preview** fast-path (distributed overlay) in DEV, follow t
 - Minimal smoke fixtures
   - Copy two small test clips to `/data/input/` and a short WAV (>= 3–4s) to `/data/music/` on the input PVC before running the smoke.
 
-- Run the opt-in smoke
+- Run the preview SLO smoke (canonical steps are in docs/operations/preview-slo.md)
 
 ```bash
 # run from a machine that can reach the DEV ingress
-./scripts/ci/preview-benchmark.sh BASE=https://<dev-host> RUNS=5
-curl -sS https://<dev-host>/metrics | grep montage_time_to_preview_seconds || true
+./scripts/ci/preview-benchmark.sh BASE=https://<dev-host> RUNS=10 --collect-metrics
 ```
-
-- Expected DEV SLO (starter): p50 < 8s, p95 < 30s (use the Grafana preview_slo dashboard for visual checks).
 
 See `patches/infra/2026-01-22-dev-distributed-deploy-report.md` for a recent deployment attempt and remediation steps.
 

@@ -30,30 +30,31 @@ deploy/
 
 ### Registry Configuration
 ```bash
-REGISTRY_URL="registry.registry.svc.cluster.local:5000"
-IMAGE_NAME="montage-ai"                    # Image name
-IMAGE_TAG="latest-amd64"                   # Image tag
+REGISTRY_URL="<REGISTRY_URL>"
+IMAGE_NAME="montage-ai"                    # Image name (default)
+IMAGE_TAG="<IMAGE_TAG>"
 IMAGE_FULL="${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
 ```
 
 ### Kubernetes Configuration
 ```bash
-CLUSTER_NAMESPACE="montage-ai"             # K8s namespace
+CLUSTER_NAMESPACE="<CLUSTER_NAMESPACE>"   # K8s namespace
 K3S_CLUSTER_DOMAIN="cluster.local"
+MONTAGE_HOSTNAME="<MONTAGE_HOSTNAME>"
 ```
 
 ### Storage Configuration
 ```bash
 STORAGE_CLASS_DEFAULT="local-path"         # StorageClass name
 STORAGE_CLASS_NFS="nfs-client"
-NFS_SERVER="10.0.0.10"                     # Optional NFS server IP
-NFS_PATH="/mnt/nfs-montage"
+NFS_SERVER="<NFS_SERVER>"                  # Optional NFS server IP
+NFS_PATH="<NFS_PATH>"
 ```
 
 ### Testing Configuration
 ```bash
-TEST_BASE_URL="http://localhost:5000"      # Backend API for tests
-TEST_UPLOAD_URL="http://localhost:5001/api/upload"
+TEST_BASE_URL="<MONTAGE_API_BASE>"
+TEST_UPLOAD_URL="<MONTAGE_API_BASE>/api/upload"
 ```
 
 ## Usage
@@ -97,11 +98,11 @@ Tests automatically use environment variables:
 make test
 
 # Cluster testing
-export TEST_BASE_URL="http://montage-ai.montage-ai.svc.cluster.local:5000"
+export TEST_BASE_URL="http://<MONTAGE_SERVICE_HOST>:<PORT>"
 make test
 
 # Production testing
-export TEST_BASE_URL="https://montage.example.com"
+export TEST_BASE_URL="https://<MONTAGE_HOSTNAME>"
 make test
 ```
 
@@ -112,12 +113,14 @@ make test
 ```yaml
 # deploy/k3s/config-global.yaml (local)
 registry:
-  url: "registry.registry.svc.cluster.local:5000"
+  url: "<REGISTRY_URL>"
 cluster:
-  namespace: "montage-dev"
+  namespace: "<CLUSTER_NAMESPACE>"
+  hostnames:
+    montage: "<MONTAGE_HOSTNAME>"
 images:
   montage_ai:
-    tag: "latest-amd64"
+    tag: "<IMAGE_TAG>"
 ```
 
 ### Production
@@ -125,9 +128,11 @@ images:
 ```yaml
 # deploy/k3s/config-global.yaml (production)
 registry:
-  url: "registry.example.com:443"
+  url: "<REGISTRY_URL>"
 cluster:
-  namespace: "montage-prod"
+  namespace: "<CLUSTER_NAMESPACE>"
+  hostnames:
+    montage: "<MONTAGE_HOSTNAME>"
 images:
   montage_ai:
     tag: "main-<sha>"
@@ -139,9 +144,11 @@ If your organization provides an internal registry or cluster CI (Tekton, Jenkin
 
 ```yaml
 registry:
-  url: "registry.internal.example:5000"
+  url: "<REGISTRY_URL>"
 cluster:
-  namespace: "montage-ai"
+  namespace: "<CLUSTER_NAMESPACE>"
+  hostnames:
+    montage: "<MONTAGE_HOSTNAME>"
 images:
   montage_ai:
     tag: "latest"

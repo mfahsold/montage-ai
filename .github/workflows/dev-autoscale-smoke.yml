@@ -7,6 +7,22 @@ on:
         description: 'Kustomize overlay to apply (defaults to canonical production overlay)'
         required: false
         default: 'deploy/k3s/overlays/production'
+      registry_url:
+        description: 'Registry URL reachable from the cluster (host:port)'
+        required: false
+        default: '127.0.0.1:30500'
+      image_name:
+        description: 'Image name to deploy'
+        required: false
+        default: 'montage-ai'
+      cluster_namespace:
+        description: 'Target namespace'
+        required: false
+        default: 'montage-ai'
+      test_base_url:
+        description: 'Base URL for in-cluster smoke checks'
+        required: false
+        default: 'http://127.0.0.1:8080'
       run_preview_slo:
         description: 'Run the optional on-cluster preview SLO benchmark (self-hosted runner required)'
         required: false
@@ -17,6 +33,11 @@ jobs:
     name: Dev autoscale smoke (requires dev runner with cluster access)
     runs-on: [self-hosted, linux, dev]
     timeout-minutes: 30
+    env:
+      REGISTRY_URL: "${{ inputs.registry_url || '127.0.0.1:30500' }}"
+      IMAGE_NAME: "${{ inputs.image_name || 'montage-ai' }}"
+      CLUSTER_NAMESPACE: "${{ inputs.cluster_namespace || 'montage-ai' }}"
+      TEST_BASE_URL: "${{ inputs.test_base_url || 'http://127.0.0.1:8080' }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,37 +48,31 @@ jobs:
 
       - name: Build and push image (runner must be able to reach cluster registry)
         run: |
-          docker build -t 127.0.0.1:30500/montage-ai:${IMAGE_TAG} .
-          docker push 127.0.0.1:30500/montage-ai:${IMAGE_TAG}
+          docker build -t ${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG} .
+          docker push ${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
 
       - name: Deploy (kustomize)
         env:
           OVERLAY: "${{ inputs.overlay || 'deploy/k3s/overlays/production' }}"
         run: |
           echo "Using overlay: $OVERLAY"
-          kubectl -n montage-ai set image deploy/montage-ai-web montage-ai=127.0.0.1:30500/montage-ai:${IMAGE_TAG} || true
-          kubectl -n montage-ai set image deploy/montage-ai-worker montage-ai=127.0.0.1:30500/montage-ai:${IMAGE_TAG} || true
-          kubectl -n montage-ai apply -k "$OVERLAY"
-          kubectl -n montage-ai rollout status deploy/montage-ai-web --timeout=3m
-          kubectl -n montage-ai rollout status deploy/montage-ai-worker --timeout=3m
+          kubectl -n "${CLUSTER_NAMESPACE}" set image deploy/montage-ai-web montage-ai=${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG} || true
+          kubectl -n "${CLUSTER_NAMESPACE}" set image deploy/montage-ai-worker montage-ai=${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG} || true
+          kubectl -n "${CLUSTER_NAMESPACE}" apply -k "$OVERLAY"
+          kubectl -n "${CLUSTER_NAMESPACE}" rollout status deploy/montage-ai-web --timeout=3m
+          kubectl -n "${CLUSTER_NAMESPACE}" rollout status deploy/montage-ai-worker --timeout=3m
 
       - name: Run infra & smoke tests
-        env:
-          TEST_BASE_URL: http://127.0.0.1:8080
         run: |
-          ./scripts/ci/run-dev-smoke.sh ${IMAGE_TAG}
+          ./scripts/ci/run-dev-smoke.sh --tag "${IMAGE_TAG}" --registry-url "${REGISTRY_URL}" --image-name "${IMAGE_NAME}" --namespace "${CLUSTER_NAMESPACE}"
 
       - name: Run on-cluster preview SLO benchmark (self-hosted only)
         if: github.event.inputs.run_preview_slo == 'true'
-        env:
-          TEST_BASE_URL: http://127.0.0.1:8080
-          SLO_P50: 8
-          SLO_P95: 30
         run: |
-          ./scripts/ci/preview-benchmark.sh ${TEST_BASE_URL}
+          SLO_P50=8 SLO_P95=30 ./scripts/ci/preview-benchmark.sh ${TEST_BASE_URL}
 
       - name: Collect logs (on failure)
         if: failure()
         run: |
-          kubectl -n montage-ai get pods -o wide
-          kubectl -n montage-ai logs -l app=montage-ai --tail=200
+          kubectl -n "${CLUSTER_NAMESPACE}" get pods -o wide
+          kubectl -n "${CLUSTER_NAMESPACE}" logs -l app=montage-ai --tail=200

@@ -33,7 +33,7 @@ Everything runs in Docker.
 make web
 ```
 
-1. Open **http://localhost:5001**
+1. Open **<MONTAGE_WEB_URL>**
 2. Upload video clips
 3. Upload music track
 4. Pick a style (or natural language prompt)
@@ -136,11 +136,11 @@ kubectl apply -k deploy/k3s/overlays/production/
 
 # Fast preview mode
 kubectl apply -k deploy/k3s/overlays/dev/
+```
 
-# Canonical overlay (cluster)
 The canonical cluster overlay is `deploy/k3s/overlays/production` and should be used for all staging/production deployments.
 
-For ephemeral/dev validation (no production data), you can use `deploy/k3s/overlays/clean-deploy` (archived helper). See `docs/ops/dev-autoscale-smoke.md` for guidance.
+For ephemeral/dev validation (no production data), you can use `deploy/k3s/overlays/legacy/clean-deploy` (archived helper). See `docs/ops/dev-autoscale-smoke.md` for guidance.
 
 Run the dev autoscale smoke (CI default points to the canonical overlay):
 
@@ -149,7 +149,7 @@ Run the dev autoscale smoke (CI default points to the canonical overlay):
 ./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/production
 
 # Manual ephemeral test (optional)
-./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/clean-deploy
+./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/legacy/clean-deploy
 ```
 
 Check job status:

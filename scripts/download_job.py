@@ -16,7 +16,7 @@ Usage:
     python scripts/download_job.py --job-id 20260112_114010 --local /data/output
 
     # Download as ZIP
-    python scripts/download_job.py --job-id 20260112_114010 --api http://localhost:5001 --zip
+    python scripts/download_job.py --job-id 20260112_114010 --api http://<MONTAGE_API_HOST> --zip
 
     # Specify output directory
     python scripts/download_job.py --job-id 20260112_114010 --output ./my_project
@@ -255,8 +255,8 @@ Examples:
   # Download from local output dir
   python scripts/download_job.py --job-id 20260112_114010 --local /data/output
 
-  # Download as ZIP
-  python scripts/download_job.py --job-id 20260112_114010 --api http://localhost:5001 --zip
+    # Download as ZIP
+    python scripts/download_job.py --job-id 20260112_114010 --api http://<MONTAGE_API_HOST> --zip
         """
     )
 
@@ -265,7 +265,7 @@ Examples:
     parser.add_argument("--zip", "-z", action="store_true", help="Download as single ZIP file")
 
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--api", "-a", help="API base URL (e.g., http://localhost:5001)")
+    source.add_argument("--api", "-a", help="API base URL (e.g., http://<MONTAGE_API_HOST>)")
     source.add_argument("--local", "-l", help="Local output directory path")
 
     args = parser.parse_args()

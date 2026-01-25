@@ -10,10 +10,8 @@ Key artifacts:
 - `benchmark_results/preview-perf-73165d7.log` — raw output and worker log excerpts
 
 Reproduction:
-1. Copy benchmark clips onto the cluster PVC (`/data/input`) for the web pod.
-2. Port-forward the web service: `kubectl -n montage-ai port-forward svc/montage-ai-web 8080:80`
-3. Run: `SLO_P50=8 SLO_P95=30 ./scripts/ci/preview-benchmark.sh http://127.0.0.1:8080`
+- Follow the canonical preview SLO doc: docs/operations/preview-slo.md (use this commit/branch).
 
 Follow-up (recommended):
 - Make JobStore writes from workers retriable/synchronous (PR: follow-up).
-- Harden `preview-benchmark.sh` to tolerate transient API staleness and add warm-up runs.
+- Re-run with current `preview-benchmark.sh` and archive artifacts via --collect-metrics.

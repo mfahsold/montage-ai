@@ -1,0 +1,20 @@
+# montage.yaml (sample)
+# Reference sizing/affinity guidance for preview workers.
+# Documentation-only; adapt to your deploy tooling or kustomize patches.
+
+preview_worker:
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  # Adjust labels to match your cluster (examples: amd-gpu, nvidia-jetson).
+  node_selector:
+    accelerator: "nvidia-jetson"
+  tolerations:
+    - key: "accelerator"
+      operator: "Equal"
+      value: "nvidia-jetson"
+      effect: "NoSchedule"

@@ -11,7 +11,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-  - host: montage-ai.fluxibri.lan
+  - host: montage-ai.local
     http:
       paths:
       - path: /

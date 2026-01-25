@@ -481,6 +481,7 @@ def get_prometheus_metrics() -> str:
         'proxy_cache_hit': 0,
         'proxy_cache_miss': 0,
         'proxy_cache_evicted': 0,
+        'preview_requests': 0,
         'jobstore_update_attempt': 0,
         'jobstore_update_failed': 0,
         'scene_detection_timeout': 0,

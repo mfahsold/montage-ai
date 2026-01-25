@@ -16,3 +16,15 @@ configMapGenerator:
       - RUN_SCALE_TESTS=1
 
 namespace: montage-ai
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.MONTAGE_HOSTNAME
+    targets:
+      - select:
+          kind: Ingress
+          name: montage-ai-web-clean-fallback
+        fieldPaths:
+          - spec.rules.0.host

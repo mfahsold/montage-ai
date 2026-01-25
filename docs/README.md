@@ -38,6 +38,8 @@ make cluster
 | [Deployment Guide](../deploy/README.md) | All deployment options |
 | [K8s Deployment](../deploy/k3s/README.md) | Kubernetes/K3s deployment |
 | [Kubernetes Runbook](KUBERNETES_RUNBOOK.md) | Operations (public stub; internal on request) |
+| [Preview SLO (canonical)](operations/preview-slo.md) | Preview SLOs and benchmark steps |
+| [Preview Worker Sizing](operations/montage.yaml) | Sample CPU/memory/affinity |
 | [Troubleshooting](troubleshooting.md) | Common issues & fixes |
 
 ### Architecture

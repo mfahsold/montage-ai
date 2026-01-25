@@ -18,4 +18,4 @@ spec:
                 name: montage-ai-web
                 port:
                   number: 80
-# NOTE: This is a dev-only fallback. Add an /etc/hosts entry to test: 127.0.0.1 montage-ai.local
+# NOTE: Dev-only fallback. Override host via MONTAGE_HOSTNAME or add a local hosts entry if needed.

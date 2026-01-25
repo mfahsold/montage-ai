@@ -45,6 +45,7 @@ registry_host = ""
 registry_port = ""
 cluster_namespace = ""
 cluster_domain = ""
+montage_hostname = ""
 image_name = ""
 image_tag = ""
 image_full = ""
@@ -72,6 +73,8 @@ if yaml is not None:
         registry_port = clean(registry.get("port", ""))
         cluster_namespace = clean(cluster.get("namespace", ""))
         cluster_domain = clean(cluster.get("clusterDomain", ""))
+        cluster_hostnames = cluster.get("hostnames", {}) if isinstance(cluster, dict) else {}
+        montage_hostname = clean(cluster_hostnames.get("montage", ""))
 
         image_name = clean(montage_ai.get("name", ""))
         image_tag = clean(montage_ai.get("tag", ""))
@@ -95,6 +98,7 @@ if not any([
     registry_port,
     cluster_namespace,
     cluster_domain,
+    montage_hostname,
     image_name,
     image_tag,
     image_full,
@@ -140,6 +144,15 @@ if not any([
                 cluster_namespace = value
             elif key == "clusterDomain":
                 cluster_domain = value
+            elif key == "hostnames":
+                subsection = "cluster_hostnames"
+                continue
+        elif section == "cluster" and subsection == "cluster_hostnames" and indent == 4 and ":" in stripped:
+            key, value = stripped.split(":", 1)
+            key = key.strip()
+            value = clean(value)
+            if key == "montage":
+                montage_hostname = value
         elif section == "storage":
             if indent == 2 and stripped.startswith("classes:"):
                 subsection = "storage_classes"
@@ -185,6 +198,7 @@ emit("REGISTRY_HOST", registry_host)
 emit("REGISTRY_PORT", registry_port)
 emit("CLUSTER_NAMESPACE", cluster_namespace)
 emit("K3S_CLUSTER_DOMAIN", cluster_domain)
+emit("MONTAGE_HOSTNAME", montage_hostname)
 emit("IMAGE_NAME", image_name)
 emit("IMAGE_TAG", image_tag)
 emit("IMAGE_FULL", image_full)

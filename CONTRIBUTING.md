@@ -160,11 +160,11 @@ Dev autoscale smoke (dev-only, safe)
 - Local quick-run:
 ```bash
 # Ensure KUBECONFIG points to a dev cluster
-./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/clean-deploy
+./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/legacy/clean-deploy
 ```
 - CI: provide a self-hosted runner with label `scale-smoke` and `kubectl` access. The workflow is `.github/workflows/dev-autoscale-smoke.yml`.
 
-Safety: `clean-deploy` uses `emptyDir` volumes and is safe to run in clusters without production data.
+Safety: `legacy/clean-deploy` uses `emptyDir` volumes and is safe to run in clusters without production data.
 
 ---
 

@@ -124,3 +124,13 @@ replacements:
           name: montage-cache
         fieldPaths:
           - spec.storageClassName
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.MONTAGE_HOSTNAME
+    targets:
+      - select:
+          kind: Ingress
+          name: montage-ai-web
+        fieldPaths:
+          - spec.rules.0.host

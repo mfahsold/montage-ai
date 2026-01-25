@@ -145,6 +145,20 @@ def _parse_int(raw: Optional[str], default: int) -> int:
         return default
 
 
+def _parse_optional_int(raw: Optional[str]) -> Optional[int]:
+    """Parse a positive int from env strings with fallback."""
+    if raw is None:
+        return None
+    try:
+        raw = str(raw).strip()
+        if not raw:
+            return None
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 def get_cluster_shard_index() -> int:
     """Cluster shard index with Kubernetes Indexed Job fallback."""
     raw = os.environ.get("CLUSTER_SHARD_INDEX")
@@ -167,8 +181,14 @@ def get_effective_cpu_count() -> int:
 
     cgroup_limit = _read_cgroup_cpu_limit()
     if cgroup_limit is None:
-        return max(1, affinity)
-    return max(1, min(affinity, cgroup_limit))
+        base_count = max(1, affinity)
+    else:
+        base_count = max(1, min(affinity, cgroup_limit))
+
+    preview_limit = _parse_optional_int(os.environ.get("MONTAGE_PREVIEW_CPU_LIMIT"))
+    if preview_limit is not None:
+        return max(1, min(base_count, preview_limit))
+    return base_count
 
 
 # =============================================================================

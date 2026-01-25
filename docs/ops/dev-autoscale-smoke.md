@@ -13,7 +13,7 @@ Prerequisites
 - `ENABLE_DEV_ENDPOINTS=true` enabled in the deployment overlay
 
 How it works (high level)
-1. Deploy `deploy/k3s/overlays/clean-deploy` (ephemeral volumes, dev guards)
+1. Deploy `deploy/k3s/overlays/legacy/clean-deploy` (ephemeral volumes, dev guards)
 2. Post 10–20 lightweight dev test jobs to `/api/internal/testjob`
 3. Assert that KEDA creates an HPA and workers scale to expected replicas
 4. Verify jobs complete and collect logs
@@ -21,21 +21,25 @@ How it works (high level)
 Quick commands (local)
 
 # apply clean/dev overlay
-kubectl -n montage-ai apply -k deploy/k3s/overlays/clean-deploy/
+CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+LOCAL_PORT="${LOCAL_PORT:-8080}"
+
+kubectl -n "$CLUSTER_NAMESPACE" apply -k deploy/k3s/overlays/legacy/clean-deploy/
 
 # port-forward to reach web UI from your machine
-kubectl -n montage-ai port-forward svc/montage-ai-web 8080:80 &
+kubectl -n "$CLUSTER_NAMESPACE" port-forward svc/montage-ai-web "${LOCAL_PORT}:80" &
 
 # POST 12 dev jobs (6s each)
+MONTAGE_API_BASE="http://localhost:${LOCAL_PORT}"
 curl -s -X POST -H 'Content-Type: application/json' \
-  -d '{"count":12,"duration":6}' http://127.0.0.1:8080/api/internal/testjob
+  -d '{"count":12,"duration":6}' "${MONTAGE_API_BASE}/api/internal/testjob"
 
 # watch worker logs
-kubectl -n montage-ai logs deployment/montage-ai-worker -f
+kubectl -n "$CLUSTER_NAMESPACE" logs deployment/montage-ai-worker -f
 
 CI (recommended)
 - Use the workflow `/.github/workflows/dev-autoscale-smoke.yml` on a self-hosted runner labeled `scale-smoke`.
-- The workflow runs `scripts/ci/run-dev-smoke.sh` which applies the overlay, posts dev jobs and asserts scaling.
+- The workflow runs `scripts/ci/run-dev-smoke.sh` (pass `--overlay` to apply a specific overlay), posts dev jobs and asserts scaling.
 
 Troubleshooting
 - If jobs are not picked up: check Redis connectivity and worker logs.
@@ -43,4 +47,4 @@ Troubleshooting
 
 Safety notes
 - This overlay uses `emptyDir` volumes; it is safe for environments without production data.
-- The workflow targets `deploy/k3s/overlays/clean-deploy` only (dev). Do NOT run against production overlays.
+- The workflow targets `deploy/k3s/overlays/legacy/clean-deploy` only (dev). Do NOT run against production overlays.

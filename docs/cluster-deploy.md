@@ -29,14 +29,14 @@ Steps (summary)
 - Example: docker pull redis:6.2-alpine && docker tag/push to internal registry
 
 4) Deploy (safe sequence)
-- kubectl -n montage-ai apply -k deploy/k3s/base   # uses existing RWX PVCs
-- kubectl -n montage-ai apply -k deploy/k3s/overlays/dev  # DEV safe defaults
-- After quota/PVs available: kubectl -n montage-ai apply -k deploy/k3s/overlays/distributed
+- CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+- kubectl -n "$CLUSTER_NAMESPACE" apply -k deploy/k3s/base   # uses existing RWX PVCs
+- kubectl -n "$CLUSTER_NAMESPACE" apply -k deploy/k3s/overlays/dev  # DEV safe defaults
+- After quota/PVs available: kubectl -n "$CLUSTER_NAMESPACE" apply -k deploy/k3s/overlays/distributed
 
 5) Verify (smoke)
 - RUN_DEV_E2E=true dev_base_url=https://<dev-host> pytest -q tests/integration/test_preview_smoke_ci.py::test_preview_smoke_and_metrics
-- ./scripts/ci/preview-benchmark.sh BASE=https://<dev-host> RUNS=10
-- Collect: /metrics snapshot, job JSONs, preview MP4s
+- Preview SLO benchmark and artifacts: follow docs/operations/preview-slo.md
 
 6) Post-deploy: docs & alerts
 - Add SLO alerts (p95 > threshold) and dashboard (we already add preview_slo.json)
@@ -48,9 +48,10 @@ Troubleshooting (common)
 - Pip/socket timeouts during arm build → retry with in-cluster builder or increase pip timeout / use a wheelhouse
 
 Useful commands
-- kubectl -n montage-ai get pvc
-- kubectl -n montage-ai describe resourcequota storage-quota
-- curl -sS https://<dev-host>/metrics | egrep 'montage_time_to_preview_seconds|montage_proxy_cache'
+- CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+- kubectl -n "$CLUSTER_NAMESPACE" get pvc
+- kubectl -n "$CLUSTER_NAMESPACE" describe resourcequota storage-quota
+- For metrics queries: see docs/operations/preview-slo.md
 
 Contact SRE checklist
 - Increase PVC quota or pre-provision NFS PVs

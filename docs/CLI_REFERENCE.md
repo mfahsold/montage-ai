@@ -41,7 +41,7 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 | `hq [STYLE]` | High quality with upscaling (1080p/4K) | Slow |
 | `shorts [STYLE]` | Vertical 9:16 with smart reframing | Medium |
 | `download JOB_ID` | Download job artifacts (video, timeline, logs) | - |
-| `web` | Launch Web UI (<http://localhost:8080>) | - |
+| `web` | Launch Web UI (<MONTAGE_WEB_URL>) | - |
 | `list` | Show available styles | - |
 
 ### Utility Commands
@@ -57,6 +57,8 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 | `cgpu-test` | Test cgpu connection |
 | `export-to-nle` | Export results to OTIO/Premiere/EDL |
 | `help` | Show full help message |
+
+Note: for local runs, `./montage-ai.sh web` uses `WEB_PORT` (default 8080).
 
 ---
 

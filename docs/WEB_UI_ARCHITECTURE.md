@@ -277,7 +277,7 @@ When converting old templates:
 # Start local server
 python src/montage_ai/web_ui/app.py
 
-# Visit: http://localhost:5000
+# Visit: <MONTAGE_WEB_URL>
 ```
 
 ## Known Templates Still to Migrate

@@ -103,7 +103,7 @@ docker exec montage-ai rm -rf /tmp/*.mp4
 
 ## Web UI Issues
 
-**Can't access http://localhost:5001**
+**Can't access the Web UI**
 
 ```bash
 # Check if running
@@ -112,7 +112,7 @@ docker ps | grep web-ui
 # Check logs
 
 # Port in use? Try different port
-docker compose -f docker-compose.web.yml up -d -e PORT=5002
+WEB_PORT=5002 docker compose -f docker-compose.web.yml up -d
 ```
 
 ---
