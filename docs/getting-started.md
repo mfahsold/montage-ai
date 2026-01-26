@@ -10,7 +10,8 @@ From zero to your first montage in 5 minutes.
 - **8 GB RAM** (16 GB for high quality)
 - Optional: [cgpu](https://github.com/RohanAdwankar/cgpu) for cloud GPU/LLM
 
-> **Low RAM?** See [Hybrid Workflow](hybrid-workflow.md) to offload AI tasks to cloud.
+> **Low RAM?** Use `QUALITY_PROFILE=preview` and consider cgpu offload. See
+> [performance-tuning.md](performance-tuning.md) and [cgpu-setup.md](cgpu-setup.md).
 
 ---
 
@@ -30,10 +31,10 @@ Everything runs in Docker.
 ### Web UI (Easiest)
 
 ```bash
-make web
+./montage-ai.sh web
 ```
 
-1. Open **<MONTAGE_WEB_URL>**
+1. Open **http://localhost:8080** (or your configured `<MONTAGE_WEB_URL>`)
 2. Upload video clips
 3. Upload music track
 4. Pick a style (or natural language prompt)
@@ -56,13 +57,8 @@ ls data/output/
 
 ## Test Assets
 
-Included scripts download open-source media (Big Buck Bunny, Sintel, etc.).
-
-```bash
-make download-assets
-```
-
-Media goes into `data/input/` and `data/music/`.
+Sample assets are not bundled in the public repo. Use your own clips, or see
+[test-assets.md](test-assets.md) for public-domain sources and synthetic fixtures.
 
 ---
 
@@ -128,29 +124,15 @@ docker compose up
 For cluster deployments:
 
 ```bash
-# Base deployment
-kubectl apply -k deploy/k3s/base/
+# Render config
+make -C deploy/k3s config
 
 # Production overlay
-kubectl apply -k deploy/k3s/overlays/production/
-
-# Fast preview mode
-kubectl apply -k deploy/k3s/overlays/dev/
+make -C deploy/k3s deploy-production
 ```
 
-The canonical cluster overlay is `deploy/k3s/overlays/production` and should be used for all staging/production deployments.
-
-For ephemeral/dev validation (no production data), you can use `deploy/k3s/overlays/legacy/clean-deploy` (archived helper). See `docs/ops/dev-autoscale-smoke.md` for guidance.
-
-Run the dev autoscale smoke (CI default points to the canonical overlay):
-
-```bash
-# CI-default (staging)
-./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/production
-
-# Manual ephemeral test (optional)
-./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/legacy/clean-deploy
-```
+The canonical cluster overlay is `deploy/k3s/overlays/production`. Use `dev`
+and `staging` overlays for non-production validation.
 
 Check job status:
 

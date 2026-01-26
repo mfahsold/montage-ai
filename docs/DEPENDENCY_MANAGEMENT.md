@@ -30,19 +30,19 @@ uv sync --all-extras --dev            # fallback when uv.lock not present
 
 ```bash
 # Run this locally; CI uses `uv sync` as a best-effort if uv.lock is missing
-make deps-lock  # runs ./scripts/uv-lock.sh
+./scripts/uv-lock.sh
 # After verifying, commit `uv.lock` to the repository
 ```
 
 CI integration
 
-- We prefer *local CI* to avoid GitHub Actions costs: run `make ci-local` or `./scripts/ci-local.sh` on a developer machine or self-hosted runner. The local CI script installs `uv` (if missing), syncs dependencies and runs `uv run pytest`.
+- We prefer *local CI* to avoid GitHub Actions costs: run `./scripts/ci-local.sh` on a developer machine or self-hosted runner. The local CI script installs `uv` (if missing), syncs dependencies and runs `uv run pytest`.
 - A lightweight GitHub Actions workflow (`.github/workflows/uv-ci.yml`) exists but **automatic triggers are disabled** and it is set to `workflow_dispatch` only. This avoids incurring recurring GitHub Actions costs.
 - The workflow currently uses `uv sync --dev` to avoid installing private extras during CI while `uv.lock` is being adopted.
 
 Agent instructions
 
-- Agents (automation) MUST run the full local CI via `make ci-local` and attach the output to PRs rather than creating/updating GitHub Actions that run on push/pr and produce cost. If a workflow change is proposed that would add recurring CI execution on push/PR, explicitly call out the cost impact and obtain maintainer approval.
+- Agents (automation) MUST run the full local CI via `./scripts/ci-local.sh` and attach the output to PRs rather than creating/updating GitHub Actions that run on push/pr and produce cost. If a workflow change is proposed that would add recurring CI execution on push/PR, explicitly call out the cost impact and obtain maintainer approval.
 - Agents should include the local CI output (e.g., `uv run pytest -q` result) in the PR description or comments.
 
 Notes & troubleshooting

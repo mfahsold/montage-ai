@@ -24,7 +24,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: amd64
-      priorityClassName: montage-ai-critical
+      priorityClassName: montage-ai-interactive
       topologySpreadConstraints:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname

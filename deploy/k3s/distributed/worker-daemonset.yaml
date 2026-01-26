@@ -40,8 +40,6 @@ spec:
               - matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
                     operator: DoesNotExist
-                  - key: node-role.kubernetes.io/master
-                    operator: DoesNotExist
 
       tolerations:
         # Allow scheduling on nodes with GPU taints

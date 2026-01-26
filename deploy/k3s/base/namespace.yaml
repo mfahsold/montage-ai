@@ -6,3 +6,4 @@ metadata:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: web-ui
     fluxibri.ai/tier: app
+    fluxibri.ai/adaptive-quota: "true"

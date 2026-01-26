@@ -34,6 +34,10 @@ export MONTAGE_HOSTNAME="${MONTAGE_HOSTNAME:-montage-ai.local}"
 
 Use the canonical, simplified deploy flow (build + push + apply overlay):
 
+If you operate the Fluxibri cluster stack, deploy core infrastructure via
+`mfahsold/fluxibri_core` first (canonical `make deploy-core`). This repo assumes
+those services are already present and focuses on the Montage-AI app layer.
+
 ```bash
 # Copy and edit canonical config
 cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml

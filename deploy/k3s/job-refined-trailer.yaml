@@ -16,6 +16,7 @@ spec:
         app.kubernetes.io/component: renderer
     spec:
       restartPolicy: Never
+      priorityClassName: montage-ai-batch
       tolerations:
         - key: "nvidia.com/gpu"
           operator: "Exists"

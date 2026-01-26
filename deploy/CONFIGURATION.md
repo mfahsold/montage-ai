@@ -95,15 +95,15 @@ Tests automatically use environment variables:
 
 ```bash
 # Local testing (default)
-make test
+pytest tests/ -q
 
 # Cluster testing
 export TEST_BASE_URL="http://<MONTAGE_SERVICE_HOST>:<PORT>"
-make test
+pytest tests/ -q
 
 # Production testing
 export TEST_BASE_URL="https://<MONTAGE_HOSTNAME>"
-make test
+pytest tests/ -q
 ```
 
 ## Environment-Specific Configurations
@@ -185,7 +185,7 @@ Below is a minimal Tekton snippet showing how a Kaniko or Kaniko-compatible task
 
 ### Before (Hardcoded)
 ```yaml
-image: YOUR_REGISTRY:30500/montage-ai:latest
+image: YOUR_REGISTRY:5000/montage-ai:latest
 namespace: montage-ai
 ```
 

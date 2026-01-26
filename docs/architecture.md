@@ -71,7 +71,7 @@ System design and component overview.
 
 For systems with limited resources (e.g., laptops), Montage AI supports a hybrid mode where heavy compute tasks are offloaded to the cloud via `cgpu`.
 
-See [Hybrid Workflow](hybrid-workflow.md) for details.
+See [cgpu-setup.md](cgpu-setup.md) for setup details.
 
 - **LLM Inference:** Offloaded to Google Gemini via `cgpu serve`.
 - **Upscaling:** Offloaded to Google Colab GPUs via `cgpu run`.

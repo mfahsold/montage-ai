@@ -5,6 +5,7 @@ metadata:
   name: montage-ai
   labels:
     app: montage-ai
+    fluxibri.ai/adaptive-quota: "true"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

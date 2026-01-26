@@ -5,7 +5,7 @@ This repository supports a vendor-agnostic CI flow that you can run locally or w
 ## Quickstart (Local)
 
 ```bash
-make ci
+./scripts/ci.sh
 ```
 
 This runs `scripts/ci.sh`, which:

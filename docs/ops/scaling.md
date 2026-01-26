@@ -22,18 +22,10 @@ Tuning pointers
 - Route heavy ffmpeg jobs to GPU/encoder node pool via nodeAffinity
 
 Runbook (staging validation)
-1. Apply staging overlay: `kubectl apply -k deploy/k3s/overlays/staging`
-2. Quick dev validation (ephemeral, no production data):
-   - Prefer: run the smoke against the canonical overlay in a staging-like namespace (example uses `montage-ai-clean`):
-     - `./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/production`
-     - Set `CLUSTER_NAMESPACE` to an isolated namespace to avoid touching prod PVCs.
-   - Optional: `deploy/k3s/overlays/legacy/clean-deploy/` remains available for quick local checks but is not canonical.
-   - Runner requirement (CI): self-hosted runner with label `scale-smoke`.
-3. Run smoke (integration): `RUN_SCALE_TESTS=1 pytest -q tests/integration/test_queue_scaling.py -q`
-4. Observe: `kubectl -n "${CLUSTER_NAMESPACE:-montage-ai}" top pods --containers` and dashboard
+1. Apply staging overlay: `make -C deploy/k3s deploy-staging`
+2. Validate that HPA/ScaledObjects exist and that workers scale with real queue
+   load (use your preferred job generator or integration tests).
+3. Observe: `kubectl -n "${CLUSTER_NAMESPACE:-montage-ai}" top pods --containers`
 
-Notes:
-- Use `legacy/clean-deploy` to validate KEDA/HPA behaviour without touching production PVCs.
-- CI smoke is gated and non-blocking for `main`; failures are diagnostic (do not auto-promote).
-
-For full tuning and production checklist see docs/ops/scale_tuning.md (TBD).
+Detailed smoke workflows and cluster-specific steps are maintained in the
+private docs set.

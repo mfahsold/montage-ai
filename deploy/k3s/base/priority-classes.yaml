@@ -1,10 +1,10 @@
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: montage-ai-critical
-value: 100000
+  name: montage-ai-interactive
+value: 600000
 globalDefault: false
-description: "Critical web/API pods for Montage AI (interactive)."
+description: "User-facing UI & realtime APIs for Montage AI."
 ---
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
@@ -12,12 +12,12 @@ metadata:
   name: montage-ai-worker
 value: 90000
 globalDefault: false
-description: "Background workers for Montage AI (queue processing)."
+description: "Standard async processing for Montage AI."
 ---
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
   name: montage-ai-batch
-value: 50000
+value: 20000
 globalDefault: false
-description: "Batch/render jobs for Montage AI (lower priority)."
+description: "Preemptible batch/render jobs for Montage AI."

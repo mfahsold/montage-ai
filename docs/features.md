@@ -494,7 +494,7 @@ Minimal schema:
 ## Web UI (Fastest path)
 
 ```bash
-make web              # or: docker compose -f docker-compose.web.yml up
+./montage-ai.sh web   # or: docker compose -f docker-compose.web.yml up
 # open <MONTAGE_WEB_URL>
 ```
 

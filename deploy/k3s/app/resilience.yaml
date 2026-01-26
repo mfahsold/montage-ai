@@ -14,7 +14,7 @@ spec:
       component: web
 
 ---
-# ResourceQuota: Prevent namespace from consuming excessive cluster resources
+# ResourceQuota: Baseline budget (adaptive quotas may be tuned by energy-scheduler)
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -22,12 +22,12 @@ metadata:
   namespace: montage-ai
 spec:
   hard:
-    requests.cpu: "8"        # Max 8 CPU cores requested
-    requests.memory: "16Gi"  # Max 16 GB memory requested
-    limits.cpu: "16"         # Max 16 CPU cores in limits
-    limits.memory: "32Gi"    # Max 32 GB memory in limits
-    pods: "10"               # Max 10 pods in namespace
-    persistentvolumeclaims: "5"  # Max 5 PVCs
+    requests.cpu: "40"       # Baseline requests budget
+    requests.memory: "80Gi"
+    limits.cpu: "80"
+    limits.memory: "160Gi"
+    pods: "30"
+    persistentvolumeclaims: "15"
 
 ---
 # NetworkPolicy: Restrict traffic (optional, can be enabled later)
@@ -50,19 +50,19 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          name: kube-system
+          kubernetes.io/metadata.name: kube-system
     - podSelector: {}  # Allow from same namespace
   # Allow from monitoring (if Prometheus exists)
   - from:
     - namespaceSelector:
         matchLabels:
-          name: monitoring
+          kubernetes.io/metadata.name: monitoring
   egress:
   # Allow DNS
   - to:
     - namespaceSelector:
         matchLabels:
-          name: kube-system
+          kubernetes.io/metadata.name: kube-system
     ports:
     - protocol: UDP
       port: 53

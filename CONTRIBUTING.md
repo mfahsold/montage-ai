@@ -11,11 +11,8 @@ Hey! Thanks for thinking about contributing. Here's how to get started.
 git clone https://github.com/YOUR_USERNAME/montage-ai.git
 cd montage-ai
 
-# Build
-make build
-
 # Run tests
-make test
+./scripts/ci.sh
 ```
 
 ---
@@ -43,10 +40,10 @@ git checkout -b fix/that-annoying-bug
 ./montage-ai.sh preview
 
 # Full test suite
-make test
+./scripts/ci.sh
 
 # If you changed K8s manifests
-make validate
+make -C deploy/k3s validate
 ```
 
 ### 4. Commit
@@ -71,7 +68,7 @@ Use the local publish script when possible to avoid Actions runner costs:
 ### 7. Open a PR
 
 Push your branch and open a pull request. Include:
-- `make ci-local` output attached to the PR
+- `./scripts/ci-local.sh` output attached to the PR
 - Output of `./scripts/check-hardcoded-registries.sh` (ensure no accidental literals)
 - A short note on any increased CI cost or long-running tests
 
@@ -131,7 +128,7 @@ def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
 
 - **Config-first**: Do NOT hardcode config values (IPs, registry URLs, paths, resource limits). Add settings to `deploy/k3s/config-global.yaml` or `config.Settings`.
 - Run `./scripts/check-hardcoded-registries.sh` before committing. You can install a helper pre-push hook: `cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push`.
-- Run `make ci-local` and attach the logs to PRs.
+- Run `./scripts/ci-local.sh` and attach the logs to PRs.
 - When using AI assistants (VS Code Copilot, OpenAI Codex), follow `.github/copilot-instructions.md` and `docs/llm-agents.md`. Our agent persona: **Senior Creative Technologist** — prioritize stability, make small, well-tested changes, and document reasoning in PRs.
 
 ---
@@ -141,30 +138,18 @@ def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
 ### Local
 
 ```bash
-make build          # Build image
-make test           # Run tests
-make shell          # Debug inside container
+./scripts/ci.sh     # Run tests
+pytest tests/ -q    # Optional: quick pass
 ```
 
 ### Kubernetes
 
 ```bash
-make validate       # Check manifests
-make deploy         # Deploy to cluster
-make logs           # Watch job logs
+make -C deploy/k3s validate           # Check manifests
+make -C deploy/k3s deploy-production  # Deploy to cluster
+kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai -f
 ```
-
-Dev autoscale smoke (dev-only, safe)
-
-- Purpose: deterministic dev validation of KEDA/HPA + worker scaling using the `legacy/clean-deploy` overlay.
-- Local quick-run:
-```bash
-# Ensure KUBECONFIG points to a dev cluster
-./scripts/ci/run-dev-smoke.sh --image <REGISTRY>/montage-ai:<TAG> --overlay deploy/k3s/overlays/legacy/clean-deploy
-```
-- CI: provide a self-hosted runner with label `scale-smoke` and `kubectl` access. The workflow is `.github/workflows/dev-autoscale-smoke.yml`.
-
-Safety: `legacy/clean-deploy` uses `emptyDir` volumes and is safe to run in clusters without production data.
+Detailed autoscale smoke workflows are documented in the private docs set.
 
 ---
 
@@ -219,7 +204,7 @@ For AI model weights (Real-ESRGAN, Whisper, etc.):
 
 ## Where to Contribute
 
-Check our [Backlog](docs/STRATEGIC_BACKLOG.md) for prioritized features (internal; contact maintainers for access):
+Check the internal backlog via the maintainers (private docs set):
 
 - 🔥 **High priority**: Epics marked "In Progress" or "Planned"
 - 🐛 **Bug fixes**: Issues labeled `bug` 

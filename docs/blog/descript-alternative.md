@@ -12,22 +12,21 @@
 - **OTIO/EDL Export:** Continue editing directly in DaVinci/Premiere (Pro handoff).
 - **Beat-Sync + Story Arcs:** Automatic music synchronization and 5-phase narrative.
 - **Local-First:** FFmpeg/Whisper/Auto-Editor run locally; optional cgpu cloud only when explicitly requested.
-- **Batch/CLI:** `make dev-test` locally, `make cluster` for multi-arch/cluster. Scriptable for CI.
+- **Batch/CLI:** `./montage-ai.sh run` locally, `make -C deploy/k3s deploy-production` for cluster.
 - **Longform-ready:** Podcasts, lectures, streams without upload limits.
 
 ## Quick Start
 ```bash
 # Local: 5-second feedback
-make dev       # one-time build
-make dev-test  # edit -> test (volume mounts)
+./montage-ai.sh run
 
 # Cluster (multi-arch, shared cache)
-make cluster   # build + push + deploy
+make -C deploy/k3s deploy-production
 ```
 
 ## Workflow: Podcast to Shorts (Offline)
 1) Place audio/video in `data/input/`
-2) Run `make dev-test` (uses local cache)
+2) Run `./montage-ai.sh run` (uses local cache)
 3) Montage AI generates rough cut + optional 9:16 clips
 4) Export as `montage.otio` -> Import into DaVinci/Premiere for finishing
 

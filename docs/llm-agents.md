@@ -61,17 +61,17 @@ You are a **Senior Creative Technologist**.
 ### Running Tests
 ```bash
 # Run all tests locally using our preferred local CI (avoids GitHub Action costs)
-make ci-local
+./scripts/ci-local.sh
 
 # Run unit tests only
-make test-unit
+pytest -m "not integration and not slow and not scale"
 
 # Run specific test
 pytest tests/test_auto_reframe.py
 ```
 
 ### Agent / Automation Guidance
-- **Agents must run local CI**: Before creating or updating PRs, automation agents should run `make ci-local` and attach the console output to the PR.
+- **Agents must run local CI**: Before creating or updating PRs, automation agents should run `./scripts/ci-local.sh` and attach the console output to the PR.
 - **Avoid adding auto-triggered workflows**: Do not add GitHub Actions that run on push/pull_request without explicit approval from maintainers—these can incur sustained CI costs. Use `workflow_dispatch` for on-demand workflows.
 - **Document cost impacts**: If a proposed change introduces significant CI runtime (e.g., heavy integration tests), document the expected runner time and expected frequency in the PR description so maintainers can approve budget/runner usage.
 

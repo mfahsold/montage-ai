@@ -6,7 +6,7 @@
 
 ```bash
 # Local development
-make dev && make dev-test
+./montage-ai.sh web
 
 # Kubernetes cluster
 make -C deploy/k3s config
@@ -45,13 +45,10 @@ deploy/
 
 ```bash
 # One-time setup
-make dev
-
-# Run with volume mounts (instant code changes)
-make dev-test
+./montage-ai.sh web
 
 # Or use Docker Compose
-docker-compose up
+docker compose up
 ```
 
 ### 2. Single-Node K3s

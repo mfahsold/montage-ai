@@ -38,7 +38,7 @@ spec:
       terminationGracePeriodSeconds: 60
       dnsPolicy: ClusterFirst
       restartPolicy: Always
-      priorityClassName: montage-ai-critical
+      priorityClassName: montage-ai-interactive
       topologySpreadConstraints:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname

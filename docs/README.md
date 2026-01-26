@@ -11,11 +11,15 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 ## Quick Start
 
 ```bash
-# Local development
-make dev && make dev-test
+# Web UI (local)
+./montage-ai.sh web
 
-# Kubernetes cluster
-make cluster
+# CLI run (uses data/input + data/music)
+./montage-ai.sh run
+
+# Kubernetes (production overlay)
+make -C deploy/k3s config
+make -C deploy/k3s deploy-production
 ```
 
 ---
@@ -88,3 +92,5 @@ make cluster
 
 **Archive:** Historical/internal notes live in the private docs set.
 **Contributing:** [CONTRIBUTING.md](../CONTRIBUTING.md)
+
+See `PUBLIC_DOCS_POLICY.md` for the public vs private documentation rules.

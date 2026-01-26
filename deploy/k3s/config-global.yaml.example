@@ -4,13 +4,12 @@
 # DRY: single source of truth for registry, cluster, storage, and image defaults.
 
 registry:
-  host: "<REGISTRY_HOST>"
-  port: 30500
-  url: "<REGISTRY_URL>"
-  nodePort: 30500
+  host: "registry.registry.svc.cluster.local"
+  port: 5000
+  url: "registry.registry.svc.cluster.local:5000"
   namespace: "registry"
   images:
-    montage_ai: "<REGISTRY_URL>/montage-ai"
+    montage_ai: "registry.registry.svc.cluster.local:5000/montage-ai"
 
 cluster:
   namespace: "<CLUSTER_NAMESPACE>"
