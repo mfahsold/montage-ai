@@ -39,10 +39,10 @@ spec:
           - weight: 100
             preference:
               matchExpressions:
-              - key: accelerator
+              - key: fluxibri.ai/gpu-type
                 operator: In
                 values:
-                - nvidia-jetson
+                - nvidia-tegra
       
       # GPU tolerations
       tolerations:

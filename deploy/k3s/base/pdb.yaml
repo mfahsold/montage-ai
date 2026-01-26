@@ -3,6 +3,10 @@ kind: PodDisruptionBudget
 metadata:
   name: montage-ai-web-pdb
   namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: web-ui
+    fluxibri.ai/tier: web
 spec:
   minAvailable: 1
   selector:

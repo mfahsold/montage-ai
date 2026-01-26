@@ -4,6 +4,9 @@ metadata:
   name: redis
   labels:
     app: redis
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: redis
+    fluxibri.ai/tier: infra
 spec:
   replicas: 1
   selector:
@@ -13,6 +16,9 @@ spec:
     metadata:
       labels:
         app: redis
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: redis
+        fluxibri.ai/tier: infra
     spec:
       containers:
       - name: redis
@@ -31,6 +37,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: redis
+  labels:
+    app: redis
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: redis
+    fluxibri.ai/tier: infra
 spec:
   selector:
     app: redis

@@ -23,15 +23,15 @@ patches:
                 - weight: 100
                   preference:
                     matchExpressions:
-                      - key: accelerator
+                      - key: fluxibri.ai/gpu-type
                         operator: In
-                        values: ["amd-gpu"]
+                        values: ["amd-rocm"]
                 - weight: 90
                   preference:
                     matchExpressions:
-                      - key: accelerator
+                      - key: fluxibri.ai/gpu-type
                         operator: In
-                        values: ["nvidia-jetson"]
+                        values: ["nvidia-tegra"]
                 - weight: 50
                   preference:
                     matchExpressions:

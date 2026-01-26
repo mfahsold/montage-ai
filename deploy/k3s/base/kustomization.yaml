@@ -36,9 +36,9 @@ configMapGenerator:
       - STABILIZE=false
       - UPSCALE=false
       - ENHANCE=false
-      - OPENAI_API_BASE=http://llama-rpc-api.llama-box-system.svc.cluster.local:8080/v1
-      - OPENAI_MODEL=qwen
-      - OPENAI_VISION_MODEL=moondream2
+      - OPENAI_API_BASE=http://llama-box-api-distributed.llama-box-system.svc.cluster.local:8080/v1
+      - OPENAI_MODEL=qwen2.5-32b-instruct-q8_0-00001-of-00009.gguf
+      - OPENAI_VISION_MODEL=
       - OLLAMA_HOST=http://llama-box-api.llama-box-system.svc.cluster.local:8080
       - LLM_TIMEOUT=120
       - CGPU_ENABLED=true

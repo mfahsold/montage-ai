@@ -10,7 +10,7 @@ spec:
         - name: cgpu-credentials-init
       # Target Jetson for NVENC/NVMPI hardware encoding
       nodeSelector:
-        accelerator: nvidia-jetson
+        fluxibri.ai/gpu-type: nvidia-tegra
       runtimeClassName: nvidia
       tolerations:
         - key: "nvidia.com/gpu"

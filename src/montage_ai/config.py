@@ -462,7 +462,7 @@ class ClusterConfig:
     registry_host: str = field(default_factory=lambda: os.environ.get("REGISTRY_HOST", "registry.registry.svc.cluster.local"))
     registry_port: str = field(default_factory=lambda: os.environ.get("REGISTRY_PORT", "5000"))
     image_name: str = field(default_factory=lambda: os.environ.get("IMAGE_NAME", "montage-ai"))
-    image_tag: str = field(default_factory=lambda: os.environ.get("IMAGE_TAG", "latest-amd64"))
+    image_tag: str = field(default_factory=lambda: os.environ.get("IMAGE_TAG", "latest"))
     namespace: str = field(default_factory=lambda: os.environ.get("CLUSTER_NAMESPACE", "montage-ai"))
     image_pull_secret: Optional[str] = field(default_factory=lambda: os.environ.get("IMAGE_PULL_SECRET"))
     pvc_name: str = field(default_factory=lambda: os.environ.get("PVC_NAME", "montage-ai-data"))

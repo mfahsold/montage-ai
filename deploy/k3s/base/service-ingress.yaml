@@ -8,6 +8,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: web-ui
+    fluxibri.ai/tier: web
 spec:
   type: ClusterIP
   ports:
@@ -28,6 +29,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: web-ui
+    fluxibri.ai/tier: web
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
     # Allow large file uploads (videos)

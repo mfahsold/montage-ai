@@ -5,6 +5,7 @@ metadata:
   namespace: montage-ai
   labels:
     app.kubernetes.io/name: montage-ai
+    fluxibri.ai/tier: config
 data:
   # Creative Direction
   CUT_STYLE: "dynamic"

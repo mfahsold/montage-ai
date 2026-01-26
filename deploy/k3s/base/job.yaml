@@ -6,6 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: renderer
+    fluxibri.ai/tier: batch
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
@@ -16,7 +17,10 @@ spec:
       labels:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: renderer
+        fluxibri.ai/tier: batch
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       imagePullSecrets:
         - name: ghcr-pull
       priorityClassName: montage-ai-batch

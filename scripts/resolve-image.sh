@@ -21,7 +21,7 @@ fi
 
 REGISTRY_URL="${REGISTRY_URL:-registry.registry.svc.cluster.local:5000}"
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
-IMAGE_TAG="${IMAGE_TAG:-latest-amd64}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
 IMAGE_FULL="${IMAGE_FULL:-${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}}"
 
 echo "${IMAGE_FULL}"

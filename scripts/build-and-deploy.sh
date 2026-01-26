@@ -30,7 +30,7 @@ NC='\033[0m' # No Color
 # REGISTRY can come from config-global (REGISTRY_URL) or environment overrides
 REGISTRY="${REGISTRY_URL:-${REGISTRY:-registry.registry.svc.cluster.local:5000}}"
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
-IMAGE_TAG="${IMAGE_TAG:-latest-amd64}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
 LOCAL_TAG="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 BUILD_QUALITY="${1:-standard}"
 NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"

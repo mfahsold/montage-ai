@@ -145,15 +145,15 @@ spec:
           - weight: 80
             preference:
               matchExpressions:
-              - key: amd.com/gpu
+              - key: fluxibri.ai/gpu-type
                 operator: In
-                values: ["present", "true"]
+                values: ["amd-rocm"]
           - weight: 60
             preference:
               matchExpressions:
-              - key: accelerator
+              - key: fluxibri.ai/gpu-type
                 operator: In
-                values: ["nvidia"]
+                values: ["nvidia-tegra"]
       tolerations:
       - key: "nvidia.com/gpu"
         operator: "Exists"

@@ -6,6 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: cgpu
+    fluxibri.ai/tier: inference
 spec:
   replicas: 1
   selector:
@@ -17,7 +18,10 @@ spec:
       labels:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: cgpu
+        fluxibri.ai/tier: inference
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       imagePullSecrets:
         - name: ghcr-pull
       initContainers:
@@ -94,6 +98,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: cgpu
+    fluxibri.ai/tier: inference
 spec:
   selector:
     app.kubernetes.io/name: montage-ai

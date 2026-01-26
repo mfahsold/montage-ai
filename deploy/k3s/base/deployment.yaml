@@ -8,6 +8,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: web-ui
+    fluxibri.ai/tier: web
 spec:
   replicas: 1
   selector:
@@ -19,7 +20,10 @@ spec:
       labels:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: web-ui
+        fluxibri.ai/tier: web
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       priorityClassName: montage-ai-critical
       topologySpreadConstraints:
       - maxSkew: 1

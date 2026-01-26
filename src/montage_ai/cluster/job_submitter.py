@@ -314,7 +314,7 @@ class JobSubmitter:
             
         pull_secret = image_pull_secret or settings.cluster.image_pull_secret
 
-        # Architecture targeting (default to amd64 as per latest-amd64 tag)
+        # Architecture targeting (default to amd64 as per latest tag)
         if node_selector is None:
             node_selector = {"kubernetes.io/arch": "amd64"}
         

@@ -8,6 +8,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: storage
+    fluxibri.ai/tier: storage
 spec:
   accessModes:
     - ReadWriteOnce  # local-path only supports RWO
@@ -25,6 +26,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: storage
+    fluxibri.ai/tier: storage
 spec:
   accessModes:
     - ReadWriteOnce
@@ -42,6 +44,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: storage
+    fluxibri.ai/tier: storage
 spec:
   accessModes:
     - ReadWriteOnce
@@ -60,6 +63,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: storage
+    fluxibri.ai/tier: storage
 spec:
   accessModes:
     - ReadWriteOnce
@@ -77,6 +81,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: storage
+    fluxibri.ai/tier: storage
 spec:
   accessModes:
     - ReadWriteOnce

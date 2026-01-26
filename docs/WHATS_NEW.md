@@ -22,7 +22,7 @@ This update focuses on **scalability and extreme performance**, transitioning Mo
 
 - **GPU Affinity & Reliability**
 - Implemented Pod Affinity to ensure encode jobs land on high-performance GPU nodes (e.g., `example.com/gpu-enabled: true`).
-  - Resolved architecture blockers (`exec format error`) by standardizing on `latest-amd64` images and node selectors.
+  - Resolved architecture blockers (`exec format error`) by standardizing on `latest` images and node selectors.
 
 ## How this helps contributors
 

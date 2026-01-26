@@ -8,7 +8,7 @@ spec:
     spec:
       # Target AMD GPU nodes (label required)
       nodeSelector:
-        accelerator: amd-gpu
+        fluxibri.ai/gpu-type: amd-rocm
       tolerations:
         - key: "gpu"
           operator: "Equal"

@@ -19,7 +19,7 @@ fi
 
 : "${REGISTRY_URL:=registry.registry.svc.cluster.local:5000}"
 : "${IMAGE_NAME:=montage-ai}"
-: "${IMAGE_TAG:=latest-amd64}"
+: "${IMAGE_TAG:=latest}"
 : "${IMAGE_FULL:=${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}}"
 : "${CLUSTER_NAMESPACE:=montage-ai}"
 : "${MONTAGE_HOSTNAME:=montage-ai.local}"

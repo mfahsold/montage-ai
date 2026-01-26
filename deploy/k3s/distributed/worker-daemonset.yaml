@@ -9,6 +9,7 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: worker
+    fluxibri.ai/tier: worker
 spec:
   selector:
     matchLabels:
@@ -24,6 +25,7 @@ spec:
       labels:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: worker
+        fluxibri.ai/tier: worker
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
@@ -142,24 +144,34 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: worker-gpu
-    montage-ai.fluxibri.dev/gpu-type: amd
+    fluxibri.ai/gpu-type: amd-rocm
+    fluxibri.ai/tier: worker-gpu
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: montage-ai
       app.kubernetes.io/component: worker-gpu
-      montage-ai.fluxibri.dev/gpu-type: amd
+      fluxibri.ai/gpu-type: amd-rocm
   template:
     metadata:
       labels:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: worker-gpu
-        montage-ai.fluxibri.dev/gpu-type: amd
+        fluxibri.ai/gpu-type: amd-rocm
+        fluxibri.ai/tier: worker-gpu
     spec:
       nodeSelector:
-        amd.com/gpu: "present"
+        fluxibri.ai/gpu-type: "amd-rocm"
         kubernetes.io/arch: amd64
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"
+        - key: "amd.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
       priorityClassName: montage-ai-worker
 
       containers:
@@ -186,10 +198,10 @@ spec:
               value: "1"
           resources:
             requests:
-              cpu: "6"
+              cpu: "2"
               memory: "12Gi"
             limits:
-              cpu: "12"
+              cpu: "8"
               memory: "32Gi"
               amd.com/gpu: "1"
           volumeMounts:
@@ -227,24 +239,34 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: worker-gpu
-    montage-ai.fluxibri.dev/gpu-type: nvidia
+    fluxibri.ai/gpu-type: nvidia-tegra
+    fluxibri.ai/tier: worker-gpu
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: montage-ai
       app.kubernetes.io/component: worker-gpu
-      montage-ai.fluxibri.dev/gpu-type: nvidia
+      fluxibri.ai/gpu-type: nvidia-tegra
   template:
     metadata:
       labels:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: worker-gpu
-        montage-ai.fluxibri.dev/gpu-type: nvidia
+        fluxibri.ai/gpu-type: nvidia-tegra
+        fluxibri.ai/tier: worker-gpu
     spec:
       nodeSelector:
-        accelerator: nvidia
-        kubernetes.io/arch: amd64
+        fluxibri.ai/gpu-type: "nvidia-tegra"
+        kubernetes.io/arch: arm64
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "nvidia-tegra"
+          effect: "NoSchedule"
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
       priorityClassName: montage-ai-worker
 
       containers:
@@ -272,10 +294,10 @@ spec:
           resources:
             requests:
               cpu: "4"
-              memory: "8Gi"
+              memory: "3Gi"
             limits:
               cpu: "10"
-              memory: "16Gi"
+              memory: "5Gi"
               nvidia.com/gpu: "1"
           volumeMounts:
             - name: input

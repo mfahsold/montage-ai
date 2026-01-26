@@ -99,4 +99,4 @@ spec:
             claimName: montage-output
       nodeSelector:
         kubernetes.io/arch: arm64
-        accelerator: nvidia-jetson  # Hypothetical label for Jetson nodes
+        fluxibri.ai/gpu-type: nvidia-tegra  # Canonical label for Jetson nodes

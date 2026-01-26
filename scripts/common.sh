@@ -43,7 +43,7 @@ fi
 
 if [ -z "${IMAGE_FULL:-}" ] && [ -n "${REGISTRY_URL:-}" ]; then
   IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
-  IMAGE_TAG="${IMAGE_TAG:-latest-amd64}"
+  IMAGE_TAG="${IMAGE_TAG:-latest}"
   IMAGE_FULL="${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
 fi
 

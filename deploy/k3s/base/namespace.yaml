@@ -5,3 +5,4 @@ metadata:
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: web-ui
+    fluxibri.ai/tier: app

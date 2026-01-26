@@ -39,7 +39,7 @@ storage:
 images:
   montage_ai:
     name: "montage-ai"
-    tag: "latest-amd64"
+    tag: "latest"
 
 resources:
   tiers:

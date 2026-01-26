@@ -234,8 +234,8 @@ kubectl label node <node> fluxibri.ai/registry-host=true
 kubectl label node <node> fluxibri.ai/registry-access=true
 
 # GPU classes (overlays/amd, overlays/jetson)
-kubectl label node <node> accelerator=amd-gpu
-kubectl label node <node> accelerator=nvidia-jetson
+kubectl label node <node> fluxibri.ai/gpu-type=amd-rocm
+kubectl label node <node> fluxibri.ai/gpu-type=nvidia-tegra
 ```
 
 ---
