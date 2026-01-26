@@ -79,11 +79,18 @@ MONTAGE_API_BASE="http://<MONTAGE_API_HOST>" ./montage-ai.sh jobs submit --style
 
 # Cancel a job
 ./montage-ai.sh jobs cancel <JOB_ID>
+
+# Submit and auto-download artifacts after completion
+./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser" --download --download-dir ~/Downloads
+
+# Download and zip artifacts (video + timeline + logs)
+./montage-ai.sh jobs submit --style documentary --download --download-zip
 ```
 
 Notes:
 - `MONTAGE_API_BASE` is the server base URL (no `/api` suffix required).
 - Use `--option options.<key>=...` to set nested `options` fields in the payload.
+- `--download` waits for job completion and saves artifacts to the local machine.
 
 ---
 

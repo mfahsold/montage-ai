@@ -8,8 +8,10 @@ replacing the legacy procedural entry point in editor.py.
 import os
 import sys
 import json
+import time
 import click
 import logging
+import zipfile
 from pathlib import Path
 from typing import Optional, Any, Dict, Iterable
 
@@ -194,6 +196,115 @@ def _request_json(api_base: str, method: str, path: str, timeout: int, **kwargs:
         return response.text
 
 
+def _download_file(api_base: str, url_path: str, dest_path: Path, timeout: int) -> None:
+    url = _build_api_url(api_base, url_path)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    with requests.get(url, stream=True, timeout=timeout) as response:
+        if response.status_code >= 400:
+            raise click.ClickException(f"{response.status_code} {response.reason}: {response.text}")
+        with dest_path.open("wb") as handle:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    handle.write(chunk)
+
+
+def _download_job_artifacts(
+    api_base: str,
+    job_id: str,
+    dest_root: Path,
+    timeout: int,
+    create_zip: bool,
+    log: callable,
+) -> Path:
+    artifacts = _request_json(
+        api_base,
+        "GET",
+        f"/api/jobs/{job_id}/artifacts",
+        timeout,
+    )
+    if not isinstance(artifacts, dict):
+        raise click.ClickException("Unexpected artifacts response from API.")
+
+    artifact_map = artifacts.get("artifacts", {})
+    if not any(artifact_map.values()):
+        raise click.ClickException(f"No artifacts found for job {job_id}.")
+
+    job_dir = dest_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    downloaded_paths: list[Path] = []
+
+    for category, files in artifact_map.items():
+        if not files:
+            continue
+        if category == "video":
+            category_dir = job_dir
+        else:
+            category_dir = job_dir / category
+            category_dir.mkdir(exist_ok=True)
+        for file_info in files:
+            name = file_info.get("name")
+            url_path = file_info.get("download_url")
+            if not name or not url_path:
+                continue
+            dest_path = category_dir / name
+            log(f"Downloading {name}...", err=True)
+            _download_file(api_base, url_path, dest_path, timeout)
+            downloaded_paths.append(dest_path)
+
+    if create_zip:
+        zip_path = job_dir / f"montage_{job_id}.zip"
+        log(f"Creating ZIP: {zip_path}", err=True)
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path in downloaded_paths:
+                arcname = path.relative_to(job_dir)
+                zf.write(path, arcname.as_posix())
+        return zip_path
+
+    return job_dir
+
+
+def _wait_for_job(
+    api_base: str,
+    job_id: str,
+    request_timeout: int,
+    wait_timeout: int,
+    poll_interval: int,
+    log: callable,
+) -> Dict[str, Any]:
+    start = time.time()
+    last_status = None
+
+    while True:
+        job = _request_json(
+            api_base,
+            "GET",
+            f"/api/jobs/{job_id}",
+            request_timeout,
+        )
+        if not isinstance(job, dict):
+            raise click.ClickException("Unexpected job status response from API.")
+
+        status = job.get("status", "unknown")
+        phase = job.get("phase", {}).get("label") or job.get("phase", {}).get("name", "")
+
+        if status != last_status:
+            message = f"Job {job_id}: {status}"
+            if phase:
+                message = f"{message} ({phase})"
+            log(message, err=True)
+            last_status = status
+
+        if status in {"completed", "success", "finished"}:
+            return job
+        if status in {"failed", "cancelled", "error"}:
+            raise click.ClickException(f"Job {job_id} ended with status: {status}")
+
+        if poll_interval > 0:
+            time.sleep(poll_interval)
+        if wait_timeout > 0 and (time.time() - start) > wait_timeout:
+            raise click.ClickException(f"Timed out waiting for job {job_id}.")
+
+
 @cli.group()
 @click.option("--api-base", "--api", default=None, envvar="MONTAGE_API_BASE", help="API base URL (no /api suffix required).")
 @click.option("--timeout", default=20, show_default=True, help="HTTP timeout in seconds.")
@@ -216,6 +327,11 @@ def jobs(ctx: click.Context, api_base: Optional[str], timeout: int):
 @click.option("--payload", help="Raw JSON payload string to merge.")
 @click.option("--payload-file", type=click.Path(exists=True, dir_okay=False), help="Path to JSON payload file.")
 @click.option("--output", type=click.Choice(["id", "json"], case_sensitive=False), default="id", show_default=True)
+@click.option("--download", is_flag=True, help="Wait for completion and download artifacts to this machine.")
+@click.option("--download-dir", type=click.Path(file_okay=False), default="./downloads", show_default=True, help="Directory to store downloaded artifacts.")
+@click.option("--download-zip", is_flag=True, help="Create a ZIP from downloaded artifacts.")
+@click.option("--poll-interval", default=10, show_default=True, help="Polling interval (seconds) when waiting for completion.")
+@click.option("--wait-timeout", default=0, show_default=True, help="Max seconds to wait (0 = no timeout).")
 @click.pass_context
 def jobs_submit(
     ctx: click.Context,
@@ -227,6 +343,11 @@ def jobs_submit(
     payload: Optional[str],
     payload_file: Optional[str],
     output: str,
+    download: bool,
+    download_dir: str,
+    download_zip: bool,
+    poll_interval: int,
+    wait_timeout: int,
 ):
     """Submit a job via POST /api/jobs."""
     data = _load_payload(payload, payload_file)
@@ -252,11 +373,33 @@ def jobs_submit(
         json=data,
     )
 
+    job_id = result.get("id") if isinstance(result, dict) else None
     if output == "json":
         click.echo(json.dumps(result, indent=2))
     else:
-        job_id = result.get("id") if isinstance(result, dict) else None
         click.echo(job_id or json.dumps(result, indent=2))
+
+    if download:
+        if not job_id:
+            raise click.ClickException("API response did not include job id.")
+        download_root = Path(download_dir).expanduser()
+        _wait_for_job(
+            ctx.obj["api_base"],
+            job_id,
+            ctx.obj["timeout"],
+            wait_timeout,
+            poll_interval,
+            click.echo,
+        )
+        downloaded_path = _download_job_artifacts(
+            ctx.obj["api_base"],
+            job_id,
+            download_root,
+            ctx.obj["timeout"],
+            download_zip,
+            click.echo,
+        )
+        click.echo(f"Downloaded artifacts to: {downloaded_path}", err=True)
 
 
 @jobs.command("status")

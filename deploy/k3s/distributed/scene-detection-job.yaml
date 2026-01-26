@@ -125,7 +125,8 @@ spec:
       restartPolicy: Never
       priorityClassName: montage-ai-batch
 
-      # GPU node affinity - prefer AMD (fastest), fallback to NVIDIA
+      # GPU node affinity - align with the requested GPU resource key below.
+      # For Jetson, switch to nvidia.com/gpu and update values to ["nvidia-tegra"].
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -154,6 +155,10 @@ spec:
         operator: "Equal"
         value: "amd-rocm"
         effect: "NoSchedule"
+      - key: "gpu"
+        operator: "Equal"
+        value: "nvidia-tegra"
+        effect: "NoSchedule"
 
       containers:
         - name: encoder
@@ -178,11 +183,13 @@ spec:
             requests:
               cpu: "4"
               memory: "8Gi"
+              # GPU resource key must match the target node type.
+              # Switch to nvidia.com/gpu for Jetson targets.
+              amd.com/gpu: "1"
             limits:
               cpu: "8"
               memory: "24Gi"
-              # Request GPU if available (uncomment as needed)
-              # amd.com/gpu: "1"
+              amd.com/gpu: "1"
           volumeMounts:
             - name: input
               mountPath: /data/input

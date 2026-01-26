@@ -56,6 +56,10 @@ spec:
         operator: Equal
         value: amd-rocm
         effect: NoSchedule
+      - key: gpu
+        operator: Equal
+        value: nvidia-tegra
+        effect: NoSchedule
       
       restartPolicy: Always
       serviceAccountName: montage-ai

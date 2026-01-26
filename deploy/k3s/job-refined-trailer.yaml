@@ -16,6 +16,21 @@ spec:
         app.kubernetes.io/component: renderer
     spec:
       restartPolicy: Never
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "amd.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"
+        - key: "gpu"
+          operator: "Equal"
+          value: "nvidia-tegra"
+          effect: "NoSchedule"
       imagePullSecrets:
         - name: ghcr-pull
       containers:
@@ -24,12 +39,13 @@ spec:
           imagePullPolicy: IfNotPresent
           resources:
             requests:
-              cpu: "4"
-              memory: "16Gi"
+              cpu: "5"
+              memory: "5Gi"
+              nvidia.com/gpu: "1"
             limits:
-              cpu: "8"
-              memory: "32Gi"
-              amd.com/gpu: "1"
+              cpu: "6"
+              memory: "5Gi"
+              nvidia.com/gpu: "1"
           env:
             - name: CUT_STYLE
               value: "cinema_trailer"
@@ -50,9 +66,9 @@ spec:
             - name: ENHANCE
               value: "true"
             - name: INPUT_DIR
-              value: "/data/input/curated"
+              value: "/data/input"
             - name: MUSIC_DIR
-              value: "/data/music/curated"
+              value: "/data/music/techno-nature"
             - name: TARGET_DURATION
               value: "60"
             - name: MUSIC_END
@@ -64,7 +80,7 @@ spec:
             - name: FFMPEG_THREADS
               value: "2"
             - name: FFMPEG_HWACCEL
-              value: "none"
+              value: "auto"
             - name: EXTRACT_REENCODE
               value: "true"
             - name: MAX_PARALLEL_JOBS
@@ -92,16 +108,16 @@ spec:
       volumes:
         - name: input
           persistentVolumeClaim:
-            claimName: montage-input
+            claimName: montage-ai-input-nfs
         - name: music
           persistentVolumeClaim:
-            claimName: montage-music
+            claimName: montage-ai-music-nfs
         - name: assets
           persistentVolumeClaim:
-            claimName: montage-assets
+            claimName: montage-ai-assets-nfs
         - name: output
           persistentVolumeClaim:
-            claimName: montage-output
+            claimName: montage-ai-output-nfs
       nodeSelector:
         # fluxibri.ai/storage-primary: "true"
         # Allow scheduling on any node with GPU (if available) or fallback

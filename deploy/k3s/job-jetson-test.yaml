@@ -18,6 +18,14 @@ spec:
       restartPolicy: Never
       imagePullSecrets:
         - name: ghcr-pull
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "gpu"
+          operator: "Equal"
+          value: "nvidia-tegra"
+          effect: "NoSchedule"
       containers:
         - name: montage-ai
           image: registry.registry.svc.cluster.local:5000/montage-ai:latest

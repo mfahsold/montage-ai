@@ -14,6 +14,10 @@ spec:
         - key: "nvidia.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
+        - key: "gpu"
+          operator: "Equal"
+          value: "nvidia-tegra"
+          effect: "NoSchedule"
       runtimeClassName: nvidia  # assumes NVIDIA device plugin + runtimeclass
       containers:
         - name: montage-ai
