@@ -47,24 +47,7 @@ configMapGenerator:
       - CLUSTER_PARALLELISM=4
       - CLUSTER_RENDER_TIER=large
       - MONTAGE_CLUSTER_MODE=k8s
-      - PVC_INPUT_NAME=montage-input
-      - PVC_OUTPUT_NAME=montage-output
-      - PVC_MUSIC_NAME=montage-music
-      - PVC_ASSETS_NAME=montage-assets
-      - LLM_TIMEOUT=120
-      - CGPU_ENABLED=true
-      - CGPU_HOST=cgpu-server
-      - CGPU_PORT=8080
-      - PREVIEW_MAX_INPUT_SIZE_MB=10000
-      - PREVIEW_MAX_FILES=50
-      - QUEUE_FAST_NAME=default
-      - QUEUE_HEAVY_NAME=heavy
-
-  - name: montage-ai-script
-    files:
-      - montage-ai.sh=patches/montage-ai.sh
-  - name: montage-ai-patch-segment-writer
-    files:
+      - CLUSTER_USE_JOBSET=true
       - segment_writer.py=patches/segment_writer.py
   - name: montage-ai-patch-clip-processor
     files:
@@ -105,36 +88,7 @@ replacements:
         fieldPaths:
           - spec.template.spec.initContainers.[name=cgpu-credentials-init].image
           - spec.template.spec.containers.[name=montage-ai].image
-  - source:
-      kind: ConfigMap
-      name: cluster-config
-      fieldPath: data.STORAGE_CLASS_DEFAULT
-    targets:
-      - select:
-          kind: PersistentVolumeClaim
-          name: montage-input
-        fieldPaths:
-          - spec.storageClassName
-      - select:
-          kind: PersistentVolumeClaim
-          name: montage-music
-        fieldPaths:
-          - spec.storageClassName
-      - select:
-          kind: PersistentVolumeClaim
-          name: montage-assets
-        fieldPaths:
-          - spec.storageClassName
-      - select:
-          kind: PersistentVolumeClaim
-          name: montage-output
-        fieldPaths:
-          - spec.storageClassName
-      - select:
-          kind: PersistentVolumeClaim
-          name: montage-cache
-        fieldPaths:
-          - spec.storageClassName
+
   - source:
       kind: ConfigMap
       name: cluster-config
