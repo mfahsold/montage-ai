@@ -126,7 +126,7 @@ kubectl -n "${CLUSTER_NAMESPACE}" set image deploy/montage-ai-web montage-ai="${
 kubectl -n "${CLUSTER_NAMESPACE}" set image deploy/montage-ai-worker worker="${IMAGE}" --record
 
 # rollout
-kubectl -n "${CLUSTER_NAMESPACE}" rollout restart deployment/montage-ai-web montage-ai-worker
+kubectl -n "${CLUSTER_NAMESPACE}" rollout restart deployment montage-ai-web montage-ai-worker
 kubectl -n "${CLUSTER_NAMESPACE}" rollout status deploy/montage-ai-web --timeout=3m
 kubectl -n "${CLUSTER_NAMESPACE}" rollout status deploy/montage-ai-worker --timeout=3m
 
