@@ -69,11 +69,11 @@ spec:
           mountPath: /data/assets
         resources:
           requests:
-            memory: "8Gi"
-            cpu: "2"
+            memory: "512Mi"
+            cpu: "250m"
           limits:
-            memory: "32Gi"
-            cpu: "8"
+            memory: "1Gi"
+            cpu: "1"
         livenessProbe:
           httpGet:
             path: /api/status
