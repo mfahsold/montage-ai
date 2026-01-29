@@ -106,11 +106,17 @@ class JobSubmitter:
             
             self.batch_v1 = client.BatchV1Api()
             self.core_v1 = client.CoreV1Api()
+            # Custom API for CRDs (JobSet)
+            try:
+                self.custom_api = client.CustomObjectsApi()
+            except Exception:
+                self.custom_api = None
             logger.info(f"✅ Kubernetes client initialized (Namespace: {self.namespace})")
         except Exception as e:
             logger.error(f"❌ Failed to initialize Kubernetes client: {e}")
             self.batch_v1 = None
             self.core_v1 = None
+            self.custom_api = None
 
     def _kubectl(self, *args, capture_output: bool = True) -> subprocess.CompletedProcess:
         """Run kubectl command."""
@@ -179,6 +185,23 @@ class JobSubmitter:
             env=env,
             tier="medium"
         )
+
+    def _supports_jobset(self) -> bool:
+        """Detect whether JobSet CRD is available in the cluster."""
+        if not getattr(settings.cluster, "use_jobset", False):
+            return False
+        if not self.custom_api:
+            return False
+        try:
+            # Try to list jobsets in the namespace as a capability probe
+            self.custom_api.list_namespaced_custom_object(group="batch.jobset.sigs.k8s.io", version="v1alpha1", namespace=self.namespace, plural="jobsets", limit=1)
+            return True
+        except ApiException as e:
+            logger.info("JobSet CRD not available or accessible: %s", e)
+            return False
+        except Exception as e:
+            logger.info("Unexpected error checking JobSet CRD: %s", e)
+            return False
 
     def get_job_status(self, job_name: str) -> Optional[JobStatus]:
         """Get status of a job using K8s API."""
@@ -464,6 +487,39 @@ class JobSubmitter:
                 )
             )
         )
+
+        # If JobSet is available and desired, prefer JobSet for coordinated distributed workloads
+        if self._supports_jobset():
+            jobset = {
+                "apiVersion": "batch.jobset.sigs.k8s.io/v1alpha1",
+                "kind": "JobSet",
+                "metadata": {
+                    "name": job_id,
+                    "namespace": self.namespace,
+                    "labels": job.metadata.labels
+                },
+                "spec": {
+                    "completions": completions,
+                    "parallelism": parallelism,
+                    "template": {
+                        "metadata": {"labels": job.spec.template.metadata.labels},
+                        "spec": job.spec.template.spec.to_dict()
+                    }
+                }
+            }
+            try:
+                self.custom_api.create_namespaced_custom_object(
+                    group="batch.jobset.sigs.k8s.io",
+                    version="v1alpha1",
+                    namespace=self.namespace,
+                    plural="jobsets",
+                    body=jobset
+                )
+                logger.info(f"Successfully submitted JobSet for {component}: {job_id}")
+                return JobSpec(name=job_id, namespace=self.namespace, parallelism=parallelism, completions=completions)
+            except ApiException as e:
+                logger.warning(f"JobSet submission failed, falling back to Job: {e}")
+                # fall through to Job creation
 
         try:
             self.batch_v1.create_namespaced_job(self.namespace, job)

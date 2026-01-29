@@ -1,0 +1,44 @@
+# Example JobSet for coordinated distributed rendering (requires JobSet CRD/install)
+# See docs/INFRA_TEAM_FEEDBACK_SOTA_2026.md for guidance and links to upstream JobSet
+apiVersion: batch.jobset.sigs.k8s.io/v1alpha1
+kind: JobSet
+metadata:
+  name: montage-ai-render-jobset
+  namespace: montage-ai
+spec:
+  completions: 3
+  parallelism: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: renderer
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: montage-ai
+          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python","-m","montage_ai.editor"]
+          envFrom:
+            - configMapRef:
+                name: montage-ai-config
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: gpu.type
+                    operator: In
+                    values:
+                      - nvidia
+                      - amd
+# Note: This is an example manifest. Install the JobSet CRD in the cluster before applying.

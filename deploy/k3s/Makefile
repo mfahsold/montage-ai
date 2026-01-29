@@ -41,6 +41,19 @@ validate: config ## Validate kustomize builds
 	@$(KUSTOMIZE_BUILD) ./overlays/cluster >/dev/null
 	@echo "${GREEN}✓ Validation complete${RESET}"
 
+# Cluster dependency helpers
+deps: ## Print/install cluster dependencies (KEDA, JobSet CRD)
+	@echo "${YELLOW}Run 'make install-keda' to install KEDA via Helm, or follow docs/${RESET}"
+
+install-keda: ## Install KEDA via Helm (requires helm available)
+	@echo "${GREEN}Installing KEDA via Helm...${RESET}"
+	@helm repo add kedacore https://kedacore.github.io/charts || true
+	@helm repo update || true
+	@helm list -n keda | grep keda || helm install keda kedacore/keda --namespace keda --create-namespace || true
+
+check-jobset: ## Check if JobSet CRD is present
+	@kubectl get crd jobs.batch.jobset.sigs.k8s.io >/dev/null 2>&1 && echo "${GREEN}JobSet CRD present${RESET}" || echo "${YELLOW}JobSet CRD not found. See docs for install instructions.${RESET}" 
+
 diff: config ## Show kubectl diff for cluster overlay
 	@$(KUSTOMIZE_BUILD) ./overlays/cluster | $(KUBECTL) diff -f - || true
 

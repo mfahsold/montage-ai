@@ -17,3 +17,4 @@
 - Add `docs/CODE_HEALTH.md` and small README note
 - Remove obvious unused imports/params (api.py, web_ui/app.py, cli.py)
 - Add `clean-deploy` ephemeral kustomize overlay and `dev-autoscale-smoke` CI workflow for safe dev/staging validation (KEDA/HPA); add docs and guarded dev-only endpoint for deterministic smoke tests
+- Implement cluster-distributed deployment improvements: KEDA ScaledObjects for `montage-ai-worker` and `montage-ai-worker-heavy`, replaced host-based pod anti-affinity with zone-level spreading, and added a JobSet example for coordinated distributed renders (docs updated)

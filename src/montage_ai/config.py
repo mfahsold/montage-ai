@@ -514,6 +514,9 @@ class ClusterConfig:
             return f"{host}:{port}/{name}:{tag}"
         return f"{host}/{name}:{tag}"
 
+    # Opt-in JobSet usage (if CRD installed and desired)
+    use_jobset: bool = field(default_factory=lambda: os.environ.get("CLUSTER_USE_JOBSET", "false").lower() == "true")
+
 
 # =============================================================================
 # Motion Analysis & Performance Tuning

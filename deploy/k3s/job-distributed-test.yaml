@@ -108,7 +108,7 @@ spec:
         - name: output
           persistentVolumeClaim:
             claimName: montage-output
-      # Affinity to spread pods across different nodes (AMD, ARM, etc.)
+      # Affinity to spread pods across different failure domains (avoid host-specific anti-patterns)
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -120,4 +120,5 @@ spec:
                   operator: In
                   values:
                   - montage-ai
-              topologyKey: kubernetes.io/hostname
+              # DO NOT use node hostname (anti-pattern). Prefer zone-level spreading for cluster-agnostic behavior.
+              topologyKey: topology.kubernetes.io/zone

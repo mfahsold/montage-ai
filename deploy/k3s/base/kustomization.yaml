@@ -62,25 +62,25 @@ configMapGenerator:
 
   - name: montage-ai-script
     files:
-      - montage-ai.sh=../../../montage-ai.sh
+      - montage-ai.sh=patches/montage-ai.sh
   - name: montage-ai-patch-segment-writer
     files:
-      - segment_writer.py=../../../src/montage_ai/segment_writer.py
+      - segment_writer.py=patches/segment_writer.py
   - name: montage-ai-patch-clip-processor
     files:
-      - clip_processor.py=../../../src/montage_ai/core/clip_processor.py
+      - clip_processor.py=patches/clip_processor.py
   - name: montage-ai-patch-analysis-engine
     files:
-      - analysis_engine.py=../../../src/montage_ai/core/analysis_engine.py
+      - analysis_engine.py=patches/analysis_engine.py
   - name: montage-ai-patch-hardware
     files:
-      - hardware.py=../../../src/montage_ai/core/hardware.py
+      - hardware.py=patches/hardware.py
   - name: montage-ai-patch-creative-director
     files:
-      - creative_director.py=../../../src/montage_ai/creative_director.py
+      - creative_director.py=patches/creative_director.py
   - name: montage-ai-patch-proxy-generator
     files:
-      - proxy_generator.py=../../../src/montage_ai/proxy_generator.py
+      - proxy_generator.py=patches/proxy_generator.py
 
 replacements:
   - source:
