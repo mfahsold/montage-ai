@@ -20,10 +20,6 @@ spec:
         app.kubernetes.io/component: cgpu
         fluxibri.ai/tier: inference
     spec:
-      nodeSelector:
-        kubernetes.io/arch: amd64
-      imagePullSecrets:
-        - name: ghcr-pull
       initContainers:
         - name: cgpu-credentials-init
           image: registry.registry.svc.cluster.local:5000/montage-ai:latest

@@ -28,10 +28,25 @@ from montage_ai.config_parser import ConfigParser
 # =============================================================================
 # Path Configuration
 # =============================================================================
+def _is_cluster_deployment() -> bool:
+    """Check if running in cluster deployment mode (unified detection)."""
+    # Import here to avoid circular dependency
+    try:
+        from montage_ai.deployment_mode import is_cluster_mode
+        return is_cluster_mode()
+    except ImportError:
+        # Fallback to legacy behavior if module not available
+        return ConfigParser.parse_bool("CLUSTER_MODE", False)
+
+
 def _select_temp_dir() -> Path:
     env_override = os.environ.get("TEMP_DIR")
     if env_override:
         return Path(env_override)
+
+    if _is_cluster_deployment():
+        output_dir = os.environ.get("OUTPUT_DIR", "/data/output")
+        return Path(output_dir) / "tmp"
 
     shm_path = Path("/dev/shm")
     if shm_path.exists() and shm_path.is_dir():
@@ -255,8 +270,10 @@ class FeatureConfig:
     low_memory_mode: bool = field(default_factory=ConfigParser.make_bool_parser("LOW_MEMORY_MODE", False))
 
     # Cluster Mode: Distribute heavy processing across multiple Kubernetes nodes
-    cluster_mode: bool = field(default_factory=ConfigParser.make_bool_parser("CLUSTER_MODE", False))
+    # Uses unified deployment mode detection for consistency
+    cluster_mode: bool = field(default_factory=_is_cluster_deployment)
     cluster_parallelism: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_PARALLELISM", 4))
+    cluster_render_tier: str = field(default_factory=ConfigParser.make_str_parser("CLUSTER_RENDER_TIER", "large"))
 
     # Color/levels normalization controls (can be disabled for clean footage)
     colorlevels: bool = field(default_factory=ConfigParser.make_bool_parser("COLORLEVELS", True))
@@ -393,14 +410,14 @@ class GPUConfig:
 class LLMConfig:
     """LLM backend configuration."""
 
-    # OpenAI-compatible API (KubeAI, vLLM, LocalAI)
+    # OpenAI-compatible API (LiteLLM/llama-box, vLLM, LocalAI)
     openai_api_base: str = field(default_factory=lambda: os.environ.get("OPENAI_API_BASE", ""))
     openai_api_key: str = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", "not-needed"))
     openai_model: str = field(default_factory=lambda: os.environ.get("OPENAI_MODEL", ""))
     openai_vision_model: str = field(default_factory=lambda: os.environ.get("OPENAI_VISION_MODEL", ""))
 
     # Ollama (local fallback)
-    ollama_host: str = field(default_factory=lambda: os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
+    ollama_host: str = field(default_factory=lambda: os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434"))
     ollama_model: str = field(default_factory=lambda: os.environ.get("OLLAMA_MODEL", "llava"))
     director_model: str = field(default_factory=lambda: os.environ.get("DIRECTOR_MODEL", "llama3.1:70b"))
 
@@ -422,10 +439,14 @@ class LLMConfig:
     # General LLM settings
     timeout: int = field(default_factory=lambda: int(os.environ.get("LLM_TIMEOUT", "60")))
 
+    @staticmethod
+    def _is_auto_model(model: str) -> bool:
+        return model.strip().lower() in ("auto", "discover", "dynamic", "default")
+
     @property
     def has_openai_backend(self) -> bool:
         """Check if OpenAI-compatible backend is configured."""
-        return bool(self.openai_api_base and self.openai_model)
+        return bool(self.openai_api_base and (self.openai_model or self._is_auto_model(self.openai_model)))
 
     @property
     def has_google_backend(self) -> bool:
@@ -466,6 +487,10 @@ class ClusterConfig:
     namespace: str = field(default_factory=lambda: os.environ.get("CLUSTER_NAMESPACE", "montage-ai"))
     image_pull_secret: Optional[str] = field(default_factory=lambda: os.environ.get("IMAGE_PULL_SECRET"))
     pvc_name: str = field(default_factory=lambda: os.environ.get("PVC_NAME", "montage-ai-data"))
+    pvc_input: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_INPUT_NAME") or "")
+    pvc_output: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_OUTPUT_NAME") or "")
+    pvc_music: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_MUSIC_NAME") or "")
+    pvc_assets: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_ASSETS_NAME") or "")
 
     # Resource Tiers (Canonical Fluxibri Tiers)
     tiers: dict = field(default_factory=lambda: {

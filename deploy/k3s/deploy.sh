@@ -8,13 +8,18 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_ROOT="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(cd "${DEPLOY_ROOT}/.." && pwd)"
-OVERLAY="${1:-dev}"  # Default to dev overlay
+OVERLAY="${1:-cluster}"  # Default to cluster overlay (canonical)
 
 # Validate overlay exists
+if [ "${OVERLAY}" != "cluster" ]; then
+  echo "❌ ERROR: Only the canonical 'cluster' overlay is supported."
+  echo "Use local mode for non-Kubernetes runs, or deploy with:"
+  echo "  ./deploy.sh cluster"
+  exit 1
+fi
+
 if [ ! -d "${SCRIPT_DIR}/overlays/${OVERLAY}" ]; then
   echo "❌ ERROR: Overlay '${OVERLAY}' not found"
-  echo "Available overlays:"
-  ls -1 "${SCRIPT_DIR}/overlays/" | sed 's/^/  - /'
   exit 1
 fi
 
@@ -66,11 +71,6 @@ fi
 echo "Building manifests from overlay '${OVERLAY}'..."
 MANIFEST_FILE=$(mktemp)
 trap "rm -f ${MANIFEST_FILE}" EXIT
-
-# Jobs are immutable; delete render job before re-apply when needed
-if [[ "${OVERLAY}" == "distributed" ]]; then
-  kubectl delete job montage-ai-render -n "${CLUSTER_NAMESPACE}" --ignore-not-found > /dev/null 2>&1 || true
-fi
 
 kustomize build --load-restrictor LoadRestrictionsNone "${SCRIPT_DIR}/overlays/${OVERLAY}" > "${MANIFEST_FILE}"
 

@@ -9,8 +9,12 @@
 ./montage-ai.sh web
 
 # Kubernetes cluster
+# Canonical (Fluxibri core): unified CLI deploy
+fluxibri deployment deploy montage-ai
+
+# Canonical cluster deploy (kustomize)
 make -C deploy/k3s config
-make -C deploy/k3s deploy-production
+make -C deploy/k3s deploy-cluster
 ```
 
 ## Documentation Map
@@ -32,8 +36,7 @@ deploy/
     ├── base/cluster-config.env ← Generated from config-global.yaml
     ├── README.md          ← Main K8s deployment guide
     ├── base/              ← Base manifests
-    ├── overlays/          ← Environment-specific configs
-    ├── app/               ← Full app deployment
+    ├── overlays/          ← Canonical cluster overlay + legacy (archived)
     ├── deploy.sh          ← Deploy script
     ├── undeploy.sh        ← Cleanup script
     └── build-and-push.sh  ← Build & push image
@@ -51,42 +54,30 @@ deploy/
 docker compose up
 ```
 
-### 2. Single-Node K3s
+### 2. Cluster Mode (Kubernetes)
 
 ```bash
 # Render config + deploy
 make -C deploy/k3s config
-make -C deploy/k3s deploy-production
+make -C deploy/k3s deploy-cluster
 
 # Or step by step:
 ./deploy/k3s/build-and-push.sh
 ./deploy/k3s/deploy.sh
 ```
 
-### 3. Multi-Node Cluster (Distributed)
+For Fluxibri-managed clusters, prefer the canonical CLI:
 
 ```bash
-# Setup NFS storage first (see k3s/README.md)
-kubectl apply -k deploy/k3s/overlays/distributed/
-```
-
-### 4. GPU-Accelerated
-
-```bash
-# AMD GPU (VAAPI)
-kubectl apply -k deploy/k3s/overlays/amd/
-
-# NVIDIA Jetson
-kubectl apply -k deploy/k3s/overlays/jetson/
+fluxibri deployment deploy montage-ai
+fluxibri hardware quotas
 ```
 
 ## K3s Make Targets
 
 ```bash
 make -C deploy/k3s help
-make -C deploy/k3s deploy-dev
-make -C deploy/k3s deploy-staging
-make -C deploy/k3s deploy-production
+make -C deploy/k3s deploy-cluster
 ```
 
 ## Environment Configuration

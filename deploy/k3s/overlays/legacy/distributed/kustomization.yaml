@@ -13,7 +13,7 @@ namespace: montage-ai
 
   # NFS PVCs are expected to exist in the cluster already
 resources:
-- ../../base
+- ../../../base
 - ../../distributed/worker-daemonset.yaml
 
   # Use JSON 6902 patch to REPLACE volumes (not add)

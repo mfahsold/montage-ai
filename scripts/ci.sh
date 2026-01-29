@@ -73,8 +73,7 @@ validate_manifests() {
   log "Validating Kubernetes manifests (kustomize)"
   set +e
   kubectl kustomize "${ROOT_DIR}/deploy/k3s/base/" >/dev/null && echo "base ✓"
-  kubectl kustomize "${ROOT_DIR}/deploy/k3s/overlays/production/" >/dev/null && echo "overlays/production ✓"
-  kubectl kustomize "${ROOT_DIR}/deploy/k3s/overlays/dev/" >/dev/null && echo "overlays/dev ✓"
+  kubectl kustomize "${ROOT_DIR}/deploy/k3s/overlays/cluster/" >/dev/null && echo "overlays/cluster ✓"
   set -e
 }
 

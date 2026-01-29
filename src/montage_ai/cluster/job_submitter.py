@@ -345,6 +345,68 @@ class JobSubmitter:
             lim_cpu = resources.get("limits_cpu", "2")
             lim_mem = resources.get("limits_memory", "4Gi")
 
+        pvc_input = settings.cluster.pvc_input or ""
+        pvc_output = settings.cluster.pvc_output or ""
+        pvc_music = settings.cluster.pvc_music or ""
+        pvc_assets = settings.cluster.pvc_assets or ""
+        use_split_pvcs = any([pvc_input, pvc_output, pvc_music, pvc_assets])
+
+        volume_mounts = []
+        volumes = []
+
+        if use_split_pvcs:
+            input_claim = pvc_input or settings.cluster.pvc_name
+            output_claim = pvc_output or settings.cluster.pvc_name
+            volumes.append(client.V1Volume(
+                name="input",
+                persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                    claim_name=input_claim
+                )
+            ))
+            volumes.append(client.V1Volume(
+                name="output",
+                persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                    claim_name=output_claim
+                )
+            ))
+            volume_mounts.extend([
+                client.V1VolumeMount(name="input", mount_path="/data/input", read_only=True),
+                client.V1VolumeMount(name="output", mount_path="/data/output")
+            ])
+
+            if pvc_music:
+                volumes.append(client.V1Volume(
+                    name="music",
+                    persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                        claim_name=pvc_music
+                    )
+                ))
+                volume_mounts.append(
+                    client.V1VolumeMount(name="music", mount_path="/data/music", read_only=True)
+                )
+
+            if pvc_assets:
+                volumes.append(client.V1Volume(
+                    name="assets",
+                    persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                        claim_name=pvc_assets
+                    )
+                ))
+                volume_mounts.append(
+                    client.V1VolumeMount(name="assets", mount_path="/data/assets", read_only=True)
+                )
+        else:
+            volumes.append(client.V1Volume(
+                name="data",
+                persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                    claim_name=settings.cluster.pvc_name
+                )
+            ))
+            volume_mounts.extend([
+                client.V1VolumeMount(name="data", mount_path="/data/input", sub_path="input", read_only=True),
+                client.V1VolumeMount(name="data", mount_path="/data/output", sub_path="output")
+            ])
+
         container = client.V1Container(
             name="worker",
             image=self.image,
@@ -355,20 +417,13 @@ class JobSubmitter:
                 requests={"cpu": req_cpu, "memory": req_mem},
                 limits={"cpu": lim_cpu, "memory": lim_mem}
             ),
-            volume_mounts=[
-                client.V1VolumeMount(name="data", mount_path="/data/input", sub_path="input", read_only=True),
-                client.V1VolumeMount(name="data", mount_path="/data/output", sub_path="output")
-            ]
+            volume_mounts=volume_mounts
         )
 
         pod_spec = client.V1PodSpec(
             restart_policy="Never",
             containers=[container],
-            volumes=[
-                client.V1Volume(name="data", persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
-                    claim_name=settings.cluster.pvc_name
-                ))
-            ],
+            volumes=volumes,
             node_selector=node_selector,
             affinity=affinity
         )

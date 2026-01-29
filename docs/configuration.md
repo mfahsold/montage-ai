@@ -70,28 +70,63 @@ LLM backends are used in **priority order**: OpenAI-compatible > Google AI > cgp
 
 ### OpenAI-Compatible API (Recommended for Kubernetes)
 
-For KubeAI, vLLM, LocalAI, or any OpenAI-compatible endpoint:
+For LiteLLM, vLLM, LocalAI, or any OpenAI-compatible endpoint:
 
 | Variable              | Default      | Description                                                      |
 | --------------------- | ------------ | ---------------------------------------------------------------- |
-| `OPENAI_API_BASE`     | *(empty)*    | API base URL (e.g., `http://kubeai.svc.local/openai/v1`)         |
-| `OPENAI_API_KEY`      | `not-needed` | API key (KubeAI ignores this)                                    |
-| `OPENAI_MODEL`        | *(empty)*    | Creative Director model (e.g., `gemma3-4b`, `qwen2-5-32b`)       |
-| `OPENAI_VISION_MODEL` | *(empty)*    | Vision model for scene analysis (e.g., `moondream2`, `llava-7b`) |
+| `OPENAI_API_BASE`     | *(empty)*    | API base URL (e.g., `http://litellm.llama-box-system.svc.cluster.local:4000/v1`) |
+| `OPENAI_API_KEY`      | `sk-1234`    | API key for LiteLLM proxy (cluster default)                      |
+| `OPENAI_MODEL`        | *(empty)*    | Model ID or `auto` to discover via `/v1/models`                  |
+| `OPENAI_VISION_MODEL` | *(empty)*    | Vision model ID or `auto` (optional)                             |
 
-**Example (KubeAI cluster):**
+**Example (Fluxibri cluster / LiteLLM):**
 
 ```bash
-OPENAI_API_BASE=http://kubeai.kubeai-system.svc.cluster.local/openai/v1 \
-OPENAI_MODEL=gemma3-4b \
-OPENAI_VISION_MODEL=moondream2 \
+OPENAI_API_BASE=http://litellm.llama-box-system.svc.cluster.local:4000/v1 \
+OPENAI_API_KEY=sk-1234 \
+OPENAI_MODEL=auto \
 ./montage-ai.sh run
 ```
 
-**Model Selection:**
-- **Creative Director**: Use small, fast models (gemma3-4b, llama3-8b)
-- **Vision Analysis**: Use vision models (moondream2, llava-7b)
-- **Complex Tasks**: Use larger models on-demand (qwen2-5-32b, llama3-70b)
+**Example (Together AI / Claude via OpenAI-compatible API):**
+
+```bash
+# point Montage AI at Together's OpenAI-compatible endpoint
+OPENAI_API_BASE=https://api.together.xyz/v1 \
+OPENAI_API_KEY=YOUR_TOGETHER_API_KEY \
+OPENAI_MODEL=auto \
+./montage-ai.sh run
+```
+
+### Claude Code Router (musistudio/claude-code-router) — recommended on org/user level
+
+If you want to route Claude/"Together" through a single, OpenAI‑compatible proxy (recommended for auditability, rate‑limits and central key management), run the `musistudio/claude-code-router` at the org/user level and point `OPENAI_API_BASE` at it.
+
+Benefits:
+- Central API key stored in one place (GitHub org secret, K8s Secret or cloud secret manager) ✅
+- Single endpoint for all CI runners / cluster nodes (easier rotation & logging) ✅
+
+Quick local example (router runs locally and exposes OpenAI‑compatible /v1):
+
+```bash
+# run router locally and point Montage at it
+# (do NOT commit your API key; keep it in env / secret manager)
+TOGETHER_API_KEY="<redacted>" docker compose -f deploy/claude-code-router/docker-compose.claude-router.yml up -d
+export OPENAI_API_BASE="http://localhost:8080/v1"
+export OPENAI_API_KEY="${TOGETHER_API_KEY}"
+./montage-ai.sh run
+```
+
+Security & deployment — store the real API key at the org/user level (do NOT commit):
+
+1) GitHub (org or repo) secrets — use `OPENAI_API_BASE` + `OPENAI_API_KEY` in workflows.
+2) Kubernetes — create a `Secret` (example below) and reference it from the Deployment.
+3) Cloud secret managers (GCP Secret Manager / AWS Secrets Manager) — inject at deploy time.
+
+**Model Selection (DRY):**
+
+- Do not hardcode model IDs. Use `OPENAI_MODEL=auto` and let the app query `/v1/models`.
+- For vision, set `OPENAI_VISION_MODEL=auto` if a vision model is available.
 
 ### Ollama (Local LLM)
 
@@ -225,13 +260,13 @@ Use `PRESERVE_ASPECT=true` when:
 
 ## Quick-Start Configurations
 
-### KubeAI Cluster with GPU Encoding
+### Fluxibri Cluster with GPU Encoding
 
 ```bash
 # .env file or docker-compose environment
-OPENAI_API_BASE=http://kubeai.kubeai-system.svc.cluster.local/openai/v1
-OPENAI_MODEL=gemma3-4b
-OPENAI_VISION_MODEL=moondream2
+OPENAI_API_BASE=http://litellm.llama-box-system.svc.cluster.local:4000/v1
+OPENAI_API_KEY=sk-1234
+OPENAI_MODEL=auto
 ENABLE_AI_FILTER=true
 FFMPEG_HWACCEL=auto
 PRESERVE_ASPECT=false

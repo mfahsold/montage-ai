@@ -13,23 +13,6 @@ spec:
       app: montage-ai
       component: web
 
----
-# ResourceQuota: Baseline budget (adaptive quotas may be tuned by energy-scheduler)
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: montage-ai-quota
-  namespace: montage-ai
-spec:
-  hard:
-    requests.cpu: "40"       # Baseline requests budget
-    requests.memory: "80Gi"
-    limits.cpu: "80"
-    limits.memory: "160Gi"
-    pods: "30"
-    persistentvolumeclaims: "15"
-
----
 # NetworkPolicy: Restrict traffic (optional, can be enabled later)
 # Allows ingress from Traefik/default namespace only
 apiVersion: networking.k8s.io/v1

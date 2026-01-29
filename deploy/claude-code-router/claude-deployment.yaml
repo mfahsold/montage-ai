@@ -1,0 +1,61 @@
+# Example Kubernetes Deployment + Secret for musistudio/claude-code-router
+# IMPORTANT: create the secret from your org-managed API key; do NOT hardcode it here.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: claude-router-secret
+type: Opaque
+stringData:
+  # store the upstream Together API key here
+  TOGETHER_API_KEY: "REPLACE_WITH_SECRET"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-code-router
+  labels:
+    app: claude-code-router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: claude-code-router
+  template:
+    metadata:
+      labels:
+        app: claude-code-router
+    spec:
+      containers:
+        - name: claude-code-router
+          image: musistudio/claude-code-router:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: TOGETHER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: claude-router-secret
+                  key: TOGETHER_API_KEY
+            - name: PORT
+              value: "8080"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude-code-router
+spec:
+  selector:
+    app: claude-code-router
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP

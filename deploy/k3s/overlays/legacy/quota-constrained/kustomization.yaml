@@ -3,7 +3,7 @@ kind: Kustomization
 # Overlay to deploy montage-ai in clusters with strict PVC ResourceQuota
 # Removes large NFS-backed PVCs so smoke-tests can run using existing RWX PVCs.
 resources:
-  - ../../base
+  - ../../../base
 patches:
   - path: remove-nfs-pvcs.yaml
     target:

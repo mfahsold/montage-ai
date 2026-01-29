@@ -127,17 +127,16 @@ For cluster deployments:
 # Render config
 make -C deploy/k3s config
 
-# Production overlay
-make -C deploy/k3s deploy-production
+# Canonical cluster overlay
+make -C deploy/k3s deploy-cluster
 ```
 
-The canonical cluster overlay is `deploy/k3s/overlays/production`. Use `dev`
-and `staging` overlays for non-production validation.
+The canonical cluster overlay is `deploy/k3s/overlays/cluster`.
 
 Check job status:
 
 ```bash
-kubectl logs -f job/montage-ai-render
+python3 -m montage_ai.cli jobs --api-base http://<cluster-service> list
 ```
 
 ---

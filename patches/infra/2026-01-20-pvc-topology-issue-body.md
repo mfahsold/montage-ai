@@ -40,7 +40,7 @@ spec:
 Warning  FailedScheduling  31m  default-scheduler  0/8 nodes are available: 2 Insufficient memory, 2 node(s) didn't match PersistentVolume's node affinity, 4 node(s) didn't match Pod's node affinity/selector.
 ```
 
-- Repo config (k3s example): `deploy/k3s/base/pvc.yaml` and `deploy/k3s/app/pvcs.yaml` default to `storageClassName: local-path` (RWO). There is an existing overlay that shows the intended fix: `deploy/k3s/overlays/distributed/nfs-pvc.yaml` (overrides to pre-provisioned PV / RWM).
+- Repo config (k3s example): `deploy/k3s/base/pvc.yaml` defaults to an RWX access mode and pulls `storageClassName` from `deploy/k3s/config-global.yaml`. Legacy overlays are archived under `deploy/k3s/overlays/legacy/` and should not be used for canonical deployments.
 
 Root cause
 ----------
@@ -54,8 +54,7 @@ Impact
 
 Recommended IaC changes (priority order)
 ----------------------------------------
-1) HIGH — Provide an RWM StorageClass for staging and migrate `montage-*` PVCs in staging to use it (NFS, CephFS, or CSI that supports RWX). Add a `deploy/k3s/overlays/staging/nfs-pvc.yaml` and a Terraform/Flux module to provision the backend.
-   - Minimal kustomize change: enable `deploy/k3s/overlays/distributed/nfs-pvc.yaml` in staging pipelines for autoscaling validation.
+1) HIGH — Provide an RWX StorageClass for staging and migrate `montage-*` PVCs in staging to use it (NFS, CephFS, or CSI that supports RWX). Update `deploy/k3s/config-global.yaml` with the class and provision the backend in IaC/Flux.
 
 2) HIGH — Add a CI job that mirrors images to an in‑cluster registry (or ensures `imagePullSecrets` for GHCR); include `push-to-cluster-registry` helper and document secrets handling.
 
@@ -97,4 +96,3 @@ Next steps I can take
 ---------------------
 - Open this issue in `mfahsold/fluxibri_core` (ready).  
 - Draft PR that: (A) provisions RWM storage for staging and (B) adds CI mirror + smoke job.  
-

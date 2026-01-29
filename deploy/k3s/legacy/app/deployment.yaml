@@ -36,6 +36,7 @@ spec:
       terminationGracePeriodSeconds: 60
       dnsPolicy: ClusterFirst
       restartPolicy: Always
+      serviceAccountName: montage-ai-cluster
       priorityClassName: montage-ai-interactive
       topologySpreadConstraints:
       - maxSkew: 1

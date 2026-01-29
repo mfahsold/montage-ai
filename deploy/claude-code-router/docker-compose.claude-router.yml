@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  claude-router:
+    image: musistudio/claude-code-router:latest
+    container_name: claude-code-router
+    ports:
+      - "8080:8080"
+    environment:
+      # Provide your Together API key here (or use an env file / secret manager)
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY}
+      # Optional: configure listen port
+      - PORT=8080
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

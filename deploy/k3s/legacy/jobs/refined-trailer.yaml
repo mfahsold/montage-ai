@@ -16,6 +16,7 @@ spec:
         app.kubernetes.io/component: renderer
     spec:
       restartPolicy: Never
+      serviceAccountName: montage-ai-cluster
       priorityClassName: montage-ai-batch
       tolerations:
         - key: "nvidia.com/gpu"
@@ -37,16 +38,14 @@ spec:
       containers:
         - name: montage-ai
           image: registry.registry.svc.cluster.local:5000/montage-ai:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           resources:
             requests:
-              cpu: "5"
-              memory: "5Gi"
-              nvidia.com/gpu: "1"
+              cpu: "8"
+              memory: "16Gi"
             limits:
-              cpu: "6"
-              memory: "5Gi"
-              nvidia.com/gpu: "1"
+              cpu: "16"
+              memory: "24Gi"
           env:
             - name: CUT_STYLE
               value: "cinema_trailer"
@@ -54,10 +53,24 @@ spec:
               value: "true"
             - name: LOG_LEVEL
               value: "DEBUG"
+            - name: CLUSTER_MODE
+              value: "true"
+            - name: CLUSTER_PARALLELISM
+              value: "4"
+            - name: CLUSTER_RENDER_TIER
+              value: "large"
             - name: CGPU_ENABLED
               value: "true"
             - name: CGPU_GPU_ENABLED
               value: "true"
+            - name: PVC_INPUT_NAME
+              value: "montage-ai-input-nfs"
+            - name: PVC_OUTPUT_NAME
+              value: "montage-ai-output-nfs"
+            - name: PVC_MUSIC_NAME
+              value: "montage-ai-music-nfs"
+            - name: PVC_ASSETS_NAME
+              value: "montage-ai-assets-nfs"
             - name: UPSCALE
               value: "true"
             - name: STABILIZE
@@ -71,9 +84,9 @@ spec:
             - name: MUSIC_DIR
               value: "/data/music/techno-nature"
             - name: TARGET_DURATION
-              value: "60"
+              value: "30"
             - name: MUSIC_END
-              value: "60"
+              value: "30"
             - name: LLM_CLIP_SELECTION
               value: "true"
             - name: NORMALIZE_CLIPS
@@ -85,7 +98,7 @@ spec:
             - name: EXTRACT_REENCODE
               value: "true"
             - name: MAX_PARALLEL_JOBS
-              value: "4"
+              value: "8"
             - name: TEMP_DIR
               value: "/data/output/tmp"
             - name: CREATIVE_LOOP
@@ -106,6 +119,8 @@ spec:
               readOnly: true
             - name: output
               mountPath: /data/output
+            - name: temp
+              mountPath: /tmp/montage_tmp
       volumes:
         - name: input
           persistentVolumeClaim:
@@ -119,7 +134,7 @@ spec:
         - name: output
           persistentVolumeClaim:
             claimName: montage-ai-output-nfs
+        - name: temp
+          emptyDir: {}
       nodeSelector:
-        # fluxibri.ai/storage-primary: "true"
-        # Allow scheduling on any node with GPU (if available) or fallback
-        # kubernetes.io/arch: amd64  # Prefer amd64 for GPU jobs usually, but let scheduler decide if not strict
+        kubernetes.io/arch: amd64

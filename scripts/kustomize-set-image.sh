@@ -13,12 +13,7 @@ echo "Setting kustomize image to: $IMAGE"
 # List of kustomize dirs to update
 KUST_DIRS=(
   "$ROOT_DIR/deploy/k3s/base"
-  "$ROOT_DIR/deploy/k3s/overlays/dev"
-  "$ROOT_DIR/deploy/k3s/overlays/staging"
-  "$ROOT_DIR/deploy/k3s/overlays/production"
-  "$ROOT_DIR/deploy/k3s/overlays/jetson"
-  "$ROOT_DIR/deploy/k3s/overlays/amd"
-  "$ROOT_DIR/deploy/k3s/overlays/distributed"
+  "$ROOT_DIR/deploy/k3s/overlays/cluster"
 )
 
 for d in "${KUST_DIRS[@]}"; do

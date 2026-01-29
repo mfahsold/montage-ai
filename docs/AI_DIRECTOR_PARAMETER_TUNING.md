@@ -297,7 +297,7 @@ User Request
     ↓
 CreativeDirector._query_backend()
     ↓
-1. OpenAI-API (KubeAI/vLLM)  [if configured]
+1. OpenAI-compatible API (LiteLLM / llama-box)  [if configured]
     ↓ (fallback on error)
 2. cgpu/Gemini             [if CGPU_ENABLED=true]
     ↓ (fallback on error)
@@ -861,4 +861,3 @@ Das System ist jetzt **produktionsbereit** für AI-gesteuerte Parameter-Optimier
 8. ✅ **Robust Parser** - Retry logic, JSON extraction fallback, safe defaults
 
 **Next:** Web UI Integration + Cluster validation.
-

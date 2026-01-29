@@ -30,13 +30,13 @@ data:
   CUT_STYLE: "dynamic"
   
   # AI / LLM Configuration
-  # Point to Exo API in cluster
-  OPENAI_API_BASE: "http://exo-api.default.svc.cluster.local:8000/v1"
-  OPENAI_API_KEY: "not-needed"
-  OPENAI_MODEL: "llama-3.2-1b"
-  OPENAI_VISION_MODEL: "llama-3.2-1b"
+  # Unified proxy (LiteLLM) with runtime model discovery
+  OPENAI_API_BASE: "http://litellm.llama-box-system.svc.cluster.local:4000/v1"
+  OPENAI_API_KEY: "sk-1234"
+  OPENAI_MODEL: "auto"
+  OPENAI_VISION_MODEL: ""
   
-  # Ollama fallback (if Exo unavailable)
+  # Ollama fallback (if proxy unavailable)
   OLLAMA_HOST: "http://host.docker.internal:11434"
   OLLAMA_MODEL: "llava"
   

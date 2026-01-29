@@ -4,15 +4,15 @@ kind: Kustomization
 namespace: montage-ai
 
 resources:
-  - priority-classes.yaml
+  - cluster-rbac.yaml
   - deployment.yaml
+  - worker.yaml
   - cgpu-server.yaml
   - service-ingress.yaml
   - redis.yaml
   - pvc.yaml
   - namespace.yaml
   - network-policy.yaml
-  - job.yaml
   - pdb.yaml
 
 # =============================================================================
@@ -36,10 +36,21 @@ configMapGenerator:
       - STABILIZE=false
       - UPSCALE=false
       - ENHANCE=false
-      - OPENAI_API_BASE=http://llama-box-api-distributed.llama-box-system.svc.cluster.local:8080/v1
-      - OPENAI_MODEL=qwen2.5-32b-instruct-q8_0-00001-of-00009.gguf
+      - OPENAI_API_BASE=http://litellm.llama-box-system.svc.cluster.local:4000/v1
+      - OPENAI_API_KEY=sk-1234
+      - OPENAI_MODEL=auto
       - OPENAI_VISION_MODEL=
-      - OLLAMA_HOST=http://llama-box-api.llama-box-system.svc.cluster.local:8080
+      - OLLAMA_HOST=http://ollama.montage-ai.svc.cluster.local:11434
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CLUSTER_MODE=true
+      - CLUSTER_PARALLELISM=4
+      - CLUSTER_RENDER_TIER=large
+      - MONTAGE_CLUSTER_MODE=k8s
+      - PVC_INPUT_NAME=montage-input
+      - PVC_OUTPUT_NAME=montage-output
+      - PVC_MUSIC_NAME=montage-music
+      - PVC_ASSETS_NAME=montage-assets
       - LLM_TIMEOUT=120
       - CGPU_ENABLED=true
       - CGPU_HOST=cgpu-server

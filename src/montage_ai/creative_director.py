@@ -2,12 +2,14 @@
 Creative Director: LLM-powered natural language video editing
 
 Translates natural language prompts into structured editing instructions
-using local LLMs (Llama 3.1, DeepSeek-R1) via Ollama, or Google Gemini via cgpu.
+using OpenAI-compatible endpoints (LiteLLM/llama-box), local LLMs via Ollama,
+or Google Gemini via cgpu.
 
 Architecture (2024/2025 industry standard):
   User Prompt → LLM → JSON Instructions → Validation → Editing Engine
 
 Backends:
+  - LiteLLM / llama-box (cluster): OPENAI_API_BASE environment variable
   - Ollama (local): OLLAMA_HOST environment variable
   - cgpu/Gemini (cloud): CGPU_ENABLED=true, requires cgpu serve running
 
@@ -41,7 +43,8 @@ except ImportError:
 VERSION = "0.3.0"
 
 # Backend configuration
-# Priority: OPENAI_API_BASE (KubeAI/OpenAI-compatible) > GOOGLE_API_KEY (direct Gemini) > CGPU_ENABLED (cgpu serve) > Ollama (local)
+# Priority: OPENAI_API_BASE (LiteLLM/llama-box or other OpenAI-compatible) > GOOGLE_API_KEY (direct Gemini)
+#           > CGPU_ENABLED (cgpu serve) > Ollama (local)
 
 def _get_llm_config():
     return get_settings().llm
@@ -53,7 +56,7 @@ class CreativeDirector:
 
     Translates natural language prompts into structured editing instructions.
     Supports multiple backends:
-      - OpenAI-compatible API (KubeAI, vLLM, LocalAI) - use OPENAI_API_BASE
+      - OpenAI-compatible API (LiteLLM/llama-box, vLLM, LocalAI) - use OPENAI_API_BASE
       - Google AI (direct API with GOOGLE_API_KEY)
       - cgpu serve (OpenAI-compatible proxy for Gemini)
       - Ollama (local LLM fallback)
@@ -88,6 +91,8 @@ class CreativeDirector:
         self.ollama_host = ollama_host if ollama_host else self.llm_config.ollama_host
         self.ollama_model = model if model else self.llm_config.ollama_model
         self.timeout = timeout if timeout is not None else self.llm_config.timeout
+        self._resolved_openai_model = None
+        self._resolved_openai_vision_model = None
         
         # Determine available backends (allow multiple for fallback)
         if use_openai_api is None:
@@ -107,7 +112,8 @@ class CreativeDirector:
         
         # Log backend selection (primary)
         if self.use_openai_api:
-            logger.info(f"Creative Director primary backend: OpenAI-compatible API ({self.llm_config.openai_model})")
+            model_hint = self.llm_config.openai_model or "auto"
+            logger.info(f"Creative Director primary backend: OpenAI-compatible API ({model_hint})")
         elif self.use_cgpu:
             cgpu_url = f"http://{self.llm_config.cgpu_host}:{self.llm_config.cgpu_port}"
             logger.info(f"Creative Director primary backend: cgpu/Gemini at {cgpu_url}")
@@ -159,6 +165,54 @@ class CreativeDirector:
         # We can add a generic advice or pull later.
         
         self.system_prompt = get_director_prompt(persona, styles_list)
+
+    @staticmethod
+    def _is_auto_model(model: str) -> bool:
+        return model.strip().lower() in ("auto", "discover", "dynamic", "default")
+
+    def _models_url(self) -> str:
+        base = (self.llm_config.openai_api_base or "").strip()
+        if not base:
+            return ""
+        base = base.rstrip("/")
+        if base.endswith("/v1"):
+            return f"{base}/models"
+        return f"{base}/v1/models"
+
+    def _discover_openai_model(self) -> Optional[str]:
+        url = self._models_url()
+        if not url:
+            return None
+        headers = {}
+        api_key = self.llm_config.openai_api_key
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+        payload = response.json()
+        models = payload.get("data") if isinstance(payload, dict) else payload
+        if not models:
+            return None
+        first = models[0]
+        if isinstance(first, dict):
+            return first.get("id") or first.get("name")
+        return str(first)
+
+    def _resolve_openai_model(self, model_name: str, cache_attr: str) -> Optional[str]:
+        if model_name and not self._is_auto_model(model_name):
+            return model_name
+        cached = getattr(self, cache_attr)
+        if cached:
+            return cached
+        try:
+            discovered = self._discover_openai_model()
+        except Exception as exc:
+            logger.warning(f"OpenAI model discovery failed: {exc}")
+            return None
+        if discovered:
+            setattr(self, cache_attr, discovered)
+            logger.info(f"Resolved OpenAI model: {discovered}")
+        return discovered
 
     def query(
         self,
@@ -257,8 +311,16 @@ class CreativeDirector:
                 "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
             })
 
+        base_model = self.llm_config.openai_model or ""
+        vision_model = self.llm_config.openai_vision_model or base_model
+        resolved_model = self._resolve_openai_model(base_model, "_resolved_openai_model")
+        resolved_vision_model = self._resolve_openai_model(vision_model, "_resolved_openai_vision_model") if image_b64 else None
+        model_id = resolved_vision_model or resolved_model
+        if not model_id:
+            raise RuntimeError("OpenAI backend configured but no model available (set OPENAI_MODEL or ensure /v1/models works)")
+
         kwargs = {
-            "model": self.llm_config.openai_model if not image_b64 else (self.llm_config.openai_vision_model or self.llm_config.openai_model),
+            "model": model_id,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": content if image_b64 else user_prompt}

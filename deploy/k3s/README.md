@@ -50,8 +50,8 @@ make -C deploy/k3s config
 cd deploy/k3s
 ./build-and-push.sh
 
-# Deploy dev overlay
-./deploy.sh dev
+# Deploy cluster overlay (canonical)
+./deploy.sh cluster
 ```
 
 Notes:
@@ -73,29 +73,16 @@ That's it. For manual control, see sections below.
 
 ```
 deploy/k3s/
-├── base/                    # Base manifests (all overlays use these)
+├── base/                    # Canonical cluster manifests (cluster-agnostic)
 │   ├── namespace.yaml       # montage-ai namespace
-│   ├── configmap.yaml       # Environment configuration
+│   ├── cluster-config.env   # Rendered from config-global.yaml
 │   ├── deployment.yaml      # Web UI deployment
-│   ├── pvc.yaml             # Storage claims (local-path)
-│   ├── nfs-pv.yaml          # NFS PersistentVolumes (distributed)
-│   ├── job.yaml             # One-off render job
-│   ├── cronjob.yaml         # Scheduled renders
+│   ├── worker.yaml          # Queue workers (default + heavy)
+│   ├── pvc.yaml             # Storage claims (RWX-friendly)
 │   └── kustomization.yaml   # Base kustomization
-├── overlays/
-│   ├── dev/                 # Fast preview (360p, minimal resources)
-│   ├── staging/             # Balanced quality
-│   ├── production/          # High quality + AMD GPU
-│   ├── amd/                 # AMD GPU (VAAPI) acceleration
-│   ├── jetson/              # NVIDIA Jetson (NVENC)
-│   ├── gpu/                 # Generic NVIDIA GPU
-│   ├── distributed/         # Multi-node GPU with NFS
-│   └── distributed-parallel/# Indexed Job shards
-└── app/                     # Full app deployment (ingress, monitoring)
-    ├── deployment.yaml
-    ├── service.yaml
-    ├── ingress.yaml
-    └── kustomization.yaml
+└── overlays/
+    ├── cluster/             # Canonical cluster overlay
+    └── legacy/              # Archived overlays (internal/legacy)
 ```
 
 ---
@@ -108,12 +95,8 @@ deploy/k3s/
 # Render cluster config
 make -C deploy/k3s config
 
-# Deploy specific overlay
-make -C deploy/k3s deploy-production
-
-# Other overlays
-make -C deploy/k3s deploy-dev
-make -C deploy/k3s deploy-staging
+# Deploy canonical cluster overlay
+make -C deploy/k3s deploy-cluster
 ```
 
 ### Option 2: Shell Scripts
@@ -124,13 +107,8 @@ cd deploy/k3s
 # Build & push to cluster registry
 ./build-and-push.sh
 
-# Deploy (default: base)
-./deploy.sh
-
-# Deploy specific environment
-./deploy.sh dev
-./deploy.sh staging
-./deploy.sh production
+# Deploy (canonical cluster overlay)
+./deploy.sh cluster
 
 # Undeploy
 ./undeploy.sh
@@ -142,31 +120,20 @@ cd deploy/k3s
 # Render cluster-config.env first
 make -C deploy/k3s config
 
-# Base deployment
-kubectl apply -k deploy/k3s/base/
-
-# With overlay
-kubectl apply -k deploy/k3s/overlays/production/
-
-# Full app deployment (includes ingress, monitoring)
-kubectl apply -k deploy/k3s/app/
+# Canonical cluster deployment
+kubectl apply -k deploy/k3s/overlays/cluster/
 ```
 
 ---
 
-## Environment Overlays
+## Canonical Deployment
 
-| Overlay | Quality | Resources | Use Case |
-|---------|---------|-----------|----------|
-| `base` | Standard | 4Gi/2CPU | Generic deployment |
-| `dev` | Preview (360p) | 2Gi/500m | Fast iteration |
-| `staging` | Standard | 4Gi/2CPU | QA testing |
-| `production` | High | 8Gi/4CPU | Production renders |
-| `amd` | High + VAAPI | 8Gi/4CPU | AMD GPU encoding |
-| `jetson` | Standard + NVENC | 4Gi | Edge/Jetson devices |
-| `distributed` | High | NFS storage | Multi-node GPU |
+Montage‑AI supports exactly two deployment modes:
 
----
+- **Local**: run via `./montage-ai.sh web` or Docker Compose.
+- **Cluster**: deploy `deploy/k3s/overlays/cluster/` (Kustomize).
+
+Legacy overlays are preserved in `deploy/k3s/overlays/legacy/` for reference only.
 
 ## GPU Acceleration
 
@@ -177,20 +144,17 @@ kubectl apply -k deploy/k3s/app/
 | gpu-node-nvidia | NVIDIA Jetson | `nvidia.com/gpu: 1` | NVENC |
 | gpu-node-amd | AMD Radeon | `amd.com/gpu: 1` | VAAPI |
 
-### Deploy with GPU
+### GPU Enablement (Cluster-Agnostic)
 
 ```bash
 # Check available GPUs
 kubectl get nodes -o custom-columns='NAME:.metadata.name,NVIDIA:.status.allocatable.nvidia\.com/gpu,AMD:.status.allocatable.amd\.com/gpu'
 
-# AMD GPU (VAAPI)
-kubectl apply -k deploy/k3s/overlays/amd/
-
-# NVIDIA Jetson (NVENC)
-kubectl apply -k deploy/k3s/overlays/jetson/
-
-# Generic NVIDIA
-kubectl apply -k deploy/k3s/overlays/gpu/
+# Use your cluster's device plugins (NVIDIA/AMD/Jetson) and taints/tolerations.
+# The canonical cluster overlay avoids hardcoded node names.
+#
+# Legacy GPU overlays are archived in:
+#   deploy/k3s/overlays/legacy/
 ```
 
 ---
@@ -199,33 +163,24 @@ kubectl apply -k deploy/k3s/overlays/gpu/
 
 ### Local Storage (Single Node)
 
-Default: `local-path` StorageClass (K3s default)
+Default is controlled by `deploy/k3s/config-global.yaml` via `STORAGE_CLASS_DEFAULT`.
+For multi-node clusters, prefer an RWX-capable storage class (e.g., NFS/CSI).
 
 ```yaml
-# In pvc.yaml
-storageClassName: local-path  # K3s
-storageClassName: standard    # GKE
-storageClassName: gp2         # AWS EBS
+# In config-global.yaml
+storage:
+  classes:
+    default: "<RWX_STORAGE_CLASS>"
 ```
 
-### NFS Storage (Multi-Node / Distributed)
+### NFS Storage (Multi-Node)
 
-For multi-node GPU rendering, use NFS:
-
-```bash
-# 1. Setup NFS server exports
-sudo mkdir -p /mnt/nfs-montage/{input,music,output,assets}
-echo "/mnt/nfs-montage *(rw,sync,no_subtree_check,no_root_squash)" | sudo tee -a /etc/exports
-sudo exportfs -a
-
-# 2. Update nfs-pv.yaml with your NFS server IP
-# 3. Deploy distributed overlay
-kubectl apply -k deploy/k3s/overlays/distributed/
-```
+Provision an RWX storage class via your cluster (NFS/CSI), then set it in
+`deploy/k3s/config-global.yaml`.
 
 ---
 
-## Node Labels (Required)
+## Node Labels (Optional)
 
 Apply these labels so overlays can schedule without hardcoded hostnames:
 
@@ -237,7 +192,7 @@ kubectl label node <node> fluxibri.ai/storage-primary=true
 kubectl label node <node> fluxibri.ai/registry-host=true
 kubectl label node <node> fluxibri.ai/registry-access=true
 
-# GPU classes (overlays/amd, overlays/jetson)
+# Optional GPU hints (if your cluster uses these labels)
 kubectl label node <node> fluxibri.ai/gpu-type=amd-rocm
 kubectl label node <node> fluxibri.ai/gpu-type=nvidia-tegra
 ```
@@ -266,47 +221,19 @@ open "http://<MONTAGE_HOSTNAME>"
 
 ---
 
-## Running Render Jobs
+## Running Render Jobs (Canonical)
 
-### One-off Render
-
-```bash
-# Create job from template
-kubectl create job montage-render-$(date +%s) \
-  --from=job/montage-ai-render \
-  -n "$CLUSTER_NAMESPACE"
-
-# Watch progress
-kubectl logs -n "$CLUSTER_NAMESPACE" -f job/montage-render-*
-```
-
-### With Custom Settings
+Jobs are submitted via the API (same path used by the Web UI).
 
 ```bash
-# Override via ConfigMap patch
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: montage-ai-config
-  namespace: "<CLUSTER_NAMESPACE>"
-data:
-  CUT_STYLE: "hitchcock"
-  STABILIZE: "true"
-  UPSCALE: "true"
-  TARGET_DURATION: "60"
-EOF
+# Submit a job via API
+python3 -m montage_ai.cli jobs --api-base http://<montage-service> submit \
+  --style cinema_trailer \
+  --option options.target_duration=30 \
+  --option options.llm_clip_selection=true
 
-kubectl create job montage-custom-$(date +%s) \
-  --from=job/montage-ai-render \
-  -n "$CLUSTER_NAMESPACE"
-```
-
-### Scheduled (CronJob)
-
-```bash
-kubectl apply -f deploy/k3s/base/cronjob.yaml
-kubectl get cronjobs -n "$CLUSTER_NAMESPACE"
+# Inspect status
+python3 -m montage_ai.cli jobs --api-base http://<montage-service> status <JOB_ID>
 ```
 
 ---

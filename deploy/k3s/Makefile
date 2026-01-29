@@ -3,7 +3,7 @@
 # Single entry point for cluster operations
 # ==============================================================================
 
-.PHONY: help config validate diff deploy deploy-dev deploy-staging deploy-production deploy-app status health
+.PHONY: help config validate diff deploy deploy-cluster status health
 
 GREEN  := $(shell tput -Txterm setaf 2 2>/dev/null || echo '')
 YELLOW := $(shell tput -Txterm setaf 3 2>/dev/null || echo '')
@@ -37,30 +37,18 @@ config: ## Render deploy/k3s/base/cluster-config.env from config-global.yaml
 validate: config ## Validate kustomize builds
 	@echo "${GREEN}Validating base manifests...${RESET}"
 	@$(KUSTOMIZE_BUILD) ./base >/dev/null
-	@echo "${GREEN}Validating production overlay...${RESET}"
-	@$(KUSTOMIZE_BUILD) ./overlays/production >/dev/null
+	@echo "${GREEN}Validating cluster overlay...${RESET}"
+	@$(KUSTOMIZE_BUILD) ./overlays/cluster >/dev/null
 	@echo "${GREEN}✓ Validation complete${RESET}"
 
 diff: config ## Show kubectl diff for production overlay
-	@$(KUSTOMIZE_BUILD) ./overlays/production | $(KUBECTL) diff -f - || true
+	@$(KUSTOMIZE_BUILD) ./overlays/cluster | $(KUBECTL) diff -f - || true
 
-deploy: deploy-production ## Deploy production overlay (default)
+deploy: deploy-cluster ## Deploy cluster overlay (default)
 
-deploy-dev: config ## Deploy dev overlay
-	@echo "${GREEN}Deploying dev overlay...${RESET}"
-	@$(KUSTOMIZE_BUILD) ./overlays/dev | $(KUBECTL) apply -f -
-
-deploy-staging: config ## Deploy staging overlay
-	@echo "${GREEN}Deploying staging overlay...${RESET}"
-	@$(KUSTOMIZE_BUILD) ./overlays/staging | $(KUBECTL) apply -f -
-
-deploy-production: config ## Deploy production overlay
-	@echo "${GREEN}Deploying production overlay...${RESET}"
-	@$(KUSTOMIZE_BUILD) ./overlays/production | $(KUBECTL) apply -f -
-
-deploy-app: config ## Deploy full app manifests (ingress, monitoring)
-	@echo "${GREEN}Deploying full app manifests...${RESET}"
-	@$(KUSTOMIZE_BUILD) ./app | $(KUBECTL) apply -f -
+deploy-cluster: config ## Deploy cluster overlay
+	@echo "${GREEN}Deploying cluster overlay...${RESET}"
+	@$(KUSTOMIZE_BUILD) ./overlays/cluster | $(KUBECTL) apply -f -
 
 status: ## Show montage-ai pod status
 	@$(KUBECTL) get pods -n $(CLUSTER_NAMESPACE)

@@ -293,7 +293,7 @@ else:
 - On parse error: Heuristic scoring
 
 **Backend Priority:**
-- OpenAI-compatible (KubeAI moondream2, llava) - preferred
+- OpenAI-compatible (LiteLLM / llama-box tiered models) - preferred
 - Google AI (Gemini)
 - Ollama (local fallback)
 

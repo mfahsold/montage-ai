@@ -13,12 +13,12 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: kubeai-system
+              kubernetes.io/metadata.name: llama-box-system
       ports:
         - protocol: TCP
-          port: 80
+          port: 4000
         - protocol: TCP
-          port: 443
+          port: 8080
     - to:
         - podSelector:
             matchLabels:

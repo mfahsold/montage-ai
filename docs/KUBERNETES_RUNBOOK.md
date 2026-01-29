@@ -25,6 +25,15 @@ kubectl describe pod -n "${CLUSTER_NAMESPACE:-montage-ai}" -l app.kubernetes.io/
 kubectl logs -n "${CLUSTER_NAMESPACE:-montage-ai}" -l app.kubernetes.io/name=montage-ai --tail=200
 ```
 
+## Fluxibri CLI (if available)
+
+```bash
+# Canonical cluster health + autoscaling visibility
+fluxibri cluster status
+fluxibri hardware quotas
+fluxibri hardware autoscale
+```
+
 ## Service Access
 
 ```bash

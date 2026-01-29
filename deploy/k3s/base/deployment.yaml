@@ -22,9 +22,7 @@ spec:
         app.kubernetes.io/component: web-ui
         fluxibri.ai/tier: web
     spec:
-      nodeSelector:
-        kubernetes.io/arch: amd64
-      priorityClassName: montage-ai-interactive
+      serviceAccountName: montage-ai-cluster
       topologySpreadConstraints:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
@@ -43,17 +41,6 @@ spec:
                   app.kubernetes.io/name: montage-ai
                   app.kubernetes.io/component: web-ui
               topologyKey: kubernetes.io/hostname
-      tolerations:
-      - key: "nvidia.com/gpu"
-        operator: "Exists"
-        effect: "NoSchedule"
-      - key: "amd.com/gpu"
-        operator: "Exists"
-        effect: "NoSchedule"
-      - key: "gpu"
-        operator: "Equal"
-        value: "amd-rocm"
-        effect: "NoSchedule"
       containers:
       - name: montage-ai
         image: registry.registry.svc.cluster.local:5000/montage-ai:latest
@@ -65,36 +52,12 @@ spec:
           protocol: TCP
         envFrom:
         - configMapRef:
+            name: cluster-config
+        - configMapRef:
             name: montage-ai-config
         env:
         - name: FLASK_ENV
           value: "production"
-        - name: INPUT_DIR
-          value: "/data/input"
-        - name: MUSIC_DIR
-          value: "/data/music"
-        - name: OUTPUT_DIR
-          value: "/data/output"
-        - name: ASSETS_DIR
-          value: "/data/assets"
-        - name: VERBOSE
-          value: "true"
-        - name: MAX_CONCURRENT_JOBS
-          value: "4"
-        - name: ENHANCE
-          value: "true"
-        - name: PARALLEL_ENHANCE
-          value: "false"
-        - name: MAX_PARALLEL_JOBS
-          value: "8"
-        - name: FFMPEG_THREADS
-          value: "0"
-        - name: CUT_STYLE
-          value: "dynamic"
-        - name: REDIS_HOST
-          value: "redis"
-        - name: REDIS_PORT
-          value: "6379"
         volumeMounts:
         - name: data-input
           mountPath: /data/input
@@ -104,9 +67,6 @@ spec:
           mountPath: /data/music
         - name: data-assets
           mountPath: /data/assets
-        - name: dev-dri
-          mountPath: /dev/dri
-          readOnly: true
         resources:
           requests:
             memory: "8Gi"
@@ -141,7 +101,3 @@ spec:
       - name: data-assets
         persistentVolumeClaim:
           claimName: montage-assets
-      - name: dev-dri
-        hostPath:
-          path: /dev/dri
-          type: DirectoryOrCreate

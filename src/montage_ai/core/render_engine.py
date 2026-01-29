@@ -189,11 +189,15 @@ class RenderEngine:
                 self._progressive_renderer.add_clip_path(final_path)
 
                 # Cleanup intermediate temp files
+                final_path_abs = os.path.abspath(final_path)
                 for tf in temp_files:
                     if tf == final_path or not os.path.exists(tf):
                         continue
                     try:
                         if os.path.isdir(tf):
+                            tf_abs = os.path.abspath(tf)
+                            if os.path.commonpath([final_path_abs, tf_abs]) == tf_abs:
+                                continue
                             shutil.rmtree(tf, ignore_errors=True)
                         else:
                             os.remove(tf)
@@ -319,6 +323,15 @@ class RenderEngine:
             
             # Note: We need to implement submit_render_job in JobSubmitter
             # Or use a generic submit_job method
+            cluster_tier = self.settings.features.cluster_render_tier
+            shard_env = {}
+            hwaccel = (self.settings.gpu.ffmpeg_hwaccel or "").strip()
+            if hwaccel:
+                shard_env["FFMPEG_HWACCEL"] = hwaccel
+            output_codec = (self.settings.gpu.output_codec or "").strip()
+            if output_codec:
+                shard_env["OUTPUT_CODEC"] = output_codec
+
             job_spec = submitter.submit_generic_job(
                 job_id=f"render-{job_id}",
                 command=[
@@ -330,7 +343,9 @@ class RenderEngine:
                     "--quality", self.settings.encoding.quality_profile
                 ],
                 parallelism=parallelism,
-                component="distributed-rendering"
+                component="distributed-rendering",
+                env=shard_env or None,
+                tier=cluster_tier
             )
             
             # 3. Wait for completion

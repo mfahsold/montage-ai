@@ -10,9 +10,8 @@ echo "Build process finished."
 
 # Check for success indicators in the log
 if grep -q "exporting to image" $LOG_FILE; then
-    echo "Build successful. Deploying to Jetson..."
-    kubectl delete job montage-ai-render -n montage-ai --ignore-not-found
-    kubectl apply -k deploy/k3s/overlays/jetson
+    echo "Build successful. Deploying to cluster..."
+    kubectl apply -k deploy/k3s/overlays/cluster
     echo "Deployment applied. Watching pods..."
     kubectl get pods -n montage-ai -o wide
 else

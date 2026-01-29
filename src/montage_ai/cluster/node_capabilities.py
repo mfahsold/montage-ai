@@ -25,10 +25,16 @@ Usage:
     nodes = cluster.get_nodes_for_task(TaskType.GPU_ENCODING, resolution=(3840, 2160))
 
 Environment Variables:
-    MONTAGE_CLUSTER_MODE: "local", "k8s", "config", "auto" (default: "auto")
+    DEPLOYMENT_MODE: "local" or "cluster" (unified mode - preferred)
+    MONTAGE_CLUSTER_MODE: "local", "k8s", "config", "auto" (legacy, still supported)
     MONTAGE_CLUSTER_CONFIG: Path to cluster config YAML
     MONTAGE_FORCE_CPU: Set to "1" to disable GPU detection
     MONTAGE_BARE_METAL_ONLY: Set to "1" to prefer bare-metal nodes for local tasks
+
+Note:
+    For new deployments, prefer setting DEPLOYMENT_MODE=cluster instead of
+    MONTAGE_CLUSTER_MODE=k8s. The unified deployment_mode module provides
+    a cleaner API: from montage_ai.deployment_mode import is_cluster_mode
 """
 
 import json

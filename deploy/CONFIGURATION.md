@@ -15,15 +15,13 @@ All deployment-related hardcoded values have been moved to `deploy/k3s/config-gl
 
 ```
 deploy/
-├── k3s/
-│   ├── config-global.yaml     # ← Canonical config (environment-specific)
-│   ├── base/cluster-config.env# ← Generated from config-global.yaml
-│   ├── Makefile               # Cluster operations (deploy, diff, validate)
-│   ├── deploy.sh              # Uses cluster-config.env
-│   ├── build-and-push.sh      # Uses config-global.yaml via scripts/common.sh
-│   └── montage-ai.yaml        # Kubernetes manifests (legacy)
-├── local/                     # (Optional) Local development overlays
-└── prod/                      # (Optional) Production overlays
+└── k3s/
+    ├── config-global.yaml     # ← Canonical config (environment-specific)
+    ├── base/cluster-config.env# ← Generated from config-global.yaml
+    ├── Makefile               # Cluster operations (deploy, diff, validate)
+    ├── deploy.sh              # Uses cluster-config.env
+    ├── build-and-push.sh      # Uses config-global.yaml via scripts/common.sh
+    └── legacy/manifests/      # Legacy manifests (archived)
 ```
 
 ## Configuration Variables
@@ -68,7 +66,7 @@ All deployment scripts read `deploy/k3s/config-global.yaml` (preferred) and/or `
 ```bash
 # deploy.sh
 source "${DEPLOY_ROOT}/k3s/base/cluster-config.env"
-kubectl apply -k deploy/k3s/overlays/production
+kubectl apply -k deploy/k3s/overlays/cluster
 
 # build-and-push.sh
 source "${DEPLOY_ROOT}/k3s/base/cluster-config.env"

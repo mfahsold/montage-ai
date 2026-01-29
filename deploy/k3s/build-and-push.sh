@@ -73,7 +73,7 @@ if docker push "${IMAGE_FULL}"; then
   echo "Image: ${IMAGE_FULL}"
   echo ""
   echo "Next steps:"
-  echo "  1. Deploy: ./deploy.sh [dev|staging|production]"
+  echo "  1. Deploy: ./deploy.sh cluster"
   echo "  2. Check: docker images | grep montage-ai"
   echo "  3. Test: kubectl get pods -n montage-ai"
 else

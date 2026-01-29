@@ -32,8 +32,8 @@ Prometheus examples (canonical):
 ## Benchmark (developer)
 
 1. Build image and push to the dev registry (see CI/README in this repo).
-2. Deploy to DEV (kustomize overlay):
-   - kubectl apply -k deploy/k3s/overlays/dev/
+2. Deploy to cluster (canonical overlay):
+   - kubectl apply -k deploy/k3s/overlays/cluster/
 3. Run local benchmark (10 runs, reproducible seed):
    - ./scripts/ci/preview-benchmark.sh BASE=https://preview.example.org RUNS=10 --collect-metrics
 4. Collect artifacts:
