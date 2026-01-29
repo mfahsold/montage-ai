@@ -41,7 +41,7 @@ validate: config ## Validate kustomize builds
 	@$(KUSTOMIZE_BUILD) ./overlays/cluster >/dev/null
 	@echo "${GREEN}✓ Validation complete${RESET}"
 
-diff: config ## Show kubectl diff for production overlay
+diff: config ## Show kubectl diff for cluster overlay
 	@$(KUSTOMIZE_BUILD) ./overlays/cluster | $(KUBECTL) diff -f - || true
 
 deploy: deploy-cluster ## Deploy cluster overlay (default)

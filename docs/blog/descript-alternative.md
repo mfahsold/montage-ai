@@ -12,7 +12,7 @@
 - **OTIO/EDL Export:** Continue editing directly in DaVinci/Premiere (Pro handoff).
 - **Beat-Sync + Story Arcs:** Automatic music synchronization and 5-phase narrative.
 - **Local-First:** FFmpeg/Whisper/Auto-Editor run locally; optional cgpu cloud only when explicitly requested.
-- **Batch/CLI:** `./montage-ai.sh run` locally, `make -C deploy/k3s deploy-production` for cluster.
+- **Batch/CLI:** `./montage-ai.sh run` locally, `make -C deploy/k3s deploy-cluster` for cluster.
 - **Longform-ready:** Podcasts, lectures, streams without upload limits.
 
 ## Quick Start
@@ -21,7 +21,7 @@
 ./montage-ai.sh run
 
 # Cluster (multi-arch, shared cache)
-make -C deploy/k3s deploy-production
+make -C deploy/k3s deploy-cluster
 ```
 
 ## Workflow: Podcast to Shorts (Offline)

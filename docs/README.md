@@ -17,9 +17,9 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 # CLI run (uses data/input + data/music)
 ./montage-ai.sh run
 
-# Kubernetes (production overlay)
+# Kubernetes (cluster overlay)
 make -C deploy/k3s config
-make -C deploy/k3s deploy-production
+make -C deploy/k3s deploy-cluster
 ```
 
 ---

@@ -324,7 +324,7 @@ async def trigger_render(
         "status": "info",
         "message": "Render triggering via RQ job queue. Use POST /api/montage to submit jobs.",
         "instructions": {
-            "kubernetes": "kubectl apply -k deploy/k3s/overlays/dev/",
+            "kubernetes": "kubectl apply -k deploy/k3s/overlays/cluster/",
             "docker": "./montage-ai.sh run " + style
         }
     }

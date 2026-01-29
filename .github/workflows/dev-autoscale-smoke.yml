@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       overlay:
-        description: 'Kustomize overlay to apply (defaults to canonical production overlay)'
+        description: 'Kustomize overlay to apply (defaults to canonical cluster overlay)'
         required: false
-        default: 'deploy/k3s/overlays/production'
+        default: 'deploy/k3s/overlays/cluster'
       registry_url:
         description: 'Registry URL reachable from the cluster (host:port)'
         required: false
@@ -53,7 +53,7 @@ jobs:
 
       - name: Deploy (kustomize)
         env:
-          OVERLAY: "${{ inputs.overlay || 'deploy/k3s/overlays/production' }}"
+          OVERLAY: "${{ inputs.overlay || 'deploy/k3s/overlays/cluster' }}"
         run: |
           echo "Using overlay: $OVERLAY"
           kubectl -n "${CLUSTER_NAMESPACE}" set image deploy/montage-ai-web montage-ai=${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG} || true

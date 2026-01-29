@@ -325,6 +325,8 @@ class JobSubmitter:
             )),
             client.V1EnvVar(name="SHARD_COUNT", value=str(completions)),
             client.V1EnvVar(name="PYTHONUNBUFFERED", value="1"),
+            # Unified deployment mode (preferred) + legacy CLUSTER_MODE for backwards compat
+            client.V1EnvVar(name="DEPLOYMENT_MODE", value="cluster"),
             client.V1EnvVar(name="CLUSTER_MODE", value="true"),
         ]
         

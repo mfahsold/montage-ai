@@ -146,7 +146,7 @@ pytest tests/ -q    # Optional: quick pass
 
 ```bash
 make -C deploy/k3s validate           # Check manifests
-make -C deploy/k3s deploy-production  # Deploy to cluster
+make -C deploy/k3s deploy-cluster  # Deploy to cluster
 kubectl logs -n montage-ai -l app.kubernetes.io/name=montage-ai -f
 ```
 Detailed autoscale smoke workflows are documented in the private docs set.

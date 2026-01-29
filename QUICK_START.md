@@ -52,7 +52,7 @@ pytest tests/test_montage_builder.py -v
 
 ```bash
 make -C deploy/k3s config
-make -C deploy/k3s deploy-production
+make -C deploy/k3s deploy-cluster
 ```
 
 See `deploy/README.md` and `deploy/k3s/README.md` for full deployment guidance.
