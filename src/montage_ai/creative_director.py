@@ -930,19 +930,6 @@ class CreativeDirector:
                 logger.error(f"Unexpected LLM validation error: {final_e}")
                 logger.debug(f"Raw problematic response: {llm_response}")
             
-            return None
-            extracted = self._safe_parse_json_response(llm_response)
-            if extracted and isinstance(extracted, dict):
-                try:
-                    # Re-validate the extracted JSON
-                    output = DirectorOutput.model_validate(extracted)
-                    instructions = output.model_dump()
-                    defaults = self.get_default_instructions()
-                    logger.warning("Recovered from malformed JSON using aggressive extraction")
-                    return self._merge_defaults(defaults, instructions)
-                except ValidationError:
-                    pass
-            
             # Final fallback: return safe defaults
             logger.warning("LLM response parsing exhausted, returning safe defaults")
             return self.get_default_instructions()

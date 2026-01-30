@@ -5,6 +5,9 @@ resources:
   - ../../base
   - keda-scaledobjects.yaml
 
+patches:
+  - path: volume-redirects.yaml
+
 # NOTE: `keda-scaledobjects.yaml` is generated from `keda-scaledobjects.yaml.in`
 # by `deploy/k3s/prepare-scaledobjects.sh` using values rendered into
 # `deploy/k3s/base/cluster-config.env` (see `make config`). This keeps

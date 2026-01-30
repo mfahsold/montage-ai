@@ -7,7 +7,8 @@ from redis import Redis
 from rq import Queue
 import time
 
-redis_host = 'redis.montage-ai.svc.cluster.local'
+# Use SOTA 2026 canonical Redis endpoint
+redis_host = 'redis.default.svc.cluster.local'
 
 def submit_jobs():
     print(f"Connecting to Redis at {redis_host}...")

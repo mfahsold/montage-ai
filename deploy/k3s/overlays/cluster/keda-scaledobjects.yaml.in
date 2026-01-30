@@ -16,7 +16,7 @@ spec:
       metadata:
         address: redis.default.svc.cluster.local:6379
         listName: "rq:queue:default"
-        listLength: ${WORKER_QUEUE_SCALE_THRESHOLD}
+        listLength: "${WORKER_QUEUE_SCALE_THRESHOLD}"
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -36,4 +36,4 @@ spec:
       metadata:
         address: redis.default.svc.cluster.local:6379
         listName: "rq:queue:heavy"
-        listLength: ${WORKER_HEAVY_QUEUE_SCALE_THRESHOLD}
+        listLength: "${WORKER_HEAVY_QUEUE_SCALE_THRESHOLD}"

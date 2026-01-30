@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-web
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      volumes:
+        - name: data-input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: data-output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+        - name: data-music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: data-assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker
+  namespace: montage-ai
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: worker
+          env:
+            - name: WORKER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+      volumes:
+        - name: data-input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: data-output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+        - name: data-music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: data-assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker-heavy
+  namespace: montage-ai
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: worker
+          env:
+            - name: WORKER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+      volumes:
+        - name: data-input
+          persistentVolumeClaim:
+            claimName: montage-ai-input-nfs
+        - name: data-output
+          persistentVolumeClaim:
+            claimName: montage-ai-output-nfs
+        - name: data-music
+          persistentVolumeClaim:
+            claimName: montage-ai-music-nfs
+        - name: data-assets
+          persistentVolumeClaim:
+            claimName: montage-ai-assets-nfs

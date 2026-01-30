@@ -19,7 +19,6 @@ Usage:
 
 import cv2
 import numpy as np
-import json
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict
 from pathlib import Path
@@ -27,11 +26,8 @@ from types import SimpleNamespace
 
 # Mathematical optimization for smooth camera paths
 # Moved to local imports to reduce package startup time by ~700ms
-SCIPY_AVAILABLE = True
-try:
-    import scipy
-except ImportError:
-    SCIPY_AVAILABLE = False
+import importlib.util
+SCIPY_AVAILABLE = importlib.util.find_spec("scipy") is not None
 
 from .logger import logger
 from .config import get_settings
@@ -246,7 +242,8 @@ class CameraMotionOptimizer:
 
         # Solve
         try:
-            smoothed_path = spsolve(A, b)
+            # Ensure A is in CSR format for efficiency and to avoid warnings
+            smoothed_path = spsolve(A.tocsr(), b)
             return [int(x) for x in smoothed_path]
         except Exception as e:
             logger.error(f"Optimization failed: {e}. Using fallback.")

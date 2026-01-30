@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from kubernetes import client, config, watch
+from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
 from ..logger import logger

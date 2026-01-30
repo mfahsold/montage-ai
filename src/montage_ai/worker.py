@@ -69,9 +69,10 @@ def start_worker():
     queues = [Queue(name, connection=conn) for name in listen]
     
     # Create worker with connection
-    # Use hostname (pod name in k8s) for unique worker name
+    # Use hostname (pod name in k8s) with random suffix for unique worker name
     import socket
-    worker_name = os.environ.get("WORKER_NAME", f"montage-{socket.gethostname()}")
+    import uuid
+    worker_name = os.environ.get("WORKER_NAME", f"montage-{socket.gethostname()}-{uuid.uuid4().hex[:4]}")
     worker = Worker(
         queues,
         connection=conn,

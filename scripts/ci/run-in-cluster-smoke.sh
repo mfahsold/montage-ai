@@ -20,7 +20,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 OVERLAY_DIR="$REPO_ROOT/deploy/k3s/overlays/cluster"
 TEMPLATE="$OVERLAY_DIR/smoke-runner-job.yaml.in"
 RENDERED="/tmp/montage-ai-smoke-runner.yaml"
@@ -58,8 +58,23 @@ if [[ -z "$POD" ]]; then
   exit 2
 fi
 
+# Wait for container to be running or terminated
+for i in $(seq 1 60); do
+  state=$(kubectl -n "$NAMESPACE_ARG" get pod "$POD" -o jsonpath='{.status.containerStatuses[0].state}' 2>/dev/null || true)
+  if echo "$state" | grep -q running; then
+    echo "Container is running; streaming logs..."
+    break
+  fi
+  if echo "$state" | grep -q terminated; then
+    echo "Container already terminated; streaming logs (terminated)..."
+    break
+  fi
+  echo "Waiting for container to start... ($i)"
+  sleep 1
+done
+
 echo "Streaming logs for pod $POD (ctrl-c to stop streaming, job will continue)..."
-kubectl -n "$NAMESPACE_ARG" logs -f "$POD"
+kubectl -n "$NAMESPACE_ARG" logs -f "$POD" || true
 
 # Wait for job completion status
 echo "Waiting for job completion..."

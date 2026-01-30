@@ -9,7 +9,6 @@ resources:
   - worker.yaml
   - cgpu-server.yaml
   - service-ingress.yaml
-  - redis.yaml
   - pvc.yaml
   - namespace.yaml
   - network-policy.yaml
@@ -41,7 +40,7 @@ configMapGenerator:
       - OPENAI_MODEL=auto
       - OPENAI_VISION_MODEL=
       - OLLAMA_HOST=http://ollama.montage-ai.svc.cluster.local:11434
-      - REDIS_HOST=redis
+      - REDIS_HOST=redis.default.svc.cluster.local
       - REDIS_PORT=6379
       - CLUSTER_MODE=true
       - CLUSTER_PARALLELISM=4

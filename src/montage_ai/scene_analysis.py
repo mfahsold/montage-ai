@@ -19,13 +19,11 @@ import tempfile
 import subprocess
 from pathlib import Path
 from dataclasses import dataclass, field
-from enum import Enum
 from functools import lru_cache
 from typing import List, Optional, Tuple, Dict, Any
 
 import cv2
 import numpy as np
-import requests
 
 # Lazy-loaded imports in classes/functions below
 # - scenedetect
@@ -41,13 +39,10 @@ except ImportError:
     ContentDetector = None
     open_video = None
 
+import importlib.util
+
 # OPTIMIZATION: K-D tree for fast scene similarity queries (sub-linear search)
-KDTREE_AVAILABLE = False
-try:
-    import scipy.spatial
-    KDTREE_AVAILABLE = True
-except ImportError:
-    pass
+KDTREE_AVAILABLE = importlib.util.find_spec("scipy") is not None
 
 from .config import get_settings
 from .video_metadata import probe_metadata  # Expose for tests to patch

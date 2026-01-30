@@ -1,15 +1,29 @@
 import shutil
 import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 
 def test_vulture_smoke():
-    if shutil.which("vulture") is None:
-        pytest.skip("vulture not installed in runtime image")
-    # Run vulture in --min-confidence=70 and ensure it exits successfully (non-blocking)
-    # This test should not be strict about specific findings; it's a smoke test to ensure vulture runs.
-    result = subprocess.run(["vulture", "src", "--min-confidence", "70"], capture_output=True, text=True)
+    # Attempt to find vulture executable or run it as a module
+    vulture_path = shutil.which("vulture")
+    
+    if vulture_path:
+        cmd = [vulture_path, "src", "--min-confidence", "70"]
+    else:
+        # Fallback to python -m vulture
+        try:
+            # Check if vulture is available as a module
+            # We don't use -m vulture directly in check because it might not be installed
+            import vulture
+            cmd = [sys.executable, "-m", "vulture", "src", "--min-confidence", "70"]
+        except ImportError:
+            pytest.skip("vulture not installed in runtime image")
+            
+    # Run vulture and ensure it exits successfully (non-blocking)
+    result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 0
     # Optionally print findings for CI logs
     if result.stdout:
