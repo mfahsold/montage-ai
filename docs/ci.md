@@ -15,6 +15,16 @@ This runs `scripts/ci.sh`, which:
 - Validates Kubernetes manifests with `kubectl kustomize` if `kubectl` is available.
 - Performs a fast Docker smoke build (no push) if `docker` is available.
 
+### Seeding test media for smoke tests
+
+Some dev smoke tests expect at least one small video in the cluster `montage-input` PVC. Use the included helper to seed a tiny preview clip:
+
+```bash
+# generates a 1s MP4 locally (requires ffmpeg) and copies it into the PVC via a running pod
+./scripts/ops/seed-test-media.sh montage-ai test_data/preview.mp4
+```
+
+This makes autoscale and end-to-end preview workflows deterministic on small test clusters.
 ## Jenkins
 
 A declarative `Jenkinsfile` is included. Minimal setup:
