@@ -7,8 +7,32 @@ set -euo pipefail
 echo "Running hardcoded registry scan..."
 if ./scripts/check-hardcoded-registries.sh; then
   echo "Registry scan passed."
-  exit 0
 else
   echo "ERROR: Hardcoded registry references detected. Fix them or update deploy/k3s/config-global.yaml and re-run the scan." >&2
   exit 1
 fi
+
+# Additional policy check: disallow pushing any commits that add/modify .github/workflows/
+# Read local and remote refs from stdin (pre-push hook protocol)
+if ! [ -t 0 ]; then
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    range="${remote_sha}..${local_sha}"
+    if git rev-list "$range" >/dev/null 2>&1; then
+      for commit in $(git rev-list "$range"); do
+        if git show --name-only --pretty=format: "$commit" | grep -qE '^.github/workflows/'; then
+          echo "ERROR: Pushing commits that add/modify .github/workflows/ is forbidden by project policy." >&2
+          echo "Please move workflow files to .github/workflows.disabled/ and try again." >&2
+          exit 1
+        fi
+      done
+    fi
+  done
+fi
+
+# Defensive check for staged changes (if invoked manually)
+if git diff --cached --name-only | grep -qE '^.github/workflows/'; then
+  echo "ERROR: Staged changes include .github/workflows/ files; pushing them is forbidden." >&2
+  exit 1
+fi
+
+echo "Pre-push checks passed."

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Sample pre-push hook to block .github/workflows additions. Copy to .git/hooks/pre-push and make executable.
+set -euo pipefail
+
+# Usage: ./scripts/hooks/pre-push.sample will exit 0; install into .git/hooks for enforcement.
+./scripts/hooks/pre-push

@@ -126,7 +126,13 @@ def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
 ### Programming style & AI assistants
 
 - **Config-first**: Do NOT hardcode config values (IPs, registry URLs, paths, resource limits). Add settings to `deploy/k3s/config-global.yaml` or `config.Settings`.
-- Run `./scripts/check-hardcoded-registries.sh` before committing. You can install a helper pre-push hook: `cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push`.
+- Run `./scripts/check-hardcoded-registries.sh` before committing. Install the pre-push hook to enforce hardcoded-registry checks *and* to block accidental `.github/workflows/` pushes:
+
+  ```bash
+  cp scripts/hooks/pre-push.sample .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+  ```
+
+  The hook runs both the registry scan and a commit scan to prevent introducing GitHub Actions workflows (this repository enforces a no-Actions policy).
 - Run `./scripts/ci-local.sh` and attach the logs to PRs.
 - When using AI assistants (VS Code Copilot, OpenAI Codex), follow `.github/copilot-instructions.md` and `docs/llm-agents.md`. Our agent persona: **Senior Creative Technologist** — prioritize stability, make small, well-tested changes, and document reasoning in PRs.
 

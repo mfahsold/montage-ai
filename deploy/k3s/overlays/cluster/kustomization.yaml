@@ -4,3 +4,30 @@ kind: Kustomization
 resources:
   - ../../base
   - keda-scaledobjects.yaml
+
+configMapGenerator:
+  - name: montage-ai-cluster-config
+    envs:
+      - ../../base/cluster-config.env
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: montage-ai-cluster-config
+      fieldPath: data.WORKER_QUEUE_SCALE_THRESHOLD
+    targets:
+      - select:
+          kind: ScaledObject
+          name: montage-ai-worker-scaledobject
+        fieldPaths:
+          - spec.triggers[0].metadata.listLength
+  - source:
+      kind: ConfigMap
+      name: montage-ai-cluster-config
+      fieldPath: data.WORKER_HEAVY_QUEUE_SCALE_THRESHOLD
+    targets:
+      - select:
+          kind: ScaledObject
+          name: montage-ai-worker-heavy-scaledobject
+        fieldPaths:
+          - spec.triggers[0].metadata.listLength
