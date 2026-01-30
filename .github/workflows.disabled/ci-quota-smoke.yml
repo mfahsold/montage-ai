@@ -1,0 +1,8 @@
+# DISABLED: This workflow has been intentionally disabled.
+# The project has a strict policy of NOT using GitHub Actions. Rationale:
+# - We run CI locally via `./scripts/ci.sh` or via a vendor-neutral CI (Jenkins/Drone/etc.)
+# - GitHub workflows are deprecated in this repository and will be ignored by maintainers
+# If you need to run these checks, run the corresponding scripts locally (see docs/ci.md).
+
+# The original workflow contents were removed.
+# See `docs/ci.md` and `scripts/ci.sh` for local CI instructions.
