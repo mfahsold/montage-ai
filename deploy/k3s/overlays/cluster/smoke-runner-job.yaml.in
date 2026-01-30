@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-smoke-runner
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: smoke-runner
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      # Use the same service account as the web app if permissions are needed
+      serviceAccountName: montage-ai-cluster
+      restartPolicy: Never
+      containers:
+        - name: smoke-runner
+          image: ${IMAGE_FULL}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              echo "Starting in-cluster smoke runner"
+              export PYTHONPATH=/app/src
+              # Wait for web service to be Ready
+              echo "Waiting for web service to be responsive..."
+              n=0
+              until curl -fsS http://montage-ai-web:8080/api/status -m 3 >/dev/null 2>&1 || [ $n -gt 30 ]; do
+                n=$((n+1))
+                sleep 2
+              done
+              echo "Running smoke tests (pytest)"
+              pytest -q tests/integration/test_queue_scaling.py -q
+      # Optional: set resource requests so job can schedule in small dev clusters
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"
+      nodeSelector: {}
