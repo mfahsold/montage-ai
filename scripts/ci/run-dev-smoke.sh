@@ -137,7 +137,7 @@ kubectl -n "${CLUSTER_NAMESPACE}" get pods -l app=montage-ai -o wide
 WEB_POD=$(kubectl -n "${CLUSTER_NAMESPACE}" get pods -l app.kubernetes.io/component=web-ui -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | awk '{print $1}')
 if [[ -n "${WEB_POD}" ]]; then
   echo "Using web pod: ${WEB_POD}"
-  kubectl -n "${CLUSTER_NAMESPACE}" exec -it "${WEB_POD}" -- curl -fsS -m 5 "${HEALTH_URL}" | jq -C '.' || true
+  kubectl -n "${CLUSTER_NAMESPACE}" exec -c montage-ai -it "${WEB_POD}" -- curl -fsS -m 5 "${HEALTH_URL}" 2>/dev/null | jq -C '.' || true
 else
   echo "No running web pod found in namespace ${CLUSTER_NAMESPACE}, skipping health check"
 fi
