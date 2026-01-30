@@ -5,29 +5,8 @@ resources:
   - ../../base
   - keda-scaledobjects.yaml
 
-configMapGenerator:
-  - name: montage-ai-cluster-config
-    envs:
-      - ../../base/cluster-config.env
-
-replacements:
-  - source:
-      kind: ConfigMap
-      name: montage-ai-cluster-config
-      fieldPath: data.WORKER_QUEUE_SCALE_THRESHOLD
-    targets:
-      - select:
-          kind: ScaledObject
-          name: montage-ai-worker-scaledobject
-        fieldPaths:
-          - spec.triggers[0].metadata.listLength
-  - source:
-      kind: ConfigMap
-      name: montage-ai-cluster-config
-      fieldPath: data.WORKER_HEAVY_QUEUE_SCALE_THRESHOLD
-    targets:
-      - select:
-          kind: ScaledObject
-          name: montage-ai-worker-heavy-scaledobject
-        fieldPaths:
-          - spec.triggers[0].metadata.listLength
+# NOTE: `keda-scaledobjects.yaml` is generated from `keda-scaledobjects.yaml.in`
+# by `deploy/k3s/prepare-scaledobjects.sh` using values rendered into
+# `deploy/k3s/base/cluster-config.env` (see `make config`). This keeps
+# KEDA thresholds configurable from `deploy/config.env` without runtime
+# in-cluster patching.
