@@ -44,7 +44,7 @@ User Prompt → Creative Director (LLM) → JSON → MontageBuilder → SegmentW
 - Guard heavy ML imports with `try/except`; add to `requirements.txt`.
 - Use `ClipMetadata` for clip state and `pathlib` for paths (`/data/...`).
 - Logging: use `logger.info()`; avoid `tqdm` in CI logs.
-- No auto-triggered workflows on `push`/`pull_request`; prefer `workflow_dispatch` and document CI cost.
+- **Do not use GitHub Actions.** Run CI locally with `./scripts/ci.sh` or use a vendor-neutral CI (Jenkins/Drone/Buildkite). Any GitHub Actions workflows are deprecated and will be removed; local CI is the canonical source for running tests and smoke checks.
 
 > Tip: Run `./scripts/check-hardcoded-registries.sh` and a quick grep for literal IPs/paths before committing; the pre-push hook also checks for new hardcoded values.
 

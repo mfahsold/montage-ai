@@ -42,6 +42,14 @@ setup_venv() {
   python -m pip install -r "${ROOT_DIR}/requirements.txt"
 }
 
+check_no_github_actions() {
+  # Fail CI early if GitHub Actions workflow files are present. This project forbids using GH Actions.
+  if compgen -G "${ROOT_DIR}/.github/workflows/*" >/dev/null; then
+    err "Error: GitHub Actions workflow files detected in .github/workflows/. This repository does not use GitHub Actions. Remove or disable them."
+    exit 2
+  fi
+}
+
 run_unit_tests() {
   log "Running unit tests"
   export PYTHONPATH="${ROOT_DIR}/src"
@@ -92,6 +100,7 @@ smoke_build() {
 main() {
   log "Starting vendor-agnostic CI"
   setup_venv
+  check_no_github_actions
   run_unit_tests
   audit_dependencies
   validate_manifests

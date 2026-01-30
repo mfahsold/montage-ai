@@ -1,19 +1,8 @@
-name: CI — quota‑constrained smoke
-on:
-  workflow_dispatch: {}
-  schedule:
-    - cron: '0 4 * * *' # nightly
-jobs:
-  smoke-quota:
-    name: Smoke (quota‑constrained overlay)
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run quota‑constrained kustomize build
-        run: |
-          kubectl kustomize deploy/k3s/overlays/distributed-quota-constrained > /tmp/manifest.yaml
-          kubectl apply -n montage-ai -f /tmp/manifest.yaml --dry-run=client
-      - name: Run preview smoke (uses existing RWX PVCs)
-        run: |
-          export TEST_BASE_URL=${{ secrets.DEV_BASE_URL }}
-          ./scripts/ci/preview-benchmark.sh BASE=${TEST_BASE_URL} RUNS=5
+# DISABLED: This workflow has been intentionally disabled.
+# The project has a strict policy of NOT using GitHub Actions. Rationale:
+# - We run CI locally via `./scripts/ci.sh` or via a vendor-neutral CI (Jenkins/Drone/etc.)
+# - GitHub workflows are deprecated in this repository and will be ignored by maintainers
+# If you need to run these checks, run the corresponding scripts locally (see docs/ci.md).
+
+# The original workflow contents were removed.
+# See `docs/ci.md` and `scripts/ci.sh` for local CI instructions.

@@ -60,11 +60,10 @@ Add your change to `CHANGELOG.md` under `[Unreleased]` with a short note.
 
 ### 6. Publish docs (optional)
 
-Use the local publish script when possible to avoid Actions runner costs:
+Use the local publish script to publish documentation; do not use GitHub Actions:
 
 - `./scripts/publish-docs.sh` (uses `gh` CLI)
-- Use Actions Pages only for large site rebuilds or when `gh` is not available.
-
+- **Do not use GitHub Actions to publish docs or run CI.** Prefer local `gh` CLI or a vendor-neutral CI.
 ### 7. Open a PR
 
 Push your branch and open a pull request. Include:
