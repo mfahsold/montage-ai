@@ -1,7 +1,0 @@
-# DISABLED: This workflow has been intentionally disabled.
-# This repository does NOT use GitHub Actions.
-# Run dev autoscale smoketests locally using `./scripts/ci/run-dev-smoke.sh` or on a controlled runner outside of GitHub Actions (Jenkins/Drone).
-# If you need to reproduce the original behavior, run the script locally with the corresponding env vars:
-# REGISTRY_URL=127.0.0.1:30500 IMAGE_NAME=montage-ai CLUSTER_NAMESPACE=montage-ai ./scripts/ci/run-dev-smoke.sh --tag "dev-$(git rev-parse --short HEAD)"
-
-# The original workflow contents were removed. See `docs/ci.md` for local CI guidance.
