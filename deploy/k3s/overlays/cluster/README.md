@@ -10,7 +10,7 @@ This overlay assumes the following cluster components are installed before apply
 
 Notes:
 - `keda-scaledobjects.yaml` uses Redis list-length triggers. Ensure Redis is reachable at `redis.default.svc.cluster.local:6379` or patch the address.
-- Override scaling thresholds using the environment variables in `deploy/config.env` before templating.
+- Override scaling thresholds using the environment variables in `deploy/config.env` (see `WORKER_QUEUE_SCALE_THRESHOLD` / `WORKER_HEAVY_QUEUE_SCALE_THRESHOLD`). The `deploy-dev` flow will temporarily lower ScaledObject thresholds to exercise autoscaling in small/dev clusters.
 
 ## Dev overlay (low-resource/dev-friendly)
 

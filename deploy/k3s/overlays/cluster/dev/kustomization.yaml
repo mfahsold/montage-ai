@@ -5,5 +5,20 @@ resources:
   - ../../base
   - ../keda-scaledobjects.yaml
 
-patchesStrategicMerge:
-  - reduce-requests-and-tolerations.yaml
+patches:
+  - path: web-patch.yaml
+    target:
+      kind: Deployment
+      name: montage-ai-web
+  - path: worker-patch.yaml
+    target:
+      kind: Deployment
+      name: montage-ai-worker
+  - path: worker-heavy-patch.yaml
+    target:
+      kind: Deployment
+      name: montage-ai-worker-heavy
+  - path: redis-patch.yaml
+    target:
+      kind: Deployment
+      name: redis

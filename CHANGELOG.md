@@ -18,3 +18,4 @@
 - Remove obvious unused imports/params (api.py, web_ui/app.py, cli.py)
 - Add `clean-deploy` ephemeral kustomize overlay and `dev-autoscale-smoke` CI workflow for safe dev/staging validation (KEDA/HPA); add docs and guarded dev-only endpoint for deterministic smoke tests
 - Implement cluster-distributed deployment improvements: KEDA ScaledObjects for `montage-ai-worker` and `montage-ai-worker-heavy`, replaced host-based pod anti-affinity with zone-level spreading, and added a JobSet example for coordinated distributed renders (docs updated)
+- Add `deploy-dev` flow and lightweight dev patches (reduced resource requests + taints toleration + lowered KEDA thresholds) to make deployment and autoscale smoke runs reliable on small or heterogeneous developer clusters
