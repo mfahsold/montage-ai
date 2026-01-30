@@ -33,6 +33,7 @@ Werkzeug>=3.0.0
 # Testing
 pytest>=8.0.0
 pytest-flask>=1.3.0
+PyYAML>=6.0
 redis>=5.0.0,<7.0.0  # redis 7.x has TCP_KEEPIDLE issues on some kernels
 rq>=1.16.0
 
