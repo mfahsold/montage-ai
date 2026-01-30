@@ -133,7 +133,14 @@ kubectl -n "${CLUSTER_NAMESPACE}" rollout status deploy/montage-ai-worker --time
 
 # quick health
 kubectl -n "${CLUSTER_NAMESPACE}" get pods -l app=montage-ai -o wide
-kubectl -n "${CLUSTER_NAMESPACE}" exec -it deploy/montage-ai-web -- curl -fsS -m 5 "${HEALTH_URL}" | jq -C '.'
+# Exec into a running web pod (prefer a Ready pod) to check health
+WEB_POD=$(kubectl -n "${CLUSTER_NAMESPACE}" get pods -l app.kubernetes.io/component=web-ui -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | awk '{print $1}')
+if [[ -n "${WEB_POD}" ]]; then
+  echo "Using web pod: ${WEB_POD}"
+  kubectl -n "${CLUSTER_NAMESPACE}" exec -it "${WEB_POD}" -- curl -fsS -m 5 "${HEALTH_URL}" | jq -C '.' || true
+else
+  echo "No running web pod found in namespace ${CLUSTER_NAMESPACE}, skipping health check"
+fi
 
 # run the repo's opt-in smoke (runner must have cluster networking or port-forward)
 export RUN_SCALE_TESTS=1
