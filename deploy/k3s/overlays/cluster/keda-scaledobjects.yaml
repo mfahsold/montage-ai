@@ -1,4 +1,4 @@
-apiVersion: keda.sh/v1beta1
+apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: montage-ai-worker-scaledobject
@@ -18,7 +18,7 @@ spec:
         listName: "rq:queue:default"
         listLength: "10"
 ---
-apiVersion: keda.sh/v1beta1
+apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: montage-ai-worker-heavy-scaledobject
