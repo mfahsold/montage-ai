@@ -144,15 +144,20 @@ fi
 
 # run the repo's opt-in smoke (runner must have cluster networking or port-forward)
 export RUN_SCALE_TESTS=1
-# Port-forward the web service to localhost to make it accessible to tests
-kubectl -n "${CLUSTER_NAMESPACE}" port-forward svc/montage-ai-web 8080:8080 >/tmp/port-forward.log 2>&1 &
-PF_PID=$!
-# Ensure port-forward has started
-sleep 2
-if ! command -v nc >/dev/null 2>&1 || nc -z localhost 8080; then
-  echo "Port-forward started (pid=${PF_PID})"
+# Port-forward the web pod to localhost to make it accessible to tests
+WEB_POD=$(kubectl -n "${CLUSTER_NAMESPACE}" get pods -l app.kubernetes.io/component=web-ui -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | awk '{print $1}')
+if [[ -n "${WEB_POD}" ]]; then
+  kubectl -n "${CLUSTER_NAMESPACE}" port-forward pod/${WEB_POD} 8080:8080 >/tmp/port-forward.log 2>&1 &
+  PF_PID=$!
+  # Ensure port-forward has started
+  sleep 2
+  if command -v nc >/dev/null 2>&1 && nc -z localhost 8080; then
+    echo "Port-forward started (pid=${PF_PID})"
+  else
+    echo "Warning: port-forward may not be established; check /tmp/port-forward.log"
+  fi
 else
-  echo "Warning: port-forward may not be established; check /tmp/port-forward.log"
+  echo "No running web pod found; skipping port-forward"
 fi
 pytest -q tests/integration/test_queue_scaling.py -q || true
 # cleanup port-forward
