@@ -1,0 +1,80 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-web
+spec:
+  template:
+    spec:
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"
+      containers:
+        - name: montage-ai
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker
+spec:
+  template:
+    spec:
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"
+      containers:
+        - name: worker
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "384Mi"
+            limits:
+              cpu: "800m"
+              memory: "1Gi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker-heavy
+spec:
+  template:
+    spec:
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"
+      containers:
+        - name: worker
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  template:
+    spec:
+      tolerations:
+        - key: "gpu"
+          operator: "Equal"
+          value: "amd-rocm"
+          effect: "NoSchedule"
+      nodeSelector: {}
