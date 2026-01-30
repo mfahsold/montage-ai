@@ -1,6 +1,6 @@
 # CI without GitHub Actions
 
-This repository supports a vendor-agnostic CI flow that you can run locally or wire into any CI system (Jenkins, Drone, Woodpecker, GitLab CI, Buildkite, etc.). No GitHub Actions are required.
+This repository enforces a strict _no GitHub Actions_ policy. CI is vendor-agnostic and runs locally or in any CI system you choose (Jenkins, Drone, Woodpecker, GitLab CI, Buildkite, etc.). The canonical CI runner is `./scripts/ci.sh` and it will fail if any files exist in `.github/workflows/`.
 
 ## Quickstart (Local)
 

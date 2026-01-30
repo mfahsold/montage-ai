@@ -13,7 +13,9 @@ def test_single_canonical_overlay_exists_and_unique():
     overlays_dir = repo_root / 'deploy' / 'k3s' / 'overlays'
     assert overlays_dir.exists(), "deploy/k3s/overlays not found"
 
-    production_dirs = [p for p in overlays_dir.iterdir() if p.is_dir() and p.name == 'production']
+    # Accept either 'production' or 'cluster' as the canonical overlay name
+    canonical_names = {"production", "cluster"}
+    production_dirs = [p for p in overlays_dir.iterdir() if p.is_dir() and p.name in canonical_names]
     assert len(production_dirs) == 1, (
-        f"Expected exactly one canonical overlay named 'production', found: {[p.name for p in overlays_dir.iterdir() if p.is_dir()]}"
+        f"Expected exactly one canonical overlay named in {sorted(list(canonical_names))}, found: {[p.name for p in overlays_dir.iterdir() if p.is_dir()]}"
     )
