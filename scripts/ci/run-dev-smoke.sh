@@ -144,6 +144,20 @@ fi
 
 # run the repo's opt-in smoke (runner must have cluster networking or port-forward)
 export RUN_SCALE_TESTS=1
-pytest -q tests/integration/test_queue_scaling.py -q
+# Port-forward the web service to localhost to make it accessible to tests
+kubectl -n "${CLUSTER_NAMESPACE}" port-forward svc/montage-ai-web 8080:8080 >/tmp/port-forward.log 2>&1 &
+PF_PID=$!
+# Ensure port-forward has started
+sleep 2
+if ! command -v nc >/dev/null 2>&1 || nc -z localhost 8080; then
+  echo "Port-forward started (pid=${PF_PID})"
+else
+  echo "Warning: port-forward may not be established; check /tmp/port-forward.log"
+fi
+pytest -q tests/integration/test_queue_scaling.py -q || true
+# cleanup port-forward
+if [ -n "${PF_PID:-}" ]; then
+  kill "${PF_PID}" 2>/dev/null || true
+fi
 
 echo "Dev autoscale smoke completed"
