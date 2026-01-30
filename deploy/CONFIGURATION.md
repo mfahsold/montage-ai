@@ -224,7 +224,27 @@ The pre-push hook validates that no new hardcoded values are committed:
 # - Hardcoded IPs/domains not using env vars
 # - Registry URLs not in config-global.yaml
 # - Namespace names not in config-global.yaml
+# - Accidental additions to .github/workflows/ (this repo enforces a no-Actions policy)
 ```
+
+## KEDA Thresholds & Autoscaling Configuration
+
+KEDA list-length thresholds for queue-driven autoscaling are configurable from `deploy/config.env`.
+Set the following values and re-run `make config` before rendering or deploying:
+
+- `WORKER_QUEUE_SCALE_THRESHOLD` (default: 10)
+- `WORKER_HEAVY_QUEUE_SCALE_THRESHOLD` (default: 20)
+
+These values are rendered into `deploy/k3s/base/cluster-config.env` and used to generate `deploy/k3s/overlays/cluster/keda-scaledobjects.yaml` via `deploy/k3s/prepare-scaledobjects.sh`.
+
+Run:
+
+```bash
+make -C deploy/k3s config
+make -C deploy/k3s validate
+```
+
+to ensure the generated manifests reflect your configured thresholds.
 
 ## Benefits
 
