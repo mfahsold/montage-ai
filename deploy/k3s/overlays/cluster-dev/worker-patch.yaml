@@ -12,10 +12,31 @@ spec:
           effect: "NoSchedule"
       containers:
         - name: worker
+          image: registry.registry.svc.cluster.local:5000/montage-ai:dev-patch-v1
+          imagePullPolicy: Always
           resources:
             requests:
-              cpu: "150m"
-              memory: "384Mi"
-            limits:
-              cpu: "800m"
+              cpu: "300m"
               memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          env:
+            - name: PREVIEW_MAX_INPUT_SIZE_MB
+              value: "10000"
+            - name: PREVIEW_MAX_FILES
+              value: "10"
+          volumeMounts:
+            - name: data-input
+              mountPath: /data/input
+            - name: data-output
+              mountPath: /data/output
+            - name: data-music
+              mountPath: /data/music
+            - name: data-assets
+              mountPath: /data/assets
+            - name: data-input
+              mountPath: /data/cache
+              subPath: cache
+            - name: tmp-segments
+              mountPath: /tmp/segments

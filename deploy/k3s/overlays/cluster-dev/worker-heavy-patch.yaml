@@ -5,17 +5,35 @@ metadata:
 spec:
   template:
     spec:
-      tolerations:
-        - key: "gpu"
-          operator: "Equal"
-          value: "amd-rocm"
-          effect: "NoSchedule"
       containers:
         - name: worker
+          image: registry.registry.svc.cluster.local:5000/montage-ai:dev-patch-v1
+          imagePullPolicy: Always
           resources:
             requests:
-              cpu: "300m"
-              memory: "512Mi"
-            limits:
               cpu: "1"
               memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          env:
+            - name: PREVIEW_MAX_INPUT_SIZE_MB
+              value: "10000"
+            - name: PREVIEW_MAX_FILES
+              value: "10"
+            - name: WORKER_QUEUES
+              value: "heavy,default"
+          volumeMounts:
+            - name: data-input
+              mountPath: /data/input
+            - name: data-output
+              mountPath: /data/output
+            - name: data-music
+              mountPath: /data/music
+            - name: data-assets
+              mountPath: /data/assets
+            - name: data-input
+              mountPath: /data/cache
+              subPath: cache
+            - name: tmp-segments
+              mountPath: /tmp/segments

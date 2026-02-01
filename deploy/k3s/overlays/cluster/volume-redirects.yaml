@@ -27,15 +27,10 @@ metadata:
   namespace: montage-ai
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     spec:
-      containers:
-        - name: worker
-          env:
-            - name: WORKER_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
       volumes:
         - name: data-input
           persistentVolumeClaim:
@@ -57,15 +52,10 @@ metadata:
   namespace: montage-ai
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     spec:
-      containers:
-        - name: worker
-          env:
-            - name: WORKER_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
       volumes:
         - name: data-input
           persistentVolumeClaim:

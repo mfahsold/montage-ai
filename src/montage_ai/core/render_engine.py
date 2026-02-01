@@ -10,6 +10,7 @@ import time
 import random
 import shutil
 import uuid
+from pathlib import Path
 from typing import Optional, Any, Tuple, Dict, List
 from ..logger import logger
 from .context import MontageContext, ClipMetadata

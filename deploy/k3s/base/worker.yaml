@@ -47,8 +47,9 @@ spec:
               mountPath: /data/music
             - name: data-assets
               mountPath: /data/assets
-            - name: cache
+            - name: data-input
               mountPath: /data/cache
+              subPath: cache
             - name: tmp-segments
               mountPath: /tmp/segments
           resources:
@@ -71,9 +72,6 @@ spec:
         - name: data-assets
           persistentVolumeClaim:
             claimName: montage-assets
-        - name: cache
-          persistentVolumeClaim:
-            claimName: montage-cache
         - name: tmp-segments
           emptyDir:
             sizeLimit: 20Gi
@@ -126,8 +124,9 @@ spec:
               mountPath: /data/music
             - name: data-assets
               mountPath: /data/assets
-            - name: cache
+            - name: data-input
               mountPath: /data/cache
+              subPath: cache
             - name: tmp-segments
               mountPath: /tmp/segments
           resources:
@@ -150,9 +149,6 @@ spec:
         - name: data-assets
           persistentVolumeClaim:
             claimName: montage-assets
-        - name: cache
-          persistentVolumeClaim:
-            claimName: montage-cache
         - name: tmp-segments
           emptyDir:
             sizeLimit: 20Gi
