@@ -10,17 +10,10 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 
 ## Quick Start
 
-```bash
-# Web UI (local)
-./montage-ai.sh web
-
-# CLI run (uses data/input + data/music)
-./montage-ai.sh run
-
-# Kubernetes (cluster overlay)
-make -C deploy/k3s config
-make -C deploy/k3s deploy-cluster
-```
+Start here:
+- [Getting Started](getting-started.md) — full walkthrough
+- [`QUICK_START.md`](../QUICK_START.md) — command cheat sheet
+- [K8s Deployment](../deploy/k3s/README.md) — cluster setup
 
 ---
 
@@ -33,6 +26,7 @@ make -C deploy/k3s deploy-cluster
 | [Getting Started](getting-started.md) | Installation & first montage |
 | [Features](features.md) | What Montage AI can do |
 | [Configuration](configuration.md) | Environment variables |
+| [Config Defaults (code-aligned)](config-defaults.md) | Audited default values |
 | [CLI Reference](CLI_REFERENCE.md) | Command-line usage |
 
 ### Deployment
@@ -44,6 +38,7 @@ make -C deploy/k3s deploy-cluster
 | [Kubernetes Runbook](KUBERNETES_RUNBOOK.md) | Operations (public stub; internal on request) |
 | [Preview SLO (canonical)](operations/preview-slo.md) | Preview SLOs and benchmark steps |
 | [Preview Worker Sizing](operations/montage.yaml) | Sample CPU/memory/affinity |
+| [Operations Hub](operations/README.md) | Operational runbooks index |
 | [Troubleshooting](troubleshooting.md) | Common issues & fixes |
 
 ### Architecture

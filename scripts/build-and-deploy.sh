@@ -28,7 +28,11 @@ NC='\033[0m' # No Color
 
 # Configuration
 # REGISTRY can come from config-global (REGISTRY_URL) or environment overrides
-REGISTRY="${REGISTRY_URL:-${REGISTRY:-registry.registry.svc.cluster.local:5000}}"
+REGISTRY="${REGISTRY:-${REGISTRY_URL:-}}"
+if [ -z "${REGISTRY}" ]; then
+  echo -e "${RED}❌ REGISTRY not set. Configure deploy/config.env or deploy/k3s/config-global.yaml.${NC}"
+  exit 1
+fi
 IMAGE_NAME="${IMAGE_NAME:-montage-ai}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 LOCAL_TAG="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"

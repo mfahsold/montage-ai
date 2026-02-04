@@ -37,7 +37,7 @@ spec:
         - name: ghcr-pull
       containers:
       - name: web-ui
-        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+        image: <IMAGE_FULL>
         imagePullPolicy: IfNotPresent
         command: ["python", "-m", "montage_ai.web_ui.app"]
         ports:

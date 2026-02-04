@@ -16,8 +16,8 @@ service: montage-ai
 version: "0.5.0"
 
 # Registry configuration
-# Default: cluster registry (override via REGISTRY env var)
-registry: registry.registry.svc.cluster.local:5000
+# Default: use REGISTRY/REGISTRY_URL from environment or deploy/config.env
+registry: <REGISTRY_URL>
 image: montage-ai
 
 # Build settings
@@ -32,7 +32,7 @@ platforms:
 builder: default
 cache:
   enabled: true
-  ref: "registry.registry.svc.cluster.local:5000/montage-ai:buildcache"
+  ref: "<REGISTRY_URL>/montage-ai:buildcache"
   mode: max
 
 # Build arguments
@@ -60,6 +60,6 @@ tagging:
 
 # Deployment targets
 deploy:
-  namespace: montage-ai
+  namespace: <CLUSTER_NAMESPACE>
   deployment: montage-ai-web
   kustomization: deploy/k3s/base/kustomization.yaml

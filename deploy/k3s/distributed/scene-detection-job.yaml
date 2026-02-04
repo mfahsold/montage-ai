@@ -41,7 +41,7 @@ spec:
 
       containers:
         - name: scene-detect
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: IfNotPresent
           command:
             - python
@@ -162,7 +162,7 @@ spec:
 
       containers:
         - name: encoder
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: IfNotPresent
           command:
             - python

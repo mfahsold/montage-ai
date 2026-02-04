@@ -24,7 +24,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: montage-ai
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: IfNotPresent
           resources:
             requests:
@@ -51,7 +51,7 @@ spec:
             - name: CGPU_GPU_ENABLED
               value: "false"
             - name: CGPU_HOST
-              value: "cgpu-server.montage-ai.svc.cluster.local"
+              value: "<CGPU_HOST>"
             - name: INPUT_DIR
               value: "/data/input"
             - name: MUSIC_DIR

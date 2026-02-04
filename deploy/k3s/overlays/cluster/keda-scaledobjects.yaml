@@ -14,7 +14,7 @@ spec:
   triggers:
     - type: redis
       metadata:
-        address: redis.default.svc.cluster.local:6379
+        address: redis.montage-ai.svc.cluster.local:6379
         listName: "rq:queue:default"
         listLength: "10"
 ---
@@ -34,6 +34,6 @@ spec:
   triggers:
     - type: redis
       metadata:
-        address: redis.default.svc.cluster.local:6379
+        address: redis.montage-ai.svc.cluster.local:6379
         listName: "rq:queue:heavy"
         listLength: "20"

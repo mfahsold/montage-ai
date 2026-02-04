@@ -43,7 +43,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: montage-ai
-        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+        image: <IMAGE_FULL>
         imagePullPolicy: IfNotPresent
         command: ["python", "-u", "-m", "montage_ai.web_ui.app"]
         ports:

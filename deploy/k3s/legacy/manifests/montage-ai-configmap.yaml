@@ -15,19 +15,19 @@ data:
   # Priority: OPENAI_API_BASE > GOOGLE_API_KEY > CGPU > OLLAMA
   
   # Option 1: OpenAI-compatible endpoint (LiteLLM unified proxy) - RECOMMENDED
-  OPENAI_API_BASE: "http://litellm.llama-box-system.svc.cluster.local:4000/v1"
-  OPENAI_API_KEY: "sk-1234"
+  OPENAI_API_BASE: "<OPENAI_API_BASE>"
+  OPENAI_API_KEY: ""
   OPENAI_MODEL: "auto"  # Discover at runtime via /v1/models (do not hardcode)
   OPENAI_VISION_MODEL: ""  # Leave empty unless a vision model is available
   
   # Option 2: Ollama (local fallback)
-  OLLAMA_HOST: "http://ollama.montage-ai.svc.cluster.local:11434"
+  OLLAMA_HOST: "<OLLAMA_HOST>"
   OLLAMA_MODEL: "llava"
   DIRECTOR_MODEL: "llama3.1:70b"
   
   # Option 3: cgpu (cloud GPU + Gemini LLM)
   CGPU_ENABLED: "true"
-  CGPU_HOST: "cgpu-server.montage-ai.svc.cluster.local"
+  CGPU_HOST: "<CGPU_HOST>"
   CGPU_PORT: "8080"
   CGPU_MODEL: "gemini-2.0-flash"
   CGPU_GPU_ENABLED: "true"
@@ -71,7 +71,7 @@ data:
   MONITOR_MEM_INTERVAL: "5"
   MAX_SCENE_REUSE: "3"
   USE_FFMPEG_MCP: "false"
-  FFMPEG_MCP_ENDPOINT: "http://ffmpeg-mcp.montage-ai.svc.cluster.local:8080"
+  FFMPEG_MCP_ENDPOINT: "<FFMPEG_MCP_ENDPOINT>"
   FINAL_CRF: "18"               # Quality: 18=master, 23=fast preview
   NORMALIZE_CLIPS: "true"       # Normalize fps/pix_fmt before concat
   ENABLE_XFADE: ""              # "", true, false ("" = follow style)

@@ -30,7 +30,7 @@ spec:
         effect: "NoSchedule"
       containers:
         - name: montage-ai
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: IfNotPresent
           resources:
             requests:

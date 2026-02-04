@@ -6,7 +6,7 @@ metadata:
 spec:
   containers:
     - name: debug
-      image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+      image: <IMAGE_FULL>
       command: ["sleep", "3600"]
       volumeMounts:
         - name: input

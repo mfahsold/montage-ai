@@ -21,8 +21,8 @@ spec:
         fluxibri.ai/tier: inference
     spec:
       initContainers:
-        - name: cgpu-credentials-init
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+      - name: cgpu-credentials-init
+        image: <IMAGE_FULL>
           command:
             - /bin/bash
             - -c
@@ -41,8 +41,8 @@ spec:
               mountPath: /cgpu-secrets
               readOnly: true
       containers:
-        - name: cgpu-server
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+      - name: cgpu-server
+        image: <IMAGE_FULL>
           imagePullPolicy: IfNotPresent
           command: ["cgpu", "serve", "--host", "0.0.0.0", "--port", "8080"]
           env:

@@ -1,6 +1,7 @@
 # Configuration Reference
 
 Complete reference for all environment variables and settings.
+For an audited snapshot of code-aligned defaults, see `docs/config-defaults.md`.
 
 ---
 
@@ -74,16 +75,16 @@ For LiteLLM, vLLM, LocalAI, or any OpenAI-compatible endpoint:
 
 | Variable              | Default      | Description                                                      |
 | --------------------- | ------------ | ---------------------------------------------------------------- |
-| `OPENAI_API_BASE`     | *(empty)*    | API base URL (e.g., `http://litellm.llama-box-system.svc.cluster.local:4000/v1`) |
-| `OPENAI_API_KEY`      | `sk-1234`    | API key for LiteLLM proxy (cluster default)                      |
+| `OPENAI_API_BASE`     | *(empty)*    | API base URL (e.g., `http://<OPENAI_BASE_HOST>:<PORT>/v1`) |
+| `OPENAI_API_KEY`      | *(empty)*    | API key for OpenAI-compatible proxy (set via secret/env)          |
 | `OPENAI_MODEL`        | *(empty)*    | Model ID or `auto` to discover via `/v1/models`                  |
 | `OPENAI_VISION_MODEL` | *(empty)*    | Vision model ID or `auto` (optional)                             |
 
-**Example (Fluxibri cluster / LiteLLM):**
+**Example (Cluster / LiteLLM):**
 
 ```bash
-OPENAI_API_BASE=http://litellm.llama-box-system.svc.cluster.local:4000/v1 \
-OPENAI_API_KEY=sk-1234 \
+OPENAI_API_BASE=http://litellm.<LLM_NAMESPACE>.svc.cluster.local:4000/v1 \
+OPENAI_API_KEY=<OPENAI_API_KEY> \
 OPENAI_MODEL=auto \
 ./montage-ai.sh run
 ```
@@ -136,6 +137,9 @@ Security & deployment — store the real API key at the org/user level (do NOT c
 | `OLLAMA_MODEL`     | `llava`                             | Model for scene analysis       |
 | `DIRECTOR_MODEL`   | `llama3.1:70b`                      | Model for Creative Director    |
 | `ENABLE_AI_FILTER` | `false`                             | Enable AI-based clip filtering |
+
+**Cluster note:** If you run Ollama in-cluster, set `OLLAMA_HOST` explicitly (or set
+`CLUSTER_NAMESPACE` so service DNS can be derived).
 
 ### Google AI (Direct API)
 
@@ -264,8 +268,8 @@ Use `PRESERVE_ASPECT=true` when:
 
 ```bash
 # .env file or docker-compose environment
-OPENAI_API_BASE=http://litellm.llama-box-system.svc.cluster.local:4000/v1
-OPENAI_API_KEY=sk-1234
+OPENAI_API_BASE=http://litellm.<LLM_NAMESPACE>.svc.cluster.local:4000/v1
+OPENAI_API_KEY=<OPENAI_API_KEY>
 OPENAI_MODEL=auto
 ENABLE_AI_FILTER=true
 FFMPEG_HWACCEL=auto
@@ -298,10 +302,14 @@ UPSCALE=true
 | ------------------- | ----------------- | ----------------------------------------------------------------- |
 | `USE_GPU`           | `auto`            | GPU mode: `auto`, `vulkan`, `v4l2`, `none`                        |
 | `FFMPEG_HWACCEL`    | `auto`            | Video encoding GPU: `auto`, `nvenc`, `vaapi`, `qsv`, `none`       |
+| `USE_FFMPEG_MCP`    | `false`           | Enable remote ffmpeg MCP service for encoding                     |
+| `FFMPEG_MCP_ENDPOINT` | *(empty)*       | Full MCP URL (overrides host/port)                                |
+| `FFMPEG_MCP_HOST`   | *(empty)*         | MCP host (used when endpoint not set)                             |
+| `FFMPEG_MCP_PORT`   | `8080`            | MCP port                                                          |
 | `FFMPEG_THREADS`    | `0`               | FFmpeg thread count (`0` = auto)                                  |
 | `FFMPEG_PRESET`     | `medium`          | Encoding speed: `ultrafast`, `fast`, `medium`, `slow`, `veryslow` |
 | `PARALLEL_ENHANCE`  | `true`            | Enable parallel clip enhancement                                  |
-| `MAX_PARALLEL_JOBS` | *(CPU cores - 2)* | Maximum parallel workers                                          |
+| `MAX_PARALLEL_JOBS` | *(effective CPU cores)* | Maximum parallel workers                                     |
 | `MONTAGE_PREVIEW_CPU_LIMIT` | *(unset)* | Optional clamp for effective CPU count in preview benchmarks     |
 
 ### GPU Hardware Acceleration

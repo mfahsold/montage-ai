@@ -8,13 +8,12 @@
 # Local development
 ./montage-ai.sh web
 
-# Kubernetes cluster
-# Canonical (Fluxibri core): unified CLI deploy
-fluxibri deployment deploy montage-ai
-
-# Canonical cluster deploy (kustomize)
+# Kubernetes cluster (kustomize)
 make -C deploy/k3s config
 make -C deploy/k3s deploy-cluster
+
+# Optional: Fluxibri Core CLI (if available)
+fluxibri deployment deploy montage-ai
 ```
 
 ## Documentation Map
@@ -36,7 +35,7 @@ deploy/
     ├── base/cluster-config.env ← Generated from config-global.yaml
     ├── README.md          ← Main K8s deployment guide
     ├── base/              ← Base manifests
-    ├── overlays/          ← Canonical cluster overlay + legacy (archived)
+    ├── overlays/          ← Canonical cluster overlay + archived legacy (reference only)
     ├── deploy.sh          ← Deploy script
     ├── undeploy.sh        ← Cleanup script
     └── build-and-push.sh  ← Build & push image
@@ -66,7 +65,7 @@ make -C deploy/k3s deploy-cluster
 ./deploy/k3s/deploy.sh
 ```
 
-For Fluxibri-managed clusters, prefer the canonical CLI:
+Optional: if your cluster is managed with Fluxibri Core, you can use the CLI:
 
 ```bash
 fluxibri deployment deploy montage-ai

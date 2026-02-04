@@ -28,16 +28,17 @@ if [ -f "${CONFIG_LEGACY}" ]; then
 fi
 
 # Derive a canonical REGISTRY_URL if not present
-if [ -n "${REGISTRY_URL:-}" ]; then
-  : # already set
-else
+if [ -z "${REGISTRY_URL:-}" ]; then
   if [ -n "${REGISTRY_HOST:-}" ] && [ -n "${REGISTRY_PORT:-}" ]; then
     REGISTRY_URL="${REGISTRY_HOST}:${REGISTRY_PORT}"
   elif [ -n "${REGISTRY_HOST:-}" ]; then
     REGISTRY_URL="${REGISTRY_HOST}"
+  elif [ -n "${REGISTRY_NAMESPACE:-}" ] || [ -n "${K3S_CLUSTER_DOMAIN:-}" ] || [ -n "${CLUSTER_DOMAIN:-}" ]; then
+    registry_ns="${REGISTRY_NAMESPACE:-registry}"
+    cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"
+    REGISTRY_URL="registry.${registry_ns}.svc.${cluster_domain}:5000"
   else
-    # Default to internal registry service
-    REGISTRY_URL="registry.registry.svc.cluster.local:5000"
+    REGISTRY_URL=""
   fi
 fi
 

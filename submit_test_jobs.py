@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
 """Submit test jobs to RQ directly"""
 import sys
-sys.path.insert(0, '/home/codeai/montage-ai/src')
+import os
+
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(REPO_ROOT, 'src'))
 
 from redis import Redis
 from rq import Queue
 import time
 
-# Use SOTA 2026 canonical Redis endpoint
-redis_host = 'redis.default.svc.cluster.local'
+# Redis endpoint (override via env)
+cluster_ns = os.environ.get("CLUSTER_NAMESPACE", "montage-ai")
+redis_host = os.environ.get("REDIS_HOST", f"redis.{cluster_ns}.svc.cluster.local")
+redis_port = int(os.environ.get("REDIS_PORT", "6379"))
 
 def submit_jobs():
     print(f"Connecting to Redis at {redis_host}...")
     try:
-        redis_conn = Redis(host=redis_host, port=6379, decode_responses=False)
+        redis_conn = Redis(host=redis_host, port=redis_port, decode_responses=False)
         redis_conn.ping()
         print("✅ Connected to Redis")
     except Exception as e:
         print(f"❌ Failed to connect: {e}")
         print("Trying with port-forward...")
-        redis_conn = Redis(host='localhost', port=6379, decode_responses=False)
+        redis_conn = Redis(host='localhost', port=redis_port, decode_responses=False)
     
     q = Queue('default', connection=redis_conn)
     

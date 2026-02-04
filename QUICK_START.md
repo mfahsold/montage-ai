@@ -1,20 +1,7 @@
 # Quick Start: Montage AI
 
-## Installation
-
-```bash
-# Core only (minimal)
-pip install montage-ai
-
-# With AI features
-pip install montage-ai[ai]
-
-# With Web UI
-pip install montage-ai[web]
-
-# With Cloud GPU support
-pip install montage-ai[cloud]
-```
+This is a command cheat sheet. For the full walkthrough, see [Getting Started](docs/getting-started.md).
+For pip/uv install options and optional extras, see [Optional Dependencies](docs/OPTIONAL_DEPENDENCIES.md).
 
 ## Run (Local)
 

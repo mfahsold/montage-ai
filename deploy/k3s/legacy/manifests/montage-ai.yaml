@@ -31,8 +31,8 @@ data:
   
   # AI / LLM Configuration
   # Unified proxy (LiteLLM) with runtime model discovery
-  OPENAI_API_BASE: "http://litellm.llama-box-system.svc.cluster.local:4000/v1"
-  OPENAI_API_KEY: "sk-1234"
+  OPENAI_API_BASE: "<OPENAI_API_BASE>"
+  OPENAI_API_KEY: ""
   OPENAI_MODEL: "auto"
   OPENAI_VISION_MODEL: ""
   
@@ -83,7 +83,7 @@ spec:
       - operator: Exists
       containers:
       - name: montage-ai
-        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+        image: <IMAGE_FULL>
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -160,10 +160,10 @@ spec:
   ingressClassName: traefik
   tls:
   - hosts:
-    - montage-ai.local
+    - <MONTAGE_HOSTNAME>
     secretName: montage-ai-tls
   rules:
-  - host: montage-ai.local
+  - host: <MONTAGE_HOSTNAME>
     http:
       paths:
       - path: /

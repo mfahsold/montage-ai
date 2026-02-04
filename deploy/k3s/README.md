@@ -82,7 +82,19 @@ deploy/k3s/
 │   └── kustomization.yaml   # Base kustomization
 └── overlays/
     ├── cluster/             # Canonical cluster overlay
-    └── legacy/              # Archived overlays (internal/legacy)
+    └── legacy/              # Archived overlays (reference only)
+```
+
+---
+
+## Rendering Image Placeholders
+
+Some manifests use `<IMAGE_FULL>` placeholders (jobs and patches). Render them
+with the shared image resolver:
+
+```bash
+scripts/render-image.sh deploy/k3s/job-documentary-trailer.yaml > /tmp/job.yaml
+kubectl apply -f /tmp/job.yaml
 ```
 
 ---

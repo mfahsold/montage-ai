@@ -2,19 +2,19 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: montage-ai-worker-scaledobject
-  namespace: montage-ai
+  namespace: ${CLUSTER_NAMESPACE}
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: worker
 spec:
   scaleTargetRef:
     name: montage-ai-worker
-  minReplicaCount: 1
-  maxReplicaCount: 8
+  minReplicaCount: ${WORKER_MIN_REPLICAS}
+  maxReplicaCount: ${WORKER_MAX_REPLICAS}
   triggers:
     - type: redis
       metadata:
-        address: redis.default.svc.cluster.local:6379
+        address: ${REDIS_HOST}:${REDIS_PORT}
         listName: "rq:queue:default"
         listLength: "${WORKER_QUEUE_SCALE_THRESHOLD}"
 ---
@@ -22,18 +22,18 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: montage-ai-worker-heavy-scaledobject
-  namespace: montage-ai
+  namespace: ${CLUSTER_NAMESPACE}
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: worker-heavy
 spec:
   scaleTargetRef:
     name: montage-ai-worker-heavy
-  minReplicaCount: 1
-  maxReplicaCount: 8
+  minReplicaCount: ${WORKER_MIN_REPLICAS}
+  maxReplicaCount: ${WORKER_MAX_REPLICAS}
   triggers:
     - type: redis
       metadata:
-        address: redis.default.svc.cluster.local:6379
+        address: ${REDIS_HOST}:${REDIS_PORT}
         listName: "rq:queue:heavy"
         listLength: "${WORKER_HEAVY_QUEUE_SCALE_THRESHOLD}"

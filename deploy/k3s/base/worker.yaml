@@ -23,7 +23,7 @@ spec:
       serviceAccountName: montage-ai-cluster
       containers:
         - name: worker
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "montage_ai.worker"]
           envFrom:
@@ -100,7 +100,7 @@ spec:
       serviceAccountName: montage-ai-cluster
       containers:
         - name: worker
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "montage_ai.worker"]
           envFrom:

@@ -37,7 +37,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-  - host: montage-ai.local
+  - host: <MONTAGE_HOSTNAME>
     http:
       paths:
       - path: /

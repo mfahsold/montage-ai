@@ -68,8 +68,8 @@ Audio Length    Processing Time    Memory
 ### Configuration
 
 ```python
-# Default threshold optimized for modern footage
-ContentDetector(threshold=27.0)
+# Default threshold (from SCENE_THRESHOLD; default 30.0)
+ContentDetector(threshold=30.0)
 
 # Lower threshold = more cuts detected (action footage)
 ContentDetector(threshold=20.0)
@@ -80,7 +80,7 @@ ContentDetector(threshold=35.0)
 
 ### Threshold Selection
 
-Our default threshold (27.0) was chosen based on:
+Our default threshold (30.0, configurable via `SCENE_THRESHOLD`) was chosen based on:
 - [PySceneDetect benchmarks](https://github.com/Breakthrough/PySceneDetect/blob/main/benchmark/README.md)
 - Testing with 1000+ clips from travel/action footage
 - Balance between false positives and missed cuts

@@ -14,8 +14,8 @@ spec:
   triggers:
     - type: redis
       metadata:
-        hostname: "redis.default.svc.cluster.local"
-        port: "6379"
+        hostname: "<REDIS_HOST>"
+        port: "<REDIS_PORT>"
         listName: "rq:queue:default"
         listLength: "10"
       authenticationRef: {}

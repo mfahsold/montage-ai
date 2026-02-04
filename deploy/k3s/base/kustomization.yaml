@@ -35,13 +35,6 @@ configMapGenerator:
       - STABILIZE=false
       - UPSCALE=false
       - ENHANCE=false
-      - OPENAI_API_BASE=http://litellm.llama-box-system.svc.cluster.local:4000/v1
-      - OPENAI_API_KEY=sk-1234
-      - OPENAI_MODEL=auto
-      - OPENAI_VISION_MODEL=
-      - OLLAMA_HOST=http://ollama.montage-ai.svc.cluster.local:11434
-      - REDIS_HOST=redis.montage-ai.svc.cluster.local
-      - REDIS_PORT=6379
       - CLUSTER_MODE=true
       - CLUSTER_PARALLELISM=4
       - CLUSTER_RENDER_TIER=large
@@ -77,6 +70,16 @@ replacements:
           - spec.template.spec.containers.[name=montage-ai].image
       - select:
           kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
+      - select:
+          kind: Deployment
+          name: montage-ai-worker-heavy
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].image
+      - select:
+          kind: Deployment
           name: cgpu-server
         fieldPaths:
           - spec.template.spec.initContainers.[name=cgpu-credentials-init].image
@@ -98,3 +101,33 @@ replacements:
           name: montage-ai-web
         fieldPaths:
           - spec.rules.0.host
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.STORAGE_CLASS_DEFAULT
+    targets:
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-input
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-output
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-music
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-assets
+        fieldPaths:
+          - spec.storageClassName
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-cache
+        fieldPaths:
+          - spec.storageClassName

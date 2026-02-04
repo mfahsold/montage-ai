@@ -110,12 +110,12 @@ The central orchestrator that executes the editing pipeline in phases:
 |--------------|----------------|--------|
 | **Preview Pipeline** | Low-res (360p) + Ultrafast preset | 10x faster iteration loop |
 | **LRU Histogram Cache** | `@lru_cache` for frame extraction | 91% cache hit rate, 2-3x faster clip selection |
-| **Parallel Scene Detection** | `ThreadPoolExecutor(max_workers=4)` | 3-4x speedup on multi-core |
+| **Parallel Scene Detection** | `ProcessPoolExecutor` (max_workers = min(len(videos), max(4, cpu_count // 2), `MAX_SCENE_WORKERS`); ThreadPool fallback) | 3-4x speedup on multi-core |
 | **FFmpeg Beat Detection** | `astats` + `tempo` filters (primary path) | Portable, no heavy deps; librosa optional via try/except |
 | **Auto GPU Encoding** | NVENC > VAAPI > QSV > CPU | 2-6x encoding speedup |
 | **Hardware Nah (Web)** | Server-Sent Events (SSE) + `os.nice(10)` | Zero polling overhead, responsive UI under load |
 | **Lazy Loading (CLI)** | Import heavy libs only when needed | Instant CLI startup time |
-| **Cluster Efficiency** | `imagePullPolicy: IfNotPresent` | Minimized network traffic for cached images |
+| **Cluster Efficiency** | `imagePullPolicy: IfNotPresent` (dev overlay uses `Always`) | Minimized network traffic for cached images |
 
 ### editor.py (CLI Entry Point)
 

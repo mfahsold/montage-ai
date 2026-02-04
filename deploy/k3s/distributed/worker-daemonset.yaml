@@ -55,18 +55,17 @@ spec:
 
       containers:
         - name: worker
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
+          envFrom:
+            - configMapRef:
+                name: cluster-config
           env:
             - name: WORKER_MODE
               value: "true"
             - name: WORKER_QUEUES
               value: "default,heavy"
-            - name: REDIS_HOST
-              value: "redis.montage-ai.svc.cluster.local"
-            - name: REDIS_PORT
-              value: "6379"
             # Node identification
             - name: NODE_NAME
               valueFrom:
@@ -174,9 +173,12 @@ spec:
 
       containers:
         - name: worker
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
+          envFrom:
+            - configMapRef:
+                name: cluster-config
           env:
             - name: WORKER_MODE
               value: "true"
@@ -188,10 +190,6 @@ spec:
               value: "amf"
             - name: OUTPUT_CODEC
               value: "h264_amf"
-            - name: REDIS_HOST
-              value: "redis.montage-ai.svc.cluster.local"
-            - name: REDIS_PORT
-              value: "6379"
             - name: PYTHONUNBUFFERED
               value: "1"
           resources:
@@ -269,9 +267,12 @@ spec:
 
       containers:
         - name: worker
-          image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+          image: <IMAGE_FULL>
           imagePullPolicy: Always
           command: ["python", "-m", "montage_ai.worker"]
+          envFrom:
+            - configMapRef:
+                name: cluster-config
           env:
             - name: WORKER_MODE
               value: "true"
@@ -283,10 +284,6 @@ spec:
               value: "cuda"
             - name: OUTPUT_CODEC
               value: "h264_nvenc"
-            - name: REDIS_HOST
-              value: "redis.montage-ai.svc.cluster.local"
-            - name: REDIS_PORT
-              value: "6379"
             - name: PYTHONUNBUFFERED
               value: "1"
           resources:

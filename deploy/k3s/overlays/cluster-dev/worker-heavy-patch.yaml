@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: worker
-          image: registry.registry.svc.cluster.local:5000/montage-ai:dev-patch-v1
+        image: <IMAGE_FULL>
           imagePullPolicy: Always
           resources:
             requests:

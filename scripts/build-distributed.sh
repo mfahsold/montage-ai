@@ -14,7 +14,7 @@
 #   TAG=v1.0.0 ./scripts/build-distributed.sh   # Override via env
 #
 # Environment Variables:
-#   REGISTRY            - Registry host (default: ${REGISTRY_URL:-registry.registry.svc.cluster.local:5000} for cluster)
+#   REGISTRY            - Registry host (default: ${REGISTRY_URL} from config)
 #   CACHE_REF           - Cache reference (default: $REGISTRY/montage-ai:buildcache)
 #   BUILDER             - Buildx builder name (default: distributed-builder)
 #   PLATFORMS           - Target platforms (default: linux/amd64,linux/arm64)

@@ -30,7 +30,9 @@ def test_job_enqueued_into_redis_queue():
     except Exception:
         pytest.skip("redis client not available in runner")
 
-    host = os.environ.get("REDIS_HOST", "redis.default.svc.cluster.local")
+    cluster_ns = os.environ.get("CLUSTER_NAMESPACE", "montage-ai")
+    default_host = f"redis.{cluster_ns}.svc.cluster.local"
+    host = os.environ.get("REDIS_HOST", default_host)
     port = int(os.environ.get("REDIS_PORT", "6379"))
 
     client = redis.Redis(host=host, port=port, socket_connect_timeout=3)

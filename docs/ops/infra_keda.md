@@ -1,10 +1,5 @@
-# KEDA / Metrics / Autoscaler (Internal)
+# Moved
 
-Infrastructure install steps are cluster-specific and stored in the private
-docs set.
+This content moved to the canonical operations path:
 
-Public references:
-- `docs/ops/scaling.md` for high-level autoscaling principles.
-- https://keda.sh for upstream installation guidance.
-
-Contact maintainers if you need the internal runbook.
+- `docs/operations/infra_keda.md`

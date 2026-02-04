@@ -26,6 +26,100 @@ from montage_ai.config_parser import ConfigParser
 
 
 # =============================================================================
+# Cluster/Service Endpoint Helpers
+# =============================================================================
+def _cluster_namespace() -> str:
+    return os.environ.get("CLUSTER_NAMESPACE") or os.environ.get("MONTAGE_NAMESPACE") or ""
+
+
+def _cluster_domain() -> str:
+    return os.environ.get("CLUSTER_DOMAIN") or os.environ.get("K3S_CLUSTER_DOMAIN") or "cluster.local"
+
+
+def _cluster_service_host(service: str, namespace: Optional[str] = None, domain: Optional[str] = None) -> str:
+    if not service:
+        return ""
+    ns = namespace or _cluster_namespace()
+    if not ns:
+        return ""
+    dom = domain or _cluster_domain()
+    if dom:
+        return f"{service}.{ns}.svc.{dom}"
+    return f"{service}.{ns}.svc"
+
+
+def _format_endpoint(host: str, port: str, scheme: str = "http") -> str:
+    if not host:
+        return ""
+    return f"{scheme}://{host}:{port}"
+
+
+def _cluster_service_url(service: str, port: str, scheme: str = "http") -> str:
+    host = _cluster_service_host(service)
+    return _format_endpoint(host, port, scheme)
+
+
+def _default_ffmpeg_mcp_endpoint() -> str:
+    explicit = os.environ.get("FFMPEG_MCP_ENDPOINT")
+    if explicit:
+        return explicit
+    host = os.environ.get("FFMPEG_MCP_HOST")
+    port = os.environ.get("FFMPEG_MCP_PORT", "8080")
+    if host:
+        return _format_endpoint(host, port)
+    if _is_cluster_deployment():
+        return _cluster_service_url("ffmpeg-mcp", port)
+    return ""
+
+
+def _default_ollama_host() -> str:
+    explicit = os.environ.get("OLLAMA_HOST")
+    if explicit:
+        return explicit
+    port = os.environ.get("OLLAMA_PORT", "11434")
+    if _is_cluster_deployment():
+        return _cluster_service_url("ollama", port)
+    return "http://host.docker.internal:11434"
+
+
+def _registry_from_env() -> Tuple[str, str]:
+    url = os.environ.get("REGISTRY_URL", "").strip()
+    if url:
+        url = url.split("://", 1)[-1]
+        host_port = url.split("/", 1)[0]
+        if ":" in host_port:
+            host, port = host_port.rsplit(":", 1)
+        else:
+            host, port = host_port, ""
+        return host, port
+    host = os.environ.get("REGISTRY_HOST", "").strip()
+    port = os.environ.get("REGISTRY_PORT", "").strip()
+    if host:
+        return host, port
+    registry_ns = os.environ.get("REGISTRY_NAMESPACE", "").strip()
+    if registry_ns:
+        host = _cluster_service_host("registry", namespace=registry_ns)
+        return host, port
+    return "", port
+
+
+def _default_registry_host() -> str:
+    host, _ = _registry_from_env()
+    return host
+
+
+def _default_registry_port() -> str:
+    host, port = _registry_from_env()
+    if port:
+        return port
+    return "5000" if host else ""
+
+
+def _app_name() -> str:
+    return os.environ.get("APP_NAME") or os.environ.get("IMAGE_NAME") or "montage-ai"
+
+
+# =============================================================================
 # Path Configuration
 # =============================================================================
 def _is_cluster_deployment() -> bool:
@@ -398,7 +492,7 @@ class GPUConfig:
     output_codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_CODEC", "h264"))
     ffmpeg_hwaccel: str = field(default_factory=lambda: os.environ.get("FFMPEG_HWACCEL", "auto"))
     use_ffmpeg_mcp: bool = field(default_factory=lambda: os.environ.get("USE_FFMPEG_MCP", "false").lower() == "true")
-    ffmpeg_mcp_endpoint: str = field(default_factory=lambda: os.environ.get("FFMPEG_MCP_ENDPOINT", "http://ffmpeg-mcp.montage-ai.svc.cluster.local:8080"))
+    ffmpeg_mcp_endpoint: str = field(default_factory=_default_ffmpeg_mcp_endpoint)
     # Force routing encoding to CGPU service when beneficial or explicitly requested
     force_cgpu_encoding: bool = field(default_factory=lambda: os.environ.get("FORCE_CGPU_ENCODING", "false").lower() == "true")
 
@@ -417,7 +511,7 @@ class LLMConfig:
     openai_vision_model: str = field(default_factory=lambda: os.environ.get("OPENAI_VISION_MODEL", ""))
 
     # Ollama (local fallback)
-    ollama_host: str = field(default_factory=lambda: os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434"))
+    ollama_host: str = field(default_factory=_default_ollama_host)
     ollama_model: str = field(default_factory=lambda: os.environ.get("OLLAMA_MODEL", "llava"))
     director_model: str = field(default_factory=lambda: os.environ.get("DIRECTOR_MODEL", "llama3.1:70b"))
 
@@ -480,13 +574,13 @@ class ClusterConfig:
     
     Syncs with deploy/k3s/config-global.yaml values for distributed processing.
     """
-    registry_host: str = field(default_factory=lambda: os.environ.get("REGISTRY_HOST", "registry.registry.svc.cluster.local"))
-    registry_port: str = field(default_factory=lambda: os.environ.get("REGISTRY_PORT", "5000"))
+    registry_host: str = field(default_factory=_default_registry_host)
+    registry_port: str = field(default_factory=_default_registry_port)
     image_name: str = field(default_factory=lambda: os.environ.get("IMAGE_NAME", "montage-ai"))
     image_tag: str = field(default_factory=lambda: os.environ.get("IMAGE_TAG", "latest"))
-    namespace: str = field(default_factory=lambda: os.environ.get("CLUSTER_NAMESPACE", "montage-ai"))
+    namespace: str = field(default_factory=lambda: _cluster_namespace() or "montage-ai")
     image_pull_secret: Optional[str] = field(default_factory=lambda: os.environ.get("IMAGE_PULL_SECRET"))
-    pvc_name: str = field(default_factory=lambda: os.environ.get("PVC_NAME", "montage-ai-data"))
+    pvc_name: str = field(default_factory=lambda: os.environ.get("PVC_NAME") or f"{_app_name()}-data")
     pvc_input: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_INPUT_NAME") or "")
     pvc_output: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_OUTPUT_NAME") or "")
     pvc_music: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_MUSIC_NAME") or "")
@@ -510,6 +604,8 @@ class ClusterConfig:
         tag = self.image_tag
         
         # Build image path
+        if not host:
+            return f"{name}:{tag}" if name else ""
         if port:
             return f"{host}:{port}/{name}:{tag}"
         return f"{host}/{name}:{tag}"

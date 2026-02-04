@@ -9,7 +9,7 @@ This overlay assumes the following cluster components are installed before apply
   - Install instructions and upstream links: https://jobset.sigs.k8s.io/
 
 Notes:
-- `keda-scaledobjects.yaml` uses Redis list-length triggers. Ensure Redis is reachable at `redis.default.svc.cluster.local:6379` or patch the address.
+- `keda-scaledobjects.yaml` uses Redis list-length triggers. Set `REDIS_HOST`/`REDIS_PORT` via `deploy/config.env` or `deploy/k3s/config-global.yaml` (rendered into `cluster-config.env`).
 - Override scaling thresholds using the environment variables in `deploy/config.env` (see `WORKER_QUEUE_SCALE_THRESHOLD` / `WORKER_HEAVY_QUEUE_SCALE_THRESHOLD`). The `deploy-dev` flow will temporarily lower ScaledObject thresholds to exercise autoscaling in small/dev clusters.
 
 ## Dev overlay (low-resource/dev-friendly)

@@ -130,7 +130,7 @@ scene_manager.detect_scenes(video)
 ```python
 frame = cv2.imread(frame_path, cv2.IMREAD_GRAYSCALE)
 laplacian_var = cv2.Laplacian(frame, cv2.CV_64F).var()
-is_blurry = laplacian_var < threshold  # threshold ~100
+is_blurry = laplacian_var < threshold  # threshold ~1000 (configurable)
 ```
 
 **How it works:**
@@ -139,7 +139,9 @@ is_blurry = laplacian_var < threshold  # threshold ~100
 3. Variance measures sharpness level
 4. Low variance = motion blur / out-of-focus
 
-**Threshold:**
+**Threshold (Laplacian variance):**
+- Default is controlled by `BLUR_DETECTION_VARIANCE_THRESHOLD` (default: 1000.0)
+- Typical range: blurry ~100, sharp ~1000
 - `< 100`: Strong blur (reject)
 - `100-500`: Moderate sharpness (accept)
 - `> 500`: High sharpness (preferred)

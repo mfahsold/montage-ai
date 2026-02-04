@@ -4,7 +4,11 @@ This document outlines how hardcoded values have been centralized to support mul
 
 ## Overview
 
-All deployment-related hardcoded values have been moved to `deploy/k3s/config-global.yaml`, which serves as the single source of truth for:
+Deployment-related hardcoded values are centralized in:
+- `deploy/k3s/config-global.yaml` (cluster/k8s defaults)
+- `deploy/config.env` (runtime/service endpoints and deploy-time defaults)
+
+These two sources are rendered into `deploy/k3s/base/cluster-config.env` for K8s.
 - Registry URLs and credentials
 - Kubernetes configuration (namespace, domain, storage)
 - Service endpoints and ports
@@ -15,13 +19,14 @@ All deployment-related hardcoded values have been moved to `deploy/k3s/config-gl
 
 ```
 deploy/
+└── config.env             # ← Runtime/deploy defaults (sourced by scripts)
 └── k3s/
     ├── config-global.yaml     # ← Canonical config (environment-specific)
     ├── base/cluster-config.env# ← Generated from config-global.yaml
     ├── Makefile               # Cluster operations (deploy, diff, validate)
     ├── deploy.sh              # Uses cluster-config.env
     ├── build-and-push.sh      # Uses config-global.yaml via scripts/common.sh
-    └── legacy/manifests/      # Legacy manifests (archived)
+    └── legacy/manifests/      # Archived legacy manifests (reference only)
 ```
 
 ## Configuration Variables
@@ -41,9 +46,19 @@ K3S_CLUSTER_DOMAIN="cluster.local"
 MONTAGE_HOSTNAME="<MONTAGE_HOSTNAME>"
 ```
 
+### Runtime Services (Queues & LLM)
+```bash
+REDIS_HOST="<REDIS_HOST>"
+REDIS_PORT="6379"
+OPENAI_API_BASE="<OPENAI_API_BASE>"
+OPENAI_API_KEY="<OPENAI_API_KEY>"
+OPENAI_MODEL="auto"
+OPENAI_VISION_MODEL=""
+```
+
 ### Storage Configuration
 ```bash
-STORAGE_CLASS_DEFAULT="local-path"         # StorageClass name
+STORAGE_CLASS_DEFAULT="<STORAGE_CLASS>"    # StorageClass name
 STORAGE_CLASS_NFS="nfs-client"
 NFS_SERVER="<NFS_SERVER>"                  # Optional NFS server IP
 NFS_PATH="<NFS_PATH>"
@@ -183,18 +198,18 @@ Below is a minimal Tekton snippet showing how a Kaniko or Kaniko-compatible task
 
 ### Before (Hardcoded)
 ```yaml
-image: YOUR_REGISTRY:5000/montage-ai:latest
+image: <HARDCODED_REGISTRY_URL>/montage-ai:latest
 namespace: montage-ai
 ```
 
 ```bash
-docker push "YOUR_REGISTRY:5000/montage-ai:latest"
+docker push "<HARDCODED_REGISTRY_URL>/montage-ai:latest"
 ```
 
 ### After (Centralized)
 ```bash
 # In deploy/k3s/config-global.yaml (rendered to cluster-config.env)
-REGISTRY_URL="YOUR_REGISTRY:5000"
+REGISTRY_URL="<REGISTRY_URL>"
 IMAGE_FULL="${REGISTRY_URL}/montage-ai:latest"
 
 # In scripts

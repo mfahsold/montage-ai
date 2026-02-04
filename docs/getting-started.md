@@ -22,7 +22,9 @@ git clone https://github.com/mfahsold/montage-ai.git
 cd montage-ai
 ```
 
-Everything runs in Docker.
+The default flow runs in Docker via `./montage-ai.sh`.
+If you prefer a local Python install (pip/uv) or need optional extras, see
+[Optional Dependencies](OPTIONAL_DEPENDENCIES.md).
 
 ---
 

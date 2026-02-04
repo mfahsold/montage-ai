@@ -1,10 +1,5 @@
-# Dev Autoscale Smoke (Internal)
+# Moved
 
-The detailed autoscale smoke runbook (internal endpoints, runner labels, and
-cluster-specific overlays) is maintained in the private docs set.
+This content moved to the canonical operations path:
 
-Public references:
-- `docs/ops/scaling.md` for the high-level scaling guidance.
-- `docs/operations/preview-slo.md` for performance verification.
-
-Request internal access if you need the full workflow.
+- `docs/operations/dev-autoscale-smoke.md`

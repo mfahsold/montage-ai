@@ -2,6 +2,10 @@
 
 This public runbook contains basic, non-environment-specific checks. The full operational runbook (cluster topology, internal hosts, incident playbooks) lives in the private docs set. Contact the maintainers if you need access.
 
+See also:
+- `deploy/k3s/README.md` for canonical deployment steps
+- `docs/operations/README.md` for public runbooks (preview SLOs, scaling)
+
 ---
 
 ## Quick Health Checks

@@ -8,7 +8,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: "web"
 spec:
   rules:
-    - host: montage-ai.local
+    - host: <MONTAGE_HOSTNAME>
       http:
         paths:
           - path: /

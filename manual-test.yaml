@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: registry.registry.svc.cluster.local:5000/montage-ai:latest
+        image: <IMAGE_FULL>
         command: ["echo", "Manual test successful"]
       restartPolicy: Never
   backoffLimit: 1

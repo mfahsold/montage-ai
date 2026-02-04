@@ -88,7 +88,8 @@ def test_cli():
 def get_base_url() -> str:
     """Get backend API URL from environment or use default."""
     import os
-    return os.environ.get("BACKEND_API_URL", "http://localhost:5000")
+    port = os.environ.get("SERVICE_PORT", "5000")
+    return os.environ.get("BACKEND_API_URL", f"http://localhost:{port}")
 
 def test_backend_health(base_url=None):
     if base_url is None:
