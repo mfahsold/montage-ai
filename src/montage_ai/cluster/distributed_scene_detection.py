@@ -122,7 +122,10 @@ def detect_scenes_shard(
 
     # Get video metadata
     meta = probe_metadata(video_path)
-    duration = meta.get("duration", 0.0)
+    if isinstance(meta, dict):
+        duration = meta.get("duration", 0.0)
+    else:
+        duration = getattr(meta, "duration", 0.0) if meta is not None else 0.0
 
     if time_range:
         # Time-based sharding - detect in range
@@ -366,7 +369,10 @@ def main():
             # Automatic time-based sharding for single video in cluster mode
             video_path = video_paths[0]
             meta = probe_metadata(video_path)
-            duration = meta.get("duration", 0.0)
+            if isinstance(meta, dict):
+                duration = meta.get("duration", 0.0)
+            else:
+                duration = getattr(meta, "duration", 0.0) if meta is not None else 0.0
 
             time_range = get_shard_time_range(
                 duration,

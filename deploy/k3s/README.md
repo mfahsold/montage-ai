@@ -187,12 +187,21 @@ For multi-node clusters, prefer an RWX-capable storage class (e.g., NFS/CSI).
 storage:
   classes:
     default: "<RWX_STORAGE_CLASS>"
+  pvc:
+    input: "montage-ai-input-nfs"
+    output: "montage-ai-output-nfs"
+    music: "montage-ai-music-nfs"
+    assets: "montage-ai-assets-nfs"
 ```
 
 ### NFS Storage (Multi-Node)
 
 Provision an RWX storage class via your cluster (NFS/CSI), then set it in
 `deploy/k3s/config-global.yaml`.
+
+If you already have dedicated PVCs (RWX split), set the PVC names under
+`storage.pvc` and they will be propagated to `cluster-config.env` for
+distributed jobs.
 
 ---
 
@@ -250,6 +259,57 @@ python3 -m montage_ai.cli jobs --api-base http://<montage-service> submit \
 
 # Inspect status
 python3 -m montage_ai.cli jobs --api-base http://<montage-service> status <JOB_ID>
+```
+
+---
+
+## Distributed Jobs (Cluster Mode)
+
+Cluster-mode jobs (scene detection + distributed render) use the in-cluster
+Kubernetes API and require:
+
+- `deploy/k3s/base/cluster-rbac.yaml` applied (includes `jobs`, `jobs/status`,
+  and `configmaps` permissions).
+- ServiceAccount `montage-ai-cluster` (already in `cluster-rbac.yaml`).
+- If JobSet CRD is **not** installed, the system falls back to standard Jobs.
+
+### Required Cluster Env (for in-cluster jobs)
+
+These values are read by the job submitter. Prefer configuring them in
+`deploy/k3s/config-global.yaml` (rendered into `cluster-config.env`).
+
+- `REGISTRY_HOST` / `REGISTRY_PORT` (or `REGISTRY_URL`)
+- `IMAGE_NAME` / `IMAGE_TAG`
+- `PVC_INPUT_NAME`, `PVC_OUTPUT_NAME`, `PVC_MUSIC_NAME`, `PVC_ASSETS_NAME`
+
+Example `cluster-config.env` excerpt:
+
+```env
+REGISTRY_URL=192.168.1.12:30500
+IMAGE_NAME=montage-ai
+IMAGE_TAG=latest
+PVC_INPUT_NAME=montage-ai-input-nfs
+PVC_OUTPUT_NAME=montage-ai-output-nfs
+PVC_MUSIC_NAME=montage-ai-music-nfs
+PVC_ASSETS_NAME=montage-ai-assets-nfs
+```
+
+### Example (ad‑hoc job)
+
+```yaml
+spec:
+  template:
+    spec:
+      serviceAccountName: montage-ai-cluster
+      containers:
+        - name: montage-ai
+          env:
+            - name: REGISTRY_HOST
+              value: 192.168.1.12
+            - name: REGISTRY_PORT
+              value: "30500"
+            - name: PVC_INPUT_NAME
+              value: montage-ai-input-nfs
 ```
 
 ---

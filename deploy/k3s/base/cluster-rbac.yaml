@@ -20,7 +20,10 @@ metadata:
     fluxibri.ai/tier: rbac
 rules:
   - apiGroups: ["batch"]
-    resources: ["jobs"]
+    resources: ["jobs", "jobs/status"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: ["batch.jobset.sigs.k8s.io"]
+    resources: ["jobsets"]
     verbs: ["create", "get", "list", "watch", "delete"]
   - apiGroups: [""]
     resources: ["configmaps"]

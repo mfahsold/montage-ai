@@ -84,12 +84,16 @@ def render_shard(
                 hwaccel = ["-hwaccel", os.environ.get("FFMPEG_HWACCEL")]
 
             import subprocess
+            export_cfg = getattr(settings, "export", None)
+            width = int(os.environ.get("EXPORT_WIDTH", getattr(export_cfg, "resolution_width", 1920)))
+            height = int(os.environ.get("EXPORT_HEIGHT", getattr(export_cfg, "resolution_height", 1080)))
+
             ffmpeg_cmd = [
                 "ffmpeg", "-y"
             ] + hwaccel + [
                 "-ss", f"{meta.start_time:.3f}", "-t", f"{meta.duration:.3f}",
                 "-i", meta.source_path,
-                "-vf", f"scale={settings.encoding.width}:{settings.encoding.height},setsar=1",
+                "-vf", f"scale={width}:{height},setsar=1",
                 "-c:v", os.environ.get("FFMPEG_ENCODER", cfg.codec),
                 "-crf", str(settings.encoding.crf),
                 "-preset", "fast",

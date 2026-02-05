@@ -352,14 +352,13 @@ class SceneDetector:
             max_resolution = 1080  # Default: downsample anything above 1080p
         
         # Metadata and proxy generation
-        import subprocess
-        from .video_metadata import probe_metadata
-        
         metadata = None
 
         # Check if proxy mode should be enabled (auto-detect for large videos)
         try:
             metadata = probe_metadata(video_path)
+            if metadata is None:
+                raise ValueError("probe_metadata returned None")
             
             # Auto-enable proxy mode for large/long videos
             if _settings.proxy.should_use_proxy(metadata.duration, metadata.width, metadata.height):

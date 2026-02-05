@@ -10,11 +10,14 @@ for scaling background workers and media encoders.
 - Avoid hardcoded values in base manifests — use `deploy/k3s/config-global.yaml` and
   `deploy/config.env` for environment overrides.
 - **Cluster mode is canonical for distributed jobs**; use local mode only for single‑node/dev runs.
+- Ensure the cluster ServiceAccount (`montage-ai-cluster`) has RBAC for `jobs`,
+  `jobs/status`, and `configmaps` (see `deploy/k3s/base/cluster-rbac.yaml`).
 
 ## Optional (SOTA)
 
 - Use JobSet for distributed render phases when you need shard‑level coordination.
 - Prefer cluster‑native queues (Redis/KEDA) over ad‑hoc job manifests.
+- JobSet is optional; if the CRD is absent, distributed jobs fall back to standard Jobs.
 
 ## Canonical Cluster Workflow (Fluxibri Core, Optional)
 

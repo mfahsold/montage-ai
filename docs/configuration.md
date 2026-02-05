@@ -141,6 +141,17 @@ Security & deployment — store the real API key at the org/user level (do NOT c
 **Cluster note:** If you run Ollama in-cluster, set `OLLAMA_HOST` explicitly (or set
 `CLUSTER_NAMESPACE` so service DNS can be derived).
 
+### Cluster storage (PVC split)
+
+Distributed jobs can use split PVCs for input/output/music/assets. Configure
+these in `deploy/k3s/config-global.yaml` under `storage.pvc` so the rendered
+`cluster-config.env` exports:
+
+- `PVC_INPUT_NAME`
+- `PVC_OUTPUT_NAME`
+- `PVC_MUSIC_NAME`
+- `PVC_ASSETS_NAME`
+
 ### Google AI (Direct API)
 
 | Variable          | Default            | Description                |

@@ -5,6 +5,7 @@ Extracts rendering logic from MontageBuilder to separate concerns.
 Handles progressive rendering finalization and FFmpeg concatenation.
 """
 
+import json
 import os
 import time
 import random
@@ -307,10 +308,17 @@ class RenderEngine:
         
         # Convert ClipMetadata objects to dicts for JSON
         import dataclasses
-        clips_data = [dataclasses.asdict(c) for c in self.ctx.timeline.clips_metadata]
-        
+        from ..utils import NumpyEncoder
+
+        clips_data = []
+        for clip in self.ctx.timeline.clips_metadata:
+            clip_dict = dataclasses.asdict(clip)
+            if clip.enhancement_decision and hasattr(clip.enhancement_decision, "to_dict"):
+                clip_dict["enhancement_decision"] = clip.enhancement_decision.to_dict()
+            clips_data.append(clip_dict)
+
         with open(clips_json_path, "w") as f:
-            json.dump(clips_data, f)
+            json.dump(clips_data, f, cls=NumpyEncoder)
             
         logger.info(f"   📝 Saved timeline metadata ({len(clips_data)} clips) to {clips_json_path}")
 
@@ -332,6 +340,9 @@ class RenderEngine:
             output_codec = (self.settings.gpu.output_codec or "").strip()
             if output_codec:
                 shard_env["OUTPUT_CODEC"] = output_codec
+            if self.ctx.media.output_profile:
+                shard_env["EXPORT_WIDTH"] = str(self.ctx.media.output_profile.width)
+                shard_env["EXPORT_HEIGHT"] = str(self.ctx.media.output_profile.height)
 
             job_spec = submitter.submit_generic_job(
                 job_id=f"render-{job_id}",
@@ -385,8 +396,10 @@ class RenderEngine:
             pr = ProgressiveRenderer(output_dir=str(segments_dir))
             # Manually inject segments into the inner segment_writer
             from ..segment_writer import SegmentInfo
-            for seg_path in all_segments:
-                pr.segment_writer.segments.append(SegmentInfo(path=seg_path, duration=0, clip_count=0))
+            for idx, seg_path in enumerate(all_segments):
+                pr.segment_writer.segments.append(
+                    SegmentInfo(path=seg_path, index=idx, duration=0, clip_count=0)
+                )
                 
             success = pr.finalize(
                 output_path=output_path,

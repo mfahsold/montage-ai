@@ -53,6 +53,10 @@ storage_class_default = ""
 storage_class_nfs = ""
 nfs_server = ""
 nfs_path = ""
+pvc_input = ""
+pvc_output = ""
+pvc_music = ""
+pvc_assets = ""
 
 try:
     import yaml  # type: ignore
@@ -86,6 +90,11 @@ if yaml is not None:
         storage_nfs = storage.get("nfs", {}) if isinstance(storage, dict) else {}
         nfs_server = clean(storage_nfs.get("server", ""))
         nfs_path = clean(storage_nfs.get("path", ""))
+        storage_pvc = storage.get("pvc", {}) if isinstance(storage, dict) else {}
+        pvc_input = clean(storage_pvc.get("input", ""))
+        pvc_output = clean(storage_pvc.get("output", ""))
+        pvc_music = clean(storage_pvc.get("music", ""))
+        pvc_assets = clean(storage_pvc.get("assets", ""))
     except Exception:
         pass
 
@@ -160,6 +169,9 @@ if not any([
             if indent == 2 and stripped.startswith("nfs:"):
                 subsection = "storage_nfs"
                 continue
+            if indent == 2 and stripped.startswith("pvc:"):
+                subsection = "storage_pvc"
+                continue
             if subsection == "storage_classes" and indent == 4 and ":" in stripped:
                 key, value = stripped.split(":", 1)
                 key = key.strip()
@@ -176,6 +188,18 @@ if not any([
                     nfs_server = value
                 elif key == "path":
                     nfs_path = value
+            if subsection == "storage_pvc" and indent == 4 and ":" in stripped:
+                key, value = stripped.split(":", 1)
+                key = key.strip()
+                value = clean(value)
+                if key == "input":
+                    pvc_input = value
+                elif key == "output":
+                    pvc_output = value
+                elif key == "music":
+                    pvc_music = value
+                elif key == "assets":
+                    pvc_assets = value
         elif section == "images":
             if indent == 2 and stripped.startswith("montage_ai:"):
                 subsection = "montage_ai"
@@ -206,5 +230,9 @@ emit("STORAGE_CLASS_DEFAULT", storage_class_default)
 emit("STORAGE_CLASS_NFS", storage_class_nfs)
 emit("NFS_SERVER", nfs_server)
 emit("NFS_PATH", nfs_path)
+emit("PVC_INPUT_NAME", pvc_input)
+emit("PVC_OUTPUT_NAME", pvc_output)
+emit("PVC_MUSIC_NAME", pvc_music)
+emit("PVC_ASSETS_NAME", pvc_assets)
 PY
 }

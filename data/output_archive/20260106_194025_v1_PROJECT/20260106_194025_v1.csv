@@ -1,4 +1,0 @@
-Clip #,Source File,Source In (sec),Source Out (sec),Timeline In (sec),Timeline Out (sec),Duration (sec),Source In (TC),Source Out (TC),Timeline In (TC),Timeline Out (TC),Energy,Action,Shot Type,Notes
-1,/home/codeai/montage-ai/data/input/GSFC_20140421_EarthOrbit_m11525~preview.mp4,204.87,208.71,0.00,3.84,3.84,00:03:24:26,00:03:28:21,00:00:00:00,00:00:03:25,0.05,medium,medium,
-2,/home/codeai/montage-ai/data/input/GSFC_20190419_Earth_m13188_Orbit~medium.mp4,16.87,20.72,3.84,7.70,3.85,00:00:16:26,00:00:20:21,00:00:03:25,00:00:07:20,0.12,medium,medium,
-3,/home/codeai/montage-ai/data/input/GSFC_20140421_EarthOrbit_m11525~preview.mp4,187.63,189.94,7.70,10.00,2.30,00:03:07:18,00:03:09:28,00:00:07:20,00:00:10:00,0.15,medium,medium,

@@ -22,6 +22,9 @@ openai>=1.55.0
 # System Monitoring
 psutil>=6.0.0
 
+# Kubernetes API (cluster mode)
+kubernetes>=29.0.0
+
 # Timeline Export (Professional NLE Integration)
 opentimelineio>=0.18.1  # Academy Software Foundation standard
 jsonschema>=4.25.1  # JSON schema validation for Creative Director

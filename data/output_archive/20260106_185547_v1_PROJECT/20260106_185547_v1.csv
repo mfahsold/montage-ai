@@ -1,5 +1,0 @@
-Clip #,Source File,Source In (sec),Source Out (sec),Timeline In (sec),Timeline Out (sec),Duration (sec),Source In (TC),Source Out (TC),Timeline In (TC),Timeline Out (TC),Energy,Action,Shot Type,Notes
-1,/home/codeai/montage-ai/data/input/GSFC_20190419_Earth_m13188_Orbit~medium.mp4,70.90,74.72,0.00,3.82,3.82,00:01:10:27,00:01:14:21,00:00:00:00,00:00:03:24,0.05,medium,medium,
-2,/home/codeai/montage-ai/data/input/GSFC_20140421_EarthOrbit_m11525~preview.mp4,0.50,4.31,3.82,7.63,3.81,00:00:00:15,00:00:04:09,00:00:03:24,00:00:07:18,0.12,medium,medium,
-3,/home/codeai/montage-ai/data/input/Seeing Earth as Only NASA Can~medium.mp4,77.33,81.21,7.63,11.51,3.88,00:01:17:09,00:01:21:06,00:00:07:18,00:00:11:15,0.15,medium,medium,
-4,/home/codeai/montage-ai/data/input/GSFC_20190419_Earth_m13188_Orbit~medium.mp4,2.17,5.66,11.51,15.00,3.49,00:00:02:04,00:00:05:19,00:00:11:15,00:00:15:00,0.12,medium,medium,

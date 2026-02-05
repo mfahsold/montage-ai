@@ -28,6 +28,7 @@ Usage:
 import hashlib
 import json
 import os
+import re
 import subprocess
 import time
 import yaml
@@ -134,6 +135,16 @@ class JobSubmitter:
         hash_suffix = hashlib.md5(content.encode()).hexdigest()[:12]
         timestamp = int(time.time()) % 1000000
         return f"{prefix}-{timestamp}-{hash_suffix}"
+
+    def _sanitize_k8s_name(self, name: str, max_len: int = 63) -> str:
+        """Make a string safe for Kubernetes resource names (RFC 1123)."""
+        safe = re.sub(r"[^a-z0-9.-]+", "-", name.lower())
+        safe = safe.strip("-.")
+        if not safe:
+            safe = f"job-{int(time.time())}"
+        if len(safe) > max_len:
+            safe = safe[:max_len].rstrip("-.")
+        return safe
 
     def submit_scene_detection(
         self,
@@ -243,6 +254,13 @@ class JobSubmitter:
             logger.error(f"Error getting job status: {e}")
             return None
 
+    def is_job_successful(self, job_name: str) -> bool:
+        """Check if a job completed successfully."""
+        status = self.get_job_status(job_name)
+        if not status:
+            return False
+        return status.is_successful
+
     def list_jobs(self, label_selector: str = "app.kubernetes.io/name=montage-ai") -> List[Dict]:
         """List all montage-ai jobs."""
         if not self.batch_v1:
@@ -334,6 +352,8 @@ class JobSubmitter:
         """
         if completions is None:
             completions = parallelism
+
+        job_name = self._sanitize_k8s_name(job_id)
             
         pull_secret = image_pull_secret or settings.cluster.image_pull_secret
 
@@ -460,7 +480,7 @@ class JobSubmitter:
             api_version="batch/v1",
             kind="Job",
             metadata=client.V1ObjectMeta(
-                name=job_id,
+                name=job_name,
                 labels={
                     "app.kubernetes.io/name": "montage-ai",
                     "app.kubernetes.io/component": component,
@@ -494,7 +514,7 @@ class JobSubmitter:
                 "apiVersion": "batch.jobset.sigs.k8s.io/v1alpha1",
                 "kind": "JobSet",
                 "metadata": {
-                    "name": job_id,
+                    "name": job_name,
                     "namespace": self.namespace,
                     "labels": job.metadata.labels
                 },
@@ -515,16 +535,16 @@ class JobSubmitter:
                     plural="jobsets",
                     body=jobset
                 )
-                logger.info(f"Successfully submitted JobSet for {component}: {job_id}")
-                return JobSpec(name=job_id, namespace=self.namespace, parallelism=parallelism, completions=completions)
+                logger.info(f"Successfully submitted JobSet for {component}: {job_name}")
+                return JobSpec(name=job_name, namespace=self.namespace, parallelism=parallelism, completions=completions)
             except ApiException as e:
                 logger.warning(f"JobSet submission failed, falling back to Job: {e}")
                 # fall through to Job creation
 
         try:
             self.batch_v1.create_namespaced_job(self.namespace, job)
-            logger.info(f"Successfully submitted {component} job via API: {job_id}")
-            return JobSpec(name=job_id, namespace=self.namespace, parallelism=parallelism, completions=completions)
+            logger.info(f"Successfully submitted {component} job via API: {job_name}")
+            return JobSpec(name=job_name, namespace=self.namespace, parallelism=parallelism, completions=completions)
         except ApiException as e:
             logger.error(f"Failed to submit job: {e.body}")
             raise RuntimeError(f"Job creation failed: {e}")

@@ -4,12 +4,12 @@
 # DRY: single source of truth for registry, cluster, storage, and image defaults.
 
 registry:
-  host: "<REGISTRY_HOST>"
-  port: 5000
-  url: "<REGISTRY_URL>"
-  namespace: "<REGISTRY_NAMESPACE>"
+  host: "192.168.1.12"
+  port: 30500
+  url: "192.168.1.12:30500"
+  namespace: "registry"
   images:
-    montage_ai: "<REGISTRY_URL>/montage-ai"
+    montage_ai: "192.168.1.12:30500/montage-ai"
 
 cluster:
   namespace: "<CLUSTER_NAMESPACE>"
@@ -34,6 +34,13 @@ storage:
   nfs:
     server: "<NFS_SERVER_IP>"
     path: "/mnt/nfs-montage"
+  pvc:
+    # Optional split PVCs for distributed jobs (RWX recommended)
+    # Leave empty to use the single PVC_NAME / legacy data PVC.
+    input: "montage-ai-input-nfs"
+    output: "montage-ai-output-nfs"
+    music: "montage-ai-music-nfs"
+    assets: "montage-ai-assets-nfs"
 
 images:
   montage_ai:
