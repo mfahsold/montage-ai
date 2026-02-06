@@ -11,6 +11,7 @@ import json
 import shutil
 import subprocess
 import threading
+import importlib
 import psutil
 import queue
 import time
@@ -35,44 +36,25 @@ from ..audio_analysis import remove_filler_words
 AUTOREFRAME_AVAILABLE = False
 TRANSCRIBER_AVAILABLE = False
 
-def _load_auto_reframe_engine_class():
-    """Import the real AutoReframeEngine class on demand."""
-    try:
-        from ..auto_reframe import AutoReframeEngine as _AR
-        globals()['AUTOREFRAME_AVAILABLE'] = True
-        return _AR
-    except Exception:
-        # Propagate the original error when actually used so callers get a clear traceback
-        raise
 
-class AutoReframeEngine:
-    """Lightweight lazy factory for the real AutoReframeEngine.
+def _lazy_factory(module_path: str, class_name: str, availability_flag: str):
+    """Create a lazy proxy class for heavyweight imports."""
+    def _load():
+        module = importlib.import_module(module_path, package=__package__)
+        globals()[availability_flag] = True
+        return getattr(module, class_name)
 
-    - Importing this module no longer imports OpenCV at import-time.
-    - The symbol remains patchable by tests (e.g. @patch('montage_ai.web_ui.app.AutoReframeEngine')).
-    """
-    def __new__(cls, *args, **kwargs):
-        Real = _load_auto_reframe_engine_class()
-        return Real(*args, **kwargs)
+    class LazyProxy:
+        """Lightweight lazy factory (patchable in tests)."""
+        def __new__(cls, *args, **kwargs):
+            Real = _load()
+            return Real(*args, **kwargs)
+
+    return LazyProxy
 
 
-def _load_transcriber_class():
-    """Import the Transcriber class on demand."""
-    try:
-        from ..transcriber import Transcriber as _T
-        globals()['TRANSCRIBER_AVAILABLE'] = True
-        return _T
-    except Exception:
-        raise
-
-class Transcriber:
-    """Lazy factory for the Transcriber wrapper (keeps module import fast).
-
-    Tests may patch `montage_ai.web_ui.app.Transcriber` as before.
-    """
-    def __new__(cls, *args, **kwargs):
-        Real = _load_transcriber_class()
-        return Real(*args, **kwargs)
+AutoReframeEngine = _lazy_factory("..auto_reframe", "AutoReframeEngine", "AUTOREFRAME_AVAILABLE")
+Transcriber = _lazy_factory("..transcriber", "Transcriber", "TRANSCRIBER_AVAILABLE")
 
 # Centralized Configuration (Single Source of Truth)
 from ..config import get_settings
@@ -175,6 +157,87 @@ DEFAULT_OPTIONS = {
     "auto_reframe": False,
     "export_recipe": False,
 }
+
+# UI toggle definitions (canonical source for frontend toggle metadata)
+UI_TOGGLE_CONFIG = [
+    {
+        "id": "shorts_mode",
+        "label": "Shorts Mode",
+        "desc": "9:16 Vertical + Smart Crop.",
+        "category": "core",
+        "badges": [{"type": "info", "text": "TikTok/Reels"}, {"type": "quality", "text": "AI Reframing"}],
+    },
+    {
+        "id": "captions",
+        "label": "Burn-in Captions",
+        "desc": "Auto-transcribed subtitles.",
+        "category": "core",
+        "badges": [{"type": "info", "text": "Social Ready"}],
+    },
+    {
+        "id": "export_timeline",
+        "label": "Export Timeline",
+        "desc": "OTIO/EDL for NLEs.",
+        "category": "core",
+        "badges": [{"type": "info", "text": "Resolve/Premiere"}],
+    },
+    {
+        "id": "cloud_acceleration",
+        "label": "Cloud Acceleration",
+        "desc": "Offload AI tasks to cloud GPU (upscaling, transcription, LLM).",
+        "category": "core",
+        "badges": [{"type": "info", "text": "Auto-Fallback"}],
+    },
+    {
+        "id": "llm_clip_selection",
+        "label": "LLM Clip Selection",
+        "desc": "Semantic scene analysis.",
+        "category": "advanced",
+        "badges": [{"type": "quality", "text": "Smart Cuts"}, {"type": "cost", "text": "LLM Cost"}],
+    },
+    {
+        "id": "creative_loop",
+        "label": "Creative Loop",
+        "desc": "LLM refines cuts iteratively.",
+        "category": "advanced",
+        "badges": [{"type": "quality", "text": "Agentic"}, {"type": "cost", "text": "2-3x Time"}],
+    },
+    {
+        "id": "story_engine",
+        "label": "Story Engine",
+        "desc": "Narrative tension-based editing.",
+        "category": "advanced",
+        "badges": [{"type": "quality", "text": "Cinematic"}],
+    },
+    {
+        "id": "generate_proxies",
+        "label": "Generate Proxies",
+        "desc": "Faster NLE editing.",
+        "category": "pro",
+        "badges": [{"type": "cost", "text": "Extra Files"}],
+    },
+    {
+        "id": "preserve_aspect",
+        "label": "Preserve Aspect",
+        "desc": "Letterbox vs crop.",
+        "category": "pro",
+        "badges": [{"type": "info", "text": "Safe Area"}],
+    },
+]
+
+
+def _build_ui_toggle_config(cgpu_available: bool) -> tuple[list, dict]:
+    defaults = {
+        **DEFAULT_OPTIONS,
+        "cgpu": DEFAULT_OPTIONS.get("cgpu", False) or cgpu_available,
+    }
+    toggles = []
+    for entry in UI_TOGGLE_CONFIG:
+        default_value = defaults.get(entry["id"], False)
+        if entry["id"] == "cloud_acceleration":
+            default_value = defaults.get("cgpu", False)
+        toggles.append({**entry, "default": bool(default_value)})
+    return toggles, defaults
 
 # Flask app
 app = Flask(__name__)
@@ -566,6 +629,19 @@ def api_status():
             **DEFAULT_OPTIONS,
             "cgpu": DEFAULT_OPTIONS.get("cgpu", False) or cgpu_ok,  # Enable if available
         }
+    })
+
+
+@app.route('/api/config/defaults')
+def api_config_defaults():
+    """Return UI config defaults and toggle metadata."""
+    cgpu_ok = is_cgpu_available()
+    toggles, defaults = _build_ui_toggle_config(cgpu_ok)
+    return jsonify({
+        "status": "ok",
+        "version": VERSION,
+        "toggles": toggles,
+        "defaults": defaults,
     })
 
 

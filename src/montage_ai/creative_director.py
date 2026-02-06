@@ -21,6 +21,7 @@ Based on research:
 
 import os
 import json
+import copy
 import requests
 from typing import Dict, Optional, Any, List
 
@@ -29,7 +30,7 @@ from jsonschema import ValidationError, validate
 from .config import get_settings
 from .style_templates import get_style_template, list_available_styles
 from .logger import logger
-from .utils import clamp, coerce_float
+from .utils import clamp, coerce_float, strip_markdown_json
 from .prompts import get_director_prompt, get_broll_planner_prompt, DirectorOutput, BRollPlan, SCHEMA_VERSION
 
 # Try importing OpenAI client for cgpu/Gemini support
@@ -538,16 +539,7 @@ class CreativeDirector:
 
     def _clean_llm_response(self, text: str) -> str:
         """Helper to clean up markdown code blocks from LLM responses."""
-        if not text:
-            return ""
-        text = text.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        elif text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        return text.strip()
+        return strip_markdown_json(text)
 
     def _query_backend(
         self,
@@ -640,68 +632,6 @@ class CreativeDirector:
         
         return None
     
-    def _safe_parse_json_response(self, response_text: str) -> Optional[Dict]:
-        """
-        Robustly parse JSON from LLM response, handling malformed output.
-        
-        Strategies:
-        1. Direct JSON parse
-        2. Extract from markdown code blocks (```json...```)
-        3. Find first {...} or [...] structure
-        4. Line-by-line extraction (last valid JSON structure)
-        
-        Args:
-            response_text: Raw LLM response
-            
-        Returns:
-            Parsed JSON dict or None if parsing failed
-        """
-        if not response_text:
-            return None
-        
-        # Strategy 1: Direct parse
-        try:
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            pass
-        
-        # Strategy 2: Extract from markdown blocks
-        if "```json" in response_text:
-            try:
-                json_str = response_text.split("```json")[1].split("```")[0].strip()
-                return json.loads(json_str)
-            except (IndexError, json.JSONDecodeError):
-                pass
-        
-        if "```" in response_text:
-            try:
-                json_str = response_text.split("```")[1].split("```")[0].strip()
-                return json.loads(json_str)
-            except (IndexError, json.JSONDecodeError):
-                pass
-        
-        # Strategy 3: Find first {...} structure
-        import re
-        matches = re.finditer(r'\{[^{}]*\}', response_text)
-        for match in matches:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                continue
-        
-        # Strategy 4: Find array [...]
-        matches = re.finditer(r'\[[^\[\]]*\]', response_text)
-        for match in matches:
-            try:
-                result = json.loads(match.group())
-                if isinstance(result, dict):
-                    return result
-            except json.JSONDecodeError:
-                continue
-        
-        logger.warning("Could not extract valid JSON from response")
-        return None
-
     def _infer_style_from_prompt(self, user_prompt: str) -> Optional[str]:
         """Heuristic style detection for template selection and memory hints."""
         user_lower = user_prompt.lower()
@@ -761,7 +691,7 @@ class CreativeDirector:
         if style_name:
             logger.info(f"Detected style template: {style_name}")
             template = get_style_template(style_name)
-            params = json.loads(json.dumps(template["params"]))
+            params = copy.deepcopy(template["params"])
             params.setdefault("schema_version", SCHEMA_VERSION)
             memory_advice = self._get_memory_advice(style_name)
             if memory_advice:
@@ -827,14 +757,9 @@ class CreativeDirector:
             return None
 
         try:
-            # Clean markdown code blocks if present
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0].strip()
-
+            cleaned_response = strip_markdown_json(response_text)
             # Validate with Pydantic
-            plan = BRollPlan.model_validate_json(response_text)
+            plan = BRollPlan.model_validate_json(cleaned_response)
             return plan.model_dump()
         except Exception as e:
             logger.error(f"Failed to parse B-roll plan: {e}")
@@ -929,13 +854,7 @@ class CreativeDirector:
         """
         try:
             # Parse JSON (handle potential markdown wrapping)
-            cleaned_response = llm_response.strip()
-            
-            # Step 1: Detect and extract markdown JSON blocks
-            if "```json" in cleaned_response:
-                cleaned_response = cleaned_response.split("```json")[1].split("```")[0].strip()
-            elif "```" in cleaned_response:
-                cleaned_response = cleaned_response.split("```")[1].split("```")[0].strip()
+            cleaned_response = strip_markdown_json(llm_response)
 
             # Step 2: More aggressive search for the JSON object if it still looks like text
             if not cleaned_response.startswith("{") or not cleaned_response.endswith("}"):

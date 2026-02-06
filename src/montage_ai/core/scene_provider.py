@@ -514,12 +514,14 @@ class SceneProvider:
 
         analyzer = SceneContentAnalyzer()
         legacy = analyzer.analyze(video_path, time_point, semantic=semantic)
+        legacy_action = getattr(legacy.action, "value", legacy.action)
+        legacy_shot = getattr(legacy.shot, "value", legacy.shot)
 
         return FrameAnalysis(
             quality=legacy.quality,
             description=legacy.description,
-            action=ActionLevel(legacy.action.value),
-            shot=ShotType(legacy.shot.value),
+            action=ActionLevel(str(legacy_action).lower()),
+            shot=ShotType(str(legacy_shot).lower()),
             tags=legacy.tags,
             caption=legacy.caption,
             objects=legacy.objects,

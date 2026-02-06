@@ -11,7 +11,7 @@ let systemStatus = {};
 // Configuration
 // =============================================================================
 
-const TOGGLE_CONFIG = [
+const FALLBACK_TOGGLE_CONFIG = [
     // Core toggles (always visible)
     { id: 'shorts_mode', label: 'Shorts Mode', desc: '9:16 Vertical + Smart Crop.', default: false, category: 'core', badges: [{ type: 'info', text: 'TikTok/Reels' }, { type: 'quality', text: 'AI Reframing' }] },
     { id: 'captions', label: 'Burn-in Captions', desc: 'Auto-transcribed subtitles.', default: false, category: 'core', badges: [{ type: 'info', text: 'Social Ready' }] },
@@ -27,6 +27,8 @@ const TOGGLE_CONFIG = [
     { id: 'generate_proxies', label: 'Generate Proxies', desc: 'Faster NLE editing.', default: false, category: 'pro', badges: [{ type: 'cost', text: 'Extra Files' }] },
     { id: 'preserve_aspect', label: 'Preserve Aspect', desc: 'Letterbox vs crop.', default: false, category: 'pro', badges: [{ type: 'info', text: 'Safe Area' }] }
 ];
+
+let TOGGLE_CONFIG = [...FALLBACK_TOGGLE_CONFIG];
 
 // Pipeline phases for progress display
 const PIPELINE_PHASES = [
@@ -131,7 +133,7 @@ async function apiCall(endpoint, options = {}) {
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    fetchStatus().then(() => {
+    Promise.all([fetchConfigDefaults(), fetchStatus()]).then(() => {
         renderToggles();
         renderStoryArcSelector();
         renderQualitySelector();
@@ -1076,6 +1078,21 @@ async function showArtifacts(jobId) {
 // Status & Defaults
 // =============================================================================
 
+async function fetchConfigDefaults() {
+    try {
+        const data = await apiCall('config/defaults');
+        TOGGLE_CONFIG = Array.isArray(data.toggles) && data.toggles.length
+            ? data.toggles
+            : [...FALLBACK_TOGGLE_CONFIG];
+        backendDefaults = data.defaults || {};
+    } catch (e) {
+        console.warn('Config defaults fetch failed', e);
+        if (!TOGGLE_CONFIG?.length) {
+            TOGGLE_CONFIG = [...FALLBACK_TOGGLE_CONFIG];
+        }
+    }
+}
+
 async function fetchStatus() {
     try {
         const response = await fetch(`${API_BASE}/status`);
@@ -1086,13 +1103,9 @@ async function fetchStatus() {
             encoder: data.system?.encoder || 'auto',
             cgpu: data.system?.cgpu_available ? 'available' : 'unavailable'
         };
-        backendDefaults = data.defaults || {};
-        // Update defaults in TOGGLE_CONFIG if provided
-        TOGGLE_CONFIG.forEach(t => {
-            if (backendDefaults[t.id] !== undefined) {
-                t.default = backendDefaults[t.id];
-            }
-        });
+        if (!Object.keys(backendDefaults).length && data.defaults) {
+            backendDefaults = data.defaults;
+        }
     } catch (e) {
         console.warn('Status fetch failed', e);
     }

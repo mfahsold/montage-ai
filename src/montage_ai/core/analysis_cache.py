@@ -51,6 +51,7 @@ import os
 from datetime import datetime
 
 from ..config import get_settings
+from pydantic import ValidationError
 
 # OPTIMIZATION Phase 3: msgpack for 22x faster serialization
 try:
@@ -60,7 +61,7 @@ except ImportError:
     MSGPACK_AVAILABLE = False
 
 from ..logger import logger
-from ..prompts import SCHEMA_VERSION
+from ..prompts import SCHEMA_VERSION, SceneAnalysisOutput
 
 
 # =============================================================================
@@ -131,32 +132,6 @@ class SceneAnalysisEntry(CacheEntry):
     threshold: float
     scenes: List[Dict[str, float]]  # [{"start": 0.0, "end": 5.2}, ...]
     total_scenes: int
-
-
-@dataclass
-class SemanticAnalysisEntry(CacheEntry):
-    """
-    Cached semantic scene analysis from Vision models.
-
-    Phase 2: Semantic Storytelling - stores AI-generated content tags.
-    Cache key includes time_point to support multiple analyses per video.
-    """
-    time_point: float           # Time in video where frame was sampled
-    schema_version: int         # SceneAnalysisOutput schema version
-    quality: str                # "YES" or "NO"
-    description: str            # 5-word scene summary
-    action: str                 # low/medium/high
-    shot: str                   # close/medium/wide
-    tags: List[str]             # Free-form semantic tags
-    caption: str                # Detailed description for embedding
-    objects: List[str]          # Detected objects
-    mood: str                   # calm/energetic/dramatic/playful/tense/peaceful/mysterious
-    setting: str                # indoor/outdoor/beach/city/nature/studio/street/home
-    caption_embedding: Optional[List[float]] = None  # Pre-computed embedding
-    # Story phase metadata (2025 Tech Vision: Episodic Memory)
-    story_phase: Optional[str] = None       # intro/build/climax/sustain/outro
-    narrative_role: Optional[str] = None    # establishing/transition/emotional_peak/resolution
-    energy_trajectory: Optional[float] = None  # Expected energy 0.0-1.0 at this story position
 
 
 @dataclass
@@ -523,7 +498,7 @@ class AnalysisCache:
 
     def load_semantic(
         self, video_path: str, time_point: float, tolerance_ms: int = 100
-    ) -> Optional[SemanticAnalysisEntry]:
+    ) -> Optional[SceneAnalysisOutput]:
         """
         Load cached semantic analysis if valid.
         OPTIMIZATION Phase 3: Supports msgpack for faster loading.
@@ -534,7 +509,7 @@ class AnalysisCache:
             tolerance_ms: Time tolerance in milliseconds (default 100ms)
 
         Returns:
-            SemanticAnalysisEntry if cache hit, None if cache miss
+            SceneAnalysisOutput if cache hit, None if cache miss
         """
         cache_path = self._semantic_cache_path(video_path, time_point)
 
@@ -569,24 +544,19 @@ class AnalysisCache:
                 return None
 
             logger.debug(f"Cache hit: semantic analysis for {os.path.basename(video_path)} @ {time_point:.1f}s")
-            return SemanticAnalysisEntry(
-                version=data["version"],
-                file_hash=data["file_hash"],
-                computed_at=data["computed_at"],
-                time_point=data["time_point"],
-                schema_version=data.get("schema_version", SCHEMA_VERSION),
-                quality=data.get("quality", "YES"),
-                description=data.get("description", ""),
-                action=data.get("action", "medium"),
-                shot=data.get("shot", "medium"),
-                tags=data.get("tags", []),
-                caption=data.get("caption", ""),
-                objects=data.get("objects", []),
-                mood=data.get("mood", "neutral"),
-                setting=data.get("setting", "unknown"),
-                caption_embedding=data.get("caption_embedding"),
-            )
-        except (json.JSONDecodeError, KeyError, OSError) as e:
+            analysis_data = dict(data)
+            analysis_data.setdefault("quality", "YES")
+            analysis_data.setdefault("description", "")
+            analysis_data.setdefault("action", "medium")
+            analysis_data.setdefault("shot", "medium")
+            analysis_data.setdefault("tags", [])
+            analysis_data.setdefault("caption", "")
+            analysis_data.setdefault("objects", [])
+            analysis_data.setdefault("mood", "neutral")
+            analysis_data.setdefault("setting", "unknown")
+            analysis_data.setdefault("schema_version", SCHEMA_VERSION)
+            return SceneAnalysisOutput.model_validate(analysis_data)
+        except (json.JSONDecodeError, KeyError, OSError, ValidationError) as e:
             logger.debug(f"Failed to load semantic cache: {e}")
             return None
 
@@ -597,7 +567,7 @@ class AnalysisCache:
         Args:
             video_path: Path to the video file
             time_point: Time in seconds where frame was sampled
-            analysis: SceneAnalysis dataclass from scene_analysis module
+            analysis: SceneAnalysis model from scene_analysis module
 
         Returns:
             True if cache was saved successfully
@@ -609,7 +579,7 @@ class AnalysisCache:
         if hasattr(analysis, "to_dict"):
             data = analysis.to_dict()
         elif isinstance(analysis, dict):
-            data = analysis
+            data = dict(analysis)
         else:
             data = {
                 "quality": getattr(analysis, "quality", "YES"),
@@ -630,27 +600,20 @@ class AnalysisCache:
         shot_str = data.get("shot", "medium")
         if hasattr(shot_str, "value"):
             shot_str = shot_str.value
+        data["action"] = str(action_str)
+        data["shot"] = str(shot_str)
+        data.setdefault("schema_version", SCHEMA_VERSION)
 
-        entry = SemanticAnalysisEntry(
-            version=CACHE_VERSION,
-            file_hash=CacheEntry.compute_file_hash(video_path),
-            computed_at=datetime.now().isoformat(),
-            time_point=float(time_point),
-            schema_version=SCHEMA_VERSION,
-            quality=data.get("quality", "YES"),
-            description=data.get("description", ""),
-            action=str(action_str),
-            shot=str(shot_str),
-            tags=list(data.get("tags", [])),
-            caption=data.get("caption", ""),
-            objects=list(data.get("objects", [])),
-            mood=data.get("mood", "neutral"),
-            setting=data.get("setting", "unknown"),
-            caption_embedding=data.get("caption_embedding"),
-        )
+        entry = {
+            "version": CACHE_VERSION,
+            "file_hash": CacheEntry.compute_file_hash(video_path),
+            "computed_at": datetime.now().isoformat(),
+            "time_point": float(time_point),
+        }
+        entry.update(data)
 
         cache_path = self._semantic_cache_path(video_path, time_point)
-        success = self._write_cache(cache_path, asdict(entry))
+        success = self._write_cache(cache_path, entry)
 
         if success:
             logger.debug(f"Cached semantic analysis: {os.path.basename(video_path)} @ {time_point:.1f}s")
@@ -1021,7 +984,6 @@ __all__ = [
     "AnalysisCache",
     "AudioAnalysisEntry",
     "SceneAnalysisEntry",
-    "SemanticAnalysisEntry",
     "EpisodicMemoryEntry",
     "CacheEntry",
     "get_analysis_cache",

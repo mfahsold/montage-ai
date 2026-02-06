@@ -87,6 +87,29 @@ def coerce_float(value: object) -> float | None:
         return None
 
 
+def strip_markdown_json(text: str) -> str:
+    """
+    Strip markdown code fences (```json ... ```) from a string.
+
+    Handles both inline and fenced JSON blocks. Returns a trimmed string.
+    """
+    if not text:
+        return ""
+
+    cleaned = text.strip()
+    if "```json" in cleaned:
+        cleaned = cleaned.split("```json", 1)[1]
+        cleaned = cleaned.split("```", 1)[0]
+        return cleaned.strip()
+
+    if "```" in cleaned:
+        cleaned = cleaned.split("```", 1)[1]
+        cleaned = cleaned.split("```", 1)[0]
+        return cleaned.strip()
+
+    return cleaned
+
+
 def file_size_mb(path: Union[str, Path]) -> float:
     """
     Get file size in megabytes.
@@ -199,4 +222,5 @@ __all__ = [
     "get_video_duration",
     "normalize_path",
     "ensure_parent_dir",
+    "strip_markdown_json",
 ]

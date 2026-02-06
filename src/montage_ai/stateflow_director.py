@@ -37,6 +37,7 @@ from .prompts import (
     Mood,
     PROMPT_GUARDRAILS,
 )
+from .utils import strip_markdown_json
 
 logger = logging.getLogger(__name__)
 
@@ -631,9 +632,7 @@ class StateFlowDirector:
     def _parse_json_response(self, response: str) -> Optional[Dict]:
         """Parse JSON from LLM response."""
         try:
-            # Strip markdown code fences
-            cleaned = re.sub(r'```json\s*', '', response)
-            cleaned = re.sub(r'```\s*', '', cleaned)
+            cleaned = strip_markdown_json(response)
             return json.loads(cleaned)
         except json.JSONDecodeError:
             return None

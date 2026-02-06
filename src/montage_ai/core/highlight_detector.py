@@ -60,9 +60,11 @@ class HighlightDetector:
             analysis = scene.meta.get('analysis') if hasattr(scene, 'meta') else None
             
             if analysis:
-                if str(analysis.action).lower() == "high":
+                action_val = getattr(analysis.action, "value", analysis.action)
+                action_str = str(action_val).lower()
+                if action_str == "high":
                     action_score = 1.0
-                elif str(analysis.action).lower() == "low":
+                elif action_str == "low":
                     action_score = 0.2
             
             # 2. Face Bonus
@@ -118,4 +120,3 @@ class HighlightDetector:
         # Sort and return top K
         candidates.sort(key=lambda x: x.score, reverse=True)
         return candidates[:top_k]
-

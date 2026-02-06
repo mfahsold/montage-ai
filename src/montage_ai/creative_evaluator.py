@@ -16,13 +16,15 @@ Based on research:
 - Human-in-the-loop editing workflows from Descript
 """
 
-import os
 import json
+import copy
 from typing import Dict, List, Optional, Any
 
 from .creative_director import CreativeDirector
 from .config import get_settings
 from .regisseur_memory import get_regisseur_memory
+from .logger import logger
+from .utils import strip_markdown_json
 from .prompts import (
     get_evaluator_prompt,
     EvaluatorOutput,
@@ -94,7 +96,7 @@ class CreativeEvaluator:
         Returns:
             MontageEvaluation with score, issues, and suggestions
         """
-        print(f"\n🔍 Creative Evaluator analyzing cut (iteration {iteration + 1})...")
+        logger.info("Creative Evaluator analyzing cut (iteration %d)...", iteration + 1)
 
         # Build evaluation context
         context = self._build_context(
@@ -105,7 +107,7 @@ class CreativeEvaluator:
         response = self._director._query_llm(self._director.system_prompt, context)
 
         if not response:
-            print("   ⚠️ LLM returned empty response, auto-approving")
+            logger.warning("LLM returned empty response, auto-approving")
             return MontageEvaluation(
                 satisfaction_score=0.8,
                 approve_for_render=True,
@@ -118,16 +120,16 @@ class CreativeEvaluator:
 
         # Force approval after max iterations
         if iteration >= self.max_iterations - 1 and not evaluation.approve_for_render:
-            print(f"   ⚠️ Max iterations reached, forcing approval")
+            logger.warning("Max iterations reached, forcing approval")
             evaluation.approve_for_render = True
 
         # Log result
         status = "APPROVED" if evaluation.approve_for_render else "NEEDS REFINEMENT"
-        print(f"   📊 Score: {evaluation.satisfaction_score:.0%} [{status}]")
+        logger.info("Score: %.0f%% [%s]", evaluation.satisfaction_score * 100, status)
         if evaluation.issues:
-            print(f"   ⚠️ Issues: {len(evaluation.issues)}")
+            logger.warning("Issues: %d", len(evaluation.issues))
         if evaluation.adjustments:
-            print(f"   💡 Suggestions: {len(evaluation.adjustments)}")
+            logger.info("Suggestions: %d", len(evaluation.adjustments))
 
         if evaluation.approve_for_render:
             try:
@@ -168,7 +170,7 @@ class CreativeEvaluator:
         Returns:
             Refined editing instructions
         """
-        refined = json.loads(json.dumps(original_instructions))  # Deep copy
+        refined = copy.deepcopy(original_instructions)
 
         for adj in evaluation.adjustments:
             self._apply_adjustment(refined, adj)
@@ -232,13 +234,7 @@ Clips Summary (first 10):
         """Parse LLM response into MontageEvaluation."""
         try:
             # Clean up response
-            text = response.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
+            text = strip_markdown_json(response)
 
             # Validate with Pydantic
             evaluation = EvaluatorOutput.model_validate_json(text)
@@ -246,7 +242,7 @@ Clips Summary (first 10):
             return evaluation
 
         except Exception as e:
-            print(f"   ⚠️ Failed to parse evaluation response: {e}")
+            logger.warning("Failed to parse evaluation response: %s", e)
             return MontageEvaluation(
                 satisfaction_score=0.7,
                 summary="Evaluation parsing failed",
@@ -272,7 +268,12 @@ Clips Summary (first 10):
         # Apply value
         if parts:
             current[parts[-1]] = adjustment.suggested_value
-            print(f"   📝 Adjusted {adjustment.target}: {adjustment.current_value} → {adjustment.suggested_value}")
+            logger.info(
+                "Adjusted %s: %s -> %s",
+                adjustment.target,
+                adjustment.current_value,
+                adjustment.suggested_value,
+            )
 
 
 # =============================================================================
@@ -331,9 +332,7 @@ def run_creative_loop(
     evaluation = None
 
     for iteration in range(max_iterations):
-        print(f"\n{'='*60}")
-        print(f"  CREATIVE LOOP - Iteration {iteration + 1}/{max_iterations}")
-        print(f"{'='*60}")
+        logger.info("Creative loop iteration %d/%d", iteration + 1, max_iterations)
 
         # Build montage
         builder_kwargs = {
@@ -346,7 +345,7 @@ def run_creative_loop(
         result = builder.build()
 
         if not result.success:
-            print(f"   ❌ Build failed: {result.error}")
+            logger.error("Build failed: %s", result.error)
             break
 
         # Evaluate
@@ -358,7 +357,7 @@ def run_creative_loop(
         )
 
         if evaluation.approve_for_render:
-            print(f"\n   ✅ Montage approved! Score: {evaluation.satisfaction_score:.0%}")
+            logger.info("Montage approved! Score: %.0f%%", evaluation.satisfaction_score * 100)
             break
 
         # Refine for next iteration

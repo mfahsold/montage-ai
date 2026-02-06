@@ -1,23 +1,12 @@
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field, ConfigDict
 
+from ..prompts import CinematographyConfig
+
 class StyleParams(BaseModel):
     """Parameters defining the visual style."""
     name: str = "dynamic"
     params: Dict[str, Any] = Field(default_factory=dict)
-
-class CinematographyConfig(BaseModel):
-    """Cinematography controls; weights are independent (no need to sum to 1.0)."""
-    prefer_wide_shots: bool = False
-    prefer_high_action: bool = False
-    match_cuts_enabled: bool = True
-    invisible_cuts_enabled: bool = False
-    shot_variation_priority: str = "medium"
-    continuity_weight: float = 0.4
-    kuleshov_weight: float = 0.15
-    variety_weight: float = 0.2
-    contrast_weight: float = 0.3
-    symmetry_weight: float = 0.1
 
 class PacingConfig(BaseModel):
     speed: str = "medium"

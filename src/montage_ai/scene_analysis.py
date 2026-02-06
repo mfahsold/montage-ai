@@ -48,7 +48,8 @@ from .config import get_settings
 from .video_metadata import probe_metadata  # Expose for tests to patch
 from .logger import logger
 from .moviepy_compat import VideoFileClip
-from .prompts import get_vision_analysis_prompt, ActionLevel, ShotType
+from .prompts import get_vision_analysis_prompt, ActionLevel, ShotType, SceneAnalysisOutput
+from .utils import strip_markdown_json
 
 # Import cgpu jobs for offloading
 try:
@@ -110,105 +111,8 @@ class Scene:
         }
 
 
-@dataclass
-class SceneAnalysis:
-    """
-    AI analysis result for a scene/frame.
-
-    Extended with semantic fields for intelligent clip selection:
-    - tags: Free-form semantic tags for content matching
-    - caption: Detailed description for embedding-based search
-    - objects: Detected objects in the frame
-    - mood: Emotional tone of the scene
-    - setting: Location/environment type
-    - face_count: Number of detected faces
-    """
-    quality: str  # "YES" or "NO"
-    description: str  # 5-word summary
-    action: ActionLevel
-    shot: ShotType
-    # Semantic fields (Phase 2: Semantic Storytelling)
-    tags: List[str] = field(default_factory=list)  # Free-form semantic tags
-    caption: str = ""  # Detailed description for embedding
-    objects: List[str] = field(default_factory=list)  # Detected objects
-    mood: str = "neutral"  # calm, energetic, dramatic, playful, tense, peaceful, mysterious
-    setting: str = "unknown"  # indoor, outdoor, beach, city, nature, studio, street, home
-    face_count: int = 0  # Number of detected faces
-    focus_center_x: float = 0.5 # Normalised X position of main subject (0.0=left, 1.0=right)
-    balance_score: float = 0.5  # Visual balance (0.0=unbalanced, 1.0=perfectly symmetric)
-
-    @classmethod
-    def default(cls) -> "SceneAnalysis":
-        """Create default analysis (no AI filter)."""
-        return cls(
-            quality="YES",
-            description="unknown",
-            action=ActionLevel.MEDIUM,
-            shot=ShotType.MEDIUM,
-            tags=[],
-            caption="",
-            objects=[],
-            mood="neutral",
-            setting="unknown",
-            face_count=0,
-            focus_center_x=0.5,
-            balance_score=0.5,
-        )
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "SceneAnalysis":
-        """Create from dictionary response."""
-        # Handle action level parsing
-        action_str = data.get("action", "medium")
-        if isinstance(action_str, str):
-            action_str = action_str.lower()
-        else:
-            action_str = "medium"
-
-        # Handle shot type parsing
-        shot_str = data.get("shot", "medium")
-        if isinstance(shot_str, str):
-            shot_str = shot_str.lower()
-        else:
-            shot_str = "medium"
-
-        return cls(
-            quality=data.get("quality", "YES"),
-            description=data.get("description", "unknown"),
-            action=ActionLevel(action_str),
-            shot=ShotType(shot_str),
-            tags=data.get("tags", []),
-            caption=data.get("caption", ""),
-            objects=data.get("objects", []),
-            mood=data.get("mood", "neutral"),
-            setting=data.get("setting", "unknown"),
-            face_count=data.get("face_count", 0),
-            focus_center_x=data.get("focus_center_x", 0.5),
-            balance_score=data.get("balance_score", 0.5),
-        )
-
-    def to_dict(self) -> dict:
-        """Convert to dictionary."""
-        return {
-            "quality": self.quality,
-            "description": self.description,
-            "action": self.action.value,
-            "shot": self.shot.value,
-            "tags": self.tags,
-            "caption": self.caption,
-            "objects": self.objects,
-            "mood": self.mood,
-            "setting": self.setting,
-            "face_count": self.face_count,
-            "focus_center_x": self.focus_center_x,
-            "balance_score": self.balance_score,
-        }
-
-
-    @property
-    def has_semantic_data(self) -> bool:
-        """Check if semantic analysis data is present."""
-        return bool(self.tags or self.caption or self.objects)
+# Canonical scene analysis model (Pydantic, shared with prompts + cache)
+SceneAnalysis = SceneAnalysisOutput
 
 
 # =============================================================================
@@ -653,8 +557,8 @@ class SceneContentAnalyzer:
             )
 
             if response_text:
-                res_json = json.loads(response_text)
-                result = SceneAnalysis.from_dict(res_json)
+                cleaned = strip_markdown_json(response_text)
+                result = SceneAnalysis.model_validate_json(cleaned)
                 result.face_count = face_count
                 return result
 

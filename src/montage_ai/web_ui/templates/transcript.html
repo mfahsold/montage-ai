@@ -10,50 +10,11 @@
 {% block content %}
     {% call m.section_header("TRANSCRIPT EDITOR", "Edit video by removing text. AI handles the cuts.") %}{% endcall %}
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Left: Video & Analysis -->
-        <div class="flex flex-col gap-4">
-            {% call m.voxel_card("PREVIEW") %}
-                <div class="transcript-video-container">
-                    <video id="mainVideo"></video>
-                </div>
-                <div class="mt-4 flex gap-2">
-                    <button class="voxel-btn voxel-btn-primary">PLAY</button>
-                    <button class="voxel-btn">PAUSE</button>
-                    <div class="flex-grow"></div>
-                    <span class="text-sm text-muted">00:12 / 01:45</span>
-                </div>
-            {% endcall %}
-
-            {% call m.voxel_card("AUDIO ENERGY") %}
-                <canvas class="energy-canvas" id="energyCanvas"></canvas>
-                <div class="flex justify-between mt-2">
-                    <span class="text-xs text-muted">BEAT DETECTION: ACTIVE</span>
-                    <span class="text-xs text-muted">BPM: 124</span>
-                </div>
-            {% endcall %}
-        </div>
-
-        <!-- Right: Transcript -->
-        <div class="flex flex-col gap-4">
-            {% call m.voxel_card("TRANSCRIPT") %}
-                <div class="flex justify-between items-center mb-4">
-                    <div class="flex gap-2">
-                        <button class="voxel-btn text-xs">Remove Fillers</button>
-                        <button class="voxel-btn text-xs">Export OTIO</button>
-                    </div>
-                </div>
-                
-                <div class="transcript-panel" id="transcriptArea">
-                    <!-- Placeholder Words -->
-                    <span class="word">So</span> <span class="word">basically</span> <span class="word filler-word">uh</span> 
-                    <span class="word">we</span> <span class="word">are</span> <span class="word">looking</span> <span class="word">at</span> 
-                    <span class="word">the</span> <span class="word">new</span> <span class="word">pipeline</span> <span class="word">and</span> 
-                    <span class="word">it</span> <span class="word">looks</span> <span class="word">really</span> <span class="word">good.</span>
-                </div>
-
-                <button class="voxel-btn voxel-btn-primary w-full mt-6">Apply Edits & Render</button>
-            {% endcall %}
-        </div>
+    <div class="voxel-card">
+        <h3 class="text-primary mb-2">COMING SOON</h3>
+        <p class="text-xs text-muted">
+            Transcript Editor UI is not wired to the backend yet. Use the CLI or API for transcript-driven
+            edits until the editor is fully integrated.
+        </p>
     </div>
 {% endblock %}

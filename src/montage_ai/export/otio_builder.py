@@ -267,34 +267,6 @@ class OTIOBuilder:
                 self.timeline.markers.append(marker)
 
 
-    def _safe_parse_json_response(self, response: str) -> Optional[Dict[str, Any]]:
-        """Parse JSON from raw or markdown-wrapped responses.
-
-        Returns dict on success, None on failure.
-        """
-        if not response:
-            return None
-
-        candidate = response.strip()
-
-        # Strip code fences
-        if candidate.startswith("```"):
-            candidate = candidate.strip('`')
-            if candidate.startswith("json"):
-                candidate = candidate[len("json"):].strip()
-
-        # If text contains JSON inline, extract first {...}
-        if candidate and candidate[0] != '{':
-            start = candidate.find('{')
-            end = candidate.rfind('}')
-            if start != -1 and end != -1 and end > start:
-                candidate = candidate[start:end + 1]
-
-        try:
-            return json.loads(candidate)
-        except Exception:
-            return None
-
     def export_to_edl(self, output_path: Path) -> bool:
         """Export timeline to EDL format.
         

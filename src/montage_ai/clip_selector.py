@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from .logger import logger
 from .config import get_settings
+from .utils import strip_markdown_json
 
 # Import Creative Director for LLM access
 try:
@@ -429,14 +430,7 @@ CRITICAL: Respond with JSON only, no markdown, no explanations."""
         """
         try:
             # Clean response (remove markdown if present)
-            response = llm_response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-            response = response.strip()
+            response = strip_markdown_json(llm_response)
 
             # Try parsing as-is first
             data = None

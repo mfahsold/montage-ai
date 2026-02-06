@@ -27,7 +27,8 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any, Tuple
 import logging
 
-from .analysis_cache import get_analysis_cache, SemanticAnalysisEntry
+from .analysis_cache import get_analysis_cache
+from ..scene_analysis import SceneAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class SearchResult:
     clip_path: str
     score: float  # Cosine similarity 0.0-1.0
     time_point: float
-    analysis: Optional[SemanticAnalysisEntry] = None
+    analysis: Optional[SceneAnalysis] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -61,7 +62,7 @@ class EmbeddingIndex:
     embeddings: np.ndarray = field(default_factory=lambda: np.array([]))
     clip_paths: List[str] = field(default_factory=list)
     time_points: List[float] = field(default_factory=list)
-    analyses: List[Optional[SemanticAnalysisEntry]] = field(default_factory=list)
+    analyses: List[Optional[SceneAnalysis]] = field(default_factory=list)
 
     @property
     def size(self) -> int:
@@ -183,7 +184,7 @@ class EmbeddingSearchEngine:
         clip_path: str,
         embedding: np.ndarray,
         time_point: float = 0.0,
-        analysis: Optional[SemanticAnalysisEntry] = None,
+        analysis: Optional[SceneAnalysis] = None,
     ) -> bool:
         """
         Add a single embedding to the index.

@@ -9,7 +9,7 @@ like Chain-of-Thought (CoT) and structured JSON outputs.
 
 from enum import Enum
 from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
 
 # =============================================================================
 # Enums & Constants
@@ -131,6 +131,8 @@ class BRollPlan(BaseModel):
     segments: List[BRollSegment] = Field(..., description="List of B-roll segments")
 
 class CinematographyConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     prefer_wide_shots: bool = Field(default=False)
     prefer_high_action: bool = Field(default=False)
     match_cuts_enabled: bool = Field(default=True)
@@ -166,6 +168,21 @@ class CinematographyConfig(BaseModel):
         le=1.0,
         description="Relative weight for visual symmetry/balance (Wes Anderson style)"
     )
+
+    @field_validator("shot_variation_priority", mode="before")
+    @classmethod
+    def normalize_shot_variation_priority(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            mapping = {
+                "minimal": "low",
+                "minimum": "low",
+                "balanced": "medium",
+                "maximum": "high",
+                "max": "high",
+            }
+            return mapping.get(normalized, normalized)
+        return value
 
 class TransitionsConfig(BaseModel):
     type: TransitionType
@@ -260,6 +277,8 @@ class EvaluatorOutput(BaseModel):
 
 class SceneAnalysisOutput(BaseModel):
     """Structured output for vision-based scene analysis."""
+    model_config = ConfigDict(extra="ignore", use_enum_values=True)
+
     schema_version: int = Field(
         default=SCHEMA_VERSION,
         description="Schema version for cache invalidation and forward compatibility"
@@ -273,6 +292,59 @@ class SceneAnalysisOutput(BaseModel):
     objects: List[str] = Field(default_factory=list, description="List of detected objects")
     mood: Mood = Field(Mood.CALM, description="Emotional tone")
     setting: str = Field("unknown", description="indoor | outdoor | beach | city | nature | studio | street | home")
+    face_count: int = Field(0, ge=0, description="Number of detected faces")
+    focus_center_x: float = Field(0.5, ge=0.0, le=1.0, description="Normalized X position of main subject")
+    balance_score: float = Field(0.5, ge=0.0, le=1.0, description="Visual balance score")
+    caption_embedding: Optional[List[float]] = Field(default=None, description="Optional caption embedding for search")
+    story_phase: Optional[str] = Field(default=None, description="intro/build/climax/sustain/outro")
+    narrative_role: Optional[str] = Field(default=None, description="establishing/transition/emotional_peak/resolution")
+    energy_trajectory: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Expected energy at story position")
+
+    @field_validator("quality", mode="before")
+    @classmethod
+    def normalize_quality(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip().upper()
+        return value
+
+    @field_validator("action", "shot", "mood", "setting", mode="before")
+    @classmethod
+    def normalize_enums(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
+    @classmethod
+    def default(cls) -> "SceneAnalysisOutput":
+        """Create default analysis (no AI filter)."""
+        return cls(
+            quality="YES",
+            description="unknown",
+            action=ActionLevel.MEDIUM,
+            shot=ShotType.MEDIUM,
+            tags=[],
+            caption="",
+            objects=[],
+            mood=Mood.CALM,
+            setting="unknown",
+            face_count=0,
+            focus_center_x=0.5,
+            balance_score=0.5,
+        )
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SceneAnalysisOutput":
+        """Create from dictionary response."""
+        return cls.model_validate(data)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return self.model_dump(mode="json", exclude_none=True)
+
+    @property
+    def has_semantic_data(self) -> bool:
+        """Check if semantic analysis data is present."""
+        return bool(self.tags or self.caption or self.objects)
 
 
 # =============================================================================
@@ -369,6 +441,7 @@ Output rules:
 - caption must be one complete sentence
 - objects should list visible nouns only (0-10 items)
 - setting must be one of: indoor, outdoor, beach, city, nature, studio, street, home
+- caption_embedding/story_phase/narrative_role/energy_trajectory are optional; omit unless explicitly provided (do not invent embeddings)
 
 You MUST respond with ONLY valid JSON matching this schema:
 {schema}

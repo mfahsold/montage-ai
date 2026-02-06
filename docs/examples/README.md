@@ -26,7 +26,7 @@ One-click quality selection replacing multiple toggles:
 
 ![Transcript Editor](../images/transcript-editor.png)
 
-Descript-style text editing:
+Descript-style text editing (UI integration in progress; preview screenshot):
 - Word-level timestamps
 - Click to seek
 - Delete text to cut video
@@ -36,7 +36,7 @@ Descript-style text editing:
 
 ![Shorts Studio](../images/shorts-studio.png)
 
-Vertical video creation:
+Vertical video creation (UI integration in progress; preview screenshot):
 - Phone-frame preview
 - Safe zone overlays
 - Caption style selection

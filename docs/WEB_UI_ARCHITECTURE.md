@@ -272,7 +272,7 @@ When converting old templates:
 ```bash
 # 1. Modify templates/base.html or voxel-dark.css
 # 2. Changes auto-apply to all pages (Flask auto-reload)
-# 3. Test all pages: /, /montage, /shorts, /gallery, etc.
+# 3. Test all pages: /, /montage, /gallery (shorts/transcript are placeholders)
 
 # Start local server
 python src/montage_ai/web_ui/app.py
@@ -320,6 +320,11 @@ The Web UI communicates with the backend via REST API endpoints. All endpoints a
 | `/api/download/<filename>` | GET | Download output file |
 
 Upload validation uses `FileTypeConfig` in `src/montage_ai/config.py` (see docs/configuration.md).
+
+### UI Config
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/config/defaults` | GET | UI toggle metadata + default values |
 
 ### Session-Based Workflows
 | Endpoint | Method | Description |

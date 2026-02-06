@@ -219,13 +219,13 @@ Workflow tools for NLE integration.
 - **Face Presence**: Clear, expressive faces
 - **Score Fusion**: `(Audio * 0.4) + (Action * 0.3) + (Face * 0.3)`
 
-**Review UI:**
+**Review UI (planned):**
 - **Interactive Cards**: Click to jump to highlight
 - **Score Breakdown**: See why a moment was picked (Action/Face/Audio)
 - **Visual Cues**: Color-coded confidence scores
 
 **Usage:**
-Select "Shorts Studio" workflow in the Web UI, or:
+Use the CLI/API for now (Web UI integration in progress):
 ```bash
 ./montage-ai.sh run --workflow shorts --audio-aware
 ```
@@ -296,7 +296,7 @@ Edit video by removing text. AI handles the cuts.
 - **Silence Removal:** Auto-gap detection
 - **Export:** MP4, EDL (Premiere), OTIO (Resolve)
 
-**Access:** Web UI at `/transcript`
+**Access:** Web UI coming soon (use CLI/API until integrated)
 
 ---
 
@@ -321,6 +321,8 @@ Move from Montage AI to professional NLEs (DaVinci, Premiere, Resolve).
 
 Auto-reframe to 9:16 for TikTok, Instagram, YouTube Shorts.
 
+> UI preview elements are planned; CLI/API workflows are available today.
+
 **Preview:**
 - Live 9:16 phone frame
 - Safe zone overlays (title, action, platform UI)
@@ -339,7 +341,7 @@ Auto-reframe to 9:16 for TikTok, Instagram, YouTube Shorts.
 - **Captions:** TikTok, Minimal, Bold, Karaoke styles
 - **Highlights:** Auto-detect best moments by energy/motion/faces
 
-**Access:** Web UI at `/shorts`
+**Access:** Web UI coming soon (use CLI/API until integrated)
 
 ---
 
@@ -567,13 +569,13 @@ See [configuration.md](configuration.md#creative-loop-agentic-refinement) for al
 
 ## Shorts Workflow (Vertical Video) {#shorts-workflow}
 
-> **Note:** The full Shorts Studio UI is available at `/shorts`. This section covers CLI usage.
+> **Note:** Shorts Studio UI is in progress; this section covers CLI usage.
 
 - **Smart Reframing**: Automatically crops horizontal footage to 9:16 vertical aspect ratio using face detection and segmented tracking.
 - **Segmented Tracking**: Stabilizes camera movement by keeping the crop window static until the subject moves significantly, preventing jitter.
 - **Auto-Captions**: Generates and burns in subtitles (requires `whisper`).  
   **Styles:** `tiktok` (Bold/Shadowed), `minimal` (Clean), `cinematic` (Serif/Boxed), `bold` (Impact).
-- **Web UI Integration**: Toggle "Shorts Mode" in the Web UI for easy creation.
+- **Web UI Integration**: In progress (use CLI/API in the meantime).
 
 **CLI usage:**
 ```bash

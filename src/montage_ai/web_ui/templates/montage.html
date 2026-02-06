@@ -30,25 +30,25 @@
                 </div>
                 
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <label class="style-card active" onclick="selectStyle('dynamic')">
+                    <label class="style-card active" onclick="selectStyle(event, 'dynamic')">
                         <input type="radio" name="style" value="dynamic" checked class="hidden-input">
                         <h5>DYNAMIC</h5>
                         <p>Fast cuts on the beat. High energy. Action & sports.</p>
                     </label>
 
-                    <label class="style-card" onclick="selectStyle('hitchcock')">
+                    <label class="style-card" onclick="selectStyle(event, 'hitchcock')">
                         <input type="radio" name="style" value="hitchcock" class="hidden-input">
                         <h5>HITCHCOCK</h5>
                         <p>Slow build + tension. Suspenseful. Cinematic reveals.</p>
                     </label>
 
-                    <label class="style-card" onclick="selectStyle('mtv')">
+                    <label class="style-card" onclick="selectStyle(event, 'mtv')">
                         <input type="radio" name="style" value="mtv" class="hidden-input">
                         <h5>MTV</h5>
                         <p>Quick cuts. Energetic transitions. Music-synced.</p>
                     </label>
 
-                    <label class="style-card" onclick="selectStyle('minimalist')">
+                    <label class="style-card" onclick="selectStyle(event, 'minimalist')">
                         <input type="radio" name="style" value="minimalist" class="hidden-input">
                         <h5>MINIMAL</h5>
                         <p>Subtle cuts. Long takes. Let footage breathe.</p>
@@ -383,12 +383,14 @@
 
 {% block extra_js %}
     <script>
-        function selectStyle(styleName) {
+        function selectStyle(event, styleName) {
             document.querySelector(`input[name="style"][value="${styleName}"]`).checked = true;
             document.querySelectorAll('.style-card').forEach(card => {
                 card.classList.remove('active');
             });
-            event.currentTarget.classList.add('active');
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -407,13 +409,7 @@
             const waveform = document.getElementById('waveform-visual');
 
             if (waveform) {
-                for (let i = 0; i < 50; i++) {
-                    const bar = document.createElement('div');
-                    bar.className = 'wave-bar';
-                    const height = Math.floor(Math.random() * 80) + 20;
-                    bar.style.height = height + '%';
-                    waveform.appendChild(bar);
-                }
+                waveform.innerHTML = '<div class="text-xs text-muted">Waveform preview will appear once audio analysis runs.</div>';
             }
 
             if (slider) {
