@@ -1,7 +1,7 @@
 # Configuration Defaults (Code-Aligned)
 
 This snapshot was audited against `src/montage_ai/config.py` and
-`src/montage_ai/config_pools.py` on 2026-02-05.
+`src/montage_ai/config_pools.py` on 2026-02-06.
 
 Scope: high-impact environment variables and computed defaults. This is not
 exhaustive; the source files above are the full reference.
@@ -29,6 +29,19 @@ Note: pool defaults use `os.cpu_count()` and do not apply cgroup limits.
 | `standard` | `medium` | `18` | Default profile. |
 | `high` | `slow` | `17` | Higher quality. |
 | `master` | `slow` | `16` | Also switches to `libx265` + `yuv420p10le` unless overridden. |
+
+## Final Encode Backend
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `FINAL_ENCODE_BACKEND` | `ffmpeg` | `router` enables EncoderRouter (CGPU → local GPU → CPU) for final encode. |
+
+## cgpu Status Timeouts
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `CGPU_STATUS_TIMEOUT` | `30` | Timeout for `cgpu status` (seconds). |
+| `CGPU_GPU_CHECK_TIMEOUT` | `120` | Timeout for `cgpu run nvidia-smi` (seconds). |
 
 ## Preview Fast Path
 
@@ -97,12 +110,17 @@ Note: pool defaults use `os.cpu_count()` and do not apply cgroup limits.
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `SCENE_CACHE_DIR` | `$OUTPUT_DIR/scene_cache` | Shard outputs for distributed scene detection. |
+| `SCENE_MERGE_OVERLAP_TOLERANCE` | `0.05` | Seconds of true overlap required to merge adjacent shard scenes. |
 
 ## Cluster (Distributed Jobs)
 
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `SCENE_DETECT_TIER` | `medium` | Resource tier for scene detection jobs. |
+| `CLUSTER_STATUS_REQUEST_TIMEOUT` | `30` | K8s API timeout (seconds) for job status polling. |
+| `CLUSTER_STATUS_POLL_INTERVAL` | `5` | Seconds between status polls. |
+| `CLUSTER_STATUS_MAX_ERRORS` | `6` | Max consecutive poll errors before aborting. |
+| `RQ_SIMPLE_WORKER` | `false` | Use RQ SimpleWorker (no fork); avoids work-horse crashes in heavy workloads. |
 
 ## Timeouts (Seconds)
 

@@ -451,6 +451,11 @@ class EncoderRouter:
         quality: int = 18,
         preset: str = "medium",
         filters: Optional[str] = None,
+        profile: Optional[str] = None,
+        level: Optional[str] = None,
+        pix_fmt: Optional[str] = None,
+        audio_codec: Optional[str] = None,
+        audio_bitrate: Optional[str] = None,
     ) -> Optional[str]:
         """
         Encode video using the best available encoder.
@@ -465,6 +470,11 @@ class EncoderRouter:
             quality: Quality level (CRF/CQ)
             preset: Speed preset
             filters: Optional FFmpeg filters
+            profile: Optional codec profile override (e.g., "high")
+            level: Optional codec level override (e.g., "4.1")
+            pix_fmt: Optional pixel format override (e.g., "yuv420p")
+            audio_codec: Optional audio codec override (e.g., "aac")
+            audio_bitrate: Optional audio bitrate override (e.g., "192k")
 
         Returns:
             Output path if successful, None if failed
@@ -505,6 +515,11 @@ class EncoderRouter:
                 quality=quality,
                 preset=preset,
                 filters=filters,
+                profile=profile,
+                level=level,
+                pix_fmt=pix_fmt,
+                audio_codec=audio_codec or "aac",
+                audio_bitrate=audio_bitrate or "192k",
             )
             result = job.execute()
 
@@ -522,6 +537,11 @@ class EncoderRouter:
             quality=quality,
             preset=preset,
             filters=filters,
+            profile=profile,
+            level=level,
+            pix_fmt=pix_fmt,
+            audio_codec=audio_codec,
+            audio_bitrate=audio_bitrate,
         )
 
     def _encode_local(
@@ -532,6 +552,11 @@ class EncoderRouter:
         quality: int,
         preset: str,
         filters: Optional[str],
+        profile: Optional[str],
+        level: Optional[str],
+        pix_fmt: Optional[str],
+        audio_codec: Optional[str],
+        audio_bitrate: Optional[str],
     ) -> Optional[str]:
         """Encode video using local FFmpeg."""
         import subprocess
@@ -574,8 +599,18 @@ class EncoderRouter:
         else:
             cmd_args.extend(["-c:v", "libx264", "-crf", str(quality), "-preset", preset])
 
+        if profile:
+            cmd_args.extend(["-profile:v", profile])
+        if level:
+            cmd_args.extend(["-level", str(level)])
+        if pix_fmt:
+            cmd_args.extend(["-pix_fmt", pix_fmt])
+
         # Audio
-        cmd_args.extend(["-c:a", "aac", "-b:a", "192k"])
+        cmd_args.extend([
+            "-c:a", audio_codec or "aac",
+            "-b:a", audio_bitrate or "192k",
+        ])
 
         # Output
         cmd_args.extend(["-movflags", "+faststart", output_path])

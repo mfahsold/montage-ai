@@ -77,6 +77,10 @@ class VideoEncodingJob(CGPUJob):
         filters: Optional[str] = None,
         audio_codec: str = "aac",
         audio_bitrate: str = "192k",
+        profile: Optional[str] = None,
+        level: Optional[str] = None,
+        pix_fmt: Optional[str] = None,
+        fps: Optional[float] = None,
         width: Optional[int] = None,
         height: Optional[int] = None,
     ):
@@ -92,6 +96,10 @@ class VideoEncodingJob(CGPUJob):
             filters: Optional FFmpeg filter string (e.g., color grading)
             audio_codec: Audio codec ("aac", "copy", or "none")
             audio_bitrate: Audio bitrate (e.g., "192k")
+            profile: Optional codec profile override (e.g., "high")
+            level: Optional codec level override (e.g., "4.1")
+            pix_fmt: Optional pixel format override (e.g., "yuv420p")
+            fps: Optional output framerate override
             width: Optional output width (None = keep original)
             height: Optional output height (None = keep original)
         """
@@ -113,6 +121,10 @@ class VideoEncodingJob(CGPUJob):
 
         # Filters
         self.filters = filters
+        self.profile = profile
+        self.level = level
+        self.pix_fmt = pix_fmt
+        self.fps = fps
 
         # Audio settings
         self.audio_codec = audio_codec
@@ -177,10 +189,21 @@ class VideoEncodingJob(CGPUJob):
         ])
 
         # Add profile and level for compatibility
-        if self.codec == "h264":
-            cmd_parts.extend(["-profile:v", "high", "-level", "4.1"])
+        if self.profile:
+            cmd_parts.extend(["-profile:v", self.profile])
         else:
-            cmd_parts.extend(["-profile:v", "main", "-level", "5.1"])
+            if self.codec == "h264":
+                cmd_parts.extend(["-profile:v", "high"])
+            else:
+                cmd_parts.extend(["-profile:v", "main"])
+
+        if self.level:
+            cmd_parts.extend(["-level", str(self.level)])
+        else:
+            cmd_parts.extend(["-level", "4.1" if self.codec == "h264" else "5.1"])
+
+        if self.pix_fmt:
+            cmd_parts.extend(["-pix_fmt", self.pix_fmt])
 
         # Scaling if requested
         if self.width and self.height:
@@ -188,11 +211,18 @@ class VideoEncodingJob(CGPUJob):
             cmd_parts.extend([
                 "-vf", f"scale_cuda={self.width}:{self.height}"
             ])
-        elif self.filters:
-            # Custom filters (need hwdownload/hwupload for CPU filters)
-            cmd_parts.extend([
-                "-vf", f"hwdownload,format=nv12,{self.filters},hwupload_cuda"
-            ])
+        else:
+            filter_chain = []
+            if self.filters:
+                filter_chain.append(self.filters)
+            if self.fps:
+                filter_chain.append(f"fps={self.fps}")
+            if filter_chain:
+                filters = ",".join(filter_chain)
+                # Custom filters (need hwdownload/hwupload for CPU filters)
+                cmd_parts.extend([
+                    "-vf", f"hwdownload,format=nv12,{filters},hwupload_cuda"
+                ])
 
         # Audio handling
         if self.audio_codec == "copy":

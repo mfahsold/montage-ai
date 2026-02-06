@@ -29,6 +29,26 @@ kubectl describe pod -n "${CLUSTER_NAMESPACE:-montage-ai}" -l app.kubernetes.io/
 kubectl logs -n "${CLUSTER_NAMESPACE:-montage-ai}" -l app.kubernetes.io/name=montage-ai --tail=200
 ```
 
+## CGPU Health (Optional)
+
+If CGPU offload is enabled (`CGPU_GPU_ENABLED=true`), ensure the credentials secret exists:
+
+```bash
+kubectl get secret -n "${CLUSTER_NAMESPACE:-montage-ai}" cgpu-credentials
+```
+
+If missing, CGPU jobs will fall back to local CPU/GPU.
+
+## Architecture Mismatch (exec format error)
+
+If distributed jobs fail with `exec format error`, the image architecture
+does not match the node architecture. Fix one of:
+
+- Build/push a multi-arch image and set `CLUSTER_ALLOW_MIXED_ARCH=true`.
+- Pin distributed jobs to a compatible arch via:
+  - `CLUSTER_ALLOW_MIXED_ARCH=false`, or
+  - `CLUSTER_NODE_SELECTOR="kubernetes.io/arch=amd64"` (adjust as needed).
+
 ## Fluxibri CLI (if available)
 
 ```bash

@@ -163,8 +163,16 @@ Recommended for large inputs (4K/AV1) and distributed runs:
 | `CLUSTER_PARALLELISM` | `4` | Shard count for distributed scene detection + render. |
 | `SCENE_DETECT_TIER` | `medium` | Resource tier for scene detection jobs (`small`, `medium`, `large`). |
 | `SCENE_CACHE_DIR` | `$OUTPUT_DIR/scene_cache` | Shared scene-cache directory for shard outputs. |
+| `SCENE_MERGE_OVERLAP_TOLERANCE` | `0.05` | Seconds of true overlap required to merge adjacent shard scenes. |
 | `PROXY_CACHE_DIR` | *(empty)* | Shared proxy cache for analysis (set to a RW PVC to avoid re-generation). |
 | `PROXY_HEIGHT_LARGE` | `720` | Proxy height for large files (lower = faster decode). |
+| `CLUSTER_NODE_SELECTOR` | *(empty)* | Optional node selector (`key=value,comma-separated`) for distributed jobs. |
+| `CLUSTER_ALLOW_MIXED_ARCH` | `true` | Allow scheduling across mixed architectures (requires multi-arch image). |
+| `CLUSTER_ARCH_SELECTOR_KEY` | `kubernetes.io/arch` | Label key used for arch pinning when needed. |
+| `CLUSTER_STATUS_REQUEST_TIMEOUT` | `30` | K8s API timeout (seconds) for job status polls. |
+| `CLUSTER_STATUS_POLL_INTERVAL` | `5` | Seconds between status polls for distributed jobs. |
+| `CLUSTER_STATUS_MAX_ERRORS` | `6` | Max consecutive status errors before failing distributed detection. |
+| `RQ_SIMPLE_WORKER` | `false` | Run RQ jobs in-process (no fork). Recommended for heavy queues if work-horse crashes. |
 
 **Example (K8s):**
 ```bash
@@ -176,6 +184,7 @@ PROXY_CACHE_DIR=/data/output/proxy_cache
 Notes:
 - Scene detection is CPU‑bound; for AV1/4K, set `SCENE_DETECT_TIER=large`.
 - If you set `PROXY_CACHE_DIR`, keep it on a shared RW PVC so shards can reuse proxies.
+- For single-arch images, set `CLUSTER_ALLOW_MIXED_ARCH=false` or set `CLUSTER_NODE_SELECTOR` to avoid `exec format error` on mixed-arch clusters.
 
 ### Google AI (Direct API)
 
@@ -195,6 +204,8 @@ Notes:
 | `CGPU_GPU_ENABLED` | `false`                | Enable cloud GPU for upscaling                   |
 | `CGPU_TIMEOUT`     | `1200`                 | Cloud operation timeout (seconds)                |
 | `CGPU_MAX_CONCURRENCY` | `1`               | Max parallel cgpu commands (advanced)            |
+| `CGPU_STATUS_TIMEOUT` | `30`               | `cgpu status` timeout (seconds)                  |
+| `CGPU_GPU_CHECK_TIMEOUT` | `120`          | `cgpu run nvidia-smi` timeout (seconds)          |
 
 ---
 
@@ -480,6 +491,7 @@ Notes:
 | `OUTPUT_CODEC`     | *auto*  | `libx264` by default; switches to `libx265` when most footage is HEVC (override to force) |
 | `OUTPUT_PROFILE`   | *auto*  | FFmpeg profile passed to encoder (usually `high` for H.264, `main` for HEVC)              |
 | `OUTPUT_LEVEL`     | *auto*  | Encoder level; raised automatically for 4K/high‑FPS projects                              |
+| `FINAL_ENCODE_BACKEND` | `ffmpeg` | Final encode backend: `ffmpeg` (local) or `router` (EncoderRouter with cgpu/local GPU fallback) |
 
 *Resolution and FPS are inferred from the dominant input footage (orientation, median size, and common framerate) to minimize re-encoding and quality loss.*
 
@@ -492,6 +504,7 @@ Notes:
 ### Encoding Overrides
 
 - `FORCE_CGPU_ENCODING`: When `true`, routes encoding to the CGPU backend regardless of local GPU availability. Maps to `settings.gpu.force_cgpu_encoding` and is exported to subprocess env for compatibility.
+- `FINAL_ENCODE_BACKEND=router`: Enables EncoderRouter for the final encode stage (CGPU → local GPU → CPU). Falls back to the FFmpeg pipeline if logo overlay is required.
 
 ---
 

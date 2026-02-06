@@ -21,8 +21,26 @@ spec:
     spec:
       terminationGracePeriodSeconds: 120
       serviceAccountName: montage-ai-cluster
-      nodeSelector:
-        kubernetes.io/arch: amd64
+      initContainers:
+        - name: cgpu-credentials-init
+          image: <IMAGE_FULL>
+          command:
+            - /bin/bash
+            - -c
+            - |
+              mkdir -p /cgpu/state
+              if [ -f /cgpu-secrets/config.json ]; then
+                cp /cgpu-secrets/config.json /cgpu/config.json
+              fi
+              if [ -f /cgpu-secrets/session.json ]; then
+                cp /cgpu-secrets/session.json /cgpu/state/session.json
+              fi
+          volumeMounts:
+            - name: cgpu-config
+              mountPath: /cgpu
+            - name: cgpu-secrets
+              mountPath: /cgpu-secrets
+              readOnly: true
       containers:
         - name: worker
           image: <IMAGE_FULL>
@@ -54,6 +72,8 @@ spec:
               subPath: cache
             - name: tmp-segments
               mountPath: /tmp/segments
+            - name: cgpu-config
+              mountPath: /home/montage/.config/cgpu
           resources:
             requests:
               cpu: "250m"
@@ -77,6 +97,17 @@ spec:
         - name: tmp-segments
           emptyDir:
             sizeLimit: 20Gi
+        - name: cgpu-config
+          emptyDir: {}
+        - name: cgpu-secrets
+          secret:
+            secretName: cgpu-credentials
+            optional: true
+            items:
+              - key: config.json
+                path: config.json
+              - key: session.json
+                path: session.json
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -100,8 +131,26 @@ spec:
     spec:
       terminationGracePeriodSeconds: 120
       serviceAccountName: montage-ai-cluster
-      nodeSelector:
-        kubernetes.io/arch: amd64
+      initContainers:
+        - name: cgpu-credentials-init
+          image: <IMAGE_FULL>
+          command:
+            - /bin/bash
+            - -c
+            - |
+              mkdir -p /cgpu/state
+              if [ -f /cgpu-secrets/config.json ]; then
+                cp /cgpu-secrets/config.json /cgpu/config.json
+              fi
+              if [ -f /cgpu-secrets/session.json ]; then
+                cp /cgpu-secrets/session.json /cgpu/state/session.json
+              fi
+          volumeMounts:
+            - name: cgpu-config
+              mountPath: /cgpu
+            - name: cgpu-secrets
+              mountPath: /cgpu-secrets
+              readOnly: true
       containers:
         - name: worker
           image: <IMAGE_FULL>
@@ -119,6 +168,8 @@ spec:
               value: "1"
             - name: LOG_LEVEL
               value: "INFO"
+            - name: RQ_SIMPLE_WORKER
+              value: "true"
           volumeMounts:
             - name: data-input
               mountPath: /data/input
@@ -133,6 +184,8 @@ spec:
               subPath: cache
             - name: tmp-segments
               mountPath: /tmp/segments
+            - name: cgpu-config
+              mountPath: /home/montage/.config/cgpu
           resources:
             requests:
               cpu: "1"
@@ -156,3 +209,14 @@ spec:
         - name: tmp-segments
           emptyDir:
             sizeLimit: 20Gi
+        - name: cgpu-config
+          emptyDir: {}
+        - name: cgpu-secrets
+          secret:
+            secretName: cgpu-credentials
+            optional: true
+            items:
+              - key: config.json
+                path: config.json
+              - key: session.json
+                path: session.json

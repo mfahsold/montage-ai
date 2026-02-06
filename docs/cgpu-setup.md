@@ -48,3 +48,9 @@ Provide the Client ID and Client Secret to the assistant, or create the config f
   "colabGapiDomain": "https://colab.googleapis.com"
 }
 ```
+
+## Cluster / Kubernetes
+
+If you run Montage AI in the cluster, CGPU jobs (encode/upscale/voice isolation) need the cgpu config mounted into worker pods.
+Create a secret named `cgpu-credentials` with `config.json` and optional `session.json`, then redeploy: the workers mount it into `/home/montage/.config/cgpu`.
+Without this secret, CGPU jobs will fall back to local CPU/GPU.

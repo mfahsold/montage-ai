@@ -28,6 +28,7 @@ Usage:
 import hashlib
 import json
 import os
+import platform
 import re
 import subprocess
 import time
@@ -72,6 +73,20 @@ def _parse_node_selector(raw: str) -> Dict[str, str]:
         if key and value:
             selector[key] = value
     return selector
+
+
+def _detect_k8s_arch() -> str:
+    """Map the current machine architecture to Kubernetes arch label values."""
+    machine = platform.machine().lower()
+    mapping = {
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+        "armv7l": "arm",
+        "armv6l": "arm",
+    }
+    return mapping.get(machine, machine)
 
 
 @dataclass
@@ -159,6 +174,31 @@ class JobSubmitter:
         cmd.extend(args)
 
         return subprocess.run(cmd, capture_output=capture_output, text=True)
+
+    def _select_node_selector(self, node_selector: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
+        """Resolve node selector with sensible defaults."""
+        if node_selector:
+            return node_selector
+
+        parsed = _parse_node_selector(settings.cluster.node_selector)
+        if parsed:
+            return parsed
+
+        if settings.cluster.allow_mixed_arch:
+            return None
+
+        arch = _detect_k8s_arch()
+        key = settings.cluster.arch_selector_key or "kubernetes.io/arch"
+        if arch:
+            logger.info("Auto-selecting node architecture: %s=%s", key, arch)
+            return {key: arch}
+        return None
+
+    def build_arch_selector(self) -> Dict[str, str]:
+        """Force a selector matching the current runtime architecture."""
+        arch = _detect_k8s_arch()
+        key = settings.cluster.arch_selector_key or "kubernetes.io/arch"
+        return {key: arch} if arch else {}
 
     def _generate_job_id(self, prefix: str, *args) -> str:
         """Generate unique job ID based on inputs."""
@@ -270,7 +310,7 @@ class JobSubmitter:
             logger.info("Unexpected error checking JobSet CRD: %s", e)
             return False
 
-    def get_job_status(self, job_name: str) -> Optional[JobStatus]:
+    def get_job_status(self, job_name: str, request_timeout: Optional[float] = None) -> Optional[JobStatus]:
         """Get status of a job using K8s API."""
         if not self.batch_v1:
             # Fallback to kubectl if client failed
@@ -291,7 +331,11 @@ class JobSubmitter:
             )
 
         try:
-            job = self.batch_v1.read_namespaced_job_status(job_name, self.namespace)
+            job = self.batch_v1.read_namespaced_job_status(
+                job_name,
+                self.namespace,
+                _request_timeout=request_timeout
+            )
             status = job.status
             spec = job.spec
             return JobStatus(
@@ -310,7 +354,16 @@ class JobSubmitter:
             )
         except ApiException as e:
             if e.status == 404:
-                return JobStatus(name=job_name, active=0, succeeded=0, failed=0, completion_time=None, conditions=[], is_not_found=True)
+                return JobStatus(
+                    name=job_name,
+                    active=0,
+                    succeeded=0,
+                    failed=0,
+                    completions=0,
+                    completion_time=None,
+                    conditions=[],
+                    is_not_found=True
+                )
             logger.error(f"Error getting job status: {e}")
             return None
 
@@ -336,6 +389,78 @@ class JobSubmitter:
         except ApiException as e:
             logger.error(f"Error listing jobs: {e}")
             return []
+
+    def list_job_pods(self, job_name: str) -> List[Dict[str, Any]]:
+        """List pods belonging to a job."""
+        label_selector = f"job-name={job_name}"
+        if not self.core_v1:
+            result = self._kubectl("get", "pods", "-l", label_selector, "-o", "json")
+            if result.returncode != 0:
+                return []
+            data = json.loads(result.stdout)
+            return data.get("items", [])
+
+        try:
+            pods = self.core_v1.list_namespaced_pod(self.namespace, label_selector=label_selector)
+            return [p.to_dict() for p in pods.items]
+        except ApiException as e:
+            logger.error(f"Error listing pods: {e}")
+            return []
+
+    def get_pod_logs(self, pod_name: str, tail_lines: int = 200) -> str:
+        """Fetch recent pod logs (best effort)."""
+        if not self.core_v1:
+            result = self._kubectl("logs", pod_name, "--tail", str(tail_lines))
+            return result.stdout if result.returncode == 0 else ""
+
+        try:
+            return self.core_v1.read_namespaced_pod_log(
+                name=pod_name,
+                namespace=self.namespace,
+                tail_lines=tail_lines
+            )
+        except ApiException:
+            return ""
+
+    def summarize_job_failure(self, job_name: str) -> Dict[str, Any]:
+        """Best-effort failure summary for a job."""
+        summary: Dict[str, Any] = {"job": job_name, "reason": None, "message": None, "pods": []}
+
+        status = self.get_job_status(job_name)
+        if status and status.conditions:
+            for cond in status.conditions:
+                if cond.get("type") in ("Failed", "FailureTarget"):
+                    summary["reason"] = cond.get("reason")
+                    summary["message"] = cond.get("message")
+                    break
+
+        pods = self.list_job_pods(job_name)
+        exec_format = False
+        sample_log = ""
+
+        for pod in pods:
+            pod_meta = pod.get("metadata", {})
+            pod_status = pod.get("status", {})
+            pod_name = pod_meta.get("name")
+            phase = pod_status.get("phase")
+            node = pod_status.get("node_name") or pod_status.get("nodeName")
+            summary["pods"].append({"name": pod_name, "phase": phase, "node": node})
+
+            if pod_name and not sample_log:
+                logs = self.get_pod_logs(pod_name, tail_lines=50)
+                if logs:
+                    sample_log = logs.strip()
+                    if "exec format error" in logs.lower():
+                        exec_format = True
+
+        if exec_format:
+            summary["reason"] = "exec_format_error"
+            if not summary.get("message"):
+                summary["message"] = "Container image architecture does not match node architecture."
+        if sample_log:
+            summary["sample_log"] = sample_log
+
+        return summary
 
     def delete_job(self, job_name: str, cascade: bool = True) -> bool:
         """Delete a job and its pods."""
@@ -418,10 +543,7 @@ class JobSubmitter:
         pull_secret = image_pull_secret or settings.cluster.image_pull_secret
 
         # Optional node selector (allows multi-arch when unset)
-        if node_selector is None or len(node_selector) == 0:
-            node_selector = _parse_node_selector(settings.cluster.node_selector)
-        if not node_selector:
-            node_selector = None
+        node_selector = self._select_node_selector(node_selector)
         
         # Build Job Manifest using library objects (SOTA approach)
         env_vars = [
@@ -547,6 +669,8 @@ class JobSubmitter:
         if pull_secret:
             pod_spec.image_pull_secrets = [client.V1LocalObjectReference(name=pull_secret)]
 
+        arch_key = settings.cluster.arch_selector_key or "kubernetes.io/arch"
+
         job = client.V1Job(
             api_version="batch/v1",
             kind="Job",
@@ -557,7 +681,7 @@ class JobSubmitter:
                     "app.kubernetes.io/component": component,
                     "fluxibri.ai/project": "montage-ai",
                     "fluxibri.ai/tier": tier,
-                    "fluxibri.ai/architecture": (node_selector or {}).get("kubernetes.io/arch", "multi"),
+                    "fluxibri.ai/architecture": (node_selector or {}).get(arch_key, "multi"),
                     "montage-ai.fluxibri.dev/job-id": job_id
                 }
             ),

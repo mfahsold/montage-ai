@@ -23,10 +23,10 @@ kubectl port-forward -n "$CLUSTER_NAMESPACE" svc/montage-ai-web "${LOCAL_PORT}:8
 open "http://localhost:${LOCAL_PORT}"
 ```
 
-Note: If you build a single-arch image (amd64 only), ensure deployments are
-pinned to amd64 nodes (see `deploy/k3s/base/deployment.yaml`,
-`deploy/k3s/base/worker.yaml`). For heterogeneous clusters, prefer a multi-arch
-build.
+Note: If you build a single-arch image (amd64 only), pin workloads to that
+architecture via an overlay patch or add a node selector before deploying.
+For heterogeneous clusters, prefer a multi-arch build and set
+`cluster.allowMixedArch: true` in `deploy/k3s/config-global.yaml`.
 
 Set defaults used throughout this guide:
 
@@ -173,6 +173,40 @@ kubectl get nodes -o custom-columns='NAME:.metadata.name,NVIDIA:.status.allocata
 # Legacy GPU overlays are archived in:
 #   deploy/k3s/overlays/legacy/
 ```
+
+---
+
+## CGPU (Cloud GPU Offload)
+
+Montage‑AI can offload heavy GPU tasks (final encode, upscale, voice isolation) to CGPU/Colab
+when enabled. In cluster mode, the worker pods must have CGPU credentials mounted.
+
+### 1) Create the credentials secret
+
+```bash
+kubectl -n "${CLUSTER_NAMESPACE:-montage-ai}" create secret generic cgpu-credentials \
+  --from-file=config.json=/path/to/cgpu/config.json \
+  --from-file=session.json=/path/to/cgpu/session.json
+```
+
+### 2) Enable CGPU in cluster config
+
+Set these in `deploy/config.env` (or export in your shell before `make -C deploy/k3s config`):
+
+```bash
+CGPU_ENABLED=true
+CGPU_GPU_ENABLED=true
+FINAL_ENCODE_BACKEND=router
+```
+
+Then re-render + deploy:
+
+```bash
+make -C deploy/k3s config
+make -C deploy/k3s deploy-cluster
+```
+
+If the secret is missing, CGPU checks will fail fast and the system will fall back to local CPU/GPU.
 
 ---
 

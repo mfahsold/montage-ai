@@ -46,6 +46,18 @@ K3S_CLUSTER_DOMAIN="cluster.local"
 MONTAGE_HOSTNAME="<MONTAGE_HOSTNAME>"
 ```
 
+### Cluster Scheduling (Architecture & Node Selection)
+```bash
+# Allow scheduling across mixed architectures (requires multi-arch image)
+CLUSTER_ALLOW_MIXED_ARCH="true"
+
+# Label key used when pinning to the current architecture
+CLUSTER_ARCH_SELECTOR_KEY="kubernetes.io/arch"
+
+# Optional selector for distributed jobs (comma-separated key=value)
+CLUSTER_NODE_SELECTOR=""
+```
+
 ### Runtime Services (Queues & LLM)
 ```bash
 REDIS_HOST="<REDIS_HOST>"
@@ -54,6 +66,17 @@ OPENAI_API_BASE="<OPENAI_API_BASE>"
 OPENAI_API_KEY="<OPENAI_API_KEY>"
 OPENAI_MODEL="auto"
 OPENAI_VISION_MODEL=""
+CGPU_ENABLED="false"
+CGPU_GPU_ENABLED="false"
+CGPU_HOST="<CGPU_HOST>"
+CGPU_PORT="8080"
+CGPU_MODEL="gemini-2.0-flash"
+CGPU_TIMEOUT="1200"
+CGPU_MAX_CONCURRENCY="1"
+CGPU_STATUS_TIMEOUT="30"
+CGPU_GPU_CHECK_TIMEOUT="120"
+FINAL_ENCODE_BACKEND="ffmpeg"  # ffmpeg|router
+FORCE_CGPU_ENCODING="false"
 ```
 
 ### Storage Configuration

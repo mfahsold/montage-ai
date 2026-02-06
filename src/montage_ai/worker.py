@@ -4,6 +4,7 @@ import time
 import redis
 import json
 from rq import Worker, Queue
+from rq.worker import SimpleWorker
 from montage_ai.config import get_settings
 from montage_ai.logger import logger
 
@@ -73,7 +74,8 @@ def start_worker():
     import socket
     import uuid
     worker_name = os.environ.get("WORKER_NAME", f"montage-{socket.gethostname()}-{uuid.uuid4().hex[:4]}")
-    worker = Worker(
+    worker_class = SimpleWorker if os.environ.get("RQ_SIMPLE_WORKER", "").lower() == "true" else Worker
+    worker = worker_class(
         queues,
         connection=conn,
         name=worker_name

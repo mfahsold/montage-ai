@@ -53,7 +53,7 @@ def submit_raw_job():
                 'quality_profile': 'preview'  # Use preview for faster turnaround
             }
         },
-        timeout='20m',
+        job_timeout='20m',
         result_ttl=500
     )
     

@@ -326,12 +326,14 @@ class RenderEngine:
         try:
             from ..cluster.job_submitter import JobSubmitter
             submitter = JobSubmitter()
-            
+            if not submitter.batch_v1:
+                logger.warning("Cluster API unavailable; falling back to local render.")
+                self.render()
+                return
+
             parallelism = self.settings.features.cluster_parallelism
             logger.info(f"   🚀 Submitting {parallelism} rendering shards to cluster...")
-            
-            # Note: We need to implement submit_render_job in JobSubmitter
-            # Or use a generic submit_job method
+
             cluster_tier = self.settings.features.cluster_render_tier
             shard_env = {}
             hwaccel = (self.settings.gpu.ffmpeg_hwaccel or "").strip()
@@ -344,53 +346,84 @@ class RenderEngine:
                 shard_env["EXPORT_WIDTH"] = str(self.ctx.media.output_profile.width)
                 shard_env["EXPORT_HEIGHT"] = str(self.ctx.media.output_profile.height)
 
-            job_spec = submitter.submit_generic_job(
-                job_id=f"render-{job_id}",
-                command=[
-                    "python", "-m", "montage_ai.cluster.distributed_rendering",
-                    "--clips-json", str(clips_json_path),
-                    "--shard-count", str(parallelism),
-                    "--output-dir", str(temp_dir / f"segments_{job_id}"),
-                    "--job-id", job_id,
-                    "--quality", self.settings.encoding.quality_profile
-                ],
-                parallelism=parallelism,
-                component="distributed-rendering",
-                env=shard_env or None,
-                tier=cluster_tier
-            )
-            
-            # 3. Wait for completion
-            self._report_render_progress(20, "Waiting for cluster nodes to render segments...")
-            submitter.wait_for_job(job_spec.name)
-            
-            if not submitter.is_job_successful(job_spec.name):
+            attempts = 0
+            max_attempts = 2
+            forced_selector = None
+
+            while attempts < max_attempts:
+                attempts += 1
+                if attempts > 1 and forced_selector:
+                    logger.warning("Retrying distributed render with node selector: %s", forced_selector)
+
+                job_spec = submitter.submit_generic_job(
+                    job_id=f"render-{job_id}",
+                    command=[
+                        "python", "-m", "montage_ai.cluster.distributed_rendering",
+                        "--clips-json", str(clips_json_path),
+                        "--shard-count", str(parallelism),
+                        "--output-dir", str(temp_dir / f"segments_{job_id}"),
+                        "--job-id", job_id,
+                        "--quality", self.settings.encoding.quality_profile
+                    ],
+                    parallelism=parallelism,
+                    component="distributed-rendering",
+                    env=shard_env or None,
+                    tier=cluster_tier,
+                    node_selector=forced_selector
+                )
+
+                # 3. Wait for completion
+                self._report_render_progress(20, "Waiting for cluster nodes to render segments...")
+                submitter.wait_for_job(job_spec.name)
+
+                if submitter.is_job_successful(job_spec.name):
+                    break
+
+                failure = submitter.summarize_job_failure(job_spec.name)
+                logger.error("Distributed render failed: %s", failure)
+
+                if failure.get("reason") == "exec_format_error" and forced_selector is None:
+                    forced_selector = submitter.build_arch_selector()
+                    submitter.delete_job(job_spec.name, cascade=True)
+                    continue
+
+                if self.settings.features.cluster_mode:
+                    logger.warning("Falling back to local render after distributed failure.")
+                    self.render()
+                    return
+
                 raise RuntimeError("Cluster rendering failed. Check K8s logs.")
-                
+
             # 4. Finalize: Concatenate segments from all shards
             self._report_render_progress(80, "Aggregating segments from nodes...")
-            
+
             # Collect all shard reports and segment paths
             all_segments = []
             segments_dir = temp_dir / f"segments_{job_id}"
-            
+
             # Search for shard reports
             import glob
             report_files = glob.glob(str(segments_dir / "shard_*" / "shard_report.json"))
-            report_files.sort() # Ensure shards stay in order
-            
+            report_files.sort()  # Ensure shards stay in order
+
+            if len(report_files) < parallelism:
+                raise RuntimeError(f"Missing shard reports ({len(report_files)}/{parallelism}).")
+
             for report_path in report_files:
                 with open(report_path, "r") as f:
                     report = json.load(f)
                     all_segments.extend(report.get("segments", []))
-            
+
+            if not all_segments:
+                raise RuntimeError("No segments produced by distributed render.")
+
             logger.info(f"   🔗 Aggregated {len(all_segments)} segments from {len(report_files)} shards")
 
             # Finalize using ProgressiveRenderer logic
             output_path = self.ctx.render.output_filename
             audio_path = self.ctx.media.audio_result.music_path
             audio_duration = self.ctx.timeline.target_duration
-            
+
             # We use ProgressiveRenderer to wrap SegmentWriter
             from ..segment_writer import ProgressiveRenderer
             pr = ProgressiveRenderer(output_dir=str(segments_dir))
@@ -400,14 +433,14 @@ class RenderEngine:
                 pr.segment_writer.segments.append(
                     SegmentInfo(path=seg_path, index=idx, duration=0, clip_count=0)
                 )
-                
+
             success = pr.finalize(
                 output_path=output_path,
                 audio_path=audio_path,
                 audio_duration=audio_duration,
                 logo_path=self.ctx.render.logo_path
             )
-            
+
             if success:
                 self.ctx.render.render_duration = time.time() - render_start_time
                 logger.info(f"   ✅ Distributed render complete in {self.ctx.render.render_duration:.1f}s")

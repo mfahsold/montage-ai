@@ -32,6 +32,7 @@ from typing import List, Optional, Tuple
 from ..scene_analysis import SceneDetector, Scene
 from ..video_metadata import probe_metadata
 from ..logger import logger
+from ..config import get_settings
 
 
 @dataclass
@@ -221,14 +222,18 @@ def aggregate_shard_results(output_dir: str, job_id: str) -> List[dict]:
             all_scenes.extend(data["scenes"])
             total_processing_time += data["processing_time"]
 
+    settings = get_settings()
+    overlap_tolerance = settings.analysis.scene_merge_overlap_tolerance_seconds
+
     # Deduplicate scenes (same video, overlapping times)
     unique_scenes = []
     for scene in sorted(all_scenes, key=lambda s: (s["path"], s["start"])):
         # Check if scene overlaps with last added scene from same video
         if unique_scenes and unique_scenes[-1]["path"] == scene["path"]:
             last = unique_scenes[-1]
-            # If scenes overlap significantly, merge them
-            if scene["start"] < last["end"] + 0.5:  # 0.5s tolerance
+            # Only merge if there is real overlap (avoid collapsing adjacent scenes)
+            overlap = last["end"] - scene["start"]
+            if overlap > overlap_tolerance:
                 last["end"] = max(last["end"], scene["end"])
                 continue
         unique_scenes.append(scene)

@@ -130,8 +130,8 @@ def render_shard(
 def main():
     parser = argparse.ArgumentParser(description="Montage AI Distributed Renderer Worker")
     parser.add_argument("--clips-json", required=True, help="Path to JSON file containing ClipMetadata list")
-    parser.add_argument("--shard-index", type=int, default=0)
-    parser.add_argument("--shard-count", type=int, default=1)
+    parser.add_argument("--shard-index", type=int, default=None)
+    parser.add_argument("--shard-count", type=int, default=None)
     parser.add_argument("--output-dir", required=True, help="Shared directory for segments")
     parser.add_argument("--job-id", default="dist-render")
     parser.add_argument("--xfade", action="store_true", help="Enable crossfades")
@@ -146,6 +146,20 @@ def main():
 
     with open(args.clips_json, "r") as f:
         clips_metadata = json.load(f)
+
+    # Prefer CLI args; fall back to job env vars for indexed jobs.
+    if args.shard_index is None:
+        env_index = os.environ.get("SHARD_INDEX")
+        try:
+            args.shard_index = int(env_index) if env_index is not None else 0
+        except ValueError:
+            args.shard_index = 0
+    if args.shard_count is None:
+        env_count = os.environ.get("SHARD_COUNT")
+        try:
+            args.shard_count = int(env_count) if env_count is not None else 1
+        except ValueError:
+            args.shard_count = 1
 
     render_shard(
         clips_metadata=clips_metadata,

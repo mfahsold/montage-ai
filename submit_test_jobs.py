@@ -45,7 +45,7 @@ def submit_jobs():
                     'enhance': True
                 }
             },
-            timeout='10m',
+            job_timeout='10m',
             result_ttl=500
         )
         job_ids.append(job.id)

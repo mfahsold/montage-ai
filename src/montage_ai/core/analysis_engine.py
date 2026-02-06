@@ -697,28 +697,63 @@ class AssetAnalyzer:
             
             # Monitor progress
             last_succeeded = -1
+            status_errors = 0
+            max_errors = max(1, int(self.settings.cluster.status_max_errors))
+            poll_interval = max(1, int(self.settings.cluster.status_poll_interval_seconds))
+            request_timeout = max(1, int(self.settings.cluster.status_request_timeout_seconds))
+
+            final_status = None
             while True:
-                status = submitter.get_job_status(job.name)
-                if status is None:
-                    break
-                    
+                try:
+                    status = submitter.get_job_status(job.name, request_timeout=request_timeout)
+                except Exception as e:
+                    status_errors += 1
+                    logger.warning(
+                        "   ⚠️ Cluster status check failed (%d/%d): %s",
+                        status_errors,
+                        max_errors,
+                        e
+                    )
+                    if status_errors >= max_errors:
+                        raise RuntimeError(
+                            f"Distributed job {job.name} status check failed after {status_errors} attempts"
+                        ) from e
+                    time.sleep(poll_interval)
+                    continue
+
+                if status is None or status.is_not_found:
+                    status_errors += 1
+                    logger.warning(
+                        "   ⚠️ Cluster status unavailable (%d/%d); retrying...",
+                        status_errors,
+                        max_errors
+                    )
+                    if status_errors >= max_errors:
+                        raise RuntimeError(
+                            f"Distributed job {job.name} status unavailable after {status_errors} attempts"
+                        )
+                    time.sleep(poll_interval)
+                    continue
+
+                status_errors = 0
+
                 if status.succeeded > last_succeeded:
                     logger.info(f"   ⏳ Progress: {status.succeeded}/{parallelism} workers completed")
                     last_succeeded = status.succeeded
-                    
+
                     if progress_callback:
                         progress_callback({
                             "percent": int((status.succeeded / parallelism) * 100),
                             "message": f"Cluster processing: {status.succeeded}/{parallelism} nodes complete",
                         })
-                
+
                 if status.is_complete:
+                    final_status = status
                     break
-                time.sleep(5)
-                
-            status = submitter.get_job_status(job.name)
-            if not status or not status.is_successful:
-                total_failed = status.failed if status else "unknown"
+                time.sleep(poll_interval)
+
+            if not final_status or not final_status.is_successful:
+                total_failed = final_status.failed if final_status else "unknown"
                 raise RuntimeError(f"Distributed job {job.name} failed (failed={total_failed})")
                 
             logger.info(f"   ✅ Distributed job {job.name} finished successfully")

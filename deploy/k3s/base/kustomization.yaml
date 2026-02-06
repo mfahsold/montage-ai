@@ -39,7 +39,7 @@ configMapGenerator:
       - CLUSTER_MODE=true
       - CLUSTER_PARALLELISM=2
       - CLUSTER_RENDER_TIER=xlarge
-      - SCENE_DETECT_TIER=xlarge
+      - SCENE_DETECT_TIER=medium
       - CLUSTER_TOLERATE_GPU=true
       - FFMPEG_HWACCEL=auto
       - MONTAGE_CLUSTER_MODE=k8s
@@ -79,11 +79,13 @@ replacements:
           name: montage-ai-worker
         fieldPaths:
           - spec.template.spec.containers.[name=worker].image
+          - spec.template.spec.initContainers.[name=cgpu-credentials-init].image
       - select:
           kind: Deployment
           name: montage-ai-worker-heavy
         fieldPaths:
           - spec.template.spec.containers.[name=worker].image
+          - spec.template.spec.initContainers.[name=cgpu-credentials-init].image
       - select:
           kind: Deployment
           name: cgpu-server

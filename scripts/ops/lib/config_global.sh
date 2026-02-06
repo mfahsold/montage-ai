@@ -46,6 +46,9 @@ registry_port = ""
 cluster_namespace = ""
 cluster_domain = ""
 montage_hostname = ""
+cluster_allow_mixed_arch = ""
+cluster_arch_selector_key = ""
+cluster_node_selector = ""
 image_name = ""
 image_tag = ""
 image_full = ""
@@ -77,6 +80,9 @@ if yaml is not None:
         registry_port = clean(registry.get("port", ""))
         cluster_namespace = clean(cluster.get("namespace", ""))
         cluster_domain = clean(cluster.get("clusterDomain", ""))
+        cluster_allow_mixed_arch = clean(cluster.get("allowMixedArch", ""))
+        cluster_arch_selector_key = clean(cluster.get("archSelectorKey", ""))
+        cluster_node_selector = clean(cluster.get("nodeSelector", ""))
         cluster_hostnames = cluster.get("hostnames", {}) if isinstance(cluster, dict) else {}
         montage_hostname = clean(cluster_hostnames.get("montage", ""))
 
@@ -153,6 +159,12 @@ if not any([
                 cluster_namespace = value
             elif key == "clusterDomain":
                 cluster_domain = value
+            elif key == "allowMixedArch":
+                cluster_allow_mixed_arch = value
+            elif key == "archSelectorKey":
+                cluster_arch_selector_key = value
+            elif key == "nodeSelector":
+                cluster_node_selector = value
             elif key == "hostnames":
                 subsection = "cluster_hostnames"
                 continue
@@ -223,6 +235,9 @@ emit("REGISTRY_PORT", registry_port)
 emit("CLUSTER_NAMESPACE", cluster_namespace)
 emit("K3S_CLUSTER_DOMAIN", cluster_domain)
 emit("MONTAGE_HOSTNAME", montage_hostname)
+emit("CLUSTER_ALLOW_MIXED_ARCH", cluster_allow_mixed_arch)
+emit("CLUSTER_ARCH_SELECTOR_KEY", cluster_arch_selector_key)
+emit("CLUSTER_NODE_SELECTOR", cluster_node_selector)
 emit("IMAGE_NAME", image_name)
 emit("IMAGE_TAG", image_tag)
 emit("IMAGE_FULL", image_full)

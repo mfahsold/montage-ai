@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field, model_validator, field_validator, ConfigD
 SCHEMA_VERSION = 1
 
 class Mood(str, Enum):
+    NEUTRAL = "neutral"
     SUSPENSEFUL = "suspenseful"
     PLAYFUL = "playful"
     ENERGETIC = "energetic"

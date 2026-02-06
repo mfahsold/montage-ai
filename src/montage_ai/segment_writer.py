@@ -1267,7 +1267,98 @@ class SegmentWriter:
             for seg in sorted_segments:
                 escaped_path = seg.path.replace("'", "'\\''")
                 f.write(f"file '{escaped_path}'\n")
-        
+
+        use_router = (_settings.encoding.final_encode_backend == "router" or _settings.gpu.force_cgpu_encoding)
+        if use_router and logo_path:
+            logger.info("   ⚠️ Router final encode disabled when logo overlay is requested. Falling back to FFmpeg pipeline.")
+            use_router = False
+        if use_router and not _settings.encoding.normalize_clips:
+            logger.info("   ⚠️ Router final encode requires NORMALIZE_CLIPS=true. Falling back to FFmpeg pipeline.")
+            use_router = False
+
+        if use_router:
+            muxed_output = str(self.output_dir / "pre_encode.mp4")
+            if os.path.exists(muxed_output):
+                os.remove(muxed_output)
+
+            try:
+                # Build concat -> mux command (stream copy video, encode audio once)
+                base_args = ["-f", "concat", "-safe", "0", "-i", concat_list_path]
+                if audio_path and os.path.exists(audio_path):
+                    base_args.extend(["-i", audio_path, "-map", "0:v", "-map", "1:a"])
+
+                cmd = build_ffmpeg_cmd(base_args)
+
+                if audio_path and os.path.exists(audio_path):
+                    af_filters = [f"volume={audio_volume}"]
+                    if audio_duration is not None and audio_duration > 0:
+                        af_filters.insert(0, f"atrim=0:{audio_duration}")
+                    af_chain = ",".join(af_filters)
+
+                    cmd.extend([
+                        "-c:v", "copy",
+                        "-c:a", _settings.encoding.audio_codec,
+                        "-b:a", _settings.encoding.audio_bitrate,
+                        "-af", af_chain,
+                        "-shortest",
+                        "-movflags", "+faststart",
+                        muxed_output,
+                    ])
+                else:
+                    cmd.extend([
+                        "-c:v", "copy",
+                        "-movflags", "+faststart",
+                        muxed_output,
+                    ])
+
+                result = run_command(
+                    cmd,
+                    capture_output=True,
+                    timeout=_settings.processing.ffmpeg_long_timeout,
+                    check=False,
+                    log_output=False
+                )
+
+                if result.returncode == 0 and os.path.exists(muxed_output):
+                    from .core.encoder_router import smart_encode
+
+                    codec = "hevc" if "265" in _ffmpeg_config.codec or "hevc" in _ffmpeg_config.codec.lower() else "h264"
+                    fps_filter = f"fps={self.target_fps}" if self.target_fps else None
+
+                    encoded_path = smart_encode(
+                        input_path=muxed_output,
+                        output_path=output_path,
+                        quality_profile=_settings.encoding.quality_profile,
+                        codec=codec,
+                        quality=self.ffmpeg_crf,
+                        preset=self.ffmpeg_preset,
+                        filters=fps_filter,
+                        profile=TARGET_PROFILE,
+                        level=TARGET_LEVEL,
+                        pix_fmt=TARGET_PIX_FMT,
+                        audio_codec=_settings.encoding.audio_codec,
+                        audio_bitrate=_settings.encoding.audio_bitrate,
+                    )
+
+                    if encoded_path:
+                        self.stats.concatenation_time = time.time() - start_time
+                        if self.cleanup_on_complete:
+                            self.cleanup_segments()
+                        final_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+                        logger.info(f"   ✅ Final video: {output_path}")
+                        logger.info(f"      Duration: {self.stats.total_duration:.1f}s")
+                        logger.info(f"      Size: {final_size / (1024*1024):.1f}MB")
+                        logger.info(f"      Concatenation time: {self.stats.concatenation_time:.1f}s")
+                        return True
+
+                logger.warning("   ⚠️ Router final encode failed; falling back to FFmpeg pipeline.")
+            finally:
+                if os.path.exists(muxed_output):
+                    try:
+                        os.remove(muxed_output)
+                    except OSError:
+                        pass
+
         # Determine output path (temp if logo overlay needed)
         # Atomic write: if no logo, write to .tmp first. If logo, write to pre_logo.mp4 (which is already temp)
         if logo_path:

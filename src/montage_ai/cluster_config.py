@@ -37,7 +37,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from .encoder_router import EncoderNode, EncoderRouter
+from .encoder_router import EncoderNode, ClusterEncoderRouter
 from .logger import logger
 
 
@@ -141,7 +141,7 @@ def create_cluster_router(
     Returns:
         Configured EncoderRouter instance.
     """
-    router = EncoderRouter(enable_cgpu=enable_cgpu)
+    router = ClusterEncoderRouter(enable_cgpu=enable_cgpu)
 
     if include_remote:
         for node in get_cluster_nodes(include_cpu=not gpu_only):

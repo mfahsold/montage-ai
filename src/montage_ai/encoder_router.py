@@ -118,6 +118,10 @@ class EncoderRouter:
         if self.local_node:
             self.add_node(self.local_node)
 
+
+# Backwards-compatible alias to clarify this is the cluster/distributed router.
+ClusterEncoderRouter = EncoderRouter
+
     def _create_local_node(self, hw_config: HWConfig) -> EncoderNode:
         """Create local node from hardware config."""
         return EncoderNode(
@@ -625,6 +629,7 @@ async def probe_node_capabilities(hostname: str, ssh_user: str) -> Dict[str, Any
 __all__ = [
     "EncoderNode",
     "EncoderRouter",
+    "ClusterEncoderRouter",
     "EncodeResult",
     "TaskType",
     "encode_segment",

@@ -72,7 +72,7 @@ spec:
             memory: "4Gi"
         volumeMounts:
           - name: cgpu-config
-            mountPath: /root/.config/cgpu
+            mountPath: /home/montage/.config/cgpu
       volumes:
         - name: cgpu-config
           emptyDir: {}

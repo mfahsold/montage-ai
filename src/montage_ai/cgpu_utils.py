@@ -39,6 +39,7 @@ from .config import get_settings
 def _refresh_from_settings() -> None:
     """Sync cgpu defaults from centralized settings."""
     global CGPU_GPU_ENABLED, CGPU_TIMEOUT, CGPU_ENABLED, CGPU_HOST, CGPU_PORT, CGPU_MODEL, CGPU_MAX_CONCURRENCY
+    global CGPU_STATUS_TIMEOUT, CGPU_GPU_CHECK_TIMEOUT
     llm = get_settings().llm
     CGPU_GPU_ENABLED = llm.cgpu_gpu_enabled
     CGPU_TIMEOUT = llm.cgpu_timeout
@@ -47,7 +48,12 @@ def _refresh_from_settings() -> None:
     CGPU_PORT = str(llm.cgpu_port)
     CGPU_MODEL = llm.cgpu_model
     CGPU_MAX_CONCURRENCY = max(1, llm.cgpu_max_concurrency)
+    CGPU_STATUS_TIMEOUT = getattr(llm, "cgpu_status_timeout", CGPU_STATUS_TIMEOUT)
+    CGPU_GPU_CHECK_TIMEOUT = getattr(llm, "cgpu_gpu_check_timeout", CGPU_GPU_CHECK_TIMEOUT)
 
+
+CGPU_STATUS_TIMEOUT = int(os.environ.get("CGPU_STATUS_TIMEOUT", "30"))
+CGPU_GPU_CHECK_TIMEOUT = int(os.environ.get("CGPU_GPU_CHECK_TIMEOUT", "120"))
 
 _refresh_from_settings()
 
@@ -62,6 +68,8 @@ class CGPUConfig:
     port: str = field(default_factory=lambda: str(get_settings().llm.cgpu_port))
     model: str = field(default_factory=lambda: get_settings().llm.cgpu_model)
     max_concurrency: int = field(default_factory=lambda: max(1, get_settings().llm.cgpu_max_concurrency))
+    status_timeout: int = field(default_factory=lambda: int(getattr(get_settings().llm, "cgpu_status_timeout", CGPU_STATUS_TIMEOUT)))
+    gpu_check_timeout: int = field(default_factory=lambda: int(getattr(get_settings().llm, "cgpu_gpu_check_timeout", CGPU_GPU_CHECK_TIMEOUT)))
 
 
 # ============================================================================
@@ -131,7 +139,7 @@ def is_cgpu_available(require_gpu: bool = True) -> bool:
                 ["cgpu", "status"],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=CGPU_STATUS_TIMEOUT
             )
         logger.debug(f"DEBUG: cgpu status returncode={result.returncode}")
         
@@ -166,12 +174,10 @@ def check_cgpu_gpu() -> Tuple[bool, str]:
                 ["cgpu", "run", "nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=CGPU_GPU_CHECK_TIMEOUT
             )
         if result.returncode == 0 and result.stdout.strip():
-            # Extract GPU info line
-            lines = [l for l in result.stdout.strip().split('\n') 
-                     if 'Tesla' in l or 'T4' in l or 'A100' in l or 'MiB' in l]
+            lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip()]
             return True, lines[0] if lines else result.stdout.strip()
         return False, result.stderr
     except subprocess.TimeoutExpired:
@@ -411,50 +417,92 @@ def copy_to_remote(local_path: str, remote_path: str, timeout: int = 600) -> boo
         return False
 
 
+def _get_remote_file_size(remote_path: str) -> Optional[int]:
+    """Best-effort remote size lookup for progress logging."""
+    success, stdout, _ = run_cgpu_command(f"stat -c %s {remote_path}", timeout=30)
+    if not success:
+        return None
+    try:
+        return int(stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return None
+
+
 def download_via_base64(
-    remote_path: str, 
+    remote_path: str,
     local_path: str,
     timeout: int = 300
 ) -> bool:
     """
-    Download file from Colab via base64 encoding.
-    
+    Download file from Colab via base64 encoding (streamed).
+
     Since cgpu copy is upload-only, we use base64 over stdout.
-    
-    Args:
-        remote_path: Path to file on Colab
-        local_path: Destination path locally
-        timeout: Timeout in seconds
-        
-    Returns:
-        True if successful
+    This implementation streams line-by-line to avoid large memory spikes.
     """
-    success, b64_data, stderr = run_cgpu_command(
-        f"base64 {remote_path}",
-        timeout=timeout
-    )
-    
-    if not success:
-        logger.error(f"   ❌ Download failed: {stderr}")
-        return False
-    
+    import time
+    import binascii
+
+    start_time = time.time()
+    remote_size = _get_remote_file_size(remote_path)
+    last_report = 0
+    report_every = 50 * 1024 * 1024  # 50MB
+
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(local_path) or '.', exist_ok=True)
+
     try:
-        # Filter out cgpu auth message lines
-        b64_lines = [l for l in b64_data.split('\n') 
-                     if l and not l.startswith('Authenticated')]
-        b64_clean = ''.join(b64_lines)
-        
-        # Decode and save
-        file_data = base64.b64decode(b64_clean)
-        
-        # Ensure output directory exists
-        os.makedirs(os.path.dirname(local_path) or '.', exist_ok=True)
-        
-        with open(local_path, 'wb') as f:
-            f.write(file_data)
-        
+        bytes_written = 0
+        with cgpu_slot():
+            proc = subprocess.Popen(
+                ["cgpu", "run", f"base64 {remote_path}"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
+
+            with open(local_path, "wb") as out_file:
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    if time.time() - start_time > timeout:
+                        proc.kill()
+                        logger.error("   ❌ Download timed out after %ss", timeout)
+                        return False
+
+                    line = line.strip()
+                    if not line or line.startswith("Authenticated"):
+                        continue
+
+                    try:
+                        chunk = base64.b64decode(line)
+                    except binascii.Error:
+                        # Skip malformed lines (should be rare)
+                        continue
+
+                    out_file.write(chunk)
+                    bytes_written += len(chunk)
+
+                    if remote_size and (bytes_written - last_report) >= report_every:
+                        pct = (bytes_written / remote_size) * 100
+                        logger.info("   ⬇️  Downloaded %.1f%% (%.1f MB)", pct, bytes_written / (1024 * 1024))
+                        last_report = bytes_written
+
+            proc.wait(timeout=max(1, int(timeout - (time.time() - start_time))))
+            stderr = proc.stderr.read().strip() if proc.stderr else ""
+
+        if proc.returncode != 0:
+            logger.error("   ❌ Download failed: %s", stderr)
+            return False
+
+        if remote_size and bytes_written < remote_size:
+            logger.error("   ❌ Download incomplete: %d/%d bytes", bytes_written, remote_size)
+            return False
+
         return True
-        
+
+    except subprocess.TimeoutExpired:
+        logger.error("   ❌ Download timed out after %ss", timeout)
+        return False
     except Exception as e:
         logger.error(f"   ❌ Failed to decode/save: {e}")
         return False

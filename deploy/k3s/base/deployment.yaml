@@ -23,8 +23,6 @@ spec:
         fluxibri.ai/tier: web
     spec:
       serviceAccountName: montage-ai-cluster
-      nodeSelector:
-        kubernetes.io/arch: amd64
       topologySpreadConstraints:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname

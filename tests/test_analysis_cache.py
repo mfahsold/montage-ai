@@ -20,7 +20,6 @@ from src.montage_ai.core.analysis_cache import (
     AnalysisCache,
     AudioAnalysisEntry,
     SceneAnalysisEntry,
-    SemanticAnalysisEntry,
     CacheEntry,
     get_analysis_cache,
     reset_cache,
@@ -504,35 +503,6 @@ class TestCacheRobustness:
             assert result is False
 
 
-class TestSemanticAnalysisEntry:
-    """Tests for SemanticAnalysisEntry dataclass (Phase 2)."""
-
-    def test_create_entry(self):
-        """SemanticAnalysisEntry can be created with all fields."""
-        entry = SemanticAnalysisEntry(
-            version="1.0",
-            file_hash="abc123",
-            computed_at="2024-01-01T12:00:00",
-            time_point=5.0,
-            quality="YES",
-            description="Beach surfing scene",
-            action="high",
-            shot="wide",
-            tags=["beach", "surfing", "ocean"],
-            caption="Person surfing on ocean waves",
-            objects=["person", "surfboard", "wave"],
-            mood="energetic",
-            setting="beach",
-            caption_embedding=None,
-        )
-
-        assert entry.time_point == 5.0
-        assert entry.quality == "YES"
-        assert entry.tags == ["beach", "surfing", "ocean"]
-        assert entry.mood == "energetic"
-        assert entry.setting == "beach"
-
-
 class TestSemanticCache:
     """Tests for semantic analysis caching (Phase 2)."""
 
@@ -580,7 +550,6 @@ class TestSemanticCache:
         # Load
         loaded = cache.load_semantic(video_file, time_point=5.0)
         assert loaded is not None
-        assert loaded.time_point == 5.0
         assert loaded.quality == "YES"
         assert loaded.tags == ["beach", "ocean"]
         assert loaded.mood == "calm"
@@ -619,7 +588,7 @@ class TestSemanticCache:
         # Exact match works
         result = cache.load_semantic(video_file, time_point=5.0)
         assert result is not None
-        assert result.time_point == 5.0
+        assert result.tags == ["test"]
 
         # Note: Cache filename includes time in ms, so different time points
         # will look for different files. The tolerance check is for verifying

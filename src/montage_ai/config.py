@@ -550,6 +550,8 @@ class LLMConfig:
     cgpu_output_dir: str = field(default_factory=lambda: os.environ.get("CGPU_OUTPUT_DIR", ""))
     cgpu_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_TIMEOUT", "1200")))
     cgpu_max_concurrency: int = field(default_factory=lambda: int(os.environ.get("CGPU_MAX_CONCURRENCY", "1")))
+    cgpu_status_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_STATUS_TIMEOUT", "30")))
+    cgpu_gpu_check_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_GPU_CHECK_TIMEOUT", "120")))
     
     # General LLM settings
     timeout: int = field(default_factory=lambda: int(os.environ.get("LLM_TIMEOUT", "60")))
@@ -619,6 +621,11 @@ class ClusterConfig:
     scene_detect_tier: str = field(default_factory=lambda: os.environ.get("SCENE_DETECT_TIER", "medium"))
     node_selector: str = field(default_factory=lambda: os.environ.get("CLUSTER_NODE_SELECTOR", ""))
     tolerate_gpu: bool = field(default_factory=lambda: os.environ.get("CLUSTER_TOLERATE_GPU", "false").lower() == "true")
+    allow_mixed_arch: bool = field(default_factory=lambda: os.environ.get("CLUSTER_ALLOW_MIXED_ARCH", "true").lower() == "true")
+    arch_selector_key: str = field(default_factory=lambda: os.environ.get("CLUSTER_ARCH_SELECTOR_KEY", "kubernetes.io/arch"))
+    status_request_timeout_seconds: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_STATUS_REQUEST_TIMEOUT", 30))
+    status_poll_interval_seconds: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_STATUS_POLL_INTERVAL", 5))
+    status_max_errors: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_STATUS_MAX_ERRORS", 6))
 
     @property
     def image_full(self) -> str:
@@ -680,6 +687,9 @@ class AnalysisConstants:
     
     # Scene Detection (PySceneDetect)
     scene_min_length_frames: int = field(default_factory=ConfigParser.make_int_parser("SCENE_MIN_LENGTH_FRAMES", 15))  # ~0.5s @ 30fps
+    scene_merge_overlap_tolerance_seconds: float = field(
+        default_factory=ConfigParser.make_float_parser("SCENE_MERGE_OVERLAP_TOLERANCE", 0.05)
+    )
     
     # Optical Flow (Farneback algorithm)
     optical_flow_pyr_scale: float = field(default_factory=ConfigParser.make_float_parser("OF_PYR_SCALE", 0.5))
@@ -799,6 +809,7 @@ class EncodingConfig:
     audio_bitrate: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_BITRATE", "192k"))
     normalize_clips: bool = field(default_factory=lambda: os.environ.get("NORMALIZE_CLIPS", "true").lower() == "true")
     extract_reencode: bool = field(default_factory=lambda: os.environ.get("EXTRACT_REENCODE", "false").lower() == "true")
+    final_encode_backend: str = field(default_factory=lambda: os.environ.get("FINAL_ENCODE_BACKEND", "ffmpeg").lower())
 
     def __post_init__(self) -> None:
         """Apply quality profile defaults when explicit env overrides are absent."""
@@ -1289,6 +1300,7 @@ class Settings:
                 "profile": self.encoding.profile,
                 "level": self.encoding.level,
                 "normalize_clips": self.encoding.normalize_clips,
+                "final_encode_backend": self.encoding.final_encode_backend,
             },
             "upscale": {
                 "model": self.upscale.model,
@@ -1364,6 +1376,8 @@ class Settings:
             "MONTAGE_CLOUD_ENDPOINT": self.cloud.endpoint,
             "CGPU_GPU_ENABLED": str(self.llm.cgpu_gpu_enabled).lower(),
             "CGPU_MAX_CONCURRENCY": str(max(1, self.llm.cgpu_max_concurrency)),
+            "CGPU_STATUS_TIMEOUT": str(self.llm.cgpu_status_timeout),
+            "CGPU_GPU_CHECK_TIMEOUT": str(self.llm.cgpu_gpu_check_timeout),
             "QUALITY_PROFILE": self.encoding.quality_profile,
             "COLORLEVELS": str(self.features.colorlevels).lower(),
             "LUMA_NORMALIZE": str(self.features.luma_normalize).lower(),
@@ -1384,6 +1398,7 @@ class Settings:
             "FFMPEG_LONG_TIMEOUT": str(self.processing.ffmpeg_long_timeout),
             "RENDER_TIMEOUT": str(self.processing.render_timeout),
             "FINAL_CRF": str(self.encoding.crf),
+            "FINAL_ENCODE_BACKEND": self.encoding.final_encode_backend,
             "EXTRACT_REENCODE": str(self.encoding.extract_reencode).lower(),
             "FORCE_CGPU_ENCODING": str(self.gpu.force_cgpu_encoding).lower(),
             "EXPORT_WIDTH": str(self.export.resolution_width),
