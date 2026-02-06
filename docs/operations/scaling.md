@@ -48,6 +48,8 @@ Otherwise, use standard Kubernetes checks:
 - Start conservative: listLength threshold = 10, maxReplicas = 8
 - Use `stabilizationWindowSeconds` to avoid flapping
 - Route heavy ffmpeg jobs to GPU/encoder node pool via `nodeAffinity`
+- For large AV1/4K inputs, raise `SCENE_DETECT_TIER` (e.g., `large`) and set
+  `PROXY_CACHE_DIR` on a shared RW PVC to avoid repeated proxy generation.
 
 ## Runbook (Cluster Validation)
 

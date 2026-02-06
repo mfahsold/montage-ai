@@ -159,6 +159,15 @@ def _select_temp_dir() -> Path:
     return Path("/tmp")
 
 
+def _default_scene_cache_dir() -> Path:
+    """Default scene cache directory (derived from OUTPUT_DIR unless overridden)."""
+    override = os.environ.get("SCENE_CACHE_DIR")
+    if override:
+        return Path(override)
+    base = os.environ.get("OUTPUT_DIR", "/data/output")
+    return Path(base) / "scene_cache"
+
+
 @dataclass
 class PathConfig:
     """All filesystem paths used by Montage AI."""
@@ -174,6 +183,7 @@ class PathConfig:
     session_dir: Path = field(default_factory=lambda: Path(os.environ.get("SESSION_DIR", "/tmp/montage_sessions")))
     transcript_dir: Path = field(default_factory=lambda: Path(os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_transcript")))
     shorts_dir: Path = field(default_factory=lambda: Path(os.environ.get("SHORTS_DIR", "/tmp/montage_shorts")))
+    scene_cache_dir: Path = field(default_factory=_default_scene_cache_dir)
     metadata_cache_dir: Path = field(
         default_factory=lambda: (
             Path(os.environ.get("METADATA_CACHE_DIR"))
@@ -208,7 +218,18 @@ class PathConfig:
 
     def ensure_directories(self) -> None:
         """Create all directories if they don't exist."""
-        for path in [self.input_dir, self.music_dir, self.output_dir, self.assets_dir, self.metadata_cache_dir, self.tension_metadata_dir, self.session_dir, self.transcript_dir, self.shorts_dir]:
+        for path in [
+            self.input_dir,
+            self.music_dir,
+            self.output_dir,
+            self.assets_dir,
+            self.metadata_cache_dir,
+            self.tension_metadata_dir,
+            self.session_dir,
+            self.transcript_dir,
+            self.shorts_dir,
+            self.scene_cache_dir,
+        ]:
             path.mkdir(parents=True, exist_ok=True)
 
     def get_log_path(self, job_id: str) -> Path:
@@ -592,8 +613,12 @@ class ClusterConfig:
         "small": {"requests": {"cpu": "100m", "memory": "256Mi"}, "limits": {"cpu": "500m", "memory": "1Gi"}},
         "medium": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2", "memory": "4Gi"}},
         "large": {"requests": {"cpu": "2", "memory": "4Gi"}, "limits": {"cpu": "8", "memory": "16Gi"}},
+        "xlarge": {"requests": {"cpu": "4", "memory": "8Gi"}, "limits": {"cpu": "16", "memory": "32Gi"}},
         "gpu": {"requests": {"cpu": "1", "memory": "4Gi"}, "limits": {"cpu": "16", "memory": "32Gi"}}
     })
+    scene_detect_tier: str = field(default_factory=lambda: os.environ.get("SCENE_DETECT_TIER", "medium"))
+    node_selector: str = field(default_factory=lambda: os.environ.get("CLUSTER_NODE_SELECTOR", ""))
+    tolerate_gpu: bool = field(default_factory=lambda: os.environ.get("CLUSTER_TOLERATE_GPU", "false").lower() == "true")
 
     @property
     def image_full(self) -> str:

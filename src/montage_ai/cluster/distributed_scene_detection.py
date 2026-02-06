@@ -281,7 +281,10 @@ def main():
     )
     parser.add_argument(
         "--output-dir", "-o",
-        default=os.environ.get("OUTPUT_DIR", "/data/output/scene_cache"),
+        default=(
+            os.environ.get("SCENE_CACHE_DIR")
+            or str(Path(os.environ.get("OUTPUT_DIR", "/data/output")) / "scene_cache")
+        ),
         help="Output directory for shard results"
     )
     parser.add_argument(

@@ -1,7 +1,7 @@
 # Configuration Defaults (Code-Aligned)
 
 This snapshot was audited against `src/montage_ai/config.py` and
-`src/montage_ai/config_pools.py` on 2026-02-04.
+`src/montage_ai/config_pools.py` on 2026-02-05.
 
 Scope: high-impact environment variables and computed defaults. This is not
 exhaustive; the source files above are the full reference.
@@ -91,6 +91,18 @@ Note: pool defaults use `os.cpu_count()` and do not apply cgroup limits.
 | `PROXY_CACHE_MIN_AGE_SECONDS` | `60` | Avoids thrash. |
 | `PROXY_LOCK_TIMEOUT_SECONDS` | `900` | File lock timeout. |
 | `PREFER_ANALYSIS_PROXY_FOR_PREVIEW` | `true` | Use lighter proxy in preview. |
+
+## Scene Cache (Distributed)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `SCENE_CACHE_DIR` | `$OUTPUT_DIR/scene_cache` | Shard outputs for distributed scene detection. |
+
+## Cluster (Distributed Jobs)
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `SCENE_DETECT_TIER` | `medium` | Resource tier for scene detection jobs. |
 
 ## Timeouts (Seconds)
 

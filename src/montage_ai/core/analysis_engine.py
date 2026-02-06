@@ -724,7 +724,7 @@ class AssetAnalyzer:
             logger.info(f"   ✅ Distributed job {job.name} finished successfully")
             
             # Aggregate results
-            output_dir = "/data/output/scene_cache"
+            output_dir = str(self.settings.paths.scene_cache_dir)
             scenes_data = aggregate_shard_results(output_dir, job.name)
             
             # Convert list of dicts to path-mapped dict

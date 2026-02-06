@@ -449,7 +449,8 @@ class ProxyGenerator:
 
         cmd.extend(["-c:a", "aac", "-b:a", "64k"])
         output = Path(output_path)
-        tmp_output = output.with_suffix(output.suffix + f".tmp.{os.getpid()}")
+        # Keep a valid media extension so ffmpeg can infer output format.
+        tmp_output = output.with_name(f"{output.stem}.tmp.{os.getpid()}{output.suffix}")
         cmd.append(str(tmp_output))
 
         logger.info("Generating analysis proxy: %sp (%s -> %s) using %s", height, src.name, Path(output_path).name, config.effective_codec)

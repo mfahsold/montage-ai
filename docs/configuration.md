@@ -152,6 +152,31 @@ these in `deploy/k3s/config-global.yaml` under `storage.pvc` so the rendered
 - `PVC_MUSIC_NAME`
 - `PVC_ASSETS_NAME`
 
+---
+
+## Cluster Performance Tuning
+
+Recommended for large inputs (4K/AV1) and distributed runs:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CLUSTER_PARALLELISM` | `4` | Shard count for distributed scene detection + render. |
+| `SCENE_DETECT_TIER` | `medium` | Resource tier for scene detection jobs (`small`, `medium`, `large`). |
+| `SCENE_CACHE_DIR` | `$OUTPUT_DIR/scene_cache` | Shared scene-cache directory for shard outputs. |
+| `PROXY_CACHE_DIR` | *(empty)* | Shared proxy cache for analysis (set to a RW PVC to avoid re-generation). |
+| `PROXY_HEIGHT_LARGE` | `720` | Proxy height for large files (lower = faster decode). |
+
+**Example (K8s):**
+```bash
+SCENE_DETECT_TIER=large \
+SCENE_CACHE_DIR=/data/output/scene_cache \
+PROXY_CACHE_DIR=/data/output/proxy_cache
+```
+
+Notes:
+- Scene detection is CPU‑bound; for AV1/4K, set `SCENE_DETECT_TIER=large`.
+- If you set `PROXY_CACHE_DIR`, keep it on a shared RW PVC so shards can reuse proxies.
+
 ### Google AI (Direct API)
 
 | Variable          | Default            | Description                |

@@ -15,6 +15,10 @@
 #   http = true
 #   insecure = true
 
+[registry."192.168.1.12:30500"]
+  http = true
+  insecure = true
+
 # Example: Private registry with self-signed cert
 # [registry."registry.example.com"]
 #   insecure = true

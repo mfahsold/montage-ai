@@ -46,6 +46,34 @@ from ..config import get_settings
 settings = get_settings()
 
 
+def _inherit_env(keys: List[str]) -> Dict[str, str]:
+    """Copy selected env vars into a job spec (skips empty/unset)."""
+    inherited: Dict[str, str] = {}
+    for key in keys:
+        value = os.environ.get(key)
+        if value is None or value == "":
+            continue
+        inherited[key] = value
+    return inherited
+
+
+def _parse_node_selector(raw: str) -> Dict[str, str]:
+    """Parse CLUSTER_NODE_SELECTOR (key=value,comma-separated) into a dict."""
+    selector: Dict[str, str] = {}
+    if not raw:
+        return selector
+    for item in raw.split(","):
+        item = item.strip()
+        if not item or "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            selector[key] = value
+    return selector
+
+
 @dataclass
 class JobSpec:
     """Specification for a distributed job."""
@@ -149,13 +177,23 @@ class JobSubmitter:
     def submit_scene_detection(
         self,
         video_paths: List[str],
-        parallelism: int = 4,
-        threshold: float = 27.0,
-        output_dir: str = "/data/output/scene_cache"
+        parallelism: Optional[int] = None,
+        threshold: Optional[float] = None,
+        output_dir: Optional[str] = None,
+        tier: Optional[str] = None
     ) -> JobSpec:
         """
         Submit distributed scene detection job using K8s API.
         """
+        if not parallelism or parallelism <= 0:
+            parallelism = min(len(video_paths), settings.features.cluster_parallelism)
+        if threshold is None:
+            threshold = settings.thresholds.scene_threshold
+        if output_dir is None:
+            output_dir = str(settings.paths.scene_cache_dir)
+        if tier is None:
+            tier = settings.cluster.scene_detect_tier
+
         job_id = self._generate_job_id("scene-detect", *video_paths)
         
         # Create ConfigMap via API
@@ -187,6 +225,21 @@ class JobSubmitter:
             "JOB_ID": job_id,
             "SCENE_DETECT_CONFIG": config_map_name
         }
+        env["SCENE_CACHE_DIR"] = output_dir
+        env.update(_inherit_env([
+            "ENABLE_PROXY_ANALYSIS",
+            "ADAPTIVE_PROXY_HEIGHT",
+            "PROXY_HEIGHT",
+            "PROXY_HEIGHT_SMALL",
+            "PROXY_HEIGHT_MEDIUM",
+            "PROXY_HEIGHT_LARGE",
+            "PROXY_CACHE_DIR",
+            "PROXY_CACHE_TTL_SECONDS",
+            "PROXY_CACHE_MAX_BYTES",
+            "PROXY_CACHE_MIN_AGE_SECONDS",
+            "PROXY_LOCK_TIMEOUT_SECONDS",
+            "FFMPEG_HWACCEL",
+        ]))
         
         return self.submit_generic_job(
             job_id=job_id,
@@ -194,7 +247,7 @@ class JobSubmitter:
             parallelism=parallelism,
             component="scene-detection",
             env=env,
-            tier="medium"
+            tier=tier
         )
 
     def _supports_jobset(self) -> bool:
@@ -357,9 +410,11 @@ class JobSubmitter:
             
         pull_secret = image_pull_secret or settings.cluster.image_pull_secret
 
-        # Architecture targeting (default to amd64 as per latest tag)
-        if node_selector is None:
-            node_selector = {"kubernetes.io/arch": "amd64"}
+        # Optional node selector (allows multi-arch when unset)
+        if node_selector is None or len(node_selector) == 0:
+            node_selector = _parse_node_selector(settings.cluster.node_selector)
+        if not node_selector:
+            node_selector = None
         
         # Build Job Manifest using library objects (SOTA approach)
         env_vars = [
@@ -472,6 +527,15 @@ class JobSubmitter:
             node_selector=node_selector,
             affinity=affinity
         )
+
+        if settings.cluster.tolerate_gpu:
+            pod_spec.tolerations = [
+                client.V1Toleration(
+                    key="gpu",
+                    operator="Exists",
+                    effect="NoSchedule"
+                )
+            ]
         
         if pull_secret:
             pod_spec.image_pull_secrets = [client.V1LocalObjectReference(name=pull_secret)]
@@ -486,7 +550,7 @@ class JobSubmitter:
                     "app.kubernetes.io/component": component,
                     "fluxibri.ai/project": "montage-ai",
                     "fluxibri.ai/tier": tier,
-                    "fluxibri.ai/architecture": node_selector.get("kubernetes.io/arch", "amd64"),
+                    "fluxibri.ai/architecture": (node_selector or {}).get("kubernetes.io/arch", "multi"),
                     "montage-ai.fluxibri.dev/job-id": job_id
                 }
             ),

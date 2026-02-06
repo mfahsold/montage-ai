@@ -46,7 +46,7 @@ spec:
           command:
             - python
             - -m
-            - montage_ai.scene_detection
+            - montage_ai.cluster.distributed_scene_detection
             - --shard-mode
           env:
             # Kubernetes injects JOB_COMPLETION_INDEX automatically for indexed jobs
@@ -61,6 +61,13 @@ spec:
                 configMapKeyRef:
                   name: scene-detect-config
                   key: video_path
+            - name: SCENE_THRESHOLD
+              valueFrom:
+                configMapKeyRef:
+                  name: scene-detect-config
+                  key: scene_threshold
+            - name: SCENE_CACHE_DIR
+              value: "/data/output/scene_cache"
             - name: OUTPUT_DIR
               value: "/data/output/scene_cache"
             - name: PYTHONUNBUFFERED
@@ -98,7 +105,7 @@ metadata:
   namespace: montage-ai
 data:
   video_path: "/data/input"
-  detection_threshold: "27.0"
+  scene_threshold: "30.0"
   min_scene_length: "0.5"
 ---
 # GPU-Accelerated Encoding Job

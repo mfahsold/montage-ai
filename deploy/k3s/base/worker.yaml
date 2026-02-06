@@ -21,6 +21,8 @@ spec:
     spec:
       terminationGracePeriodSeconds: 120
       serviceAccountName: montage-ai-cluster
+      nodeSelector:
+        kubernetes.io/arch: amd64
       containers:
         - name: worker
           image: <IMAGE_FULL>
@@ -98,6 +100,8 @@ spec:
     spec:
       terminationGracePeriodSeconds: 120
       serviceAccountName: montage-ai-cluster
+      nodeSelector:
+        kubernetes.io/arch: amd64
       containers:
         - name: worker
           image: <IMAGE_FULL>

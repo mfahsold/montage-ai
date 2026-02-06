@@ -23,6 +23,11 @@ kubectl port-forward -n "$CLUSTER_NAMESPACE" svc/montage-ai-web "${LOCAL_PORT}:8
 open "http://localhost:${LOCAL_PORT}"
 ```
 
+Note: If you build a single-arch image (amd64 only), ensure deployments are
+pinned to amd64 nodes (see `deploy/k3s/base/deployment.yaml`,
+`deploy/k3s/base/worker.yaml`). For heterogeneous clusters, prefer a multi-arch
+build.
+
 Set defaults used throughout this guide:
 
 ```bash
@@ -293,6 +298,22 @@ PVC_OUTPUT_NAME=montage-ai-output-nfs
 PVC_MUSIC_NAME=montage-ai-music-nfs
 PVC_ASSETS_NAME=montage-ai-assets-nfs
 ```
+
+### Performance Tuning (Recommended)
+
+For large AV1/4K inputs, scene detection is CPU‑bound. Use a larger tier and
+shared proxy cache to avoid repeated decodes:
+
+```env
+SCENE_DETECT_TIER=large
+SCENE_CACHE_DIR=/data/output/scene_cache
+PROXY_CACHE_DIR=/data/output/proxy_cache
+```
+
+Notes:
+- `CLUSTER_PARALLELISM` controls shard count for distributed jobs.
+- With a single video, time‑based sharding is automatic; for mixed inputs, consider
+  pre‑splitting very large files to balance load.
 
 ### Example (ad‑hoc job)
 
