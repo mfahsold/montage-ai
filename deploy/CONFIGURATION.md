@@ -271,7 +271,6 @@ KEDA list-length thresholds for queue-driven autoscaling are configurable from `
 Set the following values and re-run `make config` before rendering or deploying:
 
 - `WORKER_QUEUE_SCALE_THRESHOLD` (default: 10)
-- `WORKER_HEAVY_QUEUE_SCALE_THRESHOLD` (default: 20)
 
 These values are rendered into `deploy/k3s/base/cluster-config.env` and used to generate `deploy/k3s/overlays/cluster/keda-scaledobjects.yaml` via `deploy/k3s/prepare-scaledobjects.sh`.
 

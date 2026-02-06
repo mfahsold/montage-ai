@@ -17,23 +17,3 @@ spec:
         address: redis.montage-ai.svc.cluster.local:6379
         listName: "rq:queue:default"
         listLength: "10"
----
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata:
-  name: montage-ai-worker-heavy-scaledobject
-  namespace: montage-ai
-  labels:
-    app.kubernetes.io/name: montage-ai
-    app.kubernetes.io/component: worker-heavy
-spec:
-  scaleTargetRef:
-    name: montage-ai-worker-heavy
-  minReplicaCount: 2
-  maxReplicaCount: 12
-  triggers:
-    - type: redis
-      metadata:
-        address: redis.montage-ai.svc.cluster.local:6379
-        listName: "rq:queue:heavy"
-        listLength: "20"

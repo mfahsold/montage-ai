@@ -331,12 +331,16 @@ def _init_redis_resources():
         conn = create_resilient_redis_connection(host=redis_host, port=redis_port)
         queue_fast = ResilientQueue(name=_settings.session.queue_fast_name, connection=conn)
         queue_heavy = ResilientQueue(name=_settings.session.queue_heavy_name, connection=conn)
+        if queue_fast.name == queue_heavy.name:
+            queue_heavy = queue_fast
         store = JobStore()
         return conn, queue_fast, queue_heavy, store
     except Exception as exc:  # noqa: BLE001
         logger.warning("Redis unavailable; using in-memory stubs: %s", exc)
         stub_fast = NullQueue(_settings.session.queue_fast_name)
         stub_heavy = NullQueue(_settings.session.queue_heavy_name)
+        if stub_fast.name == stub_heavy.name:
+            stub_heavy = stub_fast
         return None, stub_fast, stub_heavy, InMemoryJobStore()
 
 
@@ -344,6 +348,20 @@ def _init_redis_resources():
 redis_conn, queue_fast, queue_heavy, job_store = _init_redis_resources()
 # Backwards-compatible alias for legacy tests and RQ-style usage
 q = queue_fast
+
+
+def _unique_queues(*queues):
+    unique = []
+    seen = set()
+    for queue in queues:
+        if queue is None:
+            continue
+        qid = id(queue)
+        if qid in seen:
+            continue
+        seen.add(qid)
+        unique.append(queue)
+    return unique
 
 
 def get_montage_queue(options: dict) -> ResilientQueue:
@@ -601,8 +619,9 @@ def api_status():
 
     # Get queue stats (RQ)
     try:
-        active_jobs = len(queue_fast.started_job_registry) + len(queue_heavy.started_job_registry)
-        queued_jobs = len(queue_fast) + len(queue_heavy)
+        queues = _unique_queues(queue_fast, queue_heavy)
+        active_jobs = sum(len(q.started_job_registry) for q in queues)
+        queued_jobs = sum(len(q) for q in queues)
     except (AttributeError, TypeError, NameError):
         active_jobs = 0
         queued_jobs = 0

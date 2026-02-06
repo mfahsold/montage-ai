@@ -6,6 +6,8 @@
 
 **Implementation Update (2026-01-30)**: Implemented initial cluster-focused changes: added KEDA ScaledObjects for `montage-ai-worker` and `montage-ai-worker-heavy`, replaced host‑based pod anti‑affinity with zone‑level spreading in distributed job manifests, added a JobSet example for coordinated renders, and refactored `JobSubmitter` to prefer JobSet (CRD) when `CLUSTER_USE_JOBSET=true` is set.
 
+**Implementation Update (2026-02-06)**: Unified to a **single adaptive worker tier** (no heavy queue split). KEDA now scales only the `default` queue and all jobs route through one worker deployment.
+
 
 ---
 

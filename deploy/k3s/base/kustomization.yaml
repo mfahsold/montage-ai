@@ -82,12 +82,6 @@ replacements:
           - spec.template.spec.initContainers.[name=cgpu-credentials-init].image
       - select:
           kind: Deployment
-          name: montage-ai-worker-heavy
-        fieldPaths:
-          - spec.template.spec.containers.[name=worker].image
-          - spec.template.spec.initContainers.[name=cgpu-credentials-init].image
-      - select:
-          kind: Deployment
           name: cgpu-server
         fieldPaths:
           - spec.template.spec.initContainers.[name=cgpu-credentials-init].image

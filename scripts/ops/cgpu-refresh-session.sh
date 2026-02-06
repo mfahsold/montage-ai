@@ -39,7 +39,6 @@ echo "Restarting worker + cgpu-server deployments to pick up new session..."
 
 kubectl -n "$CLUSTER_NAMESPACE" rollout restart \
   deploy/montage-ai-worker \
-  deploy/montage-ai-worker-heavy \
   deploy/cgpu-server
 
-echo "Done. Validate with: kubectl -n $CLUSTER_NAMESPACE exec deploy/montage-ai-worker-heavy -- cgpu status"
+echo "Done. Validate with: kubectl -n $CLUSTER_NAMESPACE exec deploy/montage-ai-worker -- cgpu status"

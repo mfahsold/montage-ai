@@ -1072,7 +1072,7 @@ class SessionConfig:
     # Prefer REDIS_SERVICE_PORT when provided by Kubernetes service env
     _redis_port_raw: str = field(default_factory=lambda: ConfigParser.parse_str("REDIS_SERVICE_PORT", ConfigParser.parse_str("REDIS_PORT", "6379")))
     queue_fast_name: str = field(default_factory=ConfigParser.make_str_parser("QUEUE_FAST_NAME", "default"))
-    queue_heavy_name: str = field(default_factory=ConfigParser.make_str_parser("QUEUE_HEAVY_NAME", "heavy"))
+    queue_heavy_name: str = field(default_factory=ConfigParser.make_str_parser("QUEUE_HEAVY_NAME", "default"))
     
     @property
     def redis_port(self) -> int:

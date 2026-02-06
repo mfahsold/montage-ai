@@ -21,7 +21,9 @@ def _resolve_queues(settings) -> list:
             return queues
 
     fast = settings.session.queue_fast_name or "default"
-    heavy = settings.session.queue_heavy_name or "heavy"
+    heavy = settings.session.queue_heavy_name or fast
+    if heavy == fast:
+        return [fast]
     return [fast, heavy]
 
 def start_worker():

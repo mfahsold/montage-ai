@@ -63,7 +63,6 @@ class K8sSyncDownloader:
     def get_running_pod(self) -> str | None:
         """Find a running pod that has the output volume mounted."""
         selectors = [
-            "app.kubernetes.io/component=worker-heavy",
             "app.kubernetes.io/component=worker",
             "app.kubernetes.io/component=web-ui",
         ]

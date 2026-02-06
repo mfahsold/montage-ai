@@ -32,8 +32,8 @@ For an audited snapshot of code-aligned defaults, see `docs/config-defaults.md`.
 ## Queue Routing
 
 - `QUEUE_FAST_NAME` (default: `default`) – short/preview + transcript jobs
-- `QUEUE_HEAVY_NAME` (default: `heavy`) – volle Renders, Upscale/Enhance, Nicht-Preview
-- Preview-Jobs werden automatisch in die Fast-Queue geleitet; Standard/High landet in Heavy.
+- `QUEUE_HEAVY_NAME` (default: `default`) – deprecated alias; keep equal to `QUEUE_FAST_NAME`
+- Preview-Jobs und Full-Render laufen über dieselbe Queue; der Cluster skaliert adaptiv.
 
 ---
 

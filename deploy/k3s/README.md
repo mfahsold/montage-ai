@@ -82,7 +82,7 @@ deploy/k3s/
 │   ├── namespace.yaml       # montage-ai namespace
 │   ├── cluster-config.env   # Rendered from config-global.yaml
 │   ├── deployment.yaml      # Web UI deployment
-│   ├── worker.yaml          # Queue workers (default + heavy)
+│   ├── worker.yaml          # Queue workers (single adaptive tier)
 │   ├── pvc.yaml             # Storage claims (RWX-friendly)
 │   └── kustomization.yaml   # Base kustomization
 └── overlays/
