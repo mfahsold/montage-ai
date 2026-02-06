@@ -102,7 +102,7 @@ We recently added a "Preview" quality profile.
 
 * **Code**: `src/`, `tests/`, workflows
 * **Examples**: `test_data/`, `scripts/examples/`
-* **User Documentation**: `README.md`, `docs/getting-started.md`, `docs/features.md`, `docs/configuration.md`, `docs/performance-tuning.md`, `QUICK_START.md`
+* **User Documentation**: `README.md`, `docs/getting-started.md`, `docs/features.md`, `docs/configuration.md`, `docs/performance-tuning.md`
 * **Technical Guides**: `docs/architecture.md`, `docs/algorithms.md`, `docs/models.md`, `docs/ci.md`, `docs/cgpu-setup.md`
 * **Operations (Public)**: `docs/operations/*` (public runbooks + stubs)
 * **Policies**: `SECURITY.md`, `.github/CODEOWNERS`, `CODE_OF_CONDUCT.md`

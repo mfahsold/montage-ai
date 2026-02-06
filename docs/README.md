@@ -8,11 +8,10 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 
 ---
 
-## Quick Start
+## Start Here
 
 Start here:
-- [Getting Started](getting-started.md) — full walkthrough
-- [`QUICK_START.md`](../QUICK_START.md) — command cheat sheet
+- [Getting Started](getting-started.md) — full walkthrough (includes TL;DR commands)
 - [K8s Deployment](../deploy/k3s/README.md) — cluster setup
 
 ---
@@ -28,6 +27,7 @@ Start here:
 | [Configuration](configuration.md) | Environment variables |
 | [Config Defaults (code-aligned)](config-defaults.md) | Audited default values |
 | [CLI Reference](CLI_REFERENCE.md) | Command-line usage |
+| [What's New / Changelog](../CHANGELOG.md) | Release notes |
 
 ### Deployment
 
@@ -48,6 +48,9 @@ Start here:
 | [Architecture](architecture.md) | System design |
 | [Algorithms](algorithms.md) | Beat detection, scene analysis |
 | [Models](models.md) | AI/ML libraries used |
+| [Design System](DESIGN_SYSTEM.md) | UI tokens and styling rules |
+| [Web UI Architecture](WEB_UI_ARCHITECTURE.md) | Frontend structure & flows |
+| [Dependency Management](DEPENDENCY_MANAGEMENT.md) | Update policy, pins, drift control |
 | [LLM Agent Guidelines](llm-agents.md) | AI coding principles |
 
 ### Cloud & Infrastructure
@@ -56,6 +59,10 @@ Start here:
 | ------ | ------------- |
 | [cgpu Setup](cgpu-setup.md) | Google Cloud GPU credentials |
 | [Optional Dependencies](OPTIONAL_DEPENDENCIES.md) | AI/ML library options |
+| [Performance Tuning](performance-tuning.md) | Runtime and cluster tuning tips |
+| [CI](ci.md) | Continuous integration notes |
+| [Cluster Deploy](cluster-deploy.md) | Cluster deploy overview |
+| [Test Assets](test-assets.md) | Test media policy |
 
 ### Reference
 
@@ -63,7 +70,8 @@ Start here:
 | ------ | ------------- |
 | [Parameter Reference](PARAMETER_REFERENCE.md) | All configurable parameters |
 | [Style Quick Reference](STYLE_QUICK_REFERENCE.md) | Editing styles |
-| [AI Director Tuning](AI_DIRECTOR_PARAMETER_TUNING.md) | LLM prompt tuning |
+| [Privacy](privacy.md) | Privacy policy |
+| [Imprint](imprint.md) | Legal imprint |
 
 ### Strategy
 

@@ -33,7 +33,28 @@ For an audited snapshot of code-aligned defaults, see `docs/config-defaults.md`.
 
 - `QUEUE_FAST_NAME` (default: `default`) – short/preview + transcript jobs
 - `QUEUE_HEAVY_NAME` (default: `default`) – deprecated alias; keep equal to `QUEUE_FAST_NAME`
-- Preview-Jobs und Full-Render laufen über dieselbe Queue; der Cluster skaliert adaptiv.
+- Preview jobs and full renders share the same queue; the cluster scales adaptively.
+
+---
+
+## Deployment Configuration
+
+Deployment defaults and cluster wiring live in `deploy/config.env` and `deploy/k3s/config-global.yaml`.
+Use those files as the source of truth and re-render the manifests with:
+
+```bash
+make -C deploy/k3s config
+```
+
+Key deployment variables (non-exhaustive):
+- `REGISTRY_HOST`, `REGISTRY_PORT`, `REGISTRY_URL`
+- `IMAGE_NAME`, `IMAGE_TAG`, `IMAGE_FULL`
+- `CLUSTER_NAMESPACE`, `APP_DOMAIN`
+- `WORKER_MIN_REPLICAS`, `WORKER_MAX_REPLICAS`, `WORKER_QUEUE_SCALE_THRESHOLD`
+- `STORAGE_CLASS`, `PVC_*` (input/output/music/assets)
+- `CGPU_*` (cloud GPU offload)
+
+See `deploy/k3s/README.md` for the full cluster deployment walkthrough.
 
 ---
 
@@ -172,7 +193,7 @@ Recommended for large inputs (4K/AV1) and distributed runs:
 | `CLUSTER_STATUS_REQUEST_TIMEOUT` | `30` | K8s API timeout (seconds) for job status polls. |
 | `CLUSTER_STATUS_POLL_INTERVAL` | `5` | Seconds between status polls for distributed jobs. |
 | `CLUSTER_STATUS_MAX_ERRORS` | `6` | Max consecutive status errors before failing distributed detection. |
-| `RQ_SIMPLE_WORKER` | `false` | Run RQ jobs in-process (no fork). Recommended for heavy queues if work-horse crashes. |
+| `RQ_SIMPLE_WORKER` | `false` | Run RQ jobs in-process (no fork). Useful for long-running jobs if forked workers crash. |
 
 **Example (K8s):**
 ```bash

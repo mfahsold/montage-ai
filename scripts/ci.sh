@@ -50,6 +50,15 @@ check_no_github_actions() {
   fi
 }
 
+check_public_docs() {
+  if [[ -x "${ROOT_DIR}/scripts/check_public_docs.sh" ]]; then
+    log "Validating public documentation boundaries"
+    "${ROOT_DIR}/scripts/check_public_docs.sh"
+  else
+    warn "Public docs check script not found; skipping"
+  fi
+}
+
 run_unit_tests() {
   log "Running unit tests"
   export PYTHONPATH="${ROOT_DIR}/src"
@@ -101,6 +110,7 @@ main() {
   log "Starting vendor-agnostic CI"
   setup_venv
   check_no_github_actions
+  check_public_docs
   run_unit_tests
   audit_dependencies
   validate_manifests

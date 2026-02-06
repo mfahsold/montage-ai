@@ -32,7 +32,7 @@ data/output/
 logs/
 
 # Local business documentation (not tracked)
-# Note: docs/BACKLOG.md IS tracked (public backlog)
+# Note: Backlog/strategy docs are private by policy and must not be tracked
 /BACKLOG.md
 docs/internal/
 docs/archive/internal/

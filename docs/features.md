@@ -69,8 +69,6 @@ python -m montage_ai.proxy_generator \
 - **8K workflows**: Proxy workflow mandatory (1080p → conform to 8K in DaVinci Resolve/FCPX)
 - **RAW codecs**: Generate H.264/H.265 proxies first for best compatibility
 
-See [EDGE_CASES_HIGH_RES_SUPPORT.md](EDGE_CASES_HIGH_RES_SUPPORT.md) for detailed technical specifications.
-
 ---
 
 #### AI Denoising
@@ -521,22 +519,6 @@ Useful endpoints (for automation):
 
 See [responsible_ai.md](responsible_ai.md) for the full policy.
 
-## Timeline Export (OTIO/EDL)
-
-Enable during run:
-
-```bash
-./montage-ai.sh run hitchcock --export-timeline --generate-proxies
-```
-
-Outputs in `data/output/`:
-- `*.otio` (preferred), `*.edl`, `*.csv`, metadata JSON, optional proxies folder.
-
-
-Import tips:
-- **DaVinci Resolve:** File → Import → Timeline → select `.otio`; relink media if paths differ.
-- **Premiere Pro / Avid:** use `.edl` and relink originals.
-
 ## Cloud LLM & GPU (cgpu)
 
 - Install: `npm i -g cgpu` (plus gemini-cli; run `cgpu connect` once)
@@ -690,5 +672,3 @@ Having issues? Check [troubleshooting.md](troubleshooting.md) for common fixes.
 
 - [Configuration](configuration.md) — All settings explained
 - [Architecture](architecture.md) — How it works under the hood
-- [Strategy](STRATEGY.md) — Product vision and roadmap
-- [Backlog](BACKLOG.md) — Upcoming features

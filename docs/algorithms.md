@@ -343,6 +343,3 @@ else:
 - **Fibonacci Editing:** Dan Olson "The Fibonacci Sequence in Film"
 
 ---
-
-*Last Updated: 2025-12-04*
-*Montage AI Version: 0.4.0*

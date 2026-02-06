@@ -113,7 +113,7 @@ The central orchestrator that executes the editing pipeline in phases:
 | **Parallel Scene Detection** | `ProcessPoolExecutor` (max_workers = min(len(videos), max(4, cpu_count // 2), `MAX_SCENE_WORKERS`); ThreadPool fallback) | 3-4x speedup on multi-core |
 | **FFmpeg Beat Detection** | `astats` + `tempo` filters (primary path) | Portable, no heavy deps; librosa optional via try/except |
 | **Auto GPU Encoding** | NVENC > VAAPI > QSV > CPU | 2-6x encoding speedup |
-| **Hardware Nah (Web)** | Server-Sent Events (SSE) + `os.nice(10)` | Zero polling overhead, responsive UI under load |
+| **Hardware-Adjacent (Web)** | Server-Sent Events (SSE) + `os.nice(10)` | Zero polling overhead, responsive UI under load |
 | **Lazy Loading (CLI)** | Import heavy libs only when needed | Instant CLI startup time |
 | **Cluster Efficiency** | `imagePullPolicy: IfNotPresent` (dev overlay uses `Always`) | Minimized network traffic for cached images |
 

@@ -88,4 +88,4 @@ GitHub Pages serves content from `docs/`:
 
 ---
 
-**Enforcement:** Manual review + automated checks (TODO: add to CI)
+**Enforcement:** Manual review + automated checks (pre-push hook). CI can call `scripts/check_public_docs.sh` if enabled.

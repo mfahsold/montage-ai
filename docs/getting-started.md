@@ -4,6 +4,39 @@ From zero to your first montage in 5 minutes.
 
 ---
 
+## TL;DR
+
+```bash
+# Web UI (local Docker)
+docker compose up
+
+# CLI run (uses data/input + data/music)
+docker compose run --rm montage-ai ./montage-ai.sh run
+```
+
+Common flags:
+
+```bash
+QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
+CGPU_ENABLED=true docker compose run --rm montage-ai ./montage-ai.sh run
+```
+
+Tests:
+
+```bash
+./scripts/ci.sh
+pytest tests/test_montage_builder.py -v
+```
+
+Kubernetes:
+
+```bash
+make -C deploy/k3s config
+make -C deploy/k3s deploy-cluster
+```
+
+---
+
 ## Requirements
 
 - **Docker** + Docker Compose v2

@@ -19,3 +19,12 @@
 - Add `clean-deploy` ephemeral kustomize overlay and `dev-autoscale-smoke` CI workflow for safe dev/staging validation (KEDA/HPA); add docs and guarded dev-only endpoint for deterministic smoke tests
 - Implement cluster-distributed deployment improvements: KEDA ScaledObjects for `montage-ai-worker` and `montage-ai-worker-heavy`, replaced host-based pod anti-affinity with zone-level spreading, and added a JobSet example for coordinated distributed renders (docs updated)
 - Simplify deployments to two paths (local Docker + cluster overlay) and archive dev-specific overlays/flows
+
+## 2026-01-15
+
+### Highlights
+- 3x performance improvements via lazy loading, lower startup time, and faster segment I/O.
+- Default hardware acceleration paths for VAAPI (where available).
+- Kubernetes job orchestration moved to the official Python API for reliability.
+- Distributed scene detection sharding (file-based and time-based).
+- Improved GPU scheduling with affinity rules and multi-arch image support.

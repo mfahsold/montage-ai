@@ -1,5 +1,5 @@
 # Example JobSet for coordinated distributed rendering (requires JobSet CRD/install)
-# See docs/INFRA_TEAM_FEEDBACK_SOTA_2026.md for guidance and links to upstream JobSet
+# See docs/cluster-deploy.md and upstream JobSet docs for guidance.
 apiVersion: batch.jobset.sigs.k8s.io/v1alpha1
 kind: JobSet
 metadata:
