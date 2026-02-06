@@ -138,7 +138,7 @@ run_web() {
     echo -e "   Open ${BLUE}http://localhost:${web_port}${NC} in your browser"
     echo -e "   ℹ️  If using Ollama on Linux, run: ${CYAN}OLLAMA_HOST=0.0.0.0 ollama serve${NC}"
     # Pass arguments like --build to docker compose
-    docker compose -f docker-compose.web.yml up "$@"
+    docker compose up "$@"
 }
 
 run_serve() {

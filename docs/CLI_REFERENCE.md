@@ -12,20 +12,23 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 
 ```bash
 # Web UI (recommended for first time)
-./montage-ai.sh web
+docker compose up
 
 # Preview (fast, 360p)
-./montage-ai.sh preview dynamic
+docker compose run --rm montage-ai ./montage-ai.sh preview dynamic
 
 # Standard montage
-./montage-ai.sh run hitchcock --stabilize --captions tiktok
+docker compose run --rm montage-ai ./montage-ai.sh run hitchcock --stabilize --captions tiktok
 
 # High quality with all effects
-./montage-ai.sh hq documentary --upscale --isolate-voice --film-grain 35mm
+docker compose run --rm montage-ai ./montage-ai.sh hq documentary --upscale --isolate-voice --film-grain 35mm
 
 # Generate 3 variants in parallel
-./montage-ai.sh run dynamic --variants 3
+docker compose run --rm montage-ai ./montage-ai.sh run dynamic --variants 3
 ```
+
+Local Docker note: examples below use `./montage-ai.sh` for brevity. When running locally,
+prefix with `docker compose run --rm montage-ai` (or exec into the container).
 
 ---
 
@@ -41,7 +44,7 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 | `hq [STYLE]` | High quality with upscaling (1080p/4K) | Slow |
 | `shorts [STYLE]` | Vertical 9:16 with smart reframing | Medium |
 | `download JOB_ID` | Download job artifacts (video, timeline, logs) | - |
-| `web` | Launch Web UI (<MONTAGE_WEB_URL>) | - |
+| `web` | Launch Web UI (prefer `docker compose up`) | - |
 | `list` | Show available styles | - |
 
 ### Utility Commands
@@ -59,7 +62,7 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 | `export-to-nle` | Export results to OTIO/Premiere/EDL |
 | `help` | Show full help message |
 
-Note: for local runs, `./montage-ai.sh web` uses `WEB_PORT` (default 8080).
+Note: for local runs, `docker compose up` uses `WEB_PORT` (default 8080).
 
 ---
 
@@ -69,22 +72,22 @@ Use the same `/api/jobs` endpoints as the Web UI, but from the CLI.
 
 ```bash
 # Submit a job
-MONTAGE_API_BASE="http://<MONTAGE_API_HOST>" ./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser"
+MONTAGE_API_BASE="http://<MONTAGE_API_HOST>" docker compose run --rm montage-ai ./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser"
 
 # Submit with extra options
-./montage-ai.sh jobs submit --style hitchcock --option stabilize=true --option quality_profile=preview
+docker compose run --rm montage-ai ./montage-ai.sh jobs submit --style hitchcock --option stabilize=true --option quality_profile=preview
 
 # Fetch status
-./montage-ai.sh jobs status <JOB_ID>
+docker compose run --rm montage-ai ./montage-ai.sh jobs status <JOB_ID>
 
 # Cancel a job
-./montage-ai.sh jobs cancel <JOB_ID>
+docker compose run --rm montage-ai ./montage-ai.sh jobs cancel <JOB_ID>
 
 # Submit and auto-download artifacts after completion
-./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser" --download --download-dir ~/Downloads
+docker compose run --rm montage-ai ./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser" --download --download-dir ~/Downloads
 
 # Download and zip artifacts (video + timeline + logs)
-./montage-ai.sh jobs submit --style documentary --download --download-zip
+docker compose run --rm montage-ai ./montage-ai.sh jobs submit --style documentary --download --download-zip
 ```
 
 Notes:
@@ -544,8 +547,7 @@ FFmpeg (video composition)
 ## Next Steps
 
 - **Tutorials:** See `docs/getting-started.md`
-- **Web UI:** Launch with `./montage-ai.sh web`
-- **Docker:** `./montage-ai.sh build && docker run montage-ai`
+- **Web UI:** Launch with `docker compose up`
 - **Kubernetes:** See `deploy/k3s/` for cluster setup
 - **Contributing:** See `CONTRIBUTING.md`
 

@@ -1,17 +1,16 @@
 # Quick Start: Montage AI
 
 This is a command cheat sheet. For the full walkthrough, see [Getting Started](docs/getting-started.md).
-For pip/uv install options and optional extras, see [Optional Dependencies](docs/OPTIONAL_DEPENDENCIES.md).
 
-## Run (Local)
+## Run (Local Docker)
 
 ```bash
 # Web UI
-./montage-ai.sh web
-# Open http://localhost:8080
+docker compose up
+# Open http://localhost:8080 (or WEB_PORT)
 
 # CLI (uses data/input + data/music)
-./montage-ai.sh run
+docker compose run --rm montage-ai ./montage-ai.sh run
 ```
 
 ## Status & Logs
@@ -24,8 +23,8 @@ For pip/uv install options and optional extras, see [Optional Dependencies](docs
 ## Common Flags
 
 ```bash
-QUALITY_PROFILE=preview ./montage-ai.sh run
-CGPU_ENABLED=true ./montage-ai.sh run
+QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
+CGPU_ENABLED=true docker compose run --rm montage-ai ./montage-ai.sh run
 ```
 
 ## Testing

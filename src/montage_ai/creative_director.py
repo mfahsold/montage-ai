@@ -30,7 +30,7 @@ from .config import get_settings
 from .style_templates import get_style_template, list_available_styles
 from .logger import logger
 from .utils import clamp, coerce_float
-from .prompts import get_director_prompt, get_broll_planner_prompt, DirectorOutput, BRollPlan
+from .prompts import get_director_prompt, get_broll_planner_prompt, DirectorOutput, BRollPlan, SCHEMA_VERSION
 
 # Try importing OpenAI client for cgpu/Gemini support
 try:
@@ -41,6 +41,27 @@ except ImportError:
     OpenAI = None
 
 VERSION = "0.3.0"
+
+# Heuristic style detection (shared by template selection + memory hints)
+STYLE_KEYWORDS = {
+    "hitchcock": ["hitchcock", "suspense", "thriller", "tension", "mystery"],
+    "action": ["action", "blockbuster", "explosive", "michael bay", "fast cuts", "adrenaline"],
+    "mtv": ["mtv", "music video", "fast-paced", "fast paced", "energetic", "rapid"],
+    "documentary": ["documentary", "doc", "realism", "natural", "observational", "vérité", "verite"],
+    "minimalist": ["minimalist", "art film", "meditative", "calm", "contemplative", "long takes", "slow"],
+    "wes_anderson": ["wes anderson", "whimsical", "symmetry", "symmetrical", "pastel", "quirky"],
+}
+
+MOOD_TO_STYLE = {
+    "cinematic": "hitchcock",
+    "elegant": "hitchcock",
+    "masterpiece": "hitchcock",
+    "professional": "documentary",
+    "smooth": "documentary",
+    "gallery": "minimalist",
+    "beautiful": "wes_anderson",
+    "artistic": "minimalist",
+}
 
 # Backend configuration
 # Priority: OPENAI_API_BASE (LiteLLM/llama-box or other OpenAI-compatible) > GOOGLE_API_KEY (direct Gemini)
@@ -160,11 +181,9 @@ class CreativeDirector:
         
         # SOTA 2026: Directorial Memory (Experience-driven)
         from .regisseur_memory import get_regisseur_memory
-        memory = get_regisseur_memory()
-        # Note: We'd ideally pass current style context here, but system prompt is global.
-        # We can add a generic advice or pull later.
-        
-        self.system_prompt = get_director_prompt(persona, styles_list)
+        self._regisseur_memory = get_regisseur_memory()
+        self._base_system_prompt = get_director_prompt(persona, styles_list)
+        self.system_prompt = self._base_system_prompt
 
     @staticmethod
     def _is_auto_model(model: str) -> bool:
@@ -682,6 +701,40 @@ class CreativeDirector:
         
         logger.warning("Could not extract valid JSON from response")
         return None
+
+    def _infer_style_from_prompt(self, user_prompt: str) -> Optional[str]:
+        """Heuristic style detection for template selection and memory hints."""
+        user_lower = user_prompt.lower()
+        for style_name in list_available_styles():
+            if style_name in user_lower or style_name.replace('_', ' ') in user_lower:
+                return style_name
+        for style_name, keywords in STYLE_KEYWORDS.items():
+            for keyword in keywords:
+                if keyword in user_lower:
+                    return style_name
+        for mood_keyword, style_name in MOOD_TO_STYLE.items():
+            if mood_keyword in user_lower:
+                return style_name
+        return None
+
+    def _get_memory_advice(self, style_hint: Optional[str]) -> Optional[str]:
+        if not style_hint or not self._regisseur_memory:
+            return None
+        try:
+            return self._regisseur_memory.get_advice(style_hint, [])
+        except Exception as exc:
+            logger.warning(f"RegisseurMemory advice lookup failed: {exc}")
+            return None
+
+    def _build_director_prompt(self, memory_advice: Optional[str]) -> str:
+        if not memory_advice:
+            return self._base_system_prompt
+        return (
+            f"{self._base_system_prompt}\n\n"
+            "Experience Memory (trusted internal signals):\n"
+            f"{memory_advice}\n"
+            "Use as a soft hint, not a hard constraint."
+        )
     
     def interpret_prompt(self, user_prompt: str) -> Optional[Dict[str, Any]]:
         """
@@ -702,54 +755,23 @@ class CreativeDirector:
         """
         logger.info(f"Creative Director analyzing: '{user_prompt}'")
 
-        # Check if prompt directly references a template
-        user_lower = user_prompt.lower()
-        for style_name in list_available_styles():
-            if style_name in user_lower or style_name.replace('_', ' ') in user_lower:
-                logger.info(f"Detected style template: {style_name}")
-                template = get_style_template(style_name)
-                return template['params']
-
-        # Extended keyword matching (no LLM needed)
-        style_keywords = {
-            'hitchcock': ['hitchcock', 'suspense', 'thriller', 'tension', 'mystery'],
-            'action': ['action', 'blockbuster', 'explosive', 'michael bay', 'fast cuts', 'adrenaline'],
-            'mtv': ['mtv', 'music video', 'fast-paced', 'fast paced', 'energetic', 'rapid'],
-            'documentary': ['documentary', 'doc', 'realism', 'natural', 'observational', 'vérité', 'verite'],
-            'minimalist': ['minimalist', 'art film', 'meditative', 'calm', 'contemplative', 'long takes', 'slow'],
-            'wes_anderson': ['wes anderson', 'whimsical', 'symmetry', 'symmetrical', 'pastel', 'quirky'],
-        }
-        
-        # Also match mood-based keywords
-        mood_to_style = {
-            'cinematic': 'hitchcock',  # Cinematic masterpiece → Hitchcock (elegant, professional)
-            'elegant': 'hitchcock',
-            'masterpiece': 'hitchcock',
-            'professional': 'documentary',
-            'smooth': 'documentary',
-            'gallery': 'minimalist',
-            'beautiful': 'wes_anderson',
-            'artistic': 'minimalist',
-        }
-        
-        # Check extended keywords
-        for style_name, keywords in style_keywords.items():
-            for keyword in keywords:
-                if keyword in user_lower:
-                    logger.info(f"Keyword match '{keyword}' → {style_name}")
-                    template = get_style_template(style_name)
-                    return template['params']
-        
-        # Check mood keywords
-        for mood_keyword, style_name in mood_to_style.items():
-            if mood_keyword in user_lower:
-                logger.info(f"Mood match '{mood_keyword}' → {style_name}")
-                template = get_style_template(style_name)
-                return template['params']
+        # Check if prompt references a known template (no LLM needed)
+        style_name = self._infer_style_from_prompt(user_prompt)
+        if style_name:
+            logger.info(f"Detected style template: {style_name}")
+            template = get_style_template(style_name)
+            params = json.loads(json.dumps(template["params"]))
+            params.setdefault("schema_version", SCHEMA_VERSION)
+            memory_advice = self._get_memory_advice(style_name)
+            if memory_advice:
+                params.setdefault("director_commentary", memory_advice)
+            return params
 
         # Otherwise, query LLM for creative interpretation
         try:
-            response = self._query_llm(self.system_prompt, user_prompt)
+            memory_advice = self._get_memory_advice(style_name)
+            system_prompt = self._build_director_prompt(memory_advice)
+            response = self._query_llm(system_prompt, user_prompt)
             if not response:
                 logger.error("LLM returned empty response")
                 return None
@@ -964,6 +986,7 @@ class CreativeDirector:
             Default editing parameters - balanced, professional look
         """
         return {
+            "schema_version": SCHEMA_VERSION,
             "style": {
                 "name": "documentary",
                 "mood": "calm"
@@ -1053,9 +1076,10 @@ def interpret_natural_language(prompt: str) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     # Test suite
+    director = CreativeDirector()
     print(f"🎬 Creative Director v{VERSION}")
-    print(f"   Model: {OLLAMA_MODEL}")
-    print(f"   Host: {OLLAMA_HOST}\n")
+    print(f"   Model: {director.ollama_model}")
+    print(f"   Host: {director.ollama_host}\n")
 
     test_prompts = [
         "Edit this like a Hitchcock thriller",
@@ -1064,8 +1088,6 @@ if __name__ == "__main__":
         "Documentary realism",
         "Create suspense with long takes then explosive action"
     ]
-
-    director = CreativeDirector()
 
     for prompt in test_prompts:
         print(f"\n{'='*60}")

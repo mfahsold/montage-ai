@@ -22,9 +22,8 @@ git clone https://github.com/mfahsold/montage-ai.git
 cd montage-ai
 ```
 
-The default flow runs in Docker via `./montage-ai.sh`.
-If you prefer a local Python install (pip/uv) or need optional extras, see
-[Optional Dependencies](OPTIONAL_DEPENDENCIES.md).
+The default flow runs in local Docker via `docker compose`.
+If you need optional extras, see [Optional Dependencies](OPTIONAL_DEPENDENCIES.md).
 
 ---
 
@@ -33,7 +32,7 @@ If you prefer a local Python install (pip/uv) or need optional extras, see
 ### Web UI (Easiest)
 
 ```bash
-./montage-ai.sh web
+docker compose up
 ```
 
 1. Open **http://localhost:8080** (or your configured `<MONTAGE_WEB_URL>`)
@@ -51,7 +50,7 @@ cp ~/Videos/*.mp4 data/input/
 cp ~/Music/track.mp3 data/music/
 
 # Run
-./montage-ai.sh run
+docker compose run --rm montage-ai ./montage-ai.sh run
 
 # Find output
 ls data/output/
@@ -68,18 +67,18 @@ Sample assets are not bundled in the public repo. Use your own clips, or see
 
 ### Editing Styles
 ```bash
-./montage-ai.sh run                # dynamic (default)
-./montage-ai.sh run hitchcock      # suspense
-./montage-ai.sh run mtv            # fast cuts
-./montage-ai.sh run documentary    # natural
+docker compose run --rm montage-ai ./montage-ai.sh run                # dynamic (default)
+docker compose run --rm montage-ai ./montage-ai.sh run hitchcock      # suspense
+docker compose run --rm montage-ai ./montage-ai.sh run mtv            # fast cuts
+docker compose run --rm montage-ai ./montage-ai.sh run documentary    # natural
 ```
 
 ### Quality Modes
 
 ```bash
-./montage-ai.sh preview hitchcock  # Fast preview (low quality)
-./montage-ai.sh run hitchcock      # Normal quality
-./montage-ai.sh hq hitchcock       # High quality + stabilization
+docker compose run --rm montage-ai ./montage-ai.sh preview hitchcock  # Fast preview (low quality)
+docker compose run --rm montage-ai ./montage-ai.sh run hitchcock      # Normal quality
+docker compose run --rm montage-ai ./montage-ai.sh hq hitchcock       # High quality + stabilization
 ```
 
 ### Custom Prompts
@@ -87,7 +86,7 @@ Sample assets are not bundled in the public repo. Use your own clips, or see
 Skip the presets and just describe what you want:
 
 ```bash
-CREATIVE_PROMPT="edit like a 90s skateboard video" ./montage-ai.sh run
+CREATIVE_PROMPT="edit like a 90s skateboard video" docker compose run --rm montage-ai ./montage-ai.sh run
 ```
 
 ---
@@ -106,18 +105,6 @@ REDIS_PORT=6379
 ```
 
 If running in Kubernetes, use the provided manifests in `deploy/k3s`.
-
-## Docker Compose
-
-If you prefer raw Docker:
-
-```bash
-# Web UI
-docker compose -f docker-compose.web.yml up
-
-# CLI job
-docker compose up
-```
 
 ---
 

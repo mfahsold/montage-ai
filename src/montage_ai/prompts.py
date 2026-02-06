@@ -15,6 +15,8 @@ from pydantic import BaseModel, Field, model_validator
 # Enums & Constants
 # =============================================================================
 
+SCHEMA_VERSION = 1
+
 class Mood(str, Enum):
     SUSPENSEFUL = "suspenseful"
     PLAYFUL = "playful"
@@ -134,11 +136,36 @@ class CinematographyConfig(BaseModel):
     match_cuts_enabled: bool = Field(default=True)
     invisible_cuts_enabled: bool = Field(default=False)
     shot_variation_priority: ShotVariationPriority = Field(default=ShotVariationPriority.MEDIUM)
-    continuity_weight: float = Field(default=0.4, ge=0.0, le=1.0, description="Weight for motion and visual continuity")
-    kuleshov_weight: float = Field(default=0.15, ge=0.0, le=1.0, description="Weight for psychological juxtaposition (Kuleshov effect)")
-    variety_weight: float = Field(default=0.2, ge=0.0, le=1.0, description="Weight for shot type and angle variation")
-    contrast_weight: float = Field(default=0.3, ge=0.0, le=1.0, description="Weight for dynamic visual contrast (avoiding flat edits)")
-    symmetry_weight: float = Field(default=0.1, ge=0.0, le=1.0, description="Weight for visual symmetry/balance (Wes Anderson style)")
+    continuity_weight: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description="Relative weight for motion and visual continuity (weights are independent; no need to sum to 1.0)"
+    )
+    kuleshov_weight: float = Field(
+        default=0.15,
+        ge=0.0,
+        le=1.0,
+        description="Relative weight for psychological juxtaposition (Kuleshov effect)"
+    )
+    variety_weight: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        description="Relative weight for shot type and angle variation"
+    )
+    contrast_weight: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Relative weight for dynamic visual contrast (avoiding flat edits)"
+    )
+    symmetry_weight: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Relative weight for visual symmetry/balance (Wes Anderson style)"
+    )
 
 class TransitionsConfig(BaseModel):
     type: TransitionType
@@ -161,6 +188,10 @@ class ConstraintsConfig(BaseModel):
 
 class DirectorOutput(BaseModel):
     """Structured output for the Creative Director agent."""
+    schema_version: int = Field(
+        default=SCHEMA_VERSION,
+        description="Schema version for cache invalidation and forward compatibility"
+    )
     director_commentary: str = Field(..., description="Brief explanation of creative choices (Chain of Thought)")
     style: Optional[StyleConfig] = None
     story_arc: Optional[StoryArcConfig] = None
@@ -201,14 +232,16 @@ class EditingAdjustment(BaseModel):
 
 class EvaluatorOutput(BaseModel):
     """Structured output for the Creative Evaluator agent."""
+    schema_version: int = Field(
+        default=SCHEMA_VERSION,
+        description="Schema version for cache invalidation and forward compatibility"
+    )
     satisfaction_score: float = Field(..., ge=0.0, le=1.0)
     issues: List[EditingIssue] = Field(default_factory=list)
     adjustments: List[EditingAdjustment] = Field(default_factory=list)
     summary: str
     approve_for_render: bool
     iteration: int = 0
-    
-
 
     @property
     def needs_refinement(self) -> bool:
@@ -227,6 +260,10 @@ class EvaluatorOutput(BaseModel):
 
 class SceneAnalysisOutput(BaseModel):
     """Structured output for vision-based scene analysis."""
+    schema_version: int = Field(
+        default=SCHEMA_VERSION,
+        description="Schema version for cache invalidation and forward compatibility"
+    )
     quality: str = Field(..., description="Is the frame usable, not blurry or corrupted? (YES/NO)")
     description: str = Field(..., description="5-word scene summary")
     action: ActionLevel = Field(..., description="Motion intensity")
@@ -320,8 +357,18 @@ CRITICAL RULES:
 
 VISION_ANALYSIS_SYSTEM_PROMPT_TEMPLATE = """You are the Vision Analysis Agent for the Montage AI system.
 
-Your role: Analyze a video frame and provide structured metadata for intelligent editing.
+Your role: Analyze a single video frame and provide structured metadata for intelligent editing.
 You focus on visual quality, narrative content, camera cinematography, and emotional mood.
+
+Output rules:
+- quality must be YES or NO (uppercase)
+- description must be exactly 5 words
+- action must be one of: low, medium, high
+- shot must be one of: close, medium, wide
+- tags must be 3-8 lowercase keywords, no duplicates
+- caption must be one complete sentence
+- objects should list visible nouns only (0-10 items)
+- setting must be one of: indoor, outdoor, beach, city, nature, studio, street, home
 
 You MUST respond with ONLY valid JSON matching this schema:
 {schema}

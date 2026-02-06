@@ -133,6 +133,8 @@ Translates natural language to editing parameters.
 - Query LLM (Ollama or Gemini)
 - Validate JSON responses
 - Map to style parameters
+- Incorporate RegisseurMemory hints when available
+- Emit schema-versioned outputs for compatibility (`schema_version`)
 
 **Backends:**
 

@@ -114,10 +114,6 @@ make -C deploy/k3s config
 
 # Deploy canonical cluster overlay
 make -C deploy/k3s deploy-cluster
-
-# If you are on a small or heterogeneous developer cluster, use the dev profile
-# which applies reduced requests and a toleration to help scheduling:
-make -C deploy/k3s deploy-dev
 ```
 
 ### Option 2: Shell Scripts
@@ -151,7 +147,7 @@ kubectl apply -k deploy/k3s/overlays/cluster/
 
 Montage‑AI supports exactly two deployment modes:
 
-- **Local**: run via `./montage-ai.sh web` or Docker Compose.
+- **Local**: run via Docker Compose (`docker compose up`).
 - **Cluster**: deploy `deploy/k3s/overlays/cluster/` (Kustomize).
 
 Legacy overlays are preserved in `deploy/k3s/overlays/legacy/` for reference only.

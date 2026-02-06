@@ -4,11 +4,11 @@ AI-assisted rough-cutting for video creators, with CLI and web UI workflows.
 
 Quickstart:
 ```bash
-# Web UI (local)
-./montage-ai.sh web
+# Web UI (local Docker)
+docker compose up
 
 # CLI run (uses data/input + data/music)
-./montage-ai.sh run
+docker compose run --rm montage-ai ./montage-ai.sh run
 ```
 
 Documentation:

@@ -7,6 +7,7 @@ class StyleParams(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
 
 class CinematographyConfig(BaseModel):
+    """Cinematography controls; weights are independent (no need to sum to 1.0)."""
     prefer_wide_shots: bool = False
     prefer_high_action: bool = False
     match_cuts_enabled: bool = True

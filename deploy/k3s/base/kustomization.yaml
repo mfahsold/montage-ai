@@ -8,6 +8,7 @@ resources:
   - deployment.yaml
   - worker.yaml
   - cgpu-server.yaml
+  - redis.yaml
   - service-ingress.yaml
   - pvc.yaml
   - namespace.yaml

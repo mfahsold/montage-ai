@@ -5,15 +5,12 @@
 ## Quick Start
 
 ```bash
-# Local development
-./montage-ai.sh web
+# Local development (Docker)
+docker compose up
 
 # Kubernetes cluster (kustomize)
 make -C deploy/k3s config
 make -C deploy/k3s deploy-cluster
-
-# Optional: Fluxibri Core CLI (if available)
-fluxibri deployment deploy montage-ai
 ```
 
 ## Documentation Map
@@ -43,13 +40,9 @@ deploy/
 
 ## Deployment Options
 
-### 1. Local Development (No K8s)
+### 1. Local Development (Docker)
 
 ```bash
-# One-time setup
-./montage-ai.sh web
-
-# Or use Docker Compose
 docker compose up
 ```
 
@@ -63,13 +56,6 @@ make -C deploy/k3s deploy-cluster
 # Or step by step:
 ./deploy/k3s/build-and-push.sh
 ./deploy/k3s/deploy.sh
-```
-
-Optional: if your cluster is managed with Fluxibri Core, you can use the CLI:
-
-```bash
-fluxibri deployment deploy montage-ai
-fluxibri hardware quotas
 ```
 
 ## K3s Make Targets

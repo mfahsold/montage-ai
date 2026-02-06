@@ -26,7 +26,7 @@ This document provides SOTA (State-of-the-Art) recommendations for transitioning
 ```
 DEPLOYMENT_MODE=local
 ```
-- Docker Compose or direct CLI (`./montage-ai.sh web`)
+- Local Docker (`docker compose up`)
 - No Kubernetes dependencies
 - Local file paths, no shared storage requirements
 - Direct job execution (no queue)

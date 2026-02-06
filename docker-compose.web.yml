@@ -1,5 +1,7 @@
 # Docker Compose for Montage AI Web UI
 #
+# DEPRECATED: Use docker-compose.yml (single local Docker entrypoint).
+#
 # Usage:
 #   docker compose -f docker-compose.web.yml up
 #

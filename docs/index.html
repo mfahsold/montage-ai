@@ -210,9 +210,9 @@
                     <span class="terminal-title">terminal</span>
                 </div>
                 <div class="terminal-body">
-                    <p><span class="prompt">$</span> ./montage-ai.sh web</p>
+                    <p><span class="prompt">$</span> docker compose up</p>
                     <p class="output">[INFO] 🌐 Web UI at http://localhost:5001</p>
-                    <p><span class="prompt">$</span> ./montage-ai.sh run hitchcock --quality high</p>
+                    <p><span class="prompt">$</span> docker compose run --rm montage-ai ./montage-ai.sh run hitchcock --quality high</p>
                     <p class="output success">[DONE] ✅ montage.mp4 + montage.otio</p>
                 </div>
             </div>
@@ -322,19 +322,19 @@
                 <h4 style="font-size: 0.9rem; color: #00ff88; margin-bottom: 0.5rem;">CLI Syntax</h4>
                 <div class="code-block" style="background: #05070f; border-left: 3px solid #00ff88; padding: 0.75rem; font-size: 0.85rem; overflow-x: auto;">
                     <p><span class="prompt">$</span> # Stabilized 1080p with captions</p>
-                    <p><span class="prompt">$</span> ./montage-ai.sh run dynamic --stabilize --captions tiktok</p>
+                    <p><span class="prompt">$</span> docker compose run --rm montage-ai ./montage-ai.sh run dynamic --stabilize --captions tiktok</p>
                     <p class="output success">[✓] montage.mp4 + montage.otio exported</p>
                     <p></p>
                     <p><span class="prompt">$</span> # Preview (fast, 360p)</p>
-                    <p><span class="prompt">$</span> ./montage-ai.sh preview hitchcock</p>
+                    <p><span class="prompt">$</span> docker compose run --rm montage-ai ./montage-ai.sh preview hitchcock</p>
                     <p class="output success">[✓] preview.mp4 (15 sec)</p>
                     <p></p>
                     <p><span class="prompt">$</span> # 4K with color grade + film grain</p>
-                    <p><span class="prompt">$</span> ./montage-ai.sh hq --color-grade teal_orange --film-grain 35mm</p>
+                    <p><span class="prompt">$</span> docker compose run --rm montage-ai ./montage-ai.sh hq --color-grade teal_orange --film-grain 35mm</p>
                     <p class="output success">[✓] 4K montage.mp4 (stabilized, upscaled)</p>
                     <p></p>
                     <p><span class="prompt">$</span> # Interview (voice isolated, normalized)</p>
-                    <p><span class="prompt">$</span> ./montage-ai.sh run documentary --isolate-voice --audio-normalize</p>
+                    <p><span class="prompt">$</span> docker compose run --rm montage-ai ./montage-ai.sh run documentary --isolate-voice --audio-normalize</p>
                     <p class="output success">[✓] Clean dialogue, −14 LUFS broadcast standard</p>
                 </div>
             </div>
@@ -441,15 +441,15 @@
                 </div>
                 <div class="terminal-body" style="font-size: 0.85rem;">
                     <p><span class="prompt">$</span> # TikTok shorts with captions</p>
-                    <p><span class="prompt">$</span> ./montage-ai.sh shorts mtv --isolate-voice --captions tiktok</p>
+                    <p><span class="prompt">$</span> docker compose run --rm montage-ai ./montage-ai.sh shorts mtv --isolate-voice --captions tiktok</p>
                     <p class="output">[DONE] ✅ 9:16 vertical, 45s, ready to post</p>
                     <p></p>
                     <p><span class="prompt">$</span> # High-res trailer with effects</p>
-                    <p><span class="prompt">$</span> ./montage-ai.sh hq hitchcock --upscale --film-grain 35mm</p>
+                    <p><span class="prompt">$</span> docker compose run --rm montage-ai ./montage-ai.sh hq hitchcock --upscale --film-grain 35mm</p>
                     <p class="output success">[DONE] ✅ 4K montage.mp4 + montage.otio</p>
                     <p></p>
                     <p><span class="prompt">$</span> # Interview with voice isolation</p>
-                    <p><span class="prompt">$</span> ./montage-ai.sh run documentary --isolate-voice --audio-normalize</p>
+                    <p><span class="prompt">$</span> docker compose run --rm montage-ai ./montage-ai.sh run documentary --isolate-voice --audio-normalize</p>
                     <p class="output success">[DONE] ✅ Clean dialogue, -14 LUFS audio</p>
                 </div>
             </div>

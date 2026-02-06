@@ -107,12 +107,12 @@ docker exec montage-ai rm -rf /tmp/*.mp4
 
 ```bash
 # Check if running
-docker ps | grep web-ui
+docker ps | grep montage-ai
 
 # Check logs
 
 # Port in use? Try different port
-WEB_PORT=5002 docker compose -f docker-compose.web.yml up -d
+WEB_PORT=5002 docker compose up -d
 ```
 
 ---

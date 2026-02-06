@@ -63,22 +63,6 @@ deploy-cluster: config ## Deploy cluster overlay
 	@echo "${GREEN}Deploying cluster overlay...${RESET}"
 	@$(KUSTOMIZE_BUILD) ./overlays/cluster | $(KUBECTL) apply -f -
 
-deploy-dev: deploy-cluster apply-dev-patches ## Deploy cluster overlay (dev profile: reduced requests + tolerations)
-	@echo "${GREEN}Deployed cluster overlay; applying dev scheduling patches...${RESET}"
-
-apply-dev-patches: ## Apply lightweight dev-friendly patches (tolerations & reduced resource requests)
-	@echo "${GREEN}Applying dev-friendly patches to deployments...${RESET}"
-	@kubectl -n $(CLUSTER_NAMESPACE) patch deployment montage-ai-web --type='json' -p='[{"op":"add","path":"/spec/template/spec/tolerations","value":[{"key":"gpu","operator":"Equal","value":"amd-rocm","effect":"NoSchedule"}]}]' || true
-	@kubectl -n $(CLUSTER_NAMESPACE) set resources deployment montage-ai-web --requests=cpu=100m,memory=256Mi --limits=cpu=500m,memory=512Mi || true
-	@kubectl -n $(CLUSTER_NAMESPACE) patch deployment montage-ai-worker --type='json' -p='[{"op":"add","path":"/spec/template/spec/tolerations","value":[{"key":"gpu","operator":"Equal","value":"amd-rocm","effect":"NoSchedule"}]}]' || true
-	@kubectl -n $(CLUSTER_NAMESPACE) set resources deployment montage-ai-worker --requests=cpu=150m,memory=384Mi --limits=cpu=800m,memory=1Gi || true
-	@kubectl -n $(CLUSTER_NAMESPACE) patch deployment montage-ai-worker-heavy --type='json' -p='[{"op":"add","path":"/spec/template/spec/tolerations","value":[{"key":"gpu","operator":"Equal","value":"amd-rocm","effect":"NoSchedule"}]}]' || true
-	@kubectl -n $(CLUSTER_NAMESPACE) set resources deployment montage-ai-worker-heavy --requests=cpu=300m,memory=512Mi --limits=cpu=1,memory=2Gi || true
-	@kubectl -n $(CLUSTER_NAMESPACE) patch deployment redis --type='json' -p='[{"op":"add","path":"/spec/template/spec/tolerations","value":[{"key":"gpu","operator":"Equal","value":"amd-rocm","effect":"NoSchedule"}]}]' || true
-	@kubectl -n $(CLUSTER_NAMESPACE) patch scaledobject montage-ai-worker-scaledobject --type='json' -p='[{"op":"replace","path":"/spec/triggers/0/metadata/listLength","value":"1"}]' || true
-	@kubectl -n $(CLUSTER_NAMESPACE) patch scaledobject montage-ai-worker-heavy-scaledobject --type='json' -p='[{"op":"replace","path":"/spec/triggers/0/metadata/listLength","value":"1"}]' || true
-	@echo "${GREEN}Dev patches applied (you can re-run to apply to new replicas).${RESET}"
-
 status: ## Show montage-ai pod status
 	@$(KUBECTL) get pods -n $(CLUSTER_NAMESPACE)
 
