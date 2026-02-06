@@ -94,6 +94,7 @@ class JobStatus:
     active: int
     succeeded: int
     failed: int
+    completions: Optional[int]
     completion_time: Optional[str]
     conditions: List[Dict[str, str]]
     is_not_found: bool = False
@@ -103,14 +104,16 @@ class JobStatus:
         """Check if job has finished (success or failure)."""
         if self.is_not_found:
             return False
-        return (self.succeeded >= 1 or self.failed >= 1)
+        expected = self.completions if self.completions is not None else 1
+        return (self.succeeded >= expected or self.failed >= 1)
 
     @property
     def is_successful(self) -> bool:
         """Check if job completed successfully."""
         if self.is_not_found:
             return False
-        return self.succeeded >= 1 and self.failed == 0
+        expected = self.completions if self.completions is not None else 1
+        return self.succeeded >= expected and self.failed == 0
 
 
 class JobSubmitter:
@@ -276,11 +279,13 @@ class JobSubmitter:
                 return None
             data = json.loads(result.stdout)
             status = data.get("status", {})
+            spec = data.get("spec", {})
             return JobStatus(
                 name=job_name,
                 active=status.get("active", 0),
                 succeeded=status.get("succeeded", 0),
                 failed=status.get("failed", 0),
+                completions=spec.get("completions"),
                 completion_time=status.get("completionTime"),
                 conditions=status.get("conditions", [])
             )
@@ -288,11 +293,13 @@ class JobSubmitter:
         try:
             job = self.batch_v1.read_namespaced_job_status(job_name, self.namespace)
             status = job.status
+            spec = job.spec
             return JobStatus(
                 name=job_name,
                 active=status.active or 0,
                 succeeded=status.succeeded or 0,
                 failed=status.failed or 0,
+                completions=getattr(spec, "completions", None),
                 completion_time=status.completion_time.isoformat() if status.completion_time else None,
                 conditions=[{
                     "type": c.type,

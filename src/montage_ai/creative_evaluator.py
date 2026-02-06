@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Any
 
 from .creative_director import CreativeDirector
 from .config import get_settings
+from .regisseur_memory import get_regisseur_memory
 from .prompts import (
     get_evaluator_prompt,
     EvaluatorOutput,
@@ -127,6 +128,28 @@ class CreativeEvaluator:
             print(f"   ⚠️ Issues: {len(evaluation.issues)}")
         if evaluation.adjustments:
             print(f"   💡 Suggestions: {len(evaluation.adjustments)}")
+
+        if evaluation.approve_for_render:
+            try:
+                memory = get_regisseur_memory()
+                style_name = (original_instructions.get("style") or {}).get("name", "dynamic")
+                stats = dict(getattr(result, "stats", {}) or {})
+                if result:
+                    stats.setdefault("cut_count", getattr(result, "cut_count", 0))
+                    stats.setdefault("duration", getattr(result, "duration", 0.0))
+                    avg_cut = getattr(result, "duration", 0.0) / max(getattr(result, "cut_count", 0), 1)
+                    stats.setdefault("avg_cut_length", avg_cut)
+                audio_tags: List[str] = []
+                if isinstance(audio_profile, dict):
+                    for key in ("tags", "genres", "moods", "labels"):
+                        value = audio_profile.get(key)
+                        if isinstance(value, list):
+                            audio_tags = [str(v) for v in value if v]
+                            break
+                memory.save_experience(style_name, audio_tags, stats, evaluation.satisfaction_score)
+            except Exception:
+                # Best-effort only; evaluator output should not fail on memory writes.
+                pass
 
         return evaluation
 

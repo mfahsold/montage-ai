@@ -16,6 +16,8 @@ class CinematographyConfig(BaseModel):
     continuity_weight: float = 0.4
     kuleshov_weight: float = 0.15
     variety_weight: float = 0.2
+    contrast_weight: float = 0.3
+    symmetry_weight: float = 0.1
 
 class PacingConfig(BaseModel):
     speed: str = "medium"

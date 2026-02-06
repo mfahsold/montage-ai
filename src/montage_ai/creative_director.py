@@ -731,9 +731,10 @@ class CreativeDirector:
             return self._base_system_prompt
         return (
             f"{self._base_system_prompt}\n\n"
-            "Experience Memory (trusted internal signals):\n"
+            "MEMORY_HINT_BEGIN\n"
             f"{memory_advice}\n"
-            "Use as a soft hint, not a hard constraint."
+            "MEMORY_HINT_END\n"
+            "Use this as a soft hint only. Do not change the required JSON-only output format."
         )
     
     def interpret_prompt(self, user_prompt: str) -> Optional[Dict[str, Any]]:
@@ -779,6 +780,26 @@ class CreativeDirector:
             # Parse and validate JSON
             instructions = self._parse_and_validate(response)
             if instructions:
+                style_from_output = None
+                if isinstance(instructions, dict):
+                    style_from_output = instructions.get("style", {}).get("name")
+                memory_advice = self._get_memory_advice(style_from_output) if style_from_output else None
+                used_memory_prompt = False
+                if memory_advice and style_name is None:
+                    retry_prompt = self._build_director_prompt(memory_advice)
+                    retry_response = self._query_llm(retry_prompt, user_prompt)
+                    if retry_response:
+                        retry_instructions = self._parse_and_validate(retry_response)
+                        if retry_instructions:
+                            instructions = retry_instructions
+                            used_memory_prompt = True
+                if memory_advice and not used_memory_prompt:
+                    existing = instructions.get("director_commentary", "")
+                    if existing:
+                        instructions["director_commentary"] = f"{existing} Memory hint: {memory_advice}"
+                    else:
+                        instructions["director_commentary"] = memory_advice
+                instructions.setdefault("schema_version", SCHEMA_VERSION)
                 logger.info(f"Generated editing instructions (style: {instructions['style']['name']})")
                 return instructions
             else:

@@ -60,6 +60,7 @@ except ImportError:
     MSGPACK_AVAILABLE = False
 
 from ..logger import logger
+from ..prompts import SCHEMA_VERSION
 
 
 # =============================================================================
@@ -141,6 +142,7 @@ class SemanticAnalysisEntry(CacheEntry):
     Cache key includes time_point to support multiple analyses per video.
     """
     time_point: float           # Time in video where frame was sampled
+    schema_version: int         # SceneAnalysisOutput schema version
     quality: str                # "YES" or "NO"
     description: str            # 5-word scene summary
     action: str                 # low/medium/high
@@ -561,6 +563,10 @@ class AnalysisCache:
             if abs(cached_time - time_point) * 1000 > tolerance_ms:
                 logger.debug(f"Time point mismatch: {cached_time} != {time_point}")
                 return None
+            cached_schema = data.get("schema_version")
+            if cached_schema != SCHEMA_VERSION:
+                logger.debug(f"Schema version mismatch: {cached_schema} != {SCHEMA_VERSION}")
+                return None
 
             logger.debug(f"Cache hit: semantic analysis for {os.path.basename(video_path)} @ {time_point:.1f}s")
             return SemanticAnalysisEntry(
@@ -568,6 +574,7 @@ class AnalysisCache:
                 file_hash=data["file_hash"],
                 computed_at=data["computed_at"],
                 time_point=data["time_point"],
+                schema_version=data.get("schema_version", SCHEMA_VERSION),
                 quality=data.get("quality", "YES"),
                 description=data.get("description", ""),
                 action=data.get("action", "medium"),
@@ -629,6 +636,7 @@ class AnalysisCache:
             file_hash=CacheEntry.compute_file_hash(video_path),
             computed_at=datetime.now().isoformat(),
             time_point=float(time_point),
+            schema_version=SCHEMA_VERSION,
             quality=data.get("quality", "YES"),
             description=data.get("description", ""),
             action=str(action_str),
