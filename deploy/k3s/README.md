@@ -124,6 +124,11 @@ cd deploy/k3s
 # Build & push to cluster registry
 ./build-and-push.sh
 
+# If your registry is HTTP (insecure), ensure buildx uses the local config:
+# - Verify buildkitd.toml has [registry."HOST:PORT"] http=true/insecure=true
+# - Recreate the builder once if needed:
+#   FORCE_BUILDER_RECREATE=true ./build-and-push.sh
+
 # Deploy (canonical cluster overlay)
 ./deploy.sh cluster
 
@@ -202,6 +207,7 @@ Set these in `deploy/config.env` (or export in your shell before `make -C deploy
 ```bash
 CGPU_ENABLED=true
 CGPU_GPU_ENABLED=true
+CGPU_HOST=cgpu-server.montage-ai.svc.cluster.local
 FINAL_ENCODE_BACKEND=router
 ```
 

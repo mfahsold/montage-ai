@@ -86,6 +86,11 @@ if [ -z "${OLLAMA_HOST:-}" ] && [ -n "${CLUSTER_NAMESPACE:-}" ]; then
   OLLAMA_HOST="http://ollama.${CLUSTER_NAMESPACE}.svc.${cluster_domain}:11434"
 fi
 
+if [ -z "${CGPU_HOST:-}" ] && [ -n "${CLUSTER_NAMESPACE:-}" ]; then
+  cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"
+  CGPU_HOST="cgpu-server.${CLUSTER_NAMESPACE}.svc.${cluster_domain}"
+fi
+
 if [ -z "${FFMPEG_MCP_ENDPOINT:-}" ] && [ -n "${CLUSTER_NAMESPACE:-}" ]; then
   cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"
   FFMPEG_MCP_ENDPOINT="http://ffmpeg-mcp.${CLUSTER_NAMESPACE}.svc.${cluster_domain}:${FFMPEG_MCP_PORT}"

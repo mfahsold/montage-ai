@@ -56,6 +56,13 @@ echo ""
 BUILD_MULTIARCH="${BUILD_MULTIARCH:-true}"
 BUILD_PLATFORMS="${BUILD_PLATFORMS:-linux/amd64,linux/arm64}"
 BUILDER_NAME="${BUILDER_NAME:-montage-ai-builder}"
+BUILDKIT_CONFIG="${BUILDKIT_CONFIG:-${PROJECT_ROOT}/buildkitd.toml}"
+FORCE_BUILDER_RECREATE="${FORCE_BUILDER_RECREATE:-false}"
+BUILDKIT_CONFIG_ARG=""
+
+if [ -f "${BUILDKIT_CONFIG}" ]; then
+  BUILDKIT_CONFIG_ARG="--config ${BUILDKIT_CONFIG}"
+fi
 
 cd "${PROJECT_ROOT}"
 
@@ -63,8 +70,15 @@ if [ "${BUILD_MULTIARCH}" = "true" ]; then
   echo "📦 Building multi-arch image (${BUILD_PLATFORMS})..."
 
   # Ensure buildx builder exists and is active
+  if [ "${FORCE_BUILDER_RECREATE}" = "true" ]; then
+    docker buildx rm "${BUILDER_NAME}" >/dev/null 2>&1 || true
+  fi
+
   if ! docker buildx inspect "${BUILDER_NAME}" >/dev/null 2>&1; then
-    docker buildx create --name "${BUILDER_NAME}" --use >/dev/null
+    docker buildx create --name "${BUILDER_NAME}" \
+      --driver docker-container \
+      ${BUILDKIT_CONFIG_ARG} \
+      --use >/dev/null
   else
     docker buildx use "${BUILDER_NAME}" >/dev/null
   fi
