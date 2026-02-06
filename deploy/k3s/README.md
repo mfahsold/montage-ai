@@ -10,7 +10,7 @@ make -C deploy/k3s config
 
 # 2. Build & push multi-arch image
 cd deploy/k3s
-./build-and-push.sh
+BUILD_MULTIARCH=true ./build-and-push.sh
 
 # 3. Access Web UI (choose one)
 # If you have ingress configured:
@@ -187,6 +187,12 @@ when enabled. In cluster mode, the worker pods must have CGPU credentials mounte
 kubectl -n "${CLUSTER_NAMESPACE:-montage-ai}" create secret generic cgpu-credentials \
   --from-file=config.json=/path/to/cgpu/config.json \
   --from-file=session.json=/path/to/cgpu/session.json
+```
+
+You can automate this with:
+
+```bash
+scripts/ops/cgpu-refresh-session.sh
 ```
 
 ### 2) Enable CGPU in cluster config

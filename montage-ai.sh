@@ -38,7 +38,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}hq${NC}              High quality render (1080p/4K)
   ${GREEN}download${NC} JOB_ID  Download job artifacts (video + timeline + logs)
   ${GREEN}jobs${NC}            Submit/manage jobs via API (/api/jobs)
-  ${GREEN}k8s-watch${NC}       Watch K8s for successful jobs and auto-download them
+  ${GREEN}k8s-watch${NC}       Watch K8s and auto-download outputs (pass --job-id/--download-dir)
   ${GREEN}export-to-nle${NC}   Export timeline to NLE formats (OTIO/EDL/Premiere/AAF)
   ${GREEN}check-hw${NC}        Diagnose hardware acceleration (NVENC/VAAPI/QSV)
   ${GREEN}list${NC}            List available styles
@@ -473,8 +473,9 @@ case "${1:-run}" in
         exit 0
         ;;
     k8s-watch)
+        shift
         echo -e "${GREEN}🚀 Starting K8s Auto-Downloader...${NC}"
-        python3 scripts/k8s_auto_downloader.py
+        python3 scripts/k8s_auto_downloader.py "$@"
         exit 0
         ;;
     status)

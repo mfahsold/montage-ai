@@ -9,8 +9,8 @@ metadata:
 spec:
   scaleTargetRef:
     name: montage-ai-worker
-  minReplicaCount: 1
-  maxReplicaCount: 8
+  minReplicaCount: 2
+  maxReplicaCount: 12
   triggers:
     - type: redis
       metadata:
@@ -29,8 +29,8 @@ metadata:
 spec:
   scaleTargetRef:
     name: montage-ai-worker-heavy
-  minReplicaCount: 1
-  maxReplicaCount: 8
+  minReplicaCount: 2
+  maxReplicaCount: 12
   triggers:
     - type: redis
       metadata:

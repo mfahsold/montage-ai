@@ -53,9 +53,66 @@ else
 fi
 echo ""
 
-# Build Docker image
-echo "📦 Building Docker image '${IMAGE_NAME}:${IMAGE_TAG}'..."
+BUILD_MULTIARCH="${BUILD_MULTIARCH:-true}"
+BUILD_PLATFORMS="${BUILD_PLATFORMS:-linux/amd64,linux/arm64}"
+BUILDER_NAME="${BUILDER_NAME:-montage-ai-builder}"
+
 cd "${PROJECT_ROOT}"
+
+if [ "${BUILD_MULTIARCH}" = "true" ]; then
+  echo "📦 Building multi-arch image (${BUILD_PLATFORMS})..."
+
+  # Ensure buildx builder exists and is active
+  if ! docker buildx inspect "${BUILDER_NAME}" >/dev/null 2>&1; then
+    docker buildx create --name "${BUILDER_NAME}" --use >/dev/null
+  else
+    docker buildx use "${BUILDER_NAME}" >/dev/null
+  fi
+
+  # Ensure binfmt/qemu is available (best-effort)
+  docker run --privileged --rm tonistiigi/binfmt --install all >/dev/null 2>&1 || true
+
+  echo ""
+  echo "📤 Building and pushing ${IMAGE_FULL}..."
+  if docker buildx build \
+    --platform "${BUILD_PLATFORMS}" \
+    -t "${IMAGE_FULL}" \
+    -f Dockerfile \
+    --push \
+    .; then
+    echo ""
+    echo "════════════════════════════════════════════════════════════"
+    echo "✅ Multi-arch image successfully pushed!"
+    echo "════════════════════════════════════════════════════════════"
+    echo ""
+    echo "Image: ${IMAGE_FULL}"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Deploy: ./deploy.sh cluster"
+    echo "  2. Verify: docker buildx imagetools inspect ${IMAGE_FULL}"
+    echo "  3. Test: kubectl get pods -n montage-ai"
+  else
+    echo ""
+    echo "════════════════════════════════════════════════════════════"
+    echo "❌ Multi-arch build failed! Troubleshooting:"
+    echo "════════════════════════════════════════════════════════════"
+    echo ""
+    echo "1. Check buildx:"
+    echo "   docker buildx ls"
+    echo ""
+    echo "2. Ensure binfmt is installed:"
+    echo "   docker run --privileged --rm tonistiigi/binfmt --install all"
+    echo ""
+    echo "3. Retry single-arch:"
+    echo "   BUILD_MULTIARCH=false ./build-and-push.sh"
+    echo ""
+    exit 1
+  fi
+  exit 0
+fi
+
+# Single-arch fallback
+echo "📦 Building Docker image '${IMAGE_NAME}:${IMAGE_TAG}'..."
 docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" -f Dockerfile .
 
 echo ""

@@ -49,8 +49,29 @@ Provide the Client ID and Client Secret to the assistant, or create the config f
 }
 ```
 
+## OAuth Login (Interactive)
+
+Run the login locally (not inside the cluster):
+
+```bash
+cgpu connect
+```
+
+Notes:
+- Keep the terminal open until the flow completes.
+- If the callback page shows “connection refused”, the local callback server wasn’t running.
+  Re-run `cgpu connect` and retry the login.
+
 ## Cluster / Kubernetes
 
 If you run Montage AI in the cluster, CGPU jobs (encode/upscale/voice isolation) need the cgpu config mounted into worker pods.
 Create a secret named `cgpu-credentials` with `config.json` and optional `session.json`, then redeploy: the workers mount it into `/home/montage/.config/cgpu`.
 Without this secret, CGPU jobs will fall back to local CPU/GPU.
+
+### One‑shot helper (recommended)
+
+```bash
+scripts/ops/cgpu-refresh-session.sh
+```
+
+This runs `cgpu connect`, updates the secret, and restarts the worker + cgpu-server deployments.

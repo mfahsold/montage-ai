@@ -59,6 +59,7 @@ prefix with `docker compose run --rm montage-ai` (or exec into the container).
 | `cgpu-stop` | Stop cgpu server |
 | `cgpu-status` | Check cgpu installation & status |
 | `cgpu-test` | Test cgpu connection |
+| `k8s-watch` | Auto-download outputs from a cluster |
 | `export-to-nle` | Export results to OTIO/Premiere/EDL |
 | `help` | Show full help message |
 
@@ -94,6 +95,24 @@ Notes:
 - `MONTAGE_API_BASE` is the server base URL (no `/api` suffix required).
 - Use `--option options.<key>=...` to set nested `options` fields in the payload.
 - `--download` waits for job completion and saves artifacts to the local machine.
+
+---
+
+## Cluster Auto-Download (K8s)
+
+Automatically fetch finished outputs from the cluster and save them locally.
+
+```bash
+./montage-ai.sh k8s-watch
+./montage-ai.sh k8s-watch --job-id <JOB_ID> --download-dir ~/Downloads
+./montage-ai.sh k8s-watch --min-size-mb 10 --stable-rounds 2
+```
+
+Options:
+- `--job-id` filters by filename substring (use the job id).
+- `--download-dir` sets the local destination (default `~/Downloads`).
+- `--min-size-mb` avoids pulling tiny/partial files.
+- `--stable-rounds` waits for the file size to stop changing before downloading.
 
 ---
 

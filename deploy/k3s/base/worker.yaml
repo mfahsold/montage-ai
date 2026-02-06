@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: worker
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: montage-ai
@@ -76,11 +76,11 @@ spec:
               mountPath: /home/montage/.config/cgpu
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "1"
+              cpu: "500m"
               memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
       volumes:
         - name: data-input
           persistentVolumeClaim:
@@ -118,7 +118,7 @@ metadata:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: worker-heavy
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: montage-ai
@@ -188,11 +188,11 @@ spec:
               mountPath: /home/montage/.config/cgpu
           resources:
             requests:
-              cpu: "1"
-              memory: "4Gi"
+              cpu: "2"
+              memory: "8Gi"
             limits:
-              cpu: "6"
-              memory: "16Gi"
+              cpu: "8"
+              memory: "24Gi"
       volumes:
         - name: data-input
           persistentVolumeClaim:
