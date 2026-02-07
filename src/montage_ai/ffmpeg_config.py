@@ -474,6 +474,8 @@ class FFmpegConfig:
         args = ["-c:v", codec_value]
         if preset_value:
             args.extend(["-preset", preset_value])
+        if self.threads:
+            args.extend(["-threads", str(self.threads)])
         args.extend(["-crf", str(crf_value)])
         if profile_value:
             args.extend(["-profile:v", profile_value])

@@ -331,6 +331,9 @@ These values are read by the job submitter. Prefer configuring them in
 - `REGISTRY_HOST` / `REGISTRY_PORT` (or `REGISTRY_URL`)
 - `IMAGE_NAME` / `IMAGE_TAG`
 - `PVC_INPUT_NAME`, `PVC_OUTPUT_NAME`, `PVC_MUSIC_NAME`, `PVC_ASSETS_NAME`
+- `WORKER_QUEUE_LIST_NAME`, `WORKER_QUEUE_SCALE_THRESHOLD`
+- `WORKER_MIN_REPLICAS`, `WORKER_MAX_REPLICAS`
+- `CLUSTER_PARALLELISM`, `MAX_SCENE_WORKERS`, `MAX_PARALLEL_JOBS`, `FFMPEG_THREADS`
 
 Example `cluster-config.env` excerpt:
 
@@ -342,6 +345,14 @@ PVC_INPUT_NAME=montage-ai-input-nfs
 PVC_OUTPUT_NAME=montage-ai-output-nfs
 PVC_MUSIC_NAME=montage-ai-music-nfs
 PVC_ASSETS_NAME=montage-ai-assets-nfs
+WORKER_QUEUE_LIST_NAME=rq:queue:default:intermediate
+WORKER_QUEUE_SCALE_THRESHOLD=4
+WORKER_MIN_REPLICAS=3
+WORKER_MAX_REPLICAS=24
+CLUSTER_PARALLELISM=24
+MAX_SCENE_WORKERS=24
+MAX_PARALLEL_JOBS=24
+FFMPEG_THREADS=16
 ```
 
 ### Performance Tuning (Recommended)
@@ -350,13 +361,19 @@ For large AV1/4K inputs, scene detection is CPU‑bound. Use a larger tier and
 shared proxy cache to avoid repeated decodes:
 
 ```env
-SCENE_DETECT_TIER=large
+SCENE_DETECT_TIER=xlarge
 SCENE_CACHE_DIR=/data/output/scene_cache
 PROXY_CACHE_DIR=/data/output/proxy_cache
+CLUSTER_PARALLELISM=24
+MAX_SCENE_WORKERS=24
+MAX_PARALLEL_JOBS=24
+FFMPEG_THREADS=16
 ```
 
 Notes:
 - `CLUSTER_PARALLELISM` controls shard count for distributed jobs.
+- KEDA scales workers based on `WORKER_QUEUE_LIST_NAME`; keep this aligned with the queue name used by the web/API process.
+- If KEDA does not scale, verify `ScaledObject` health with `kubectl -n montage-ai describe scaledobject montage-ai-worker-scaler`.
 - With a single video, time‑based sharding is automatic; for mixed inputs, consider
   pre‑splitting very large files to balance load.
 

@@ -14,6 +14,21 @@ registry:
 cluster:
   namespace: "<CLUSTER_NAMESPACE>"
   clusterDomain: "<CLUSTER_DOMAIN>"
+  parallelism: 24
+  renderTier: "xlarge"
+  sceneDetectTier: "xlarge"
+  workerMinReplicas: 3
+  workerMaxReplicas: 24
+  workerQueueScaleThreshold: 4
+  workerQueueListName: "rq:queue:default:intermediate"
+  maxSceneWorkers: 24
+  maxParallelJobs: 24
+  ffmpegThreads: "16"
+  workerResources:
+    cpuRequest: "1000m"
+    cpuLimit: "16"
+    memoryRequest: "2Gi"
+    memoryLimit: "24Gi"
   hostnames:
     montage: "montage-ai.<YOUR_DOMAIN>"
   nodes:

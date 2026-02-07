@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: montage-ai-quota
+  namespace: montage-ai
+  labels:
+    fluxibri.ai/security: resource-quotas
+spec:
+  hard:
+    limits.cpu: "200"
+    limits.memory: 320Gi
+    requests.cpu: "80"
+    requests.memory: 160Gi
+    pods: "80"
+    persistentvolumeclaims: "20"

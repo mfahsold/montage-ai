@@ -39,6 +39,18 @@ def render_shard(
     Render a specific shard of the timeline.
     """
     settings = get_settings()
+
+    def _write_shard_report(clip_count: int, segments: Optional[List[str]] = None) -> None:
+        """Persist shard results so the aggregator can reliably collect all shard outputs."""
+        shard_output_dir = os.path.join(output_dir, f"shard_{shard_index}")
+        os.makedirs(shard_output_dir, exist_ok=True)
+        report = {
+            "shard_index": shard_index,
+            "clip_count": clip_count,
+            "segments": segments or [],
+        }
+        with open(os.path.join(shard_output_dir, "shard_report.json"), "w") as f:
+            json.dump(report, f)
     
     # 1. Determine which clips this shard is responsible for
     total_clips = len(clips_metadata)
@@ -49,6 +61,7 @@ def render_shard(
     
     if start_idx >= total_clips:
         logger.info(f"   ℹ️ Shard {shard_index} has no clips to process. Exiting.")
+        _write_shard_report(clip_count=0, segments=[])
         return
 
     my_clips = clips_metadata[start_idx:end_idx]
@@ -117,14 +130,8 @@ def render_shard(
     renderer.flush_batch()
     
     # Save shard report
-    report = {
-        "shard_index": shard_index,
-        "clip_count": len(my_clips),
-        "segments": [s.path for s in renderer.segment_writer.segments] if hasattr(renderer.segment_writer, 'segments') else []
-    }
-    
-    with open(os.path.join(shard_output_dir, "shard_report.json"), "w") as f:
-        json.dump(report, f)
+    segments = [s.path for s in renderer.segment_writer.segments] if hasattr(renderer.segment_writer, "segments") else []
+    _write_shard_report(clip_count=len(my_clips), segments=segments)
 
 
 def main():

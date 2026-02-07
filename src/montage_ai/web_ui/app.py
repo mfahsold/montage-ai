@@ -326,22 +326,40 @@ class InMemoryJobStore:
 def _init_redis_resources():
     redis_host = _settings.session.redis_host or 'localhost'
     redis_port = _settings.session.redis_port
+    cluster_mode = str(os.environ.get("CLUSTER_MODE", "")).lower() == "true"
+    default_retries = 30 if cluster_mode else 1
+    max_retries = max(1, int(os.environ.get("REDIS_INIT_MAX_RETRIES", str(default_retries))))
+    retry_sleep = max(0.1, float(os.environ.get("REDIS_INIT_RETRY_SECONDS", "2")))
 
-    try:
-        conn = create_resilient_redis_connection(host=redis_host, port=redis_port)
-        queue_fast = ResilientQueue(name=_settings.session.queue_fast_name, connection=conn)
-        queue_heavy = ResilientQueue(name=_settings.session.queue_heavy_name, connection=conn)
-        if queue_fast.name == queue_heavy.name:
-            queue_heavy = queue_fast
-        store = JobStore()
-        return conn, queue_fast, queue_heavy, store
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Redis unavailable; using in-memory stubs: %s", exc)
-        stub_fast = NullQueue(_settings.session.queue_fast_name)
-        stub_heavy = NullQueue(_settings.session.queue_heavy_name)
-        if stub_fast.name == stub_heavy.name:
-            stub_heavy = stub_fast
-        return None, stub_fast, stub_heavy, InMemoryJobStore()
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            conn = create_resilient_redis_connection(host=redis_host, port=redis_port)
+            queue_fast = ResilientQueue(name=_settings.session.queue_fast_name, connection=conn)
+            queue_heavy = ResilientQueue(name=_settings.session.queue_heavy_name, connection=conn)
+            if queue_fast.name == queue_heavy.name:
+                queue_heavy = queue_fast
+            store = JobStore()
+            return conn, queue_fast, queue_heavy, store
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if attempt >= max_retries:
+                break
+            logger.warning(
+                "Redis init attempt %s/%s failed: %s (retrying in %.1fs)",
+                attempt,
+                max_retries,
+                exc,
+                retry_sleep,
+            )
+            time.sleep(retry_sleep)
+
+    logger.warning("Redis unavailable after %s attempts; using in-memory stubs: %s", max_retries, last_exc)
+    stub_fast = NullQueue(_settings.session.queue_fast_name)
+    stub_heavy = NullQueue(_settings.session.queue_heavy_name)
+    if stub_fast.name == stub_heavy.name:
+        stub_heavy = stub_fast
+    return None, stub_fast, stub_heavy, InMemoryJobStore()
 
 
 # Redis connection (centralized via settings)
@@ -526,6 +544,8 @@ def redis_listener():
     """Listen for updates from Redis and broadcast to SSE clients."""
     try:
         # Create a dedicated connection for pubsub to avoid conflicts
+        redis_host = _settings.session.redis_host or 'localhost'
+        redis_port = _settings.session.redis_port
         pubsub_conn = create_resilient_redis_connection(host=redis_host, port=redis_port)
         pubsub = pubsub_conn.pubsub()
         pubsub.subscribe('job_updates')
@@ -744,7 +764,8 @@ def api_status():
         queues = _unique_queues(queue_fast, queue_heavy)
         active_jobs = sum(len(q.started_job_registry) for q in queues)
         queued_jobs = sum(len(q) for q in queues)
-    except (AttributeError, TypeError, NameError):
+    except Exception as exc:
+        logger.warning("Failed to read queue registries for /api/status: %s", exc)
         active_jobs = 0
         queued_jobs = 0
     

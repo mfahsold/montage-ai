@@ -160,7 +160,7 @@ def download_from_api(job_id: str, api_base: str, dest_dir: Path, as_zip: bool =
         resp.raise_for_status()
         job = resp.json()
 
-        if job.get("status") not in ("completed", "success"):
+        if job.get("status") not in ("completed", "success", "finished"):
             log(f"Job not completed (status: {job.get('status')})", Colors.YELLOW)
             return False
     except requests.RequestException as e:
@@ -196,51 +196,49 @@ def download_from_api(job_id: str, api_base: str, dest_dir: Path, as_zip: bool =
             return True
 
         except requests.RequestException as e:
-            log(f"Download failed: {e}", Colors.RED)
-            return False
+            log(f"ZIP download failed ({e}); falling back to file-by-file download.", Colors.YELLOW)
 
-    else:
-        # Get artifacts list
-        try:
-            resp = requests.get(f"{api_base}/api/jobs/{job_id}/artifacts", timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-        except requests.RequestException as e:
-            log(f"Failed to get artifacts list: {e}", Colors.RED)
-            return False
+    # Get artifacts list
+    try:
+        resp = requests.get(f"{api_base}/api/jobs/{job_id}/artifacts", timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.RequestException as e:
+        log(f"Failed to get artifacts list: {e}", Colors.RED)
+        return False
 
-        # Download individual files
-        downloaded = 0
-        for category, files in data.get("artifacts", {}).items():
-            if not files:
-                continue
+    # Download individual files
+    downloaded = 0
+    for category, files in data.get("artifacts", {}).items():
+        if not files:
+            continue
 
-            # Create category subfolder (except video in root)
-            if category == "video":
-                cat_dir = dest_dir
-            else:
-                cat_dir = dest_dir / category
-                cat_dir.mkdir(exist_ok=True)
+        # Create category subfolder (except video in root)
+        if category == "video":
+            cat_dir = dest_dir
+        else:
+            cat_dir = dest_dir / category
+            cat_dir.mkdir(exist_ok=True)
 
-            for file_info in files:
-                url = f"{api_base}{file_info['download_url']}"
-                dest_path = cat_dir / file_info['name']
+        for file_info in files:
+            url = f"{api_base}{file_info['download_url']}"
+            dest_path = cat_dir / file_info['name']
 
-                try:
-                    with requests.get(url, stream=True, timeout=300) as r:
-                        r.raise_for_status()
-                        with open(dest_path, 'wb') as f:
-                            for chunk in r.iter_content(chunk_size=8192):
-                                f.write(chunk)
+            try:
+                with requests.get(url, stream=True, timeout=300) as r:
+                    r.raise_for_status()
+                    with open(dest_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
 
-                    log(f"  {Colors.GREEN}[{category}]{Colors.RESET} {file_info['name']} ({file_info['size_mb']} MB)")
-                    downloaded += 1
+                log(f"  {Colors.GREEN}[{category}]{Colors.RESET} {file_info['name']} ({file_info['size_mb']} MB)")
+                downloaded += 1
 
-                except requests.RequestException as e:
-                    log(f"  {Colors.RED}[FAILED]{Colors.RESET} {file_info['name']}: {e}")
+            except requests.RequestException as e:
+                log(f"  {Colors.RED}[FAILED]{Colors.RESET} {file_info['name']}: {e}")
 
-        log(f"\n{Colors.BOLD}Downloaded {downloaded} files to {dest_dir}{Colors.RESET}", Colors.GREEN)
-        return downloaded > 0
+    log(f"\n{Colors.BOLD}Downloaded {downloaded} files to {dest_dir}{Colors.RESET}", Colors.GREEN)
+    return downloaded > 0
 
 
 def main():

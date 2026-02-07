@@ -50,7 +50,8 @@ Key deployment variables (non-exhaustive):
 - `REGISTRY_HOST`, `REGISTRY_PORT`, `REGISTRY_URL`
 - `IMAGE_NAME`, `IMAGE_TAG`, `IMAGE_FULL`
 - `CLUSTER_NAMESPACE`, `APP_DOMAIN`
-- `WORKER_MIN_REPLICAS`, `WORKER_MAX_REPLICAS`, `WORKER_QUEUE_SCALE_THRESHOLD`
+- `WORKER_MIN_REPLICAS`, `WORKER_MAX_REPLICAS`, `WORKER_QUEUE_SCALE_THRESHOLD`, `WORKER_QUEUE_LIST_NAME`
+- `CLUSTER_PARALLELISM`, `MAX_SCENE_WORKERS`, `MAX_PARALLEL_JOBS`, `FFMPEG_THREADS`
 - `STORAGE_CLASS`, `PVC_*` (input/output/music/assets)
 - `CGPU_*` (cloud GPU offload)
 
@@ -181,8 +182,13 @@ Recommended for large inputs (4K/AV1) and distributed runs:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CLUSTER_PARALLELISM` | `4` | Shard count for distributed scene detection + render. |
-| `SCENE_DETECT_TIER` | `medium` | Resource tier for scene detection jobs (`small`, `medium`, `large`). |
+| `CLUSTER_PARALLELISM` | `24` | Shard count for distributed scene detection + render (from `deploy/k3s/config-global.yaml`). |
+| `MAX_SCENE_WORKERS` | `24` | Max concurrent scene analysis workers per job. |
+| `MAX_PARALLEL_JOBS` | `24` | Max parallel processing workers in montage runtime. |
+| `FFMPEG_THREADS` | `16` | FFmpeg CPU thread budget for encode/decode-heavy stages. |
+| `WORKER_QUEUE_LIST_NAME` | `rq:queue:default:intermediate` | Redis list watched by KEDA for worker autoscaling. |
+| `WORKER_QUEUE_SCALE_THRESHOLD` | `4` | Queue length threshold that triggers worker scale-up. |
+| `SCENE_DETECT_TIER` | `xlarge` | Resource tier for scene detection jobs (`small`, `medium`, `large`, `xlarge`). |
 | `SCENE_CACHE_DIR` | `$OUTPUT_DIR/scene_cache` | Shared scene-cache directory for shard outputs. |
 | `SCENE_MERGE_OVERLAP_TOLERANCE` | `0.05` | Seconds of true overlap required to merge adjacent shard scenes. |
 | `PROXY_CACHE_DIR` | *(empty)* | Shared proxy cache for analysis (set to a RW PVC to avoid re-generation). |
@@ -194,6 +200,8 @@ Recommended for large inputs (4K/AV1) and distributed runs:
 | `CLUSTER_STATUS_POLL_INTERVAL` | `5` | Seconds between status polls for distributed jobs. |
 | `CLUSTER_STATUS_MAX_ERRORS` | `6` | Max consecutive status errors before failing distributed detection. |
 | `RQ_SIMPLE_WORKER` | `false` | Run RQ jobs in-process (no fork). Useful for long-running jobs if forked workers crash. |
+| `REDIS_INIT_MAX_RETRIES` | `30` in cluster / `1` local | Redis bootstrap retries before fail-open to in-memory queue stubs. |
+| `REDIS_INIT_RETRY_SECONDS` | `2` | Delay between Redis bootstrap retries. |
 
 **Example (K8s):**
 ```bash
@@ -340,7 +348,8 @@ OPENAI_API_BASE=http://litellm.<LLM_NAMESPACE>.svc.cluster.local:4000/v1
 OPENAI_API_KEY=<OPENAI_API_KEY>
 OPENAI_MODEL=auto
 ENABLE_AI_FILTER=true
-FFMPEG_HWACCEL=auto
+FFMPEG_HWACCEL=none
+FFMPEG_THREADS=16
 PRESERVE_ASPECT=false
 ```
 
@@ -369,15 +378,15 @@ UPSCALE=true
 | Variable            | Default           | Description                                                       |
 | ------------------- | ----------------- | ----------------------------------------------------------------- |
 | `USE_GPU`           | `auto`            | GPU mode: `auto`, `vulkan`, `v4l2`, `none`                        |
-| `FFMPEG_HWACCEL`    | `auto`            | Video encoding GPU: `auto`, `nvenc`, `vaapi`, `qsv`, `none`       |
+| `FFMPEG_HWACCEL`    | `auto` local / `none` cluster | Video encoding GPU: `auto`, `nvenc`, `vaapi`, `qsv`, `none` |
 | `USE_FFMPEG_MCP`    | `false`           | Enable remote ffmpeg MCP service for encoding                     |
 | `FFMPEG_MCP_ENDPOINT` | *(empty)*       | Full MCP URL (overrides host/port)                                |
 | `FFMPEG_MCP_HOST`   | *(empty)*         | MCP host (used when endpoint not set)                             |
 | `FFMPEG_MCP_PORT`   | `8080`            | MCP port                                                          |
-| `FFMPEG_THREADS`    | `0`               | FFmpeg thread count (`0` = auto)                                  |
+| `FFMPEG_THREADS`    | `0` local / `16` cluster | FFmpeg thread count (`0` = auto)                            |
 | `FFMPEG_PRESET`     | `medium`          | Encoding speed: `ultrafast`, `fast`, `medium`, `slow`, `veryslow` |
 | `PARALLEL_ENHANCE`  | `true`            | Enable parallel clip enhancement                                  |
-| `MAX_PARALLEL_JOBS` | *(effective CPU cores)* | Maximum parallel workers                                     |
+| `MAX_PARALLEL_JOBS` | *(effective CPU cores)* local / `24` cluster | Maximum parallel workers                        |
 | `MONTAGE_PREVIEW_CPU_LIMIT` | *(unset)* | Optional clamp for effective CPU count in preview benchmarks     |
 
 ### GPU Hardware Acceleration

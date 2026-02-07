@@ -15,5 +15,5 @@ spec:
     - type: redis
       metadata:
         address: ${REDIS_HOST}:${REDIS_PORT}
-        listName: "rq:queue:default"
+        listName: "${WORKER_QUEUE_LIST_NAME}"
         listLength: "${WORKER_QUEUE_SCALE_THRESHOLD}"

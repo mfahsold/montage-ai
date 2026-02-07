@@ -21,6 +21,18 @@ spec:
     spec:
       terminationGracePeriodSeconds: 120
       serviceAccountName: montage-ai-cluster
+      tolerations:
+        - key: gpu
+          operator: Exists
+          effect: NoSchedule
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: montage-ai
+              app.kubernetes.io/component: worker
       initContainers:
         - name: cgpu-credentials-init
           image: <IMAGE_FULL>
@@ -76,11 +88,11 @@ spec:
               mountPath: /home/montage/.config/cgpu
           resources:
             requests:
-              cpu: "500m"
-              memory: "1Gi"
+              cpu: "1000m"
+              memory: "2Gi"
             limits:
-              cpu: "2"
-              memory: "4Gi"
+              cpu: "16"
+              memory: "24Gi"
       volumes:
         - name: data-input
           persistentVolumeClaim:

@@ -331,8 +331,15 @@ class RenderEngine:
                 self.render()
                 return
 
-            parallelism = self.settings.features.cluster_parallelism
-            logger.info(f"   🚀 Submitting {parallelism} rendering shards to cluster...")
+            requested_parallelism = int(self.settings.features.cluster_parallelism)
+            clip_count = len(clips_data)
+            parallelism = max(1, min(requested_parallelism, clip_count))
+            logger.info(
+                "   🚀 Submitting %s rendering shards to cluster (requested=%s, clips=%s)...",
+                parallelism,
+                requested_parallelism,
+                clip_count,
+            )
 
             cluster_tier = self.settings.features.cluster_render_tier
             shard_env = {}

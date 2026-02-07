@@ -11,6 +11,7 @@ resources:
   - redis.yaml
   - service-ingress.yaml
   - pvc.yaml
+  - resourcequota.yaml
   - namespace.yaml
   - network-policy.yaml
   - pdb.yaml
@@ -37,11 +38,8 @@ configMapGenerator:
       - UPSCALE=false
       - ENHANCE=false
       - CLUSTER_MODE=true
-      - CLUSTER_PARALLELISM=2
-      - CLUSTER_RENDER_TIER=xlarge
-      - SCENE_DETECT_TIER=medium
       - CLUSTER_TOLERATE_GPU=true
-      - FFMPEG_HWACCEL=auto
+      - FFMPEG_HWACCEL=none
       - MONTAGE_CLUSTER_MODE=k8s
       - CLUSTER_USE_JOBSET=true
       - SCENE_CACHE_DIR=/data/output/scene_cache
@@ -133,3 +131,43 @@ replacements:
           name: montage-cache
         fieldPaths:
           - spec.storageClassName
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.WORKER_CPU_REQUEST
+    targets:
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].resources.requests.cpu
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.WORKER_CPU_LIMIT
+    targets:
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].resources.limits.cpu
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.WORKER_MEMORY_REQUEST
+    targets:
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].resources.requests.memory
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.WORKER_MEMORY_LIMIT
+    targets:
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.containers.[name=worker].resources.limits.memory

@@ -22,6 +22,7 @@ fi
 
 # Export variables of interest for envsubst
 export WORKER_QUEUE_SCALE_THRESHOLD
+export WORKER_QUEUE_LIST_NAME
 export WORKER_MIN_REPLICAS
 export WORKER_MAX_REPLICAS
 export REDIS_HOST

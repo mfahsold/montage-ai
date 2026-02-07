@@ -9,11 +9,11 @@ metadata:
 spec:
   scaleTargetRef:
     name: montage-ai-worker
-  minReplicaCount: 2
-  maxReplicaCount: 12
+  minReplicaCount: 3
+  maxReplicaCount: 24
   triggers:
     - type: redis
       metadata:
         address: redis.montage-ai.svc.cluster.local:6379
-        listName: "rq:queue:default"
-        listLength: "10"
+        listName: "rq:queue:default:intermediate"
+        listLength: "4"
