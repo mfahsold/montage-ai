@@ -7,6 +7,7 @@ Simple tests following KISS principle.
 import pytest
 import json
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
 from src.montage_ai.web_ui.app import app
 
 
@@ -108,6 +109,31 @@ def test_api_get_job_not_found(client):
     """Test getting non-existent job."""
     response = client.get('/api/jobs/nonexistent123')
     assert response.status_code == 404
+
+
+def test_api_get_job_reconciles_stale_orphaned_running_job(client, monkeypatch):
+    """Stale running jobs without active RQ execution are auto-failed."""
+    import src.montage_ai.web_ui.app as web_app
+
+    stale_time = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+    web_app.job_store.get_job.return_value = {
+        "id": "stale-1",
+        "status": "running",
+        "created_at": stale_time,
+        "updated_at": stale_time,
+        "phase": {"name": "processing", "label": "Processing"},
+        "options": {"quality_profile": "preview", "job_timeout": 60},
+    }
+    web_app.job_store.update_job_with_retry.return_value = True
+    monkeypatch.setattr(web_app, "_is_rq_job_active", lambda _job_id: False)
+
+    response = client.get('/api/jobs/stale-1')
+    assert response.status_code == 200
+
+    data = json.loads(response.data)
+    assert data["status"] == "failed"
+    assert data["phase"]["name"] == "failed"
+    assert "stale" in data.get("error", "").lower()
 
 
 def test_file_upload_validation(client):

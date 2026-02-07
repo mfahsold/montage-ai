@@ -55,32 +55,86 @@ echo ""
 
 BUILD_MULTIARCH="${BUILD_MULTIARCH:-true}"
 BUILD_PLATFORMS="${BUILD_PLATFORMS:-linux/amd64,linux/arm64}"
-BUILDER_NAME="${BUILDER_NAME:-montage-ai-builder}"
+BUILDER_NAME="${BUILDER_NAME:-montage-multiarch}"
 BUILDKIT_CONFIG="${BUILDKIT_CONFIG:-${PROJECT_ROOT}/buildkitd.toml}"
 FORCE_BUILDER_RECREATE="${FORCE_BUILDER_RECREATE:-false}"
+USE_REGISTRY_CACHE="${USE_REGISTRY_CACHE:-true}"
+CACHE_REF="${CACHE_REF:-${REGISTRY_URL}/${APP_NAME}:buildcache}"
+BUILDER_CANDIDATES="${BUILDER_CANDIDATES:-montage-multiarch,simple-builder,fluxibri,multiarch-builder,montage-ai-builder}"
+BUILD_PROGRESS="${BUILD_PROGRESS:-plain}"
 BUILDKIT_CONFIG_ARG=""
 
 if [ -f "${BUILDKIT_CONFIG}" ]; then
   BUILDKIT_CONFIG_ARG="--config ${BUILDKIT_CONFIG}"
 fi
 
+supports_required_platforms() {
+  local builder="$1"
+  local required_csv="$2"
+  local inspect_out required
+
+  if ! inspect_out="$(docker buildx inspect "${builder}" --bootstrap 2>/dev/null | tr '\n' ' ')"; then
+    return 1
+  fi
+
+  for required in ${required_csv//,/ }; do
+    if [[ "${inspect_out}" != *"${required}"* ]]; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+select_builder() {
+  local requested="$1"
+  local platforms="$2"
+  local candidate
+
+  if supports_required_platforms "${requested}" "${platforms}"; then
+    echo "${requested}"
+    return 0
+  fi
+
+  IFS=',' read -r -a candidates <<< "${BUILDER_CANDIDATES}"
+  for candidate in "${candidates[@]}"; do
+    candidate="${candidate// /}"
+    [ -z "${candidate}" ] && continue
+    if supports_required_platforms "${candidate}" "${platforms}"; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 cd "${PROJECT_ROOT}"
 
 if [ "${BUILD_MULTIARCH}" = "true" ]; then
   echo "📦 Building multi-arch image (${BUILD_PLATFORMS})..."
 
-  # Ensure buildx builder exists and is active
-  if [ "${FORCE_BUILDER_RECREATE}" = "true" ]; then
-    docker buildx rm "${BUILDER_NAME}" >/dev/null 2>&1 || true
-  fi
+  SELECTED_BUILDER="$(select_builder "${BUILDER_NAME}" "${BUILD_PLATFORMS}" || true)"
 
-  if ! docker buildx inspect "${BUILDER_NAME}" >/dev/null 2>&1; then
-    docker buildx create --name "${BUILDER_NAME}" \
-      --driver docker-container \
-      ${BUILDKIT_CONFIG_ARG} \
-      --use >/dev/null
+  # Ensure buildx builder exists and is active
+  if [ -n "${SELECTED_BUILDER}" ]; then
+    echo "✅ Using existing multi-arch builder: ${SELECTED_BUILDER}"
+    docker buildx use "${SELECTED_BUILDER}" >/dev/null
   else
-    docker buildx use "${BUILDER_NAME}" >/dev/null
+    if [ "${FORCE_BUILDER_RECREATE}" = "true" ]; then
+      docker buildx rm "${BUILDER_NAME}" >/dev/null 2>&1 || true
+    fi
+
+    if ! docker buildx inspect "${BUILDER_NAME}" >/dev/null 2>&1; then
+      docker buildx create --name "${BUILDER_NAME}" \
+        --driver docker-container \
+        ${BUILDKIT_CONFIG_ARG} \
+        --use >/dev/null
+    else
+      docker buildx use "${BUILDER_NAME}" >/dev/null
+    fi
+    SELECTED_BUILDER="${BUILDER_NAME}"
+    echo "⚠️  Falling back to local builder: ${SELECTED_BUILDER}"
   fi
 
   # Ensure binfmt/qemu is available (best-effort)
@@ -88,12 +142,26 @@ if [ "${BUILD_MULTIARCH}" = "true" ]; then
 
   echo ""
   echo "📤 Building and pushing ${IMAGE_FULL}..."
-  if docker buildx build \
-    --platform "${BUILD_PLATFORMS}" \
-    -t "${IMAGE_FULL}" \
-    -f Dockerfile \
-    --push \
-    .; then
+  BUILD_ARGS=(
+    --builder "${SELECTED_BUILDER}"
+    --platform "${BUILD_PLATFORMS}"
+    --progress "${BUILD_PROGRESS}"
+    --build-arg "BUILDKIT_INLINE_CACHE=1"
+    -t "${IMAGE_FULL}"
+    -f Dockerfile
+    --push
+  )
+  if [ "${USE_REGISTRY_CACHE}" = "true" ]; then
+    BUILD_ARGS+=(
+      --cache-from "type=registry,ref=${CACHE_REF}"
+      --cache-to "type=registry,ref=${CACHE_REF},mode=max"
+    )
+    echo "🧠 Registry cache enabled: ${CACHE_REF}"
+  else
+    echo "ℹ️  Registry cache disabled (USE_REGISTRY_CACHE=false)"
+  fi
+
+  if docker buildx build "${BUILD_ARGS[@]}" .; then
     echo ""
     echo "════════════════════════════════════════════════════════════"
     echo "✅ Multi-arch image successfully pushed!"

@@ -27,6 +27,9 @@ Note: If you build a single-arch image (amd64 only), pin workloads to that
 architecture via an overlay patch or add a node selector before deploying.
 For heterogeneous clusters, prefer a multi-arch build and set
 `cluster.allowMixedArch: true` in `deploy/k3s/config-global.yaml`.
+`build-and-push.sh` now auto-selects an existing native multi-arch builder
+(`montage-multiarch`, `simple-builder`, etc.) before falling back to local QEMU,
+and enables registry layer cache by default (`CACHE_REF`).
 
 Set defaults used throughout this guide:
 

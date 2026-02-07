@@ -39,8 +39,16 @@ def test_enqueue_montage_uses_correct_queue_and_logs(monkeypatch, caplog):
         def __init__(self, name):
             self.name = name
 
-        def enqueue(self, fn, job_id, style, options, job_timeout=None):
-            recorded['called'] = (self.name, job_id, options.get('quality_profile'), job_timeout)
+        def enqueue(self, fn, *args, **kwargs):
+            job_id = args[0]
+            options = args[2]
+            recorded['called'] = (
+                self.name,
+                job_id,
+                options.get('quality_profile'),
+                kwargs.get('job_timeout'),
+                kwargs.get('job_id'),
+            )
             class J: id = 'rq-123'
             return J()
 
@@ -54,5 +62,6 @@ def test_enqueue_montage_uses_correct_queue_and_logs(monkeypatch, caplog):
     assert recorded['called'][1] == 'j-1'
     assert recorded['called'][2] == 'preview'
     assert recorded['called'][3] == 42
+    assert recorded['called'][4] == 'j-1'
     assert getattr(rq_job, 'id') == 'rq-123'
     assert any('Enqueuing job j-1' in r.message for r in caplog.records)

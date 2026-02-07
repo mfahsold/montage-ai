@@ -882,7 +882,7 @@ class ProcessingConfig:
     """Batch processing and performance settings."""
 
     batch_size: int = field(default_factory=ConfigParser.make_int_parser("BATCH_SIZE", 25))
-    max_scene_workers: int = field(default_factory=lambda: ConfigParser.parse_int("MAX_SCENE_WORKERS", os.cpu_count() or 2))
+    max_scene_workers: int = field(default_factory=lambda: ConfigParser.parse_int("MAX_SCENE_WORKERS", get_effective_cpu_count()))
     force_gc: bool = field(default_factory=ConfigParser.make_bool_parser("FORCE_GC", True))
     parallel_enhance: bool = field(default_factory=ConfigParser.make_bool_parser("PARALLEL_ENHANCE", True))
     skip_existing_outputs: bool = field(default_factory=ConfigParser.make_bool_parser("SKIP_EXISTING_OUTPUTS", True))

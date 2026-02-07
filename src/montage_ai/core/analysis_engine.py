@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_compl
 import numpy as np
 
 from ..logger import logger
-from ..config import Settings
+from ..config import Settings, get_effective_cpu_count
 from .context import AudioAnalysisResult, SceneInfo, MontageContext
 from ..utils import file_exists_and_valid
 from ..media_files import list_media_files
@@ -428,19 +428,20 @@ class AssetAnalyzer:
             # OPTIMIZATION Phase 3: ProcessPoolExecutor for CPU-intensive scene detection
             # Bypasses Python GIL for 2-4x speedup on multi-core systems
             # PHASE 5: Scale with available cores (cluster-optimized)
-            cpu_count = os.cpu_count() or 2
+            cpu_count = max(1, get_effective_cpu_count())
             cfg_workers = self.settings.processing.max_scene_workers
 
             # CRITICAL: Respect LOW_MEMORY_MODE for constrained environments
             if self.settings.features.low_memory_mode:
-                # Strict sequential processing - never exceed configured workers
-                max_workers = min(len(uncached_videos), cfg_workers)
-                logger.info(f"   ⚠️ LOW_MEMORY_MODE: Sequential scene detection ({max_workers} worker)")
+                # Strict sequential processing in constrained environments.
+                max_workers = 1
+                logger.info("   ⚠️ LOW_MEMORY_MODE: Sequential scene detection (1 worker)")
             else:
+                # Use up to 50% of effective CPUs (cgroup-aware), never below 1.
                 max_workers = min(
                     len(uncached_videos),
-                    max(4, cpu_count // 2),  # Use 50% of cores (reserve for system)
-                    cfg_workers
+                    max(1, cpu_count // 2),
+                    cfg_workers,
                 )
             logger.info(f"   🚀 ProcessPool scene detection ({len(uncached_videos)} videos, {max_workers}/{cpu_count} CPU workers)")
             
@@ -584,13 +585,13 @@ class AssetAnalyzer:
                 return scene, {}
 
         # OPTIMIZATION: Scale workers with scene count (up to CPU cores)
-        cpu_count = os.cpu_count() or 4
+        cpu_count = max(1, get_effective_cpu_count())
         if self.settings.features.low_memory_mode:
             # LOW_MEMORY_MODE: Sequential AI analysis to minimize memory spikes
             ai_workers = 1
             logger.debug("   ⚠️ LOW_MEMORY_MODE: Sequential AI scene analysis")
         else:
-            ai_workers = min(len(scenes_to_analyze), max(4, cpu_count // 2))
+            ai_workers = min(len(scenes_to_analyze), max(1, cpu_count // 2))
 
         total_ai = len(scenes_to_analyze)
         if total_ai == 0:

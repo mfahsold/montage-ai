@@ -375,6 +375,114 @@ def get_montage_queue(options: dict) -> ResilientQueue:
     return queue_fast if quality == "preview" else queue_heavy
 
 
+_ACTIVE_RQ_STATUSES = {"queued", "started", "deferred", "scheduled"}
+
+
+def _resolve_job_timeout_seconds(options: dict) -> int:
+    """Resolve effective job timeout from options/settings."""
+    quality = (options or {}).get("quality_profile", "standard")
+    default_timeout = (
+        _settings.processing.preview_job_timeout
+        if quality == "preview"
+        else _settings.processing.default_job_timeout
+    )
+    raw_timeout = (options or {}).get("job_timeout", default_timeout)
+    try:
+        return max(1, int(raw_timeout))
+    except (TypeError, ValueError):
+        return max(1, int(default_timeout))
+
+
+def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse ISO datetime with best-effort timezone normalization."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _is_rq_job_active(rq_job_id: str) -> bool:
+    """Check if RQ currently tracks this job as active."""
+    if not redis_conn or not rq_job_id:
+        return False
+
+    try:
+        from rq.exceptions import NoSuchJobError
+        from rq.job import Job
+
+        rq_job = Job.fetch(rq_job_id, connection=redis_conn)
+        status = (rq_job.get_status(refresh=True) or "").lower()
+        return status in _ACTIVE_RQ_STATUSES
+    except NoSuchJobError:
+        return False
+    except Exception as exc:  # noqa: BLE001
+        # Fail-open on Redis/RQ transient errors to avoid false stale-failures.
+        logger.warning("Could not verify RQ status for %s: %s", rq_job_id, exc)
+        return True
+
+
+def _reconcile_stale_job(job_id: str, job: dict) -> dict:
+    """Mark orphaned running jobs as failed when they exceed timeout + grace."""
+    if not isinstance(job, dict):
+        return job
+
+    status = str(job.get("status") or "").lower()
+    if status not in {"running", "started"}:
+        return job
+
+    updated_at = _parse_iso_datetime(job.get("updated_at")) or _parse_iso_datetime(job.get("created_at"))
+    if not updated_at:
+        return job
+
+    options = job.get("options") if isinstance(job.get("options"), dict) else {}
+    timeout_seconds = _resolve_job_timeout_seconds(options)
+    stale_grace_seconds = max(60, int(os.environ.get("JOB_STALE_GRACE_SECONDS", "600")))
+    stale_after_seconds = timeout_seconds + stale_grace_seconds
+    age_seconds = int((datetime.now(timezone.utc) - updated_at).total_seconds())
+
+    if age_seconds <= stale_after_seconds:
+        return job
+
+    rq_job_id = str(job.get("rq_job_id") or job_id)
+    if _is_rq_job_active(rq_job_id):
+        return job
+
+    err = (
+        f"Job marked stale after {age_seconds}s without updates and no active RQ execution "
+        f"(threshold={stale_after_seconds}s, rq_job_id={rq_job_id})."
+    )
+    updates = {
+        "status": "failed",
+        "phase": {"name": "failed", "label": "Failed"},
+        "error": err,
+        "message": err,
+        "failed_at": datetime.now().isoformat(),
+    }
+
+    persisted = False
+    try:
+        if hasattr(job_store, "update_job_with_retry"):
+            persisted = bool(job_store.update_job_with_retry(job_id, updates, retries=3))
+        else:
+            persisted = bool(job_store.update_job(job_id, updates))
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to persist stale-job reconciliation for %s", job_id)
+
+    if not persisted:
+        return job
+
+    merged = dict(job)
+    merged.update(updates)
+    merged["updated_at"] = datetime.now().isoformat()
+    logger.warning("Reconciled stale job %s -> failed (rq_job_id=%s, age=%ss)", job_id, rq_job_id, age_seconds)
+    return merged
+
+
 def enqueue_montage(job_id: str, style: str, options: dict):
     queue = get_montage_queue(options)
 
@@ -386,10 +494,7 @@ def enqueue_montage(job_id: str, style: str, options: dict):
             telemetry.record_event("preview_requests", {"job_id": job_id})
         except Exception:
             logger.debug("Failed to record preview request", exc_info=True)
-    job_timeout = options.get(
-        "job_timeout",
-        _settings.processing.preview_job_timeout if quality == "preview" else _settings.processing.default_job_timeout,
-    )
+    job_timeout = _resolve_job_timeout_seconds(options or {})
 
     # Defensive logging to make queue/timeout mismatches observable in CI/cluster
     try:
@@ -398,12 +503,23 @@ def enqueue_montage(job_id: str, style: str, options: dict):
         queue_name = None
     logger.info("Enqueuing job %s → queue=%s timeout=%s (quality=%s)", job_id, queue_name, job_timeout, quality)
 
-    rq_job = queue.enqueue(run_montage, job_id, style, options, job_timeout=job_timeout)
+    # Use the external job_id as canonical RQ id so status reconciliation can be exact.
+    rq_job = queue.enqueue(run_montage, job_id, style, options, job_timeout=job_timeout, job_id=job_id)
     try:
         rq_id = getattr(rq_job, "id", None) or str(rq_job)
     except Exception:
         rq_id = str(rq_job)
     logger.info("Enqueue result for %s: %s", job_id, rq_id)
+
+    try:
+        updates = {"rq_job_id": rq_id, "job_timeout": job_timeout, "queue": queue_name}
+        if hasattr(job_store, "update_job_with_retry"):
+            job_store.update_job_with_retry(job_id, updates, retries=2)
+        else:
+            job_store.update_job(job_id, updates)
+    except Exception:  # noqa: BLE001
+        logger.warning("Failed to persist queue metadata for job %s", job_id, exc_info=True)
+
     return rq_job
 
 def redis_listener():
@@ -473,7 +589,13 @@ def check_memory_available(required_gb: float = MIN_MEMORY_GB) -> tuple[bool, fl
 def get_job_status(job_id: str) -> dict:
     """Get status of a job."""
     job = job_store.get_job(job_id)
-    return job if job else {"status": "not_found"}
+    if not job:
+        return {"status": "not_found"}
+    try:
+        return _reconcile_stale_job(job_id, job)
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed stale-job reconciliation for %s", job_id)
+        return job
 
 
 # =============================================================================
@@ -1231,6 +1353,11 @@ def api_cancel_job(job_id):
 def api_list_jobs():
     """List all jobs."""
     jobs_dict = job_store.list_jobs()
+    for jid, job in list(jobs_dict.items()):
+        try:
+            jobs_dict[jid] = _reconcile_stale_job(jid, job)
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed stale-job reconciliation during listing for %s", jid)
     job_list = list(jobs_dict.values())
     return jsonify({"jobs": sorted(job_list, key=lambda x: x['created_at'], reverse=True)})
 
