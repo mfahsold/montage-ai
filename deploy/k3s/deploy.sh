@@ -67,6 +67,19 @@ if ! command -v kustomize &> /dev/null; then
   exit 1
 fi
 
+# Inject configured namespace into overlay before kustomize build
+(cd "${SCRIPT_DIR}/overlays/${OVERLAY}" && kustomize edit set namespace "${CLUSTER_NAMESPACE}")
+
+# Ensure namespace exists
+kubectl get namespace "${CLUSTER_NAMESPACE}" >/dev/null 2>&1 || \
+  kubectl create namespace "${CLUSTER_NAMESPACE}"
+kubectl label namespace "${CLUSTER_NAMESPACE}" \
+  app.kubernetes.io/name=montage-ai \
+  app.kubernetes.io/component=web-ui \
+  fluxibri.ai/tier=app \
+  "fluxibri.ai/adaptive-quota=true" \
+  --overwrite 2>/dev/null
+
 # Build manifests with kustomize (includes registry substitution)
 echo "Building manifests from overlay '${OVERLAY}'..."
 MANIFEST_FILE=$(mktemp)
@@ -92,7 +105,7 @@ for doc in "${PVC_DIR}"/doc-*.yaml; do
       continue
     fi
     echo "Applying PVC ${pvc_name}"
-    kubectl apply -f "${doc}"
+    kubectl apply -n "${CLUSTER_NAMESPACE}" -f "${doc}"
     continue
   fi
 
@@ -101,7 +114,7 @@ for doc in "${PVC_DIR}"/doc-*.yaml; do
 done
 
 if [ -s "${NON_PVC_FILE}" ]; then
-  kubectl apply -f "${NON_PVC_FILE}"
+  kubectl apply -n "${CLUSTER_NAMESPACE}" -f "${NON_PVC_FILE}"
 fi
 
 # Wait for deployment

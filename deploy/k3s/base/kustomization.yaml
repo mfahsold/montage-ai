@@ -1,8 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: montage-ai
-
 resources:
   - cluster-rbac.yaml
   - deployment.yaml
@@ -12,7 +10,6 @@ resources:
   - service-ingress.yaml
   - pvc.yaml
   - resourcequota.yaml
-  - namespace.yaml
   - network-policy.yaml
   - pdb.yaml
 

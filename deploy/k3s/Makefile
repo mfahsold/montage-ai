@@ -14,6 +14,7 @@ RESET  := $(shell tput -Txterm sgr0 2>/dev/null || echo '')
 KUBECTL ?= kubectl
 KUSTOMIZE_BUILD ?= kustomize build --load-restrictor LoadRestrictionsNone
 CONFIG_GLOBAL ?= ./config-global.yaml
+-include base/cluster-config.env
 CLUSTER_NAMESPACE ?= montage-ai
 
 CONFIG_ENV_SCRIPT := ../../scripts/ops/render_cluster_config_env.sh
