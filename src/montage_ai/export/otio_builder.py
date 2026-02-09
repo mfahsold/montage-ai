@@ -378,6 +378,46 @@ class OTIOBuilder:
             logger.error(f"EditingParameters JSON export failed: {e}")
             return False
 
+    def _safe_parse_json_response(self, response: str) -> Optional[dict]:
+        """Parse JSON response, handling markdown code blocks and embedded JSON.
+
+        Args:
+            response: Raw string that may contain JSON directly, wrapped in
+                      markdown code blocks, or embedded in surrounding text.
+
+        Returns:
+            Parsed dict, or None if no valid JSON found.
+        """
+        if not response or not response.strip():
+            return None
+
+        text = response.strip()
+
+        # Try direct parse first
+        try:
+            return json.loads(text)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Try extracting from markdown code blocks
+        import re
+        md_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
+        if md_match:
+            try:
+                return json.loads(md_match.group(1).strip())
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Try extracting first JSON object from text
+        brace_match = re.search(r'\{[^{}]*\}', text)
+        if brace_match:
+            try:
+                return json.loads(brace_match.group(0))
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        return None
+
     def get_timeline(self):
         """Get OTIO timeline for further manipulation."""
         return self.timeline

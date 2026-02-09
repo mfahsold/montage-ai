@@ -9,6 +9,8 @@ metadata:
     app.kubernetes.io/component: worker
 spec:
   replicas: 3
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
   selector:
     matchLabels:
       app.kubernetes.io/name: montage-ai

@@ -118,10 +118,6 @@ class EncoderRouter:
         if self.local_node:
             self.add_node(self.local_node)
 
-
-# Backwards-compatible alias to clarify this is the cluster/distributed router.
-ClusterEncoderRouter = EncoderRouter
-
     def _create_local_node(self, hw_config: HWConfig) -> EncoderNode:
         """Create local node from hardware config."""
         return EncoderNode(
@@ -219,6 +215,10 @@ ClusterEncoderRouter = EncoderRouter
             if node.name == name:
                 return node
         return None
+
+
+# Backwards-compatible alias to clarify this is the cluster/distributed router.
+ClusterEncoderRouter = EncoderRouter
 
 
 # =============================================================================

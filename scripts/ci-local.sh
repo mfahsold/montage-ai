@@ -62,6 +62,22 @@ fi
 SKIP_SYNC=0
 if [ -f uv.lock ]; then
   echo "Found uv.lock — performing locked sync"
+
+  # Pre-check: detect stale lockfile before attempting sync
+  if ! uv lock --check 2>/dev/null; then
+    echo ""
+    echo "❌ ERROR: uv.lock is out of date with pyproject.toml"
+    echo ""
+    echo "To fix, run:"
+    echo "  uv lock"
+    echo "  git add uv.lock"
+    echo "  git commit -m 'chore: update uv.lock'"
+    echo ""
+    echo "Then retry:"
+    echo "  ./scripts/ci-local.sh"
+    exit 1
+  fi
+
   if ! uv sync --locked --all-extras --dev; then
     echo "Warning: locked sync with extras failed. Falling back to locked sync without extras."
     uv sync --locked --dev || { echo "uv sync --locked --dev failed; aborting."; exit 1; }

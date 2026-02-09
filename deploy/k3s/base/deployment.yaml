@@ -11,6 +11,8 @@ metadata:
     fluxibri.ai/tier: web
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
   selector:
     matchLabels:
       app.kubernetes.io/name: montage-ai
