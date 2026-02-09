@@ -6,4 +6,4 @@ resources:
 - keda-scaledobjects.yaml
 # Namespace is injected dynamically by deploy.sh via `kustomize edit set namespace`.
 # Default matches CLUSTER_NAMESPACE in config-global.yaml / deploy/config.env.
-namespace: montage-ai
+namespace: montage-ai-test
