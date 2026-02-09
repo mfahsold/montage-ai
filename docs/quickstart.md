@@ -53,6 +53,25 @@ docker compose up
 
 Open http://localhost:8080 in your browser.
 
+> **Build taking a while?** The first build downloads base images and ~40 Python packages (~1.2 GB). Subsequent builds use Docker cache and are much faster. If the build hangs for >30 minutes, check your network (`ping registry-1.docker.io`) and disk space (`df -h`, needs 3+ GB free). Use `docker compose build --progress=plain` for verbose output.
+
+### 4.5. Verify Installation
+
+Before creating your first montage, verify everything is working:
+
+```bash
+# Check container is running
+docker ps | grep montage-ai
+
+# Verify CLI is accessible
+docker compose run --rm montage-ai /app/montage-ai.sh --help
+
+# Check data directories are mounted
+docker compose run --rm montage-ai ls /data/input /data/music /data/output
+```
+
+All three commands should succeed. If not, see [Troubleshooting](troubleshooting.md) or the full [Installation Test Guide](INSTALLATION_TEST.md).
+
 ### 5. Create Your First Montage
 
 1. Select a style (e.g., "Dynamic" or "Hitchcock")
@@ -73,6 +92,12 @@ QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
 # Specific style
 docker compose run --rm montage-ai ./montage-ai.sh run hitchcock
 ```
+
+---
+
+## Working Directory
+
+> All commands on this page assume you are in the repository root (`montage-ai/`).
 
 ---
 

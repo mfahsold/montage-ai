@@ -10,6 +10,8 @@ Choose the setup that fits your environment:
 
 ---
 
+> All commands on this page assume you are in the repository root (`montage-ai/`).
+
 ## Docker Setup
 
 ### Prerequisites
@@ -57,7 +59,16 @@ docker compose build    # First build takes 5-15 min (downloads dependencies)
 docker compose up
 ```
 
-> **First build:** `docker compose build` downloads base images and installs all dependencies. This takes 5-15 minutes depending on your internet speed. Subsequent builds use the Docker cache and are much faster.
+> **First build:** `docker compose build` downloads base images and installs all dependencies (~1.2 GB). This takes 5-15 minutes depending on your internet speed. Subsequent builds use the Docker cache and are much faster. If the build hangs, try `docker compose build --progress=plain` for verbose output.
+
+> **Resource limits:** Docker defaults to 12 GB memory / 4 CPUs. If your system has more (or less) RAM, override:
+> ```bash
+> # 32 GB system:
+> DOCKER_MEMORY_LIMIT=24g DOCKER_CPU_LIMIT=8 docker compose up
+> # 8 GB system:
+> DOCKER_MEMORY_LIMIT=6g DOCKER_CPU_LIMIT=2 QUALITY_PROFILE=preview docker compose up
+> ```
+> See [Performance Tuning](performance-tuning.md) for all options.
 
 Open http://localhost:8080 in your browser.
 
@@ -67,6 +78,21 @@ If port 8080 is already in use:
 WEB_PORT=8081 docker compose up
 # Then open http://localhost:8081
 ```
+
+### 3.5. Verify installation
+
+```bash
+# Check container is running
+docker ps | grep montage-ai
+
+# Verify CLI is accessible
+docker compose run --rm montage-ai /app/montage-ai.sh --help
+
+# Check data directories are mounted
+docker compose run --rm montage-ai ls /data/input /data/music /data/output
+```
+
+For a comprehensive test, see [Installation Test Guide](INSTALLATION_TEST.md).
 
 ### 4. CLI usage (alternative to Web UI)
 

@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 # Create synthetic test media for montage-ai development/testing
 # Generates minimal test video and audio files without needing external media
+#
+# This script is idempotent — safe to run multiple times.
+# Existing test files will not be overwritten unless --force is used.
+#
+# Usage:
+#   ./scripts/ops/create-test-video.sh          # Create files (skip if exist)
+#   ./scripts/ops/create-test-video.sh --force   # Regenerate all files
 
 set -euo pipefail
+
+FORCE=false
+if [[ "${1:-}" == "--force" ]]; then
+    FORCE=true
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -24,7 +36,10 @@ echo "🎬 Creating synthetic test media..."
 # - Size: ~1-2 MB (depending on duration)
 
 VIDEO_FILE="${TEST_DATA_DIR}/input/test-video.mp4"
-if [ ! -f "$VIDEO_FILE" ]; then
+if [ -f "$VIDEO_FILE" ] && [ "$FORCE" = false ]; then
+    echo "  ✓ Test video already exists: $VIDEO_FILE"
+    echo "    To regenerate, run: $0 --force"
+else
     echo "  📹 Generating test video (10 sec, 1920x1080)..."
     ffmpeg -f lavfi -i "color=c=blue:s=1920x1080:d=10" \
            -f lavfi -i "sine=f=440:d=10" \
@@ -41,7 +56,10 @@ fi
 # - Frequency: 440 Hz (standard A note tuning)
 
 AUDIO_FILE="${TEST_DATA_DIR}/music/test-audio.mp3"
-if [ ! -f "$AUDIO_FILE" ]; then
+if [ -f "$AUDIO_FILE" ] && [ "$FORCE" = false ]; then
+    echo "  ✓ Test audio already exists: $AUDIO_FILE"
+    echo "    To regenerate, run: $0 --force"
+else
     echo "  🎵 Generating test audio (10 sec, stereo)..."
     ffmpeg -f lavfi -i "sine=f=440:d=10" \
            -f lavfi -i "sine=f=880:d=10" \
@@ -53,7 +71,10 @@ fi
 
 # Optional: Create multi-clip test video for scene detection testing
 MULTI_CLIP_FILE="${TEST_DATA_DIR}/input/test-multi-scene.mp4"
-if [ ! -f "$MULTI_CLIP_FILE" ]; then
+if [ -f "$MULTI_CLIP_FILE" ] && [ "$FORCE" = false ]; then
+    echo "  ✓ Multi-scene video already exists: $MULTI_CLIP_FILE"
+    echo "    To regenerate, run: $0 --force"
+else
     echo "  📹 Generating multi-scene test video (30 sec with 3 scenes)..."
     # Create 3 segments of different colors (each 10 sec)
     ffmpeg -f lavfi -i "color=c=red:s=1920x1080:d=10" \

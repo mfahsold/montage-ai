@@ -238,6 +238,53 @@ cluster:
 
 Then re-render: `make -C deploy/k3s config`
 
+### ImagePullBackOff on Mixed ARM/AMD Clusters
+
+**Symptom:**
+```
+NAME                     READY   STATUS             RESTARTS   AGE
+montage-ai-web-abc123    0/1     ImagePullBackOff   0          2m
+```
+
+**Cause:** Node architecture in `config-global.yaml` doesn't match the actual node, so the wrong image platform is pulled.
+
+**Fix:**
+```bash
+# Check actual architecture
+kubectl get nodes -o wide
+# See ARCH column: arm64, amd64, etc.
+
+# Update config-global.yaml to match
+# nodes:
+#   - name: "node1"
+#     arch: "arm64"  # ← Must match actual node
+
+# Rebuild multi-arch image
+cd deploy/k3s
+BUILD_MULTIARCH=true ./build-and-push.sh
+```
+
+### Pods Stuck in `Pending` (Storage)
+
+**Symptom:** `kubectl get pods` shows pods stuck in `Pending`.
+
+**Cause:** No StorageClass available, or StorageClass doesn't support the required access mode.
+
+**Fix:**
+```bash
+# Check StorageClass
+kubectl get storageclass
+
+# Check PVC status
+kubectl get pvc -n montage-ai
+# All should show "Bound". If "Pending":
+
+kubectl describe pvc -n montage-ai <pvc-name>
+# Look for: "waiting for first consumer" or "no persistent volumes available"
+```
+
+For multi-node clusters, you need an RWX-capable StorageClass (NFS, Longhorn, etc.). See [Cluster Deployment: Storage Setup](cluster-deploy.md#storage-setup).
+
 ---
 
 ## Missing Files
@@ -314,6 +361,52 @@ ss -tlnp | grep 8080   # Linux alternative
 # Use a different port
 WEB_PORT=8081 docker compose up
 # Then open http://localhost:8081
+```
+
+---
+
+## Docker Build Issues
+
+### Build Takes > 30 Minutes
+
+**Cause:** Slow network or disk I/O bottleneck.
+
+**Fix:**
+```bash
+# Increase timeout
+export DOCKER_CLIENT_TIMEOUT=600
+export COMPOSE_HTTP_TIMEOUT=600
+docker compose build
+
+# Use verbose output to see progress
+docker compose build --progress=plain
+```
+
+### "no space left on device"
+
+**Fix:**
+```bash
+# Clean Docker cache
+docker system prune -a --volumes -f
+
+# Check available space (needs >= 3 GB)
+df -h /var/lib/docker
+```
+
+### Dependency Download Fails
+
+**Symptom:**
+```
+ERROR: Could not find a version that satisfies the requirement opencv-python-headless
+```
+
+**Fix:**
+```bash
+# Retry with plain progress for visibility
+docker compose build --progress=plain
+
+# Check network connectivity
+ping registry-1.docker.io
 ```
 
 ---

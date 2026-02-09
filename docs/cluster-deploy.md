@@ -157,6 +157,13 @@ make -C deploy/k3s deploy-cluster
 # Existing data in PVCs will NOT be deleted
 ```
 
+**Verify idempotency** (optional, requires running cluster):
+
+```bash
+./scripts/test-cluster-idempotency.sh
+# Deploys twice and verifies: PVCs unchanged, all PVCs Bound, all pods Running
+```
+
 See [Rollback Guide](operations/rollback.md) for recovery procedures.
 
 ---
@@ -177,6 +184,9 @@ Verify the registry is accessible and the image exists:
 ```bash
 docker pull <your-registry>/montage-ai:<tag>
 ```
+
+**ImagePullBackOff on mixed ARM/AMD clusters:**
+Node architecture in `config-global.yaml` doesn't match the actual node. Check with `kubectl get nodes -o wide` (ARCH column) and update node definitions to match. Then rebuild with `BUILD_MULTIARCH=true ./build-and-push.sh`. See [Troubleshooting](troubleshooting.md#imagepullbackoff-on-mixed-armamd-clusters).
 
 **Unresolved placeholders:**
 Check config-global.yaml for remaining `<...>` values:

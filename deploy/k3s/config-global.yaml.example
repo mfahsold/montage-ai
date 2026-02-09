@@ -42,8 +42,14 @@ cluster:
     # (only lowercase alphanumeric, '-' and '.'; no angle brackets).
     montage: "montage-ai.local"
   nodes:
-    # VERIFY architecture: kubectl get nodes -o wide (check ARCH column)
-    # Or per node: kubectl get node <name> -o jsonpath='{.status.nodeInfo.architecture}'
+    # ⚠️  CRITICAL: Verify architecture BEFORE deploying!
+    # Wrong architecture causes ImagePullBackOff errors (wrong image platform).
+    #
+    # To check your cluster:
+    #   kubectl get nodes -o wide              # See ARCH column
+    #   kubectl get node <name> -o jsonpath='{.status.nodeInfo.architecture}'
+    #
+    # Common values: "amd64" (x86_64), "arm64" (Apple Silicon, Snapdragon, Raspberry Pi)
     - name: "control-plane"
       ip: "<CONTROL_PLANE_IP>"
       arch: "arm64"              # Verify with: kubectl get node <name> -o jsonpath='{.status.nodeInfo.architecture}'

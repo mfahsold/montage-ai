@@ -73,7 +73,19 @@ if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null; then
   fi
 fi
 
-# 6. Check kustomize builds
+# 6. Check node architectures
+if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null; then
+  ACTUAL_ARCHS=$(kubectl get nodes -o jsonpath='{.items[*].status.nodeInfo.architecture}' 2>/dev/null | tr ' ' '\n' | sort -u)
+  if [ -n "$ACTUAL_ARCHS" ]; then
+    echo -e "${GREEN}[OK]${NC} Cluster node architecture(s): $(echo $ACTUAL_ARCHS | tr '\n' ', ' | sed 's/,$//')"
+    echo "       Verify these match your config-global.yaml node definitions."
+    echo "       Run: kubectl get nodes -o wide"
+  else
+    echo -e "${YELLOW}[WARN]${NC} Could not detect node architectures"
+  fi
+fi
+
+# 7. Check kustomize builds
 if command -v kustomize &>/dev/null && [ -d "${SCRIPT_DIR}/base" ]; then
   if kustomize build --load-restrictor LoadRestrictionsNone "${SCRIPT_DIR}/base" >/dev/null 2>&1; then
     echo -e "${GREEN}[OK]${NC} kustomize build (base) succeeds"

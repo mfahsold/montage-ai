@@ -284,6 +284,14 @@ def process_clip(clip_path: str, style: str = "dynamic") -> VideoClip:
 - 2-space indentation
 - Comment non-obvious choices
 
+### Path Conventions
+
+All commands in this project assume you are in the repository root (`montage-ai/`).
+
+- **Local scripts** (run on host): Use relative paths from repo root — `./scripts/setup.sh`, `./scripts/ops/create-test-video.sh`
+- **Docker commands**: Use absolute paths inside the container — `docker compose run --rm montage-ai /app/montage-ai.sh run`
+- Both `./montage-ai.sh` and `/app/montage-ai.sh` work inside Docker (because `working_dir: /app`), but prefer `/app/montage-ai.sh` for clarity in documentation.
+
 ### Programming style & AI assistants
 
 - **Config-first**: Do NOT hardcode config values (IPs, registry URLs, paths, resource limits). Add settings to `deploy/k3s/config-global.yaml` or `config.Settings`.

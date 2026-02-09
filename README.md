@@ -62,7 +62,17 @@ RAM: (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
 CPU: (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 ```
 
-If Docker fails to start, reduce the memory limit in docker-compose.yml.
+**Resource limits:** Docker defaults to 12 GB memory / 4 CPUs (optimized for 16 GB systems). Override for your system:
+
+```bash
+# 32 GB system (recommended for best performance):
+DOCKER_MEMORY_LIMIT=24g DOCKER_CPU_LIMIT=8 docker compose up
+
+# 8 GB system (minimum, use preview mode):
+DOCKER_MEMORY_LIMIT=6g DOCKER_CPU_LIMIT=2 QUALITY_PROFILE=preview docker compose up
+```
+
+If Docker fails to start with "OCI runtime error", reduce the memory limit below your system RAM.
 
 ## First-Time Setup
 

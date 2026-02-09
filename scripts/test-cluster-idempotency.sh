@@ -68,6 +68,21 @@ else
   echo -e "   ${YELLOW}[WARN]${NC} ${NOT_RUNNING} pod(s) not in Running state"
 fi
 
+# Test 5: ConfigMap change should NOT restart pods
+echo ""
+echo "5. Testing ConfigMap update does not restart pods..."
+POD_UIDS_BEFORE=$(kubectl get pods -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.uid}{"\n"}{end}' 2>/dev/null | sort)
+kubectl patch configmap montage-ai-config -n "$NAMESPACE" -p '{"data":{"IDEMPOTENCY_TEST":"true"}}' 2>/dev/null || true
+sleep 3
+POD_UIDS_AFTER=$(kubectl get pods -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.uid}{"\n"}{end}' 2>/dev/null | sort)
+
+if [ "$POD_UIDS_BEFORE" = "$POD_UIDS_AFTER" ]; then
+  echo -e "   ${GREEN}[OK]${NC} ConfigMap update did not restart pods"
+else
+  echo -e "   ${RED}[FAIL]${NC} Pods restarted after ConfigMap update"
+  ERRORS=$((ERRORS + 1))
+fi
+
 echo ""
 echo "================================================================"
 if [ "$ERRORS" -gt 0 ]; then
