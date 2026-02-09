@@ -205,6 +205,25 @@ Or disable smart reframing:
 SMART_REFRAME_ENABLED=false ./montage-ai.sh run
 ```
 
+### MediaPipe on ARM64 {#mediapipe-on-arm64}
+
+**Why is MediaPipe unavailable on ARM64?**
+
+Google does not publish pre-built `mediapipe` wheels for Linux aarch64 (or Python >= 3.13). The library relies on platform-specific C++ binaries that are only built for x86_64 Linux, macOS (Intel/Apple Silicon via Rosetta), and Windows.
+
+**What happens without MediaPipe?**
+
+Auto-reframe uses a **center-crop fallback** instead of face detection. This works well for:
+- Landscape → portrait conversion (9:16)
+- Talking-head content (subject usually centered)
+- Action footage (motion detection fills the gap)
+
+**When face detection matters:**
+- Off-center subjects in wide shots
+- Multi-person scenes where the main speaker shifts
+
+**Future:** Building MediaPipe from source on ARM64 is theoretically possible but currently unsupported upstream. Track progress at [google/mediapipe#4292](https://github.com/google/mediapipe/issues/4292).
+
 ### "mediapipe" not installable on aarch64
 On Linux aarch64 (or Python ≥3.13), `mediapipe` wheels are not available. The
 `[ai]` and `[all]` extras skip installing `mediapipe`, and Montage AI falls back

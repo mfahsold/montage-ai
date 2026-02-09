@@ -130,15 +130,47 @@ If you want an automated check and a preview render test:
 - High-performance system: `DOCKER_MEMORY_LIMIT=24g DOCKER_CPU_LIMIT=8 docker compose up`
 - aarch64 local venv: `mediapipe` is unavailable on Python >= 3.13; use Docker or skip `[ai]`
 
-## Docs Index
+## Documentation Navigator
 
-- [Quick Start Guide](docs/quickstart.md) — 5-minute setup
-- [Configuration](docs/configuration.md) — All environment variables and settings
-- [Features](docs/features.md) — Styles, effects, enhancements, export
-- [Troubleshooting](docs/troubleshooting.md) — Common issues and fixes
-- [Performance Tuning](docs/performance-tuning.md) — Optimization for your hardware
-- [Cluster Deployment](docs/cluster-deploy.md) — Kubernetes/K3s deployment
-- [Full Docs Index](docs/README.md) — All documentation
+**Where should I start?**
+
+```
+New user?
+├── Just want to try it → docs/quickstart.md (5 min)
+├── Full setup guide    → docs/getting-started.md
+└── ARM64 device?       → docs/getting-started-arm.md
+
+Already running?
+├── Configure settings  → docs/configuration.md
+├── See all features    → docs/features.md
+├── Fix an error        → docs/troubleshooting.md
+└── Tune performance    → docs/performance-tuning.md
+
+Deploying to K8s?
+├── Cluster setup       → docs/cluster-deploy.md
+├── Full K8s reference  → deploy/k3s/README.md
+└── Operations          → docs/operations/README.md
+
+Developing?
+├── Architecture        → docs/architecture.md
+├── Contributing        → CONTRIBUTING.md
+└── Full docs index     → docs/README.md
+```
+
+## LLM Backend: Optional
+
+Montage AI works **without any LLM backend**. Style templates, beat-synced editing, and all video effects work out of the box. LLM adds natural language creative direction but is not required.
+
+| Capability | No LLM | With LLM (Ollama/Gemini/OpenAI) |
+|-----------|--------|--------------------------------|
+| Style templates (7 built-in) | Yes | Yes |
+| Beat-synced editing | Yes | Yes |
+| All video effects | Yes | Yes |
+| Natural language prompts | — | Yes |
+| Creative Loop (iterative refinement) | — | Yes |
+| Custom editing instructions | — | Yes |
+
+If you see `No LLM backend available` in the logs, this is informational — not an error. To enable LLM features, see [Configuration: AI/LLM Settings](docs/configuration.md#ai--llm-settings).
 
 ## How It Works
 

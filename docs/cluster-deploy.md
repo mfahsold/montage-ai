@@ -130,18 +130,34 @@ open "https://<your-hostname>"
 
 The deployment is **idempotent** and safe to re-run:
 
-| Resource | On Re-deploy |
-|----------|--------------|
-| PVCs (data volumes) | Preserved (immutable fields protected) |
-| ConfigMaps | Updated with latest config |
-| Deployments | Rolling update (zero downtime) |
-| Services | Preserved |
+| Resource | On Re-deploy | Immutable Fields | Notes |
+|----------|-------------|------------------|-------|
+| **PVCs** | Preserved | `storageClassName`, `accessModes`, `storage` size | Data never deleted; mismatches cause errors |
+| **ConfigMaps** | Updated | — | New values applied, but **pods do NOT auto-restart** |
+| **Deployments** | Rolling update | — | Zero-downtime; pods restart if image or env changes |
+| **Services** | Preserved | `clusterIP` | Stable endpoints |
+| **Namespace** | Preserved | `name` | Labels updated |
+
+**Important details:**
+- **ConfigMap changes** require a pod restart to take effect: `kubectl rollout restart deployment/montage-ai-web -n montage-ai`
+- **Image updates** only trigger a rollout if the image tag changes (use unique tags, not just `latest`)
+- **PVC spec is immutable** after creation — if storage class or size changes in config, delete old PVCs first (data loss!)
+
+**Preview changes before applying:**
 
 ```bash
-# Safe to run multiple times:
+# Show what would change without applying
+make -C deploy/k3s diff
+```
+
+**Safe to run multiple times:**
+
+```bash
 make -C deploy/k3s deploy-cluster
 # Existing data in PVCs will NOT be deleted
 ```
+
+See [Rollback Guide](operations/rollback.md) for recovery procedures.
 
 ---
 
@@ -177,6 +193,31 @@ See [Troubleshooting: Kubernetes](troubleshooting.md#kubernetes-deploy-errors) f
 ## Storage Setup
 
 Montage AI requires shared storage (ReadWriteMany PVCs) for media files across pods.
+
+### Storage Requirements by Cluster Type
+
+| Cluster Type | Access Mode | Recommended Provider | Notes |
+|-------------|-------------|---------------------|-------|
+| **Single-node** (testing) | RWO | `local-path` (K3s default) | Works out of the box |
+| **Multi-node** (production) | **RWX** | NFS, Longhorn, Rook/Ceph | Required for shared media across pods |
+| **Cloud** (EKS/GKE) | RWX | EFS (AWS), Filestore (GCP) | Managed RWX providers |
+
+**Why RWX?** Render workers and the web UI pod both need access to the same `/data/input`, `/data/output`, `/data/music`, and `/data/assets` volumes. With RWO (ReadWriteOnce), only one pod on one node can mount the volume — multi-node scheduling will fail with `Multi-Attach error`.
+
+**Check your cluster's StorageClass capabilities:**
+
+```bash
+# List available storage classes
+kubectl get storageclass
+
+# Check if a class supports RWX (look for ReadWriteMany in allowedTopologies or docs)
+kubectl describe storageclass <name>
+```
+
+**PVC stuck in Pending?** Common causes:
+1. No StorageClass exists → install a provisioner (see options below)
+2. StorageClass doesn't support RWX → switch to NFS/Longhorn for multi-node
+3. Insufficient disk → check node disk space with `df -h`
 
 ### Single-Node / Testing
 

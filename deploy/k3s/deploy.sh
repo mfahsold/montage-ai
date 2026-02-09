@@ -10,6 +10,22 @@ DEPLOY_ROOT="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(cd "${DEPLOY_ROOT}/.." && pwd)"
 OVERLAY="${1:-cluster}"  # Default to cluster overlay (canonical)
 
+# Guard: config-global.yaml must exist
+CONFIG_CHECK="${SCRIPT_DIR}/config-global.yaml"
+if [ ! -f "${CONFIG_CHECK}" ]; then
+  echo "❌ ERROR: config-global.yaml not found."
+  echo "Run: cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml"
+  echo "Then replace all <...> placeholders and run: make -C deploy/k3s config"
+  exit 1
+fi
+
+# Guard: run pre-flight checks
+if [ -x "${SCRIPT_DIR}/pre-flight-check.sh" ]; then
+  echo "Running pre-flight checks..."
+  bash "${SCRIPT_DIR}/pre-flight-check.sh" || exit 1
+  echo ""
+fi
+
 # Validate overlay exists
 if [ "${OVERLAY}" != "cluster" ]; then
   echo "❌ ERROR: Only the canonical 'cluster' overlay is supported."

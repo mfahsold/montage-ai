@@ -66,7 +66,7 @@ diff: config ## Show kubectl diff for cluster overlay
 
 deploy: deploy-cluster ## Deploy cluster overlay (default)
 
-deploy-cluster: config ## Deploy cluster overlay (via deploy.sh with PVC guard)
+deploy-cluster: config pre-flight ## Deploy cluster overlay (via deploy.sh with PVC guard)
 	@echo "${GREEN}Deploying cluster overlay...${RESET}"
 	@bash ./deploy.sh cluster
 

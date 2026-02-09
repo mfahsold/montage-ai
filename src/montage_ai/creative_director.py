@@ -310,14 +310,15 @@ class CreativeDirector:
                 backend_errors[backend_name] = str(e)
                 continue
 
-        # Consolidated single error message with configuration hints
+        # Consolidated message — INFO not ERROR because LLM is optional.
+        # Style templates and beat-synced editing work without any LLM backend.
         error_summary = "; ".join(f"{k}: {v}" for k, v in backend_errors.items())
-        logger.error(
-            f"All LLM backends unavailable ({', '.join(backends_attempted)}). "
-            f"Errors: {error_summary}. "
-            "Configure a backend: set OPENAI_API_BASE (OpenAI-compatible), "
-            "GOOGLE_API_KEY (Gemini), CGPU_ENABLED=true (cgpu), "
-            "or OLLAMA_HOST (local). See docs/configuration.md."
+        logger.info(
+            f"No LLM backend available ({', '.join(backends_attempted)}). "
+            "Using style template fallback — this works fine for most workflows. "
+            f"Details: {error_summary}. "
+            "To enable LLM features: set OPENAI_API_BASE, GOOGLE_API_KEY, "
+            "CGPU_ENABLED=true, or OLLAMA_HOST. See docs/configuration.md."
         )
         return None
 

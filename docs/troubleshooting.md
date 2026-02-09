@@ -269,6 +269,24 @@ docker exec montage-ai rm -rf /tmp/*.mp4
 
 ---
 
+## LLM / AI Issues
+
+### "No LLM backend available"
+
+**Symptom:** Log shows `No LLM backend available (OpenAI API, Ollama)`.
+
+**This is NOT an error.** LLM is optional. Montage AI works fully without it — style templates, beat-synced editing, and all video effects function without LLM. The message is informational.
+
+**To enable LLM features** (natural language prompts, Creative Loop):
+- **Ollama (local):** `OLLAMA_HOST=http://localhost:11434`
+- **OpenAI-compatible:** `OPENAI_API_BASE=http://your-api/v1 OPENAI_MODEL=auto`
+- **Google Gemini:** `GOOGLE_API_KEY=your-key`
+- **cgpu:** `CGPU_ENABLED=true`
+
+See [Configuration: AI/LLM](configuration.md#ai--llm-settings) for all options.
+
+---
+
 ## Web UI Issues
 
 **Can't access the Web UI**

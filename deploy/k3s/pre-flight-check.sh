@@ -60,7 +60,20 @@ if command -v kubectl &>/dev/null; then
   fi
 fi
 
-# 5. Check kustomize builds
+# 5. Check StorageClass availability
+if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null; then
+  SC_COUNT=$(kubectl get storageclass --no-headers 2>/dev/null | wc -l || echo "0")
+  if [ "${SC_COUNT:-0}" -gt 0 ]; then
+    echo -e "${GREEN}[OK]${NC} ${SC_COUNT} StorageClass(es) available"
+  else
+    echo -e "${YELLOW}[WARN]${NC} No StorageClass found. Pods requiring PVCs will stay Pending."
+    echo "       For single-node: K3s includes local-path by default."
+    echo "       For multi-node: Install an RWX-capable provisioner (NFS, Longhorn)."
+    echo "       See: docs/cluster-deploy.md#storage-setup"
+  fi
+fi
+
+# 6. Check kustomize builds
 if command -v kustomize &>/dev/null && [ -d "${SCRIPT_DIR}/base" ]; then
   if kustomize build --load-restrictor LoadRestrictionsNone "${SCRIPT_DIR}/base" >/dev/null 2>&1; then
     echo -e "${GREEN}[OK]${NC} kustomize build (base) succeeds"
