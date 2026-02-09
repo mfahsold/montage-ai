@@ -297,8 +297,7 @@ class AutoReframeEngine:
                 # Fallback stub without mock dependency
                 self.face_detector = SimpleNamespace(process=lambda _: SimpleNamespace(detections=[]))
 
-    # Backward compatibility alias
-    SmartReframer = None # Will be set after class definition if needed, but better to just rename usages.
+    # Deprecated: Use AutoReframeEngine directly instead of SmartReframer.
 
     def _calculate_iou(self, box1, box2) -> float:
         """Calculate Intersection over Union (IoU) between two normalized bounding boxes."""
@@ -386,12 +385,10 @@ class AutoReframeEngine:
                             best_iou = iou
                             current_best_face = detection
                     
-                    # If match is too poor, consider it lost (or scene cut)
+                    # If match is too poor, consider face tracking lost (scene cut or exit)
                     if best_iou < 0.1:
-                        # Fallback to largest if tracking fails completely? 
-                        # Or just hold position? Let's hold position for now, but check if there's a HUGE face we are ignoring.
-                        # For stability, let's just increment lost counter.
-                        current_best_face = None 
+                        # Hold last position for stability instead of jumping
+                        current_best_face = None
                     else:
                         frames_since_detection = 0
 

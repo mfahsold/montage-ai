@@ -131,10 +131,69 @@ UPSCALE=false \
 
 **Common CUDA errors:**
 
+| Error                | Cause              | Solution                               |
 | -------------------- | ------------------ | -------------------------------------- |
 | `CUDA out of memory` | Video too large    | Use smaller clips or reduce resolution |
 | `session expired`    | Colab disconnected | Runs auto-retry (2 attempts)           |
 | `CUDA not available` | No GPU assigned    | Run `cgpu connect` again               |
+
+---
+
+## Kubernetes Deploy Errors
+
+### PVC Patch Fails ("spec is immutable")
+
+**Symptom:** `make -C deploy/k3s deploy-cluster` fails with:
+
+```text
+PersistentVolumeClaim "montage-ai-input-nfs" is invalid: spec is immutable
+```
+
+**Cause:** Existing PVCs in the cluster have a different `storageClassName`,
+`accessModes`, or `storage` size than the values rendered from
+`config-global.yaml`.
+
+**Fix:**
+
+```bash
+# 1. Check existing PVC settings
+kubectl get pvc -n montage-ai -o custom-columns=\
+'NAME:.metadata.name,CLASS:.spec.storageClassName,ACCESS:.spec.accessModes[0],SIZE:.spec.resources.requests.storage'
+
+# 2. Update config-global.yaml to match:
+#    - storage.classes.default → must match existing storageClassName
+#    - storage.pvc.* → must match existing PVC names
+
+# 3. Re-render and deploy
+make -C deploy/k3s config
+make -C deploy/k3s deploy-cluster
+```
+
+If the PVCs are no longer needed, delete them first (data loss!):
+
+```bash
+kubectl delete pvc <pvc-name> -n montage-ai
+```
+
+### Ingress Fails ("host is invalid")
+
+**Symptom:** `kubectl apply` rejects the Ingress with:
+
+```text
+host: montage-ai.<YOUR_DOMAIN> is invalid
+```
+
+**Cause:** The `cluster.hostnames.montage` value in `config-global.yaml` still
+contains placeholder characters (`<>`), which violate RFC1123.
+
+**Fix:** Set a valid hostname in `config-global.yaml`:
+```yaml
+cluster:
+  hostnames:
+    montage: "montage-ai.example.com"   # or "montage-ai.local" for dev
+```
+
+Then re-render: `make -C deploy/k3s config`
 
 ---
 
@@ -145,7 +204,6 @@ UPSCALE=false \
 ```bash
 ls data/input/   # Should see your .mp4 files
 ```
-
 
 ```bash
 ls data/music/   # Should see your .mp3 file

@@ -8,13 +8,13 @@ This directory contains example outputs, demo videos, and usage examples for Mon
 
 ### Web UI - Main Interface
 
-![Web UI Hero](../images/web-ui-hero.png)
+<!-- Screenshot: web-ui-hero.png (not yet available) -->
 
 The main interface showing upload area, style selection, and quality profiles.
 
 ### Quality Profiles
 
-![Quality Profiles](../images/quality-profiles.png)
+<!-- Screenshot: quality-profiles.png (not yet available) -->
 
 One-click quality selection replacing multiple toggles:
 - 🚀 **Preview** — Fast iteration
@@ -24,7 +24,7 @@ One-click quality selection replacing multiple toggles:
 
 ### Transcript Editor
 
-![Transcript Editor](../images/transcript-editor.png)
+<!-- Screenshot: transcript-editor.png (not yet available) -->
 
 Descript-style text editing (UI integration in progress; preview screenshot):
 - Word-level timestamps
@@ -34,7 +34,7 @@ Descript-style text editing (UI integration in progress; preview screenshot):
 
 ### Shorts Studio
 
-![Shorts Studio](../images/shorts-studio.png)
+<!-- Screenshot: shorts-studio.png (not yet available) -->
 
 Vertical video creation (UI integration in progress; preview screenshot):
 - Phone-frame preview
@@ -187,19 +187,19 @@ data/
 
 ### Dynamic (Default)
 Best for: General purpose, adapts to music
-![Dynamic Style](../images/style-dynamic.jpg)
+<!-- Screenshot: style-dynamic.jpg (not yet available) -->
 
 ### Hitchcock
 Best for: Thrillers, reveals, dramatic content
-![Hitchcock Style](../images/style-hitchcock.jpg)
+<!-- Screenshot: style-hitchcock.jpg (not yet available) -->
 
 ### MTV
 Best for: Music videos, dance, high energy
-![MTV Style](../images/style-mtv.jpg)
+<!-- Screenshot: style-mtv.jpg (not yet available) -->
 
 ### Wes Anderson
 Best for: Aesthetic pieces, quirky content
-![Wes Anderson Style](../images/style-wes-anderson.jpg)
+<!-- Screenshot: style-wes-anderson.jpg (not yet available) -->
 
 ---
 

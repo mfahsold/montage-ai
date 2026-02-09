@@ -152,14 +152,6 @@ def setup_logger(
         file_handler.setFormatter(FileFormatter())
         logger.addHandler(file_handler)
 
-    # Silence noisy third-party libraries
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("matplotlib").setLevel(logging.WARNING)
-    logging.getLogger("PIL").setLevel(logging.WARNING)
-    logging.getLogger("moviepy").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-
     return logger
 
 

@@ -4,7 +4,7 @@ Clip Processor Module
 Handles the heavy lifting of processing individual clips:
 - FFmpeg extraction
 - Auto-reframing (Smart Crop)
-- Enhancement (Stabilization, Upscaling, Colo Grading)
+- Enhancement (Stabilization, Upscaling, Color Grading)
 - Normalization (Frame rate/Size standardization)
 
 This function is designed to be run in a separate thread/process.
@@ -233,9 +233,6 @@ def process_clip_task(
         if output_profile.pix_fmt:
             vf_filters.append(f"format={output_profile.pix_fmt}")
 
-        # Removed 'normalize' filter to prevent RGB conversion errors
-        # if getattr(settings.features, "luma_normalize", True):
-        #     vf_filters.append("normalize=blackpt=black:whitept=white:smoothing=10")
         vf_chain = ",".join(vf_filters)
 
         def run_normalize(cfg, params, label: str) -> bool:

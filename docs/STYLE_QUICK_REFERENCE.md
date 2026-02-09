@@ -203,9 +203,7 @@ When adding new UI text:
 
 ## 🔗 References
 
-- Full guide: [TYPOGRAPHY_WRITING_GUIDE.md](TYPOGRAPHY_WRITING_GUIDE.md)
-- Audit log: [TYPOGRAPHY_AUDIT_COMPLETE.md](TYPOGRAPHY_AUDIT_COMPLETE.md)
-- Phase 2 summary: [PHASE_2_COMPLETE.md](PHASE_2_COMPLETE.md)
+- Typography and design standards are maintained in the internal documentation set (contact maintainers for access).
 
 ---
 

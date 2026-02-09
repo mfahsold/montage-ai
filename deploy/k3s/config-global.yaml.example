@@ -2,6 +2,10 @@
 # Global Configuration Values for Montage-AI K3s/K8s
 # Copy to deploy/k3s/config-global.yaml and update for your environment.
 # DRY: single source of truth for registry, cluster, storage, and image defaults.
+#
+# WARNING: You MUST replace ALL angle-bracket placeholders (<...>) before running
+# `make -C deploy/k3s config`. Unreplaced placeholders will cause deploy failures
+# (e.g. invalid RFC1123 hostnames in Ingress resources).
 
 registry:
   host: "192.168.1.12"
@@ -30,7 +34,9 @@ cluster:
     memoryRequest: "2Gi"
     memoryLimit: "24Gi"
   hostnames:
-    montage: "montage-ai.<YOUR_DOMAIN>"
+    # Replace with your actual domain. Must be a valid RFC1123 hostname
+    # (only lowercase alphanumeric, '-' and '.'; no angle brackets).
+    montage: "montage-ai.local"
   nodes:
     - name: "control-plane"
       ip: "<CONTROL_PLANE_IP>"
@@ -44,14 +50,19 @@ cluster:
 
 storage:
   classes:
+    # IMPORTANT: If PVCs already exist in your cluster, set 'default' to match
+    # their storageClassName exactly. Kubernetes PVC spec fields (storageClassName,
+    # accessModes, storage size) are IMMUTABLE after creation. Mismatches will
+    # cause deploy failures. Check with: kubectl get pvc -n montage-ai -o yaml
     default: "local-path"
     nfs: "nfs-client"
   nfs:
     server: "<NFS_SERVER_IP>"
     path: "/mnt/nfs-montage"
   pvc:
-    # Optional split PVCs for distributed jobs (RWX recommended)
     # Set these to match existing PVC names to avoid immutable PVC conflicts.
+    # If PVCs already exist with different names, either use those names here
+    # or delete the old PVCs first (data loss!) and let the deploy create new ones.
     input: "montage-ai-input-nfs"
     output: "montage-ai-output-nfs"
     music: "montage-ai-music-nfs"

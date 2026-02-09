@@ -377,4 +377,4 @@ Check the internal backlog via the maintainers (private docs set):
 - 📝 **Documentation**: Always welcome
 - 🧪 **Tests**: We can always use more coverage
 
-See [docs/STRATEGY.md](docs/STRATEGY.md) for product vision and [docs/roadmap/ROADMAP_2026.md](docs/roadmap/ROADMAP_2026.md) for the development plan.
+Product vision and development roadmap are maintained in the private documentation set. Contact the maintainers for access.

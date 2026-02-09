@@ -59,9 +59,9 @@ diff: config ## Show kubectl diff for cluster overlay
 
 deploy: deploy-cluster ## Deploy cluster overlay (default)
 
-deploy-cluster: config ## Deploy cluster overlay
+deploy-cluster: config ## Deploy cluster overlay (via deploy.sh with PVC guard)
 	@echo "${GREEN}Deploying cluster overlay...${RESET}"
-	@$(KUSTOMIZE_BUILD) ./overlays/cluster | $(KUBECTL) apply -f -
+	@bash ./deploy.sh cluster
 
 status: ## Show montage-ai pod status
 	@$(KUBECTL) get pods -n $(CLUSTER_NAMESPACE)

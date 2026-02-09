@@ -47,6 +47,10 @@ If you operate the Fluxibri cluster stack, deploy core infrastructure via
 `mfahsold/fluxibri_core` first (canonical `make deploy-core`). This repo assumes
 those services are already present and focuses on the Montage-AI app layer.
 
+> **Before you start:** Replace **all** angle-bracket placeholders (`<...>`) in
+> your `config-global.yaml`. Unreplaced placeholders cause invalid hostnames and
+> deploy failures. See the "Pre-Deploy Checklist" section below.
+
 ```bash
 # Copy and edit canonical config (local copy is ignored by git)
 cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
@@ -319,6 +323,36 @@ make -C deploy/k3s deploy-cluster
 ```
 
 If the secret is missing, CGPU checks will fail fast and the system will fall back to local CPU/GPU.
+
+---
+
+## Pre-Deploy Checklist
+
+Before running `make deploy-cluster` or `./deploy.sh cluster`, verify:
+
+1. **All placeholders replaced** — no `<...>` tokens remain in your
+   `config-global.yaml`:
+   ```bash
+   grep -n '<[A-Z_]*>' deploy/k3s/config-global.yaml && echo "FIX THESE" || echo "OK"
+   ```
+
+2. **Hostname is valid RFC1123** — `cluster.hostnames.montage` must contain
+   only lowercase letters, digits, `-` and `.` (e.g. `montage-ai.example.com`).
+   If you don't need Ingress, you can set it to `montage-ai.local` and use
+   port-forwarding instead.
+
+3. **Storage class matches existing PVCs** — Kubernetes PVC spec fields
+   (`storageClassName`, `accessModes`, storage size) are **immutable** after
+   creation. If PVCs already exist in your cluster, set `storage.classes.default`
+   to match:
+   ```bash
+   # Check existing PVCs
+   kubectl get pvc -n montage-ai -o custom-columns=\
+   'NAME:.metadata.name,CLASS:.spec.storageClassName,ACCESS:.spec.accessModes[0],SIZE:.spec.resources.requests.storage'
+   ```
+   If you see mismatches, either update `config-global.yaml` to match the
+   existing values, or delete the old PVCs first (`kubectl delete pvc <name>
+   -n montage-ai` — **this deletes data**).
 
 ---
 

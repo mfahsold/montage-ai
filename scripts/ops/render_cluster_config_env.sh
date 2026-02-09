@@ -120,6 +120,20 @@ if [ -z "${CLUSTER_ARCH_SELECTOR_KEY:-}" ]; then
   CLUSTER_ARCH_SELECTOR_KEY="kubernetes.io/arch"
 fi
 
+# Validate: reject unresolved angle-bracket placeholders in critical fields
+_validation_failed=0
+for _var_name in MONTAGE_HOSTNAME CLUSTER_NAMESPACE; do
+  eval "_val=\${${_var_name}:-}"
+  if echo "$_val" | grep -qE '<[A-Z_]+>'; then
+    echo "❌ ERROR: ${_var_name}=\"${_val}\" contains an unresolved placeholder."
+    echo "   Update deploy/k3s/config-global.yaml and replace all <...> values."
+    _validation_failed=1
+  fi
+done
+if [ "$_validation_failed" -eq 1 ]; then
+  exit 1
+fi
+
 cat > "$ENV_OUT" <<EOF_ENV
 REGISTRY_URL=${REGISTRY_URL}
 IMAGE_NAME=${IMAGE_NAME}

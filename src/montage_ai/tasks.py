@@ -130,10 +130,8 @@ def run_montage(job_id: str, style: str, options: dict):
             file_handler.close()
 
 def run_transcript_render(_job_data: dict):
-    """Run transcript render in background."""
-    # Similar to run_montage but for transcript
-    # For now, just a stub or copy logic if needed
-    pass
+    """Run transcript render in background (not yet implemented)."""
+    raise NotImplementedError("Transcript rendering not yet implemented")
 
 
 def run_test_job(job_id: str, duration: int = 5):

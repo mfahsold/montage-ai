@@ -193,13 +193,9 @@ class ShortsWorkflow(VideoWorkflow):
         
         logger.info(f"Reframing to: {self.reframed_path}")
         
-        # Performance Tuning: Use preview preset if this is a preview?
-        # The user/UI doesn't explicitly send "preview" mode for shorts yet, but 
-        # config.quality_profile might be set.
+        # Use quality preset from settings (defaults to "medium" if not configured)
         from ..config import get_settings
         settings = get_settings()
-        # Default to high quality unless env var set or passed (TODO: pass from options)
-        # Using settings.ffmpeg.preset if available or hardcoded "medium"
         
         self.reframer.apply(
             self.crop_data,

@@ -194,23 +194,8 @@ def render_preview(session_id):
                 })
 
         elif session.type == 'transcript':
-            # Transcript Preview
-            # We need to import the timeline builder helper
-            # This is a bit tricky as it was in app.py. 
-            # We should move it to a shared utility or the session class.
-            # For now, we'll duplicate or import if possible.
-            from ...timeline_exporter import Timeline, Clip
-            
-            # Re-implement timeline build logic here or move it to core
-            # Let's assume we move _build_timeline_from_session to session.py or a util
-            # For this refactor, I will inline a simplified version or TODO it
-            
-            # ... (Timeline logic) ...
-            # To keep this file clean, let's assume we move the logic to a util
-            pass 
-            
-            # Placeholder for now to not break the refactor flow
-            return jsonify({"error": "Transcript preview logic moving..."}), 501
+            # Transcript preview not yet implemented (requires timeline builder refactor)
+            return jsonify({"error": "Transcript preview not yet implemented"}), 501
             
         else:
             return jsonify({"error": "Unknown session type"}), 400
