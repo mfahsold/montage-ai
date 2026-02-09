@@ -42,6 +42,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}export-to-nle${NC}   Export timeline to NLE formats (OTIO/EDL/Premiere/AAF)
   ${GREEN}generate-proxies${NC} Generate H.264 proxies for high-res footage (6K+/8K/RAW)
   ${GREEN}check-hw${NC}        Diagnose hardware acceleration (NVENC/VAAPI/QSV)
+  ${GREEN}check-deps${NC}      Check optional dependencies (cgpu, gemini-cli, Docker)
   ${GREEN}list${NC}            List available styles
   ${GREEN}build${NC}           Build Docker image
   ${GREEN}cgpu-start${NC}      Start cgpu serve (Gemini LLM API)
@@ -233,6 +234,24 @@ cgpu_status() {
     else
         echo "  ⚠️ gemini-cli not found (needed for cgpu serve)"
     fi
+}
+
+check_deps() {
+    echo -e "${CYAN}Checking dependencies:${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Required:${NC}"
+    command -v docker &>/dev/null && echo -e "  ✅ Docker ($(docker --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1))" || echo -e "  ❌ Docker (required for all modes)"
+    docker compose version &>/dev/null && echo -e "  ✅ Docker Compose (v2)" || echo -e "  ❌ Docker Compose v2 (required)"
+    command -v python3 &>/dev/null && echo -e "  ✅ Python3 ($(python3 --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'))" || echo -e "  ⚠️  Python3 (needed for local dev, not required for Docker)"
+    echo ""
+    echo -e "  ${YELLOW}Optional (cloud/AI features):${NC}"
+    command -v cgpu &>/dev/null && echo -e "  ✅ cgpu (LLM features, voice isolation, cloud GPU)" || echo -e "  ⚠️  cgpu not installed (needed for: LLM features, voice isolation, cloud GPU)"
+    command -v gemini &>/dev/null && echo -e "  ✅ gemini-cli (cgpu serve backend)" || echo -e "  ⚠️  gemini-cli not installed (needed for: cgpu serve)"
+    command -v ffmpeg &>/dev/null && echo -e "  ✅ FFmpeg ($(ffmpeg -version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1))" || echo -e "  ⚠️  FFmpeg not found locally (included in Docker image)"
+    echo ""
+    echo -e "  ${YELLOW}Cluster (optional):${NC}"
+    command -v kubectl &>/dev/null && echo -e "  ✅ kubectl" || echo -e "  ⚠️  kubectl (needed for Kubernetes deployment)"
+    command -v kustomize &>/dev/null && echo -e "  ✅ kustomize" || echo -e "  ⚠️  kustomize (needed for Kubernetes deployment)"
 }
 
 build_image() {
@@ -547,6 +566,10 @@ case "${1:-run}" in
         shift
         python3 -m montage_ai.cli check-hw "$@"
         exit $?
+        ;;
+    check-deps)
+        check_deps
+        exit 0
         ;;
     help|--help|-h)
         show_help

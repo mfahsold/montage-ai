@@ -64,11 +64,10 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check if docker-compose is available
-if ! command -v docker || ! command -v docker-compose &> /dev/null; then
-    if ! docker compose version &> /dev/null; then
-        echo "⚠️  docker compose not found. Install Docker Compose v2."
-    fi
+# Check for Compose v2 (preferred)
+if ! docker compose version &> /dev/null; then
+    echo "⚠️  docker compose (v2) not found. Install Docker Compose v2."
+    echo "   See: https://docs.docker.com/compose/install/"
 fi
 
 docker_version=$(docker --version | grep -oE "[0-9]+\.[0-9]+")

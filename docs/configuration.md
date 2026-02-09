@@ -712,6 +712,32 @@ NUM_VARIANTS=5 \
 
 ---
 
+## Running Without Cloud Dependencies
+
+For fully local, deterministic runs without any cloud or AI services:
+
+```bash
+CGPU_ENABLED=false \
+STORY_ENGINE=false \
+VOICE_ISOLATION=false \
+CAPTIONS=false \
+TEST_NO_LLM=1 \
+docker compose run --rm montage-ai /app/montage-ai.sh run dynamic
+```
+
+This uses only local FFmpeg beat detection and scene analysis. No LLM, no cloud GPU, no network calls. Useful for:
+- Air-gapped environments
+- Reproducible CI/CD pipelines
+- Testing without API keys
+
+To check which optional dependencies are available:
+
+```bash
+./montage-ai.sh check-deps
+```
+
+---
+
 ## See Also
 
 - **[Features](features.md)** — Feature matrix and CLI examples

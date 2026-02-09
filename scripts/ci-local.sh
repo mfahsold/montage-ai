@@ -3,6 +3,27 @@ set -euo pipefail
 
 # Local CI script: installs uv (if missing), sets up Python and dependencies via uv, then runs tests.
 # Designed to run on developer machines or self-hosted runners to avoid GitHub Actions costs.
+# Use DRY_RUN=1 for quick syntax checks without installing packages or running tests.
+
+if [ "${DRY_RUN:-0}" = "1" ]; then
+  echo "DRY_RUN mode: checking syntax only"
+  bash -n "$0"
+
+  # Syntax check all Python files
+  echo "Checking Python syntax..."
+  ERRORS=0
+  while IFS= read -r f; do
+    python3 -m py_compile "$f" 2>&1 || ERRORS=$((ERRORS + 1))
+  done < <(find src/ tests/ -name "*.py" 2>/dev/null | head -200)
+
+  if [ "$ERRORS" -gt 0 ]; then
+    echo "❌ Found $ERRORS syntax error(s)"
+    exit 1
+  fi
+
+  echo "✅ Syntax checks passed"
+  exit 0
+fi
 
 UV_BIN="$(command -v uv || true)"
 if [ -z "$UV_BIN" ]; then

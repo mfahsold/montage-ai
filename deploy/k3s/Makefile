@@ -3,7 +3,7 @@
 # Single entry point for cluster operations
 # ==============================================================================
 
-.PHONY: help config validate pre-flight diff deploy deploy-cluster status health
+.PHONY: help config validate validate-config pre-flight diff deploy deploy-cluster status health
 
 GREEN  := $(shell tput -Txterm setaf 2 2>/dev/null || echo '')
 YELLOW := $(shell tput -Txterm setaf 3 2>/dev/null || echo '')
@@ -57,6 +57,9 @@ check-jobset: ## Check if JobSet CRD is present
 
 pre-flight: ## Run pre-flight checks before deploying
 	@bash ./pre-flight-check.sh
+
+validate-config: ## Ensure all placeholders in config-global.yaml are replaced
+	@bash ./validate-config.sh $(CONFIG_GLOBAL)
 
 diff: config ## Show kubectl diff for cluster overlay
 	@$(KUSTOMIZE_BUILD) ./overlays/cluster | $(KUBECTL) diff -f - || true
