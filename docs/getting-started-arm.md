@@ -2,6 +2,10 @@
 
 This guide covers ARM64-specific setup. For general setup, see the [README](../README.md).
 
+## ARM64 Limitations
+
+> **MediaPipe not available on ARM64.** Auto-reframe uses center-crop fallback instead of face detection. This works well for most content. The `[WARN] MediaPipe not installed` log message is expected and safe to ignore. See [Optional Dependencies](OPTIONAL_DEPENDENCIES.md) for details.
+
 ## Prerequisites
 
 - Docker + Docker Compose v2 ([general requirements](../README.md#system-requirements))

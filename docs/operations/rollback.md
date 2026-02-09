@@ -1,6 +1,84 @@
-# Rollback Guide
+# Rollback & Recovery Guide
 
-How to recover from failed deployments or revert to a previous version.
+How to recover from failed deployments, revert to a previous version, and safely re-deploy.
+
+---
+
+## Idempotency Guarantees
+
+`deploy.sh` and `make deploy-cluster` are designed to be **safe to run multiple times**:
+
+| Resource | First Deploy | Re-deploy | Notes |
+|----------|-------------|-----------|-------|
+| Namespace | Created | Skipped (exists) | Labels updated |
+| PVCs | Created | **Skipped** (immutable) | Data preserved |
+| ConfigMaps | Created | Updated | New config values applied |
+| Deployments | Created | Rolling update | Zero-downtime |
+| Services | Created | No change | Stable endpoints |
+| Ingress | Created | Updated | Hostname from config |
+
+**Key:** PVCs are never deleted or modified during re-deploy. This protects your data.
+
+### Safe Re-deploy
+
+```bash
+# Always safe to run:
+make -C deploy/k3s config
+make -C deploy/k3s deploy-cluster
+# → Existing PVCs preserved, Deployments updated
+```
+
+### After a Failed Image Push
+
+```bash
+# Fix the image, then re-push and re-deploy:
+cd deploy/k3s
+./build-and-push.sh
+./deploy.sh cluster
+# → Pods will pull the new image
+```
+
+### PVC Lifecycle
+
+PVCs are **immutable** after creation (storageClassName, accessModes, size cannot change).
+
+```bash
+# Check existing PVCs
+kubectl get pvc -n "${CLUSTER_NAMESPACE:-montage-ai}"
+
+# If PVC names changed in config, you must either:
+# 1. Update config-global.yaml storage.pvc.* to match existing names
+# 2. Or delete old PVCs first (WARNING: data loss!)
+kubectl delete pvc <old-name> -n "${CLUSTER_NAMESPACE:-montage-ai}"
+```
+
+### Recovering from Interrupted PVC Creation
+
+If deploy was interrupted mid-PVC-creation:
+
+```bash
+# Check for stuck PVCs
+kubectl get pvc -n "${CLUSTER_NAMESPACE:-montage-ai}" | grep -v Bound
+
+# Delete stuck (Pending) PVCs and re-deploy
+kubectl delete pvc <stuck-pvc> -n "${CLUSTER_NAMESPACE:-montage-ai}"
+make -C deploy/k3s deploy-cluster
+```
+
+### Scaling Workers Safely
+
+```bash
+NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
+
+# Scale up
+kubectl scale deployment montage-ai-worker -n "$NAMESPACE" --replicas=4
+
+# Scale down (graceful — waits for in-progress jobs)
+kubectl scale deployment montage-ai-worker -n "$NAMESPACE" --replicas=1
+
+# Scale to zero (stop all workers)
+kubectl scale deployment montage-ai-worker -n "$NAMESPACE" --replicas=0
+```
 
 ---
 

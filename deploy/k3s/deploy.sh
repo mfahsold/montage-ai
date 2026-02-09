@@ -136,6 +136,10 @@ if kubectl wait --for=condition=available --timeout=300s deployment/${APP_NAME} 
 else
   echo "⚠️  Deployment not ready after 300s. Check pod status:"
   kubectl get pods -n ${CLUSTER_NAMESPACE} -l ${APP_LABEL}
+  echo ""
+  echo "Rollback commands:"
+  echo "  kubectl rollout undo deployment/${APP_NAME} -n ${CLUSTER_NAMESPACE}"
+  echo "  See: docs/operations/rollback.md"
 fi
 
 echo ""

@@ -5,7 +5,7 @@ endpoints, node topology, incident playbooks) live in the private docs set.
 
 ## Core Runbooks
 
-- [Rollback Guide](rollback.md)
+- [Rollback & Recovery Guide](rollback.md) — Idempotency, PVC lifecycle, rollback, scaling
 - [Preview SLO (canonical)](preview-slo.md)
 - [Scaling & Autoscaling](scaling.md)
 - [KEDA / Metrics / Autoscaler](infra_keda.md)

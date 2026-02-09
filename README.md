@@ -104,6 +104,8 @@ docker compose up
 
 ARM64 is supported via multi-arch Docker images. Use the same commands.
 
+> **ARM64 limitation:** MediaPipe (face detection for auto-reframe) is not available on ARM64. Auto-reframe uses **center-crop fallback**, which works well for most content. The `[WARN] MediaPipe not installed` log message is safe to ignore. See [Optional Dependencies](docs/OPTIONAL_DEPENDENCIES.md) for details.
+
 Verify architecture:
 
 ```bash
@@ -114,8 +116,6 @@ Recommended Docker resources (examples):
 
 - Snapdragon 12 GB: memory 8g, cpus 8
 - Apple Silicon 16 GB: memory 12g, cpus 8
-
-**MediaPipe note:** On ARM64, MediaPipe (face detection for smart reframing) may not be available. This is expected — auto-reframe falls back to center-crop mode, which works well for most content. The `[WARN] MediaPipe not installed` log message is safe to ignore.
 
 If you want an automated check and a preview render test:
 

@@ -19,8 +19,9 @@ pip install montage-ai[ai]
 Adds:
 - **mediapipe** — Smart Reframing with face detection
 - **scipy** — Path optimization for smooth camera motion
-- **librosa** — Audio analysis fallback (FFmpeg is primary)
 - **color-matcher** — Shot-to-shot color consistency
+
+> **Note:** `librosa` was removed from `[ai]` extras due to Python 3.12 incompatibility (numba/llvmlite). FFmpeg `astats`/tempo is the primary beat detection engine and works without librosa. If you need librosa on Python <3.12, install it manually: `pip install librosa`.
 
 ### With Web UI
 ```bash
@@ -106,8 +107,9 @@ Includes all optional groups (equivalent to `pip install -r requirements.txt`)
 |---------|---------|---------|-------|------|
 | **mediapipe** | ≥0.10.0 | Face detection for smart reframing | Optional; skipped on Linux aarch64 or Python ≥3.13 | ~300 MB |
 | **scipy** | ≥1.10.0 | Path optimization for camera motion | Optional; fallback to linear interpolation | ~45 MB |
-| **librosa** | ≥0.10.0 | Audio analysis fallback | FFmpeg is primary; librosa is conditional | ~25 MB |
 | **color-matcher** | ≥0.5.0 | Shot-to-shot color grading | Optional; fallback: no color matching | ~2 MB |
+
+> `librosa` was removed from `[ai]` due to Python 3.12 incompatibility. FFmpeg is the primary audio analysis engine.
 
 ### Web UI (`[web]`)
 
