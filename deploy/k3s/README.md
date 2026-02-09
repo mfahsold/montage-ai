@@ -226,7 +226,7 @@ Some manifests use `<IMAGE_FULL>` placeholders (jobs and patches). Render them
 with the shared image resolver:
 
 ```bash
-scripts/render-image.sh deploy/k3s/job-documentary-trailer.yaml > /tmp/job.yaml
+./scripts/render-image.sh deploy/k3s/job-documentary-trailer.yaml > /tmp/job.yaml
 kubectl apply -f /tmp/job.yaml
 ```
 
@@ -325,7 +325,7 @@ kubectl -n "${CLUSTER_NAMESPACE:-montage-ai}" create secret generic cgpu-credent
 You can automate this with:
 
 ```bash
-scripts/ops/cgpu-refresh-session.sh
+./scripts/ops/cgpu-refresh-session.sh
 ```
 
 ### 2) Enable CGPU in cluster config
@@ -624,7 +624,7 @@ Use a lightweight benchmark job to label nodes with a performance multiplier
 for task routing (label: `montage-ai/bench-score`).
 
 ```bash
-python3 scripts/benchmarks/run_cluster_benchmark.py --namespace "$CLUSTER_NAMESPACE"
+python3 ./scripts/benchmarks/run_cluster_benchmark.py --namespace "$CLUSTER_NAMESPACE"
 ```
 
 ---

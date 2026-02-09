@@ -16,6 +16,8 @@ Step-by-step guide for deploying Montage AI to a Kubernetes (K3s/K8s) cluster.
 
 ## Quick Start
 
+> **Storage required:** Pods will stay in `Pending` or `Init:0/2` if no storage class is available. Verify with `kubectl get storageclass` before deploying. See [Storage Setup](#storage-setup) below.
+
 ```bash
 # 1. Configure
 cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
@@ -24,13 +26,16 @@ cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
 # 2. Render manifests
 make -C deploy/k3s config
 
-# 3. Validate
+# 3. Pre-flight check (tools, placeholders, cluster connectivity)
+make -C deploy/k3s pre-flight
+
+# 4. Validate
 make -C deploy/k3s validate
 
-# 4. Deploy
+# 5. Deploy
 make -C deploy/k3s deploy-cluster
 
-# 5. Access Web UI
+# 6. Access Web UI
 kubectl port-forward -n montage-ai svc/montage-ai-web 8080:80
 # Open http://localhost:8080
 ```

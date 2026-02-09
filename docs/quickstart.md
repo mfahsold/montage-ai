@@ -44,9 +44,10 @@ cp ~/Videos/*.mp4 data/input/
 cp ~/Music/track.mp3 data/music/
 ```
 
-### 4. Start Web UI
+### 4. Build and Start Web UI
 
 ```bash
+docker compose build    # First build: 5-15 min (subsequent builds use cache)
 docker compose up
 ```
 

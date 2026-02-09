@@ -71,7 +71,7 @@ Without this secret, CGPU jobs will fall back to local CPU/GPU.
 ### One‑shot helper (recommended)
 
 ```bash
-scripts/ops/cgpu-refresh-session.sh
+./scripts/ops/cgpu-refresh-session.sh
 ```
 
 This runs `cgpu connect`, updates the secret, and restarts the worker + cgpu-server deployments.

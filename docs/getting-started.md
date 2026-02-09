@@ -53,9 +53,11 @@ Or generate test media:
 ### 3. Build and run
 
 ```bash
-docker compose build
+docker compose build    # First build takes 5-15 min (downloads dependencies)
 docker compose up
 ```
+
+> **First build:** `docker compose build` downloads base images and installs all dependencies. This takes 5-15 minutes depending on your internet speed. Subsequent builds use the Docker cache and are much faster.
 
 Open http://localhost:8080 in your browser.
 

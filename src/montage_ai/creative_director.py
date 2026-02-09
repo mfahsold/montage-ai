@@ -277,8 +277,8 @@ class CreativeDirector:
         
         # Track attempted backends for fallback
         backends_attempted = []
-        last_error = None
-        
+        backend_errors = {}
+
         # Define backends in priority order
         backends = []
         if self.use_openai_api and self.openai_client:
@@ -292,25 +292,33 @@ class CreativeDirector:
         for backend_name, query_fn in backends:
             try:
                 backends_attempted.append(backend_name)
-                
+
                 # Use retry wrapper
                 response = self._query_with_retry(
                     query_fn,
-                    system_prompt, formatted_prompt, image_b64, 
+                    system_prompt, formatted_prompt, image_b64,
                     json_mode, temperature, max_tokens,
                     max_retries=max_retries,
                     timeout=effective_timeout
                 )
-                
+
                 if response:
                     logger.info(f"✅ {backend_name}: Success")
                     return response
             except Exception as e:
-                logger.warning(f"⚠️ {backend_name} failed: {e}")
-                last_error = e
+                logger.debug(f"{backend_name} failed: {e}")
+                backend_errors[backend_name] = str(e)
                 continue
-        
-        logger.error(f"All LLM backends failed (attempted: {', '.join(backends_attempted)})")
+
+        # Consolidated single error message with configuration hints
+        error_summary = "; ".join(f"{k}: {v}" for k, v in backend_errors.items())
+        logger.error(
+            f"All LLM backends unavailable ({', '.join(backends_attempted)}). "
+            f"Errors: {error_summary}. "
+            "Configure a backend: set OPENAI_API_BASE (OpenAI-compatible), "
+            "GOOGLE_API_KEY (Gemini), CGPU_ENABLED=true (cgpu), "
+            "or OLLAMA_HOST (local). See docs/configuration.md."
+        )
         return None
 
     def _query_openai_api_unified(

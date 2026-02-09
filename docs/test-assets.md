@@ -47,13 +47,13 @@ An optional helper exists in `scripts/archive/prepare_trailer_assets.py` to down
 
 ```bash
 # Download 4 video clips + audio (NASA public domain)
-python scripts/archive/prepare_trailer_assets.py
+python ./scripts/archive/prepare_trailer_assets.py
 
 # Custom queries
-python scripts/archive/prepare_trailer_assets.py --query "apollo" --query "nebula"
+python ./scripts/archive/prepare_trailer_assets.py --query "apollo" --query "nebula"
 
 # Limit download size
-python scripts/archive/prepare_trailer_assets.py --max-video-mb 50 --videos 2
+python ./scripts/archive/prepare_trailer_assets.py --max-video-mb 50 --videos 2
 ```
 
 **Why NASA?**
@@ -122,7 +122,7 @@ For testing the full pipeline with real media:
 
 ```bash
 # Download test assets first (optional helper)
-python scripts/archive/prepare_trailer_assets.py
+python ./scripts/archive/prepare_trailer_assets.py
 
 # Run integration tests
 pytest tests/integration/ -v --run-slow
@@ -202,7 +202,7 @@ For full integration testing:
 
 ```yaml
 - name: Download Test Assets
-  run: python scripts/archive/prepare_trailer_assets.py
+  run: python ./scripts/archive/prepare_trailer_assets.py
 
 - name: Run Integration Tests
   run: pytest tests/integration/ -v

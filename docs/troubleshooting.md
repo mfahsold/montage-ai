@@ -139,6 +139,49 @@ UPSCALE=false \
 
 ---
 
+## Kubernetes Pod Issues
+
+### Pod Stuck in `Init:0/2`
+
+**Symptom:** Pod stays in `Init:0/2` for minutes or hours:
+```
+NAME                          READY   STATUS     RESTARTS   AGE
+montage-ai-render-8h65q       0/1     Init:0/2   0          2d6h
+```
+
+**Common causes and fixes:**
+
+1. **Storage not ready** (most common) — init container waits for `/data/input/.ready`:
+   ```bash
+   # Run bootstrap to create .ready markers
+   ./deploy/k3s/bootstrap.sh
+
+   # Or manually create the marker
+   kubectl exec -it -n montage-ai <pod> -c wait-for-nfs-ready -- touch /data/input/.ready
+   ```
+
+2. **PVC not bound** — storage class missing or misconfigured:
+   ```bash
+   kubectl get pvc -n montage-ai
+   # All PVCs should show "Bound". If "Pending", check storage class:
+   kubectl get storageclass
+   ```
+
+3. **Image pull failure** — init container image not available:
+   ```bash
+   kubectl describe pod <pod> -n montage-ai | grep -A 5 "Init Containers"
+   ```
+
+4. **Init container crash** — check init container logs:
+   ```bash
+   kubectl logs <pod> -c wait-for-nfs-ready -n montage-ai
+   kubectl logs <pod> -c init-dirs -n montage-ai
+   ```
+
+See [deploy/k3s/README.md](../deploy/k3s/README.md#the-ready-file-issue) for detailed NFS/bootstrap setup.
+
+---
+
 ## Kubernetes Deploy Errors
 
 ### PVC Patch Fails ("spec is immutable")

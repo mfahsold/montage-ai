@@ -87,11 +87,9 @@ cp ~/Videos/*.mp4 data/input/
 cp ~/Music/track.mp3 data/music/
 ```
 
-**Permission note:** On Linux, if you see "Permission denied" errors, the setup script will help fix `data/` directory ownership. If needed, run:
-
-```bash
-sudo chown -R $USER:$USER data/
-```
+**Permission note:**
+- **Linux:** If you see "Permission denied" errors, the setup script will help fix `data/` directory ownership. If needed, run: `sudo chown -R $USER:$USER data/`
+- **macOS / Windows (Docker Desktop):** Permissions are handled automatically by Docker Desktop. No manual fix needed.
 
 Run:
 
