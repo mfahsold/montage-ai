@@ -80,15 +80,29 @@ grep '<' deploy/k3s/config-global.yaml
 
 ### 3. Build and Push Image
 
+**Option A: Push to a container registry** (multi-node clusters):
+
 ```bash
 cd deploy/k3s
 
-# Multi-arch build (recommended for mixed ARM/AMD clusters)
-BUILD_MULTIARCH=true ./build-and-push.sh
-
 # Single-arch build (faster, for homogeneous clusters)
 ./build-and-push.sh
+
+# Multi-arch build (recommended for mixed ARM/AMD clusters)
+# Prerequisites: docker buildx, a builder instance (docker buildx create --use)
+BUILD_MULTIARCH=true ./build-and-push.sh
 ```
+
+**Option B: Load directly into K3s** (single-node, no registry needed):
+
+```bash
+docker build -t montage-ai:latest .
+docker save montage-ai:latest | sudo k3s ctr images import -
+```
+
+Then set `imagePullPolicy: IfNotPresent` in your deployments (already the default).
+
+> **Multi-arch prerequisites:** `BUILD_MULTIARCH=true` requires Docker Buildx and a multi-platform builder. Set up with: `docker buildx create --name multibuilder --use && docker buildx inspect --bootstrap`. If it fails, fall back to single-arch builds for your target architecture.
 
 ### 4. Deploy
 
@@ -123,6 +137,28 @@ kubectl port-forward -n montage-ai svc/montage-ai-web 8080:80
 # Or use ingress if configured
 open "https://<your-hostname>"
 ```
+
+---
+
+## Configuration Lifecycle
+
+Understanding how configuration flows through the deployment pipeline:
+
+```
+config-global.yaml → make config → cluster-config.env → kustomize build → kubectl apply
+```
+
+| Step | Command | What it does |
+|------|---------|--------------|
+| 1. Edit config | `$EDITOR deploy/k3s/config-global.yaml` | Set namespace, registry, storage, IPs |
+| 2. Render env | `make -C deploy/k3s config` | Generates `base/cluster-config.env` from YAML |
+| 3. Deploy | `make -C deploy/k3s deploy-cluster` | Builds manifests, injects namespace, applies to cluster |
+
+**When to re-run `make config`:**
+- After editing `config-global.yaml` (namespace, registry, storage class, etc.)
+- After updating `deploy/config.env` defaults
+
+**Namespace handling:** The namespace in `config-global.yaml` (`CLUSTER_NAMESPACE`) is injected into the kustomize overlay at deploy time via `kustomize edit set namespace`. You do **not** need to edit the overlay's `kustomization.yaml` manually.
 
 ---
 
@@ -185,8 +221,27 @@ Verify the registry is accessible and the image exists:
 docker pull <your-registry>/montage-ai:<tag>
 ```
 
+**ErrImagePull / ImagePullBackOff:**
+Image not found or registry authentication failed.
+```bash
+# Check which image is expected
+kubectl describe pod -n montage-ai <pod-name> | grep "Image:"
+# Verify it exists
+docker pull <image>
+# For K3s without registry: load image directly
+docker save montage-ai:latest | sudo k3s ctr images import -
+```
+
 **ImagePullBackOff on mixed ARM/AMD clusters:**
 Node architecture in `config-global.yaml` doesn't match the actual node. Check with `kubectl get nodes -o wide` (ARCH column) and update node definitions to match. Then rebuild with `BUILD_MULTIARCH=true ./build-and-push.sh`. See [Troubleshooting](troubleshooting.md#imagepullbackoff-on-mixed-armamd-clusters).
+
+**OOMKilled (Out of Memory):**
+Container exceeded memory limits. Increase limits in `config-global.yaml` or use `QUALITY_PROFILE=preview`:
+```bash
+# Check current limits
+kubectl describe pod -n montage-ai <pod-name> | grep -A2 "Limits:"
+# Update in config-global.yaml, then re-deploy
+```
 
 **Unresolved placeholders:**
 Check config-global.yaml for remaining `<...>` values:

@@ -81,12 +81,25 @@ If Docker fails to start with "OCI runtime error", reduce the memory limit below
 git clone https://github.com/mfahsold/montage-ai.git
 cd montage-ai
 
-# Run setup script (handles data/ directory creation + permissions)
+# Run setup script (required before first build)
 ./scripts/setup.sh
 
 # Generate test media (optional; or provide your own)
 ./scripts/ops/create-test-video.sh
 ```
+
+**What `setup.sh` does:**
+
+| Check | Action |
+|-------|--------|
+| Data directories | Creates `data/input`, `data/music`, `data/output`, `data/assets`, `data/luts` |
+| Permissions (Linux) | Fixes ownership if directories are owned by root |
+| Docker | Verifies Docker and Compose v2 are installed |
+| Disk space | Warns if < 30 GB free, fails if < 5 GB |
+| RAM | Reports available system memory |
+| Architecture | Detects ARM64 and notes MediaPipe limitation |
+
+The script is idempotent — safe to re-run at any time.
 
 Add your own media (alternative):
 

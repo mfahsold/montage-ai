@@ -1,6 +1,7 @@
 ## 2026-02-09
 
 ### Fixes
+- Fix: K3s cluster overlay hardcoded `montage-ai-test` namespace instead of using `config-global.yaml` value; reset to `montage-ai` default with deploy.sh dynamic injection comment (#117).
 - Fix: Dockerfile base image updated from Python 3.10 to 3.12 to match `pyproject.toml` `requires-python = ">=3.12,<3.13"` (#104). Also fixed `Dockerfile.qsv` (was 3.11).
 - Fix: `deploy-cluster` now respects namespace override from `config-global.yaml` (#34). Removed hardcoded `namespace: montage-ai` from base kustomization; namespace is injected dynamically via `kustomize edit set namespace` at deploy time.
 - Fix: CI installation on clean systems — added `cloud-private` optional dependency group and fixed `ci-local.sh` to handle it gracefully in both locked and non-locked sync paths (#35).
@@ -12,6 +13,8 @@
 - `FFmpegConfig` now exposes `gpu_available`, `gpu_type`, and `encoder` properties for better IDE discoverability (#110).
 
 ### Documentation
+- Added Configuration Lifecycle section, image building options (registry + K3s direct load), multi-arch prerequisites, and common K8s error troubleshooting to `cluster-deploy.md` (#118, #119).
+- Added `setup.sh` purpose table to README explaining all checks and actions (#120).
 - Added cross-links between related docs: README → Installation Test, getting-started → configuration/features/CLI, cluster-deploy → troubleshooting/configuration, features → getting-started (#115).
 - Updated INSTALLATION_TEST.md with detailed verification results and ✅ status markers for all 5 previously fixed issues (#116).
 - Made port conflict hint more prominent in README Quick Start section (#111).
