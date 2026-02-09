@@ -99,6 +99,29 @@ That's it. For manual control, see sections below.
 - [ ] **Storage setup** (see "NFS Prerequisites" section below)
 - [ ] Cluster resources: ≥ 16 GB RAM, ≥ 4 CPUs available
 
+### Quick Local Cluster Setup (Testing)
+
+If no cluster is available, use one of these options:
+
+**Option A: k3d (Docker-based K3s)**
+```bash
+curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+k3d cluster create montage-ai --agents 2 -p "8080:80@loadbalancer" -p "8443:443@loadbalancer"
+kubectl cluster-info
+```
+
+**Option B: minikube**
+```bash
+minikube start --cpus=4 --memory=16384 --addons storage-provisioner
+minikube addons enable nfs-provisioner
+```
+
+**Option C: Kind (Kubernetes in Docker)**
+```bash
+kind create cluster --name montage-ai
+kubectl cluster-info
+```
+
 ### NFS Prerequisites
 
 **Why NFS?** The render pods need persistent, shared storage for `/data/input`, `/data/music`, `/data/output`, and `/data/assets`.
@@ -306,6 +329,34 @@ kubectl get nodes -o custom-columns='NAME:.metadata.name,NVIDIA:.status.allocata
 # Legacy GPU overlays are archived in:
 #   deploy/k3s/overlays/legacy/
 ```
+
+---
+
+## LLM Inference (Fluxibri LiteLLM)
+
+When deployed on a Fluxibri cluster, the Creative Director uses the **LiteLLM Unified
+Proxy** as its OpenAI-compatible backend. This is configured in `config-global.yaml`:
+
+```yaml
+llm:
+  openaiApiBase: "http://litellm.llama-box-system.svc.cluster.local:4000/v1"
+  openaiApiKey: "sk-1234"
+  openaiModel: "auto"          # discovers model via /v1/models (DRY)
+  openaiVisionModel: "auto"    # Performance tier for vision tasks
+```
+
+**Tiered routing** is handled transparently by LiteLLM:
+
+| Tier | Model Class | Use Case |
+|------|-------------|----------|
+| Eco | 0.5B | Classification, simple extraction |
+| Performance | 2B-VL (Qwen2-VL) | Vision analysis, standard reasoning |
+| Distributed | 32B | Deep reasoning, complex planning |
+
+Model names are **runtime state** — set `openaiModel: "auto"` and the Creative
+Director discovers available models via `/v1/models`. See
+[fluxibri_core LLM_API_USAGE.md](https://github.com/mfahsold/fluxibri_core/blob/main/docs/2_how-to/dev/LLM_API_USAGE.md)
+for full documentation.
 
 ---
 
@@ -712,6 +763,35 @@ kubectl get networkpolicy -n "$CLUSTER_NAMESPACE"
 │  └─────────────┘                                           │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Post-Deploy Verification
+
+After deploying, verify the cluster is healthy:
+
+```bash
+# All pods should be Running (no CrashLoopBackOff or ImagePullBackOff)
+kubectl get pods -n "$CLUSTER_NAMESPACE"
+
+# All PVCs should be Bound
+kubectl get pvc -n "$CLUSTER_NAMESPACE"
+
+# Check resource usage
+kubectl top pods -n "$CLUSTER_NAMESPACE"
+kubectl top nodes
+
+# Test rollback/recovery
+kubectl rollout restart deployment/montage-ai-web -n "$CLUSTER_NAMESPACE"
+kubectl get pods -n "$CLUSTER_NAMESPACE"  # should recover within 30s
+```
+
+**Acceptance Criteria:**
+- [ ] Pre-flight checks pass (`make -C deploy/k3s pre-flight`)
+- [ ] All pods in Running state
+- [ ] Web UI accessible (port-forward or ingress)
+- [ ] Test render job completes successfully
+- [ ] Data persists across pod restarts
 
 ---
 

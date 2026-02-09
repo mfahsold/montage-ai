@@ -74,6 +74,12 @@ pvc_input = ""
 pvc_output = ""
 pvc_music = ""
 pvc_assets = ""
+openai_api_base = ""
+openai_api_key = ""
+openai_model = ""
+openai_vision_model = ""
+ollama_host = ""
+cgpu_enabled = ""
 
 try:
     import yaml  # type: ignore
@@ -130,6 +136,14 @@ if yaml is not None:
         pvc_output = clean(storage_pvc.get("output", ""))
         pvc_music = clean(storage_pvc.get("music", ""))
         pvc_assets = clean(storage_pvc.get("assets", ""))
+
+        llm = parsed.get("llm", {}) if isinstance(parsed, dict) else {}
+        openai_api_base = clean(llm.get("openaiApiBase", ""))
+        openai_api_key = clean(llm.get("openaiApiKey", ""))
+        openai_model = clean(llm.get("openaiModel", ""))
+        openai_vision_model = clean(llm.get("openaiVisionModel", ""))
+        ollama_host = clean(llm.get("ollamaHost", ""))
+        cgpu_enabled = clean(llm.get("cgpuEnabled", ""))
     except Exception:
         pass
 
@@ -181,6 +195,8 @@ if not any([
                 section = "cluster"
             elif stripped.startswith("storage:"):
                 section = "storage"
+            elif stripped.startswith("llm:"):
+                section = "llm"
             elif stripped.startswith("images:"):
                 section = "images"
             continue
@@ -290,6 +306,22 @@ if not any([
                     pvc_music = value
                 elif key == "assets":
                     pvc_assets = value
+        elif section == "llm" and indent == 2 and ":" in stripped:
+            key, value = stripped.split(":", 1)
+            key = key.strip()
+            value = clean(value)
+            if key == "openaiApiBase":
+                openai_api_base = value
+            elif key == "openaiApiKey":
+                openai_api_key = value
+            elif key == "openaiModel":
+                openai_model = value
+            elif key == "openaiVisionModel":
+                openai_vision_model = value
+            elif key == "ollamaHost":
+                ollama_host = value
+            elif key == "cgpuEnabled":
+                cgpu_enabled = value
         elif section == "images":
             if indent == 2 and stripped.startswith("montage_ai:"):
                 subsection = "montage_ai"
@@ -341,5 +373,11 @@ emit("PVC_INPUT_NAME", pvc_input)
 emit("PVC_OUTPUT_NAME", pvc_output)
 emit("PVC_MUSIC_NAME", pvc_music)
 emit("PVC_ASSETS_NAME", pvc_assets)
+emit("OPENAI_API_BASE", openai_api_base)
+emit("OPENAI_API_KEY", openai_api_key)
+emit("OPENAI_MODEL", openai_model)
+emit("OPENAI_VISION_MODEL", openai_vision_model)
+emit("OLLAMA_HOST", ollama_host)
+emit("CGPU_ENABLED", cgpu_enabled)
 PY
 }

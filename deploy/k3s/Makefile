@@ -3,7 +3,7 @@
 # Single entry point for cluster operations
 # ==============================================================================
 
-.PHONY: help config validate validate-config pre-flight diff deploy deploy-cluster status health
+.PHONY: help config validate validate-config pre-flight diff deploy deploy-cluster status health test-e2e
 
 GREEN  := $(shell tput -Txterm setaf 2 2>/dev/null || echo '')
 YELLOW := $(shell tput -Txterm setaf 3 2>/dev/null || echo '')
@@ -76,3 +76,6 @@ status: ## Show montage-ai pod status
 health: ## Basic health checks
 	@$(KUBECTL) get pods -n $(CLUSTER_NAMESPACE)
 	@$(KUBECTL) rollout status deployment/montage-ai-web -n $(CLUSTER_NAMESPACE) --timeout=120s || true
+
+test-e2e: ## Run E2E deploy test against ephemeral Kind cluster
+	@bash ./test-deploy-e2e.sh

@@ -5,11 +5,35 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_ROOT="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "${DEPLOY_ROOT}/.." && pwd)"
+
+# Source centralized configuration for PVC names (fixes #124)
+CONFIG_GLOBAL="${CONFIG_GLOBAL:-${SCRIPT_DIR}/config-global.yaml}"
+CONFIG_ENV_SCRIPT="${REPO_ROOT}/scripts/ops/render_cluster_config_env.sh"
+CONFIG_ENV_OUT="${SCRIPT_DIR}/base/cluster-config.env"
+
+if [ -x "${CONFIG_ENV_SCRIPT}" ]; then
+  CONFIG_GLOBAL="${CONFIG_GLOBAL}" ENV_OUT="${CONFIG_ENV_OUT}" bash "${CONFIG_ENV_SCRIPT}"
+fi
+
+if [ -f "${CONFIG_ENV_OUT}" ]; then
+  # shellcheck disable=SC1090
+  source "${CONFIG_ENV_OUT}"
+fi
+
 CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
 WAIT_TIME="${WAIT_TIME:-300}"  # 5 minutes default
 
+# PVC names from config, falling back to Kustomize base defaults
+PVC_INPUT="${PVC_INPUT_NAME:-montage-ai-input-nfs}"
+PVC_OUTPUT="${PVC_OUTPUT_NAME:-montage-ai-output-nfs}"
+PVC_MUSIC="${PVC_MUSIC_NAME:-montage-ai-music-nfs}"
+PVC_ASSETS="${PVC_ASSETS_NAME:-montage-ai-assets-nfs}"
+
 echo "🚀 Bootstrapping montage-ai Kubernetes deployment..."
 echo "   Namespace: $CLUSTER_NAMESPACE"
+echo "   PVCs: $PVC_INPUT, $PVC_OUTPUT, $PVC_MUSIC, $PVC_ASSETS"
 echo ""
 
 # Check kubectl access
@@ -31,7 +55,7 @@ echo "   ✅ Namespace ready"
 echo ""
 echo "2️⃣  Checking persistent volumes..."
 BOUND_PVCS=0
-for pvc_name in montage-input montage-output montage-music montage-assets; do
+for pvc_name in "$PVC_INPUT" "$PVC_OUTPUT" "$PVC_MUSIC" "$PVC_ASSETS"; do
     if kubectl get pvc "$pvc_name" -n "$CLUSTER_NAMESPACE" > /dev/null 2>&1; then
         STATUS=$(kubectl get pvc "$pvc_name" -n "$CLUSTER_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
         if [ "$STATUS" == "Bound" ]; then
@@ -65,18 +89,19 @@ echo ""
 echo "3️⃣  Initializing storage markers..."
 
 # Use a simple pod to create the .ready marker
-cat > /tmp/init-pod.yaml << 'EOF'
+# PVC names are injected from cluster config (fixes #124)
+cat > /tmp/init-pod.yaml <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
   name: montage-init
-  namespace: NAMESPACE
+  namespace: ${CLUSTER_NAMESPACE}
 spec:
   restartPolicy: Never
   containers:
   - name: init
     image: busybox:latest
-    command: 
+    command:
       - sh
       - -c
       - |
@@ -85,7 +110,7 @@ spec:
         touch /data/input/.ready
         # Create basic output directory structure
         mkdir -p /data/output /data/music /data/assets
-        echo "Storage initialized at $(date -u)"
+        echo "Storage initialized at \$(date -u)"
         sleep 1
     volumeMounts:
     - name: input
@@ -99,20 +124,17 @@ spec:
   volumes:
   - name: input
     persistentVolumeClaim:
-      claimName: montage-input
+      claimName: ${PVC_INPUT}
   - name: output
     persistentVolumeClaim:
-      claimName: montage-output
+      claimName: ${PVC_OUTPUT}
   - name: music
     persistentVolumeClaim:
-      claimName: montage-music
+      claimName: ${PVC_MUSIC}
   - name: assets
     persistentVolumeClaim:
-      claimName: montage-assets
+      claimName: ${PVC_ASSETS}
 EOF
-
-# Replace namespace
-sed -i.bak "s/NAMESPACE/$CLUSTER_NAMESPACE/g" /tmp/init-pod.yaml
 
 # Apply and wait for init pod
 kubectl apply -f /tmp/init-pod.yaml
@@ -183,4 +205,4 @@ echo "      kubectl logs <POD_NAME> -c wait-for-nfs-ready -n $CLUSTER_NAMESPACE"
 echo ""
 
 # Cleanup
-rm -f /tmp/init-pod.yaml /tmp/init-pod.yaml.bak
+rm -f /tmp/init-pod.yaml

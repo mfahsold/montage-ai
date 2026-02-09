@@ -84,6 +84,20 @@ storage:
     music: "montage-ai-music-nfs"
     assets: "montage-ai-assets-nfs"
 
+llm:
+  # LLM inference backend for Creative Director.
+  # Recommended: Use the Fluxibri LiteLLM Unified Proxy (routes to Eco/Performance/Distributed tiers).
+  # See: mfahsold/fluxibri_core DEVELOPER_QUICKSTART.md and docs/2_how-to/dev/LLM_API_USAGE.md
+  #
+  # Model selection: set to "auto" to discover available models at runtime via /v1/models.
+  # Do NOT hardcode model names — they are runtime state.
+  openaiApiBase: "http://litellm.llama-box-system.svc.cluster.local:4000/v1"
+  openaiApiKey: "sk-1234"
+  openaiModel: "auto"                 # auto-discovers via /v1/models (DRY)
+  openaiVisionModel: "auto"           # Performance tier (Qwen2-VL) for vision tasks
+  ollamaHost: ""                      # Optional: local Ollama fallback
+  cgpuEnabled: ""                     # Optional: cloud GPU burst via cgpu
+
 images:
   montage_ai:
     name: "montage-ai"

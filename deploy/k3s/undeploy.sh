@@ -43,18 +43,35 @@ if ! kubectl cluster-info &> /dev/null; then
   exit 1
 fi
 
-# Delete deployment and associated resources
+# Issue all delete commands first, then wait — so cleanup is not
+# abandoned if any single wait times out (fixes #123).
+
 echo "⏳ Deleting deployment ${APP_NAME}..."
 kubectl delete deployment ${APP_NAME} -n ${CLUSTER_NAMESPACE} --ignore-not-found=true
 
+echo "⏳ Deleting workers..."
+kubectl delete deployment montage-ai-worker -n ${CLUSTER_NAMESPACE} --ignore-not-found=true
+
 echo "⏳ Deleting services..."
 kubectl delete svc ${APP_NAME} -n ${CLUSTER_NAMESPACE} --ignore-not-found=true
+kubectl delete svc redis -n ${CLUSTER_NAMESPACE} --ignore-not-found=true
 
 echo "⏳ Deleting configmaps..."
 kubectl delete configmap montage-ai-config -n ${CLUSTER_NAMESPACE} --ignore-not-found=true
 
-echo "⏳ Waiting for pods to terminate..."
-kubectl wait --for=delete pod -l ${APP_LABEL} -n ${CLUSTER_NAMESPACE} --timeout=60s || true
+echo "⏳ Deleting redis..."
+kubectl delete deployment redis -n ${CLUSTER_NAMESPACE} --ignore-not-found=true
+kubectl delete statefulset redis -n ${CLUSTER_NAMESPACE} --ignore-not-found=true
+
+echo "⏳ Waiting for pods to terminate (timeout is non-fatal)..."
+set +e
+kubectl wait --for=delete pod -l ${APP_LABEL} -n ${CLUSTER_NAMESPACE} --timeout=60s
+wait_rc=$?
+set -e
+if [ $wait_rc -ne 0 ]; then
+  echo "⚠️  Pod wait timed out — some pods may still be terminating."
+  echo "   Continuing cleanup anyway."
+fi
 
 echo ""
 echo "════════════════════════════════════════════════════════════"
