@@ -25,10 +25,15 @@ CLI run (uses data/input + data/music):
 docker compose run --rm montage-ai /app/montage-ai.sh run
 ```
 
+**Output:** `data/output/montage_<timestamp>.mp4`
+**Duration:** ~2-5 min for 3x 30s clips (system-dependent)
+**Progress:** Logs show beat detection -> scene analysis -> clip assembly -> rendering
+
 Preview mode (faster):
 
 ```bash
 QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh run
+# → 360p output, ~60% faster
 ```
 
 ## System Requirements
@@ -110,6 +115,8 @@ Recommended Docker resources (examples):
 - Snapdragon 12 GB: memory 8g, cpus 8
 - Apple Silicon 16 GB: memory 12g, cpus 8
 
+**MediaPipe note:** On ARM64, MediaPipe (face detection for smart reframing) may not be available. This is expected — auto-reframe falls back to center-crop mode, which works well for most content. The `[WARN] MediaPipe not installed` log message is safe to ignore.
+
 If you want an automated check and a preview render test:
 
 ```bash
@@ -134,6 +141,17 @@ If you want an automated check and a preview render test:
 - [Performance Tuning](docs/performance-tuning.md) — Optimization for your hardware
 - [Cluster Deployment](docs/cluster-deploy.md) — Kubernetes/K3s deployment
 - [Full Docs Index](docs/README.md) — All documentation
+
+## How It Works
+
+```
+Input Videos + Music ─> Beat Detection ─> Scene Analysis ─> Clip Assembly ─> FFmpeg Render ─> Final Video
+                              │                                    ▲
+                              └── Creative Director (LLM) ─────────┘
+                                  Style Template (JSON)
+```
+
+See [Architecture](docs/architecture.md) for the full component diagram.
 
 ## Key Features
 

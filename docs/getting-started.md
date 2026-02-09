@@ -82,48 +82,21 @@ Output files appear in `data/output/`.
 
 ## Kubernetes
 
-For cluster deployments using K3s or K8s:
+For cluster deployments (K3s, K8s, EKS, GKE), see the dedicated guide:
 
-### Prerequisites
+**[Cluster Deployment Guide](cluster-deploy.md)** — Full walkthrough with prerequisites, storage setup, troubleshooting, and rollback.
 
-- A running Kubernetes cluster (`kubectl cluster-info` succeeds)
-- `kustomize` installed
-- `make` available
-
-### 1. Configure
+Quick summary:
 
 ```bash
-# Copy and edit config
 cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
-# Edit deploy/k3s/config-global.yaml with your registry, namespace, and hostnames
-
-# Render manifests
+$EDITOR deploy/k3s/config-global.yaml   # Replace all <...> placeholders
 make -C deploy/k3s config
-```
-
-### 2. Validate and deploy
-
-```bash
-# Validate kustomize builds
-make -C deploy/k3s validate
-
-# Deploy
+make -C deploy/k3s pre-flight
 make -C deploy/k3s deploy-cluster
 ```
 
-### 3. Access
-
-```bash
-# Port-forward to access Web UI locally
-kubectl port-forward -n montage-ai svc/montage-ai-web 8080:80
-
-# Check status
-make -C deploy/k3s status
-```
-
-See [deploy/k3s/README.md](../deploy/k3s/README.md) for the full cluster deployment guide, or [Cluster Deployment](cluster-deploy.md) for a standalone walkthrough.
-
-**Re-deploying is safe:** Existing data volumes (PVCs) are preserved. ConfigMaps are updated, Deployments get a rolling update.
+For advanced topics (multi-arch builds, KEDA, distributed rendering), see [deploy/k3s/README.md](../deploy/k3s/README.md).
 
 ---
 

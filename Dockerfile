@@ -93,6 +93,6 @@ ENV PYTHONPATH=/app/src
 # Switch to non-root user
 USER montage
 
-# Default command
+# Default command (absolute path so working_dir overrides in docker-compose don't break it)
 WORKDIR /app/src
 CMD ["sh", "-c", "/app/montage-ai.sh cgpu-start && python3 -m montage_ai.web_ui.app"]

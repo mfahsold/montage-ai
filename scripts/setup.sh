@@ -91,6 +91,15 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     echo "  System memory: ${SYSTEM_MEMORY}GB available"
 fi
 
+# ARM64 note about MediaPipe
+MACHINE_ARCH="$(uname -m)"
+if [[ "$MACHINE_ARCH" == "aarch64" || "$MACHINE_ARCH" == "arm64" ]]; then
+    echo ""
+    echo "ℹ️  ARM64 detected: MediaPipe (face detection for auto-reframe) may not be available."
+    echo "   Auto-reframe will use center-crop fallback — this works fine for most content."
+    echo "   See docs/OPTIONAL_DEPENDENCIES.md for details."
+fi
+
 echo ""
 echo "✅ Setup complete!"
 echo ""
