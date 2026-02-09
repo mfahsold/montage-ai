@@ -1,123 +1,15 @@
-# 🔧 Snapdragon ARM Deployment Testing Plan
+# Snapdragon ARM Deployment Test Plan
 
-**Target System:** Windows on Arm (Snapdragon X1/X1E) with Docker Desktop  
-**Architecture:** ARM64 (aarch64)  
-**Expected Duration:** 45-60 minutes total  
+This content has been consolidated into the single source of truth:
 
----
+- [README.md](README.md) (see the ARM64 section)
 
-## Pre-Flight Checklist
+Use the automated checks instead of a long manual plan:
 
-### Hardware Requirements (Snapdragon)
-
-- [ ] RAM: 12GB+ available (check: Settings → About → Device specifications)
-- [ ] Disk: 30GB+ free SSD space (check: C: drive free space)
-- [ ] Connection: Stable internet (for Docker image pulls)
-- [ ] Power: Connected to power (battery will throttle rendering)
-
-### Software Pre-requisites
-
-- [ ] Windows on Arm installed (April 2024 update or newer)
-- [ ] Docker Desktop for Windows on Arm installed
-- [ ] Git for Windows installed
-- [ ] PowerShell 7+ (recommended) or Command Prompt
-
----
-
-## Phase 1: Environment Verification (5 minutes)
-
-Run in **PowerShell as Administrator**:
-
-```powershell
-# 1. Check Windows on Arm version
-wsl --version                          # Should show WSL version
-[System.Environment]::OSVersion        # Should show Windows 11
-
-# 2. Verify Docker
-docker --version                       # >= 20.10
-docker compose version                 # >= v2.0
-
-# 3. Check Docker daemon
-docker run hello-world                 # Should print hello message
-
-# 4. Check architecture
-docker run --rm alpine uname -m        # Should print: aarch64
-
-# 5. Verify Docker resources
-$containers = docker ps --all --quiet --no-trunc
-if ($containers) {
-    docker inspect $containers[0] | findstr -i "Memory\|CpuQuota"
-}
-
-# If no containers, check settings:
-# Docker Desktop → Settings → Resources → check Memory allocation
+```bash
+./scripts/quick-setup-arm.sh
+./scripts/validate-onboarding.sh
 ```
-
-**Success Criteria:**
-- ✅ Docker version >= 20.10
-- ✅ Docker Compose version >= v2.0
-- ✅ `hello-world` runs successfully
-- ✅ Architecture shows `aarch64`
-- ✅ Memory allocated >= 8GB in Docker Desktop
-
----
-
-## Phase 2: Repository Setup (10 minutes)
-
-```powershell
-# Navigate to workspace
-cd $env:UserProfile\projects  # or your preferred directory
-
-# Clone repository
-git clone https://github.com/mfahsold/montage-ai.git
-cd montage-ai
-
-# Create data directories
-mkdir -p data\input, data\music, data\output, data\assets
-
-# Verify structure
-ls -la data\
-# Expected output:
-#   assets/ - LUT color files
-#   input/  - Upload video clips here
-#   music/  - Upload music tracks here
-#   output/ - Rendered videos go here
-```
-
-**Success Criteria:**
-- ✅ Repository cloned successfully
-- ✅ Data directories created
-- ✅ All files present (can verify with `ls src/montage_ai/`)
-
----
-
-## Phase 3: Docker Build (15 minutes)
-
-```powershell
-# Navigate to repo
-cd montage-ai
-
-# Build image for ARM64 (auto-detected)
-docker compose build
-
-# Monitor output for:
-# - No architecture conflicts
-# - All layers cached or downloaded successfully
-# - Final step completes without errors
-```
-
-**Potential Issues:**
-
-| Error | Solution |
-|-------|----------|
-| `Layer not found` | Docker cache issue → `docker compose build --no-cache` |
-| `Out of disk` | Insufficient disk space → free up space or expand Docker image size |
-| `No space left on device` | Docker volume full → Settings → Resources → increase "Disk image size" |
-| `Timeout downloading layers` | Network issue → Check internet connection, retry build |
-
-**Success Criteria:**
-- ✅ Build completes in 10-15 minutes
-- ✅ No timeout errors
 - ✅ Final image size ~2-3GB (normal for ARM64 Python + FFmpeg)
 
 ---
