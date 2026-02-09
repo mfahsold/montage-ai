@@ -8,6 +8,7 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-dev}
     image: montage-ai:latest
     container_name: montage-ai
+    working_dir: /app
     ports:
       # Web UI: http://localhost:8080 (override: WEB_PORT=8081 docker compose up)
       - "${WEB_PORT:-8080}:8080"

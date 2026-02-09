@@ -10,7 +10,8 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 
 ## Start Here
 
-- [Getting Started](getting-started.md) — local setup and Kubernetes quick start
+- [5-Minute Quick Start](quickstart.md) — fastest path to your first montage
+- [Getting Started](getting-started.md) — detailed setup (Docker + Kubernetes)
 - [K8s Deployment](../deploy/k3s/README.md) — full cluster setup guide
 
 ---
@@ -21,6 +22,7 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 
 | Document | Description |
 | ------ | ------------- |
+| [Quick Start](quickstart.md) | 5-minute setup guide |
 | [Getting Started](getting-started.md) | Installation & first montage |
 | [Features](features.md) | What Montage AI can do |
 | [Configuration](configuration.md) | Environment variables |
@@ -84,7 +86,8 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 
 | I want to... | Read this |
 |--------------|-----------|
-| Get started | [Getting Started](getting-started.md) |
+| Get started fast | [Quick Start](quickstart.md) |
+| Full setup guide | [Getting Started](getting-started.md) |
 | Deploy to K8s | [K8s Deployment](../deploy/k3s/README.md) |
 | Fix an error | [Troubleshooting](troubleshooting.md) |
 | Understand internals | [Architecture](architecture.md) |

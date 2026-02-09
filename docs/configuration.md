@@ -298,6 +298,38 @@ Fine-tune the length and timing of your montage.
 | `COLORLEVELS`     | `true`        | Apply broadcast-safe levels (16-235)          |
 | `LUMA_NORMALIZE`  | `true`        | Normalize luma for consistency across clips   |
 
+### Denoising
+
+| Variable            | Default  | Description                                           |
+| ------------------- | -------- | ----------------------------------------------------- |
+| `DENOISE`           | `false`  | Enable AI denoising                                   |
+| `DENOISE_SPATIAL`   | `0.3`   | Spatial noise reduction strength (0.0-1.0)            |
+| `DENOISE_TEMPORAL`  | `0.5`   | Temporal noise reduction strength (0.0-1.0)           |
+
+**Methods:** `hqdn3d` (fast, default) or `nlmeans` (higher quality, slower).
+
+```bash
+# Via CLI flag
+./montage-ai.sh run hitchcock --denoise
+
+# Via environment
+DENOISE=true DENOISE_SPATIAL=0.4 ./montage-ai.sh run
+```
+
+### Film Grain
+
+| Variable              | Default | Description                                        |
+| --------------------- | ------- | -------------------------------------------------- |
+| `FILM_GRAIN`          | `none`  | Film grain preset: `none`, `fine`, `medium`, `35mm`, `16mm`, `8mm` |
+
+```bash
+# Via CLI flag
+./montage-ai.sh run --film-grain 35mm
+
+# Via environment
+FILM_GRAIN=35mm ./montage-ai.sh run hitchcock
+```
+
 ### Color Grading
 
 | Variable          | Default       | Description                                                             |

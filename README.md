@@ -126,10 +126,13 @@ If you want an automated check and a preview render test:
 
 ## Docs Index
 
-- [docs/README.md](docs/README.md)
-- [docs/troubleshooting.md](docs/troubleshooting.md)
-- [docs/performance-tuning.md](docs/performance-tuning.md)
-- [deploy/README.md](deploy/README.md)
+- [Quick Start Guide](docs/quickstart.md) — 5-minute setup
+- [Configuration](docs/configuration.md) — All environment variables and settings
+- [Features](docs/features.md) — Styles, effects, enhancements, export
+- [Troubleshooting](docs/troubleshooting.md) — Common issues and fixes
+- [Performance Tuning](docs/performance-tuning.md) — Optimization for your hardware
+- [Cluster Deployment](docs/cluster-deploy.md) — Kubernetes/K3s deployment
+- [Full Docs Index](docs/README.md) — All documentation
 
 ## Development
 

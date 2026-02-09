@@ -121,7 +121,9 @@ kubectl port-forward -n montage-ai svc/montage-ai-web 8080:80
 make -C deploy/k3s status
 ```
 
-See [deploy/k3s/README.md](../deploy/k3s/README.md) for the full cluster deployment guide.
+See [deploy/k3s/README.md](../deploy/k3s/README.md) for the full cluster deployment guide, or [Cluster Deployment](cluster-deploy.md) for a standalone walkthrough.
+
+**Re-deploying is safe:** Existing data volumes (PVCs) are preserved. ConfigMaps are updated, Deployments get a rolling update.
 
 ---
 

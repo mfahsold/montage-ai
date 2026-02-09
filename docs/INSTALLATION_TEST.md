@@ -67,19 +67,34 @@ make -C deploy/k3s validate            # Validate kustomize manifests
 **Cause:** Non-portable GNU `free` extension (`-BG` flag)
 **Solution:** Fixed — `setup.sh` now parses `/proc/meminfo` directly.
 **Test:** `./scripts/setup.sh` should complete without errors
+**Verified:** 2026-02-09 (Ubuntu 22.04, macOS 14)
 
 ### Issue 2: Docker CLI fails - "stat ./montage-ai.sh: no such file or directory"
 
-**Cause:** Incorrect path in docker compose run
-**Wrong:** `docker compose run --rm montage-ai ./montage-ai.sh run`
-**Correct:** `docker compose run --rm montage-ai /app/montage-ai.sh run`
-**Test:** Run with correct path
+**Cause:** Container WORKDIR was `/app/src`, not `/app`
+**Solution:** Fixed — `docker-compose.yml` now sets `working_dir: /app`. Both paths work:
+- `docker compose run --rm montage-ai ./montage-ai.sh run` (relative)
+- `docker compose run --rm montage-ai /app/montage-ai.sh run` (absolute)
+**Verified:** 2026-02-09
 
 ### Issue 3: Kubernetes deployment fails with "unresolved placeholder"
 
 **Cause:** config-global.yaml contains `<CLUSTER_NAMESPACE>` etc.
 **Fix:** Replace all angle-bracket placeholders in `deploy/k3s/config-global.yaml`
 **Test:** `make -C deploy/k3s config` should generate cluster-config.env
+**Verified:** 2026-02-09
+
+### Issue 4: deploy-cluster ignores namespace override (#34)
+
+**Cause:** Hardcoded `namespace: montage-ai` in base kustomization.yaml
+**Solution:** Fixed — namespace is injected dynamically via `kustomize edit set namespace` at deploy time.
+**Verified:** 2026-02-09
+
+### Issue 5: ConfigMap hash suffix causes CreateContainerConfigError (#38)
+
+**Cause:** Kustomize appends hash suffix to ConfigMap names, breaking `envFrom.configMapRef`
+**Solution:** Fixed — added `generatorOptions.disableNameSuffixHash: true` to kustomization.yaml.
+**Verified:** 2026-02-09
 
 ---
 

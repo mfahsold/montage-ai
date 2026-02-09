@@ -40,6 +40,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}jobs${NC}            Submit/manage jobs via API (/api/jobs)
   ${GREEN}k8s-watch${NC}       Watch K8s and auto-download outputs (pass --job-id/--download-dir)
   ${GREEN}export-to-nle${NC}   Export timeline to NLE formats (OTIO/EDL/Premiere/AAF)
+  ${GREEN}generate-proxies${NC} Generate H.264 proxies for high-res footage (6K+/8K/RAW)
   ${GREEN}check-hw${NC}        Diagnose hardware acceleration (NVENC/VAAPI/QSV)
   ${GREEN}list${NC}            List available styles
   ${GREEN}build${NC}           Build Docker image
@@ -523,6 +524,12 @@ case "${1:-run}" in
             echo -e "${GREEN}📥 Downloading job ${JOB_ID} from local output...${NC}"
             python3 scripts/download_job.py --job-id "$JOB_ID" --local "${OUTPUT_DIR:-/data/output}" --output "$OUTPUT_DIR" $ZIP_FLAG
         fi
+        exit $?
+        ;;
+    generate-proxies)
+        shift
+        echo -e "${GREEN}📦 Generating proxies for high-res footage...${NC}"
+        python3 -m montage_ai.proxy_generator "$@"
         exit $?
         ;;
     export-to-nle)

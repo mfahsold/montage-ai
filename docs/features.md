@@ -55,7 +55,15 @@ export INPUT_DIR=/data/8k
 ./montage-ai.sh run
 # → Error with proxy generation instructions
 
-# Generate proxies for 6K+ material
+# Generate proxies for 6K+ material (via CLI wrapper)
+./montage-ai.sh generate-proxies \
+    --input /data/8k/*.mp4 \
+    --output /data/proxies \
+    --format h264 \
+    --scale 1920:-1 \
+    --preset fast
+
+# Or directly via Python module
 python -m montage_ai.proxy_generator \
     --input /data/8k/*.mp4 \
     --output /data/proxies \
@@ -89,10 +97,17 @@ Reduce noise while preserving film grain texture.
 
 **Usage:**
 ```bash
+# CLI flag (simplest)
 ./montage-ai.sh run hitchcock --denoise
-# Or with custom settings
+
+# Custom strength via environment
 DENOISE_SPATIAL=0.4 DENOISE_TEMPORAL=0.6 ./montage-ai.sh run
+
+# Docker Compose
+docker compose run --rm -e DENOISE=true -e DENOISE_SPATIAL=0.4 montage-ai /app/montage-ai.sh run
 ```
+
+See [Configuration: Denoising](configuration.md#denoising) for all variables.
 
 #### Film Grain Simulation
 
@@ -109,8 +124,14 @@ Add authentic film grain for cinematic look.
 
 **Usage:**
 ```bash
+# CLI flag
 ./montage-ai.sh run --film-grain 35mm
+
+# Environment
+FILM_GRAIN=16mm ./montage-ai.sh run documentary
 ```
+
+See [Configuration: Film Grain](configuration.md#film-grain) for all variables.
 
 #### Dialogue Ducking
 
