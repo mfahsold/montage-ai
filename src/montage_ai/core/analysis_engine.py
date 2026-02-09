@@ -437,7 +437,7 @@ class AssetAnalyzer:
                 max_workers = 1
                 logger.info("   ⚠️ LOW_MEMORY_MODE: Sequential scene detection (1 worker)")
             else:
-                # Use up to 50% of effective CPUs (cgroup-aware), never below 1.
+                # Cap at 50% of CPUs (cgroup-aware) to leave headroom for other pods.
                 max_workers = min(
                     len(uncached_videos),
                     max(1, cpu_count // 2),

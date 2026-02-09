@@ -307,16 +307,11 @@ async def trigger_render(
     export_timeline: bool = Form(False)
 ):
     """
-    Trigger montage rendering (placeholder for future implementation).
+    Trigger montage rendering via RQ/K8s job queue.
 
-    Currently, rendering is done via K8s Job or docker-compose.
-    Future: This endpoint will trigger the editor.py directly.
+    Rendering is submitted as a background job: POST /api/montage creates an
+    RQ job that is processed by cluster workers. Output lands in /data/output/.
     """
-
-    # NOTE: Background rendering already implemented via RQ/K8s job queue
-    # See: /api/montage endpoint (creates RQ job) → worker processes → output
-    # This placeholder endpoint is for alternative trigger mechanism
-    # Current implementation: POST /api/montage → RQ job → K8s worker → /data/output/
 
     return {
         "status": "info",

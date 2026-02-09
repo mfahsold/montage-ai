@@ -698,8 +698,8 @@ class TextEditor:
         # Output path
         cmd.append(output_path)
 
-        logger.info(f"   Rendering...")
-        # logger.debug(" ".join(cmd)) # Debug
+        logger.info("   Rendering...")
+        logger.debug("FFmpeg command: %s", " ".join(cmd))
         
         try:
             subprocess.run(cmd, check=True)

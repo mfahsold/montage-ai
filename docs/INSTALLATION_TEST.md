@@ -2,8 +2,8 @@
 
 This document describes how to verify a clean Montage AI installation on a new system (local or remote).
 
-**Last Tested:** 2026-02-09  
-**System:** Linux 29GB RAM, 12 CPUs, Docker 28.2.2, Kubernetes available
+**Last Tested:** 2026-02-09
+**Minimum Requirements:** 16 GB RAM, 4 CPUs, Docker >= 20.10
 
 ---
 
@@ -62,10 +62,10 @@ make -C deploy/k3s validate            # Validate kustomize manifests
 
 ## Common Issues & Fixes
 
-### Issue 1: scripts/setup.sh fails with "free: Ungültige Option"
+### Issue 1: scripts/setup.sh fails with "free: invalid option"
 
-**Cause:** Non-portable GNU free extension
-**Solution:** Already fixed in version >= 19da914
+**Cause:** Non-portable GNU `free` extension (`-BG` flag)
+**Solution:** Fixed — `setup.sh` now parses `/proc/meminfo` directly.
 **Test:** `./scripts/setup.sh` should complete without errors
 
 ### Issue 2: Docker CLI fails - "stat ./montage-ai.sh: no such file or directory"
@@ -123,11 +123,13 @@ docker compose run --rm montage-ai /app/montage-ai.sh --version | head -5
 if kubectl cluster-info &>/dev/null; then
     echo "6️⃣  Testing Kubernetes config generation..."
     cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
-    # Apply minimal valid config
-    sed -i 's/<CLUSTER_NAMESPACE>/montage-ai-test/g' deploy/k3s/config-global.yaml
-    sed -i 's/<CLUSTER_DOMAIN>/cluster.local/g' deploy/k3s/config-global.yaml
-    sed -i 's/<CONTROL_PLANE_IP>/127.0.0.1/g' deploy/k3s/config-global.yaml
-    sed -i 's/<NFS_SERVER_IP>/localhost/g' deploy/k3s/config-global.yaml
+    # Apply minimal valid config (portable sed across Linux and macOS)
+    sed_inplace() { if [[ "$OSTYPE" == "darwin"* ]]; then sed -i '' "$@"; else sed -i "$@"; fi; }
+    sed_inplace 's/<CLUSTER_NAMESPACE>/montage-ai-test/g' deploy/k3s/config-global.yaml
+    sed_inplace 's/<CLUSTER_DOMAIN>/cluster.local/g' deploy/k3s/config-global.yaml
+    sed_inplace 's/<CONTROL_PLANE_IP>/127.0.0.1/g' deploy/k3s/config-global.yaml
+    sed_inplace 's/<GPU_NODE_IP>/127.0.0.1/g' deploy/k3s/config-global.yaml
+    sed_inplace 's/<NFS_SERVER_IP>/localhost/g' deploy/k3s/config-global.yaml
     
     make -C deploy/k3s config
     make -C deploy/k3s validate

@@ -47,8 +47,7 @@ class StoryEngine:
         # 1. Identify all input clips
         input_clips = self.ctx.media.video_files
         if not input_clips:
-            # Fallback scan if context not populated (rare)
-            # Reimplementing basic scan from builder
+            # Fallback: scan input directory if context was not pre-populated
             directory = self.ctx.paths.input_dir
             if os.path.isdir(str(directory)):
                  input_clips = []

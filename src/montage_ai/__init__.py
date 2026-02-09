@@ -111,7 +111,7 @@ def format_plan(*args, **kwargs):
     from .broll_planner import format_plan as _format_plan
     return _format_plan(*args, **kwargs)
 
-BROLL_PLANNER_AVAILABLE = True # Assume available, will error on call if missing
+BROLL_PLANNER_AVAILABLE = True  # Lazy-imported above; errors surface on actual call
 
 # StateFlow Director (Deterministic Multi-State Pipeline)
 # ... keep available as is for now since it's just classes mostly

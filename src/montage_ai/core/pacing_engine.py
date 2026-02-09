@@ -127,36 +127,20 @@ class PacingEngine:
         
         # Compatibility helper (since we have Pydantic now but maybe dict legacy logic here or there)
         # Actually context purification ensures we use Pydantic if converted
-        # But instructions might be None
-        
         constraints = {}
         pacing_speed = "dynamic"
-        
+
         if instr:
-            # If Pydantic model (expected)
-            if hasattr(instr, 'extract_constraints'): # If we added methods to model? No.
-               # Pydantic model doesn't have .get() unless we implemented it or its a dict
-               pass
-            elif isinstance(instr, dict):
-                # Legacy safety
+            if isinstance(instr, dict):
                 constraints = instr.get("constraints", {})
                 pacing_speed = instr.get("pacing", {}).get("speed", "dynamic")
-            else:
-                 # It's a Pydantic model. 
-                 # We need to access fields. But models.py didn't show nested constraints yet?
-                 # Let's assume for now we use getattr or it is not yet fully typed in structure
-                 # The user code had: instr.get("constraints")
-                 pass
+            elif hasattr(instr, "model_dump"):
+                # Pydantic model — convert to dict for uniform access
+                instr_dict = instr.model_dump()
+                constraints = instr_dict.get("constraints", {})
+                pacing_speed = instr_dict.get("pacing", {}).get("speed", "dynamic")
 
-        # To be safe, let's treat it carefully.
-        # Ideally, we should update models.py to have full schema, but for now let's implement safe access.
-        
-        # Let's fetch cut_patterns first
         cut_patterns = self._get_cut_patterns()
-
-        # Extract constraints override
-        # We need to know the structure of EditingInstructions in models.py
-        # Based on previous read, it had 'music_track', 'style', 'script', 'broll_plan'
         # It did NOT explicit 'constraints' or 'pacing'. 
         # But it had `class Config: extra = "allow"`. So these might be dynamic fields.
         

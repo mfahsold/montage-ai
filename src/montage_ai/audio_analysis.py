@@ -1151,7 +1151,7 @@ def _ffmpeg_analyze_energy_fast(audio_path: str, duration: float) -> Tuple[np.nd
         for line in result.stderr.split('\n'):
             if 'lavfi.astats.Overall.RMS_level' in line:
                 try:
-                    # Format: frame:N pts:XXX lavfi.astats.Overall.RMS_level=-XX.XX
+                    # Example: frame:0 pts:0.000000 lavfi.astats.Overall.RMS_level=-42.50
                     value = float(line.split('=')[-1].strip())
                     # Convert dB to linear scale
                     rms_linear = 10 ** (value / 20.0) if value > -90 else 0.0

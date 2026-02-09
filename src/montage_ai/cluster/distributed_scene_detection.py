@@ -129,9 +129,9 @@ def detect_scenes_shard(
         duration = getattr(meta, "duration", 0.0) if meta is not None else 0.0
 
     if time_range:
-        # Time-based sharding - detect in range
-        # For now, detect full video and filter (TransNetV2 is fast enough)
-        # TODO: Implement seek-based detection for very large videos
+        # Time-based sharding: detect full video, then filter to range.
+        # TransNetV2 is fast enough for most files; seek-based detection
+        # would only help for 100GB+ inputs.
         logger.info(
             f"🔍 Shard {shard_index}/{shard_count}: Detecting scenes in "
             f"{os.path.basename(video_path)} [{time_range[0]:.1f}s - {time_range[1]:.1f}s]"

@@ -138,9 +138,8 @@ class VoiceIsolationJob(CGPUJob):
 
         success, stdout, stderr = run_cgpu_command(cmd, timeout=self.timeout)
 
-        # cgpu sometimes doesn't report exit code correctly, so verify output exists
+        # CGPU exit codes are unreliable (known issue) — verify output file exists
         if not success:
-            # Check if output was actually created despite exit code issue
             expected_output = f"{self.remote_work_dir}/{self.model}/{stem}/vocals.wav"
             verify_cmd = f"test -f '{expected_output}' && echo 'EXISTS' || echo 'MISSING'"
             verify_ok, verify_out, _ = run_cgpu_command(verify_cmd, timeout=30)
