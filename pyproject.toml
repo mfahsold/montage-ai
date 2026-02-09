@@ -65,6 +65,9 @@ cloud = [
 ]
 
 # Private cloud extras (not included in `all`) — requires private index or manual installation
+cloud-private = [
+    "cgpu>=0.4.0",
+]
 
 all = [
     # All optional dependencies for: pip install montage-ai[all]

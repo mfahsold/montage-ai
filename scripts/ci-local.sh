@@ -24,7 +24,21 @@ echo "Using uv (version: $(uv --version 2>/dev/null || echo 'unknown'))"
 echo "Installing Python runtime (uv python install)"
 uv python install || true
 
+# If the project declares private extras (e.g., `cloud-private`), temporarily remove them
+# to avoid failures when a private index is not available. Developers can opt-in
+# by setting INCLUDE_PRIVATE_EXTRAS=1 in their environment.
+PYPROJECT_BACKUP=""
+if grep -q "^cloud-private = " pyproject.toml && [ "${INCLUDE_PRIVATE_EXTRAS:-}" != "1" ]; then
+  echo "⚠️  Detected private extras (cloud-private) in pyproject.toml — temporarily removing for public CI."
+  PYPROJECT_BACKUP="$(mktemp)"
+  cp pyproject.toml "$PYPROJECT_BACKUP"
+  # Remove cloud-private section using sed (works cross-platform)
+  sed '/^cloud-private = \[/,/^]/d' "$PYPROJECT_BACKUP" > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml
+  echo "   (will restore after sync)"
+fi
+
 # Prefer locked sync if uv.lock exists
+SKIP_SYNC=0
 if [ -f uv.lock ]; then
   echo "Found uv.lock — performing locked sync"
   if ! uv sync --locked --all-extras --dev; then
@@ -33,32 +47,16 @@ if [ -f uv.lock ]; then
   fi
 else
   echo "No uv.lock found — performing best-effort sync"
-  
-  # If the project declares private extras (e.g., `cloud-private`), temporarily remove them
-  # to avoid failures when a private index is not available. Developers can opt-in
-  # by setting INCLUDE_PRIVATE_EXTRAS=1 in their environment.
-  PYPROJECT_BACKUP=""
-  if grep -q "^cloud-private = " pyproject.toml && [ "${INCLUDE_PRIVATE_EXTRAS:-}" != "1" ]; then
-    echo "⚠️  Detected private extras (cloud-private) in pyproject.toml — temporarily removing for public CI."
-    PYPROJECT_BACKUP="$(mktemp)"
-    cp pyproject.toml "$PYPROJECT_BACKUP"
-    # Remove cloud-private section using sed (works cross-platform)
-    sed '/^cloud-private = \[/,/^]/d' "$PYPROJECT_BACKUP" > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml
-    echo "   (will restore after sync)"
-  fi
-
-  # Perform sync with potentially modified pyproject
-  SKIP_SYNC=0
   if ! uv sync --dev --extra test 2>&1 | tee /tmp/uv-sync.log; then
     echo "⚠️  uv sync failed; see /tmp/uv-sync.log for details"
     SKIP_SYNC=1
   fi
+fi
 
-  # Restore pyproject.toml if we backed it up
-  if [ -n "$PYPROJECT_BACKUP" ] && [ -f "$PYPROJECT_BACKUP" ]; then
-    mv "$PYPROJECT_BACKUP" pyproject.toml
-    echo "✅ Restored pyproject.toml"
-  fi
+# Restore pyproject.toml if we backed it up
+if [ -n "$PYPROJECT_BACKUP" ] && [ -f "$PYPROJECT_BACKUP" ]; then
+  mv "$PYPROJECT_BACKUP" pyproject.toml
+  echo "✅ Restored pyproject.toml"
 fi
 
 # Run test suite
@@ -76,11 +74,17 @@ else
     sed '/^cloud-private = \[/,/^]/d' "$PYPROJECT_BACKUP" > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml
   fi
 
-  uv run pytest -q
-  
+  PYTEST_EXIT=0
+  uv run pytest -q || PYTEST_EXIT=$?
+
   # Restore if needed
   if [ -n "$PYPROJECT_BACKUP" ] && [ -f "$PYPROJECT_BACKUP" ]; then
     mv "$PYPROJECT_BACKUP" pyproject.toml
+  fi
+
+  if [ "$PYTEST_EXIT" -ne 0 ]; then
+    echo "Local CI complete (pytest exited with $PYTEST_EXIT)"
+    exit "$PYTEST_EXIT"
   fi
 fi
 
