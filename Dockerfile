@@ -70,9 +70,8 @@ RUN groupadd -g ${GID} montage && \
     useradd -u ${UID} -g ${GID} -m -s /bin/bash montage && \
     chown -R montage:montage /app
 
-# Expose port for web UI
-# Allow override via build-arg/service config; default kept as 5000 for backwards compatibility
-ARG SERVICE_PORT=5000
+# Expose port for web UI (must match Flask app port in app.py, default 8080)
+ARG SERVICE_PORT=8080
 EXPOSE ${SERVICE_PORT}
 ENV SERVICE_PORT=${SERVICE_PORT}
 

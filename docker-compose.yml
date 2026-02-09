@@ -9,7 +9,7 @@ services:
     image: montage-ai:latest
     container_name: montage-ai
     ports:
-      - "${WEB_PORT:-8080}:5000"
+      - "${WEB_PORT:-8080}:8080"
     # === RESOURCE LIMITS - CRITICAL FOR STABILITY ===
     # ⚠️  These limits prevent the container from consuming all system resources.
     #
