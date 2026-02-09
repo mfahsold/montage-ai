@@ -2,12 +2,17 @@
 Audio Analysis Module for Montage AI
 
 Provides beat detection, energy analysis, and dynamic cut length calculation.
-Uses librosa for audio processing.
+Uses FFmpeg astats/tempo filters as the primary engine (portable, no heavy deps).
 
 Usage:
-    from montage_ai.audio_analysis import analyze_audio, get_beat_times, calculate_dynamic_cut_length
+    from montage_ai.audio_analysis import get_beat_times, analyze_music_energy, BeatInfo
 
     beat_info = get_beat_times("/path/to/music.mp3")
+    print(beat_info.tempo)            # BPM (float)
+    print(beat_info.beat_times)       # numpy array of beat timestamps
+    print(len(beat_info))             # number of detected beats
+    print(beat_info.beat_count)       # same as len()
+
     energy = analyze_music_energy("/path/to/music.mp3")
 """
 
@@ -174,11 +179,29 @@ def _detect_beats_madmom_downbeat(audio_path: str) -> Tuple[float, np.ndarray, n
 
 @dataclass
 class BeatInfo:
-    """Beat detection results."""
+    """Beat detection results.
+
+    Attributes:
+        tempo: Detected BPM (beats per minute).
+        beat_times: Numpy array of beat timestamps in seconds.
+        duration: Total audio duration in seconds.
+        sample_rate: Audio sample rate in Hz.
+
+    Example:
+        >>> beat_info = get_beat_times("/data/music/track.mp3")
+        >>> print(f"{beat_info.tempo:.0f} BPM, {len(beat_info)} beats")
+        100 BPM, 17 beats
+        >>> for t in beat_info.beat_times[:5]:
+        ...     print(f"  beat at {t:.2f}s")
+    """
     tempo: float
     beat_times: np.ndarray
     duration: float
     sample_rate: int
+
+    def __len__(self) -> int:
+        """Return the number of detected beats."""
+        return len(self.beat_times)
 
     @property
     def beat_count(self) -> int:
@@ -1413,7 +1436,15 @@ def get_beat_times(audio_path: str, verbose: Optional[bool] = None, backend: str
         backend: "auto", "madmom", "ffmpeg", or "cloud"
 
     Returns:
-        BeatInfo with tempo, beat times, duration, and sample rate
+        BeatInfo dataclass with ``tempo``, ``beat_times``, ``duration``, and
+        ``sample_rate``.  Supports ``len()`` to get the beat count directly.
+
+    Example:
+        >>> beat_info = get_beat_times("/data/music/track.mp3")
+        >>> print(f"{beat_info.tempo:.0f} BPM, {len(beat_info)} beats")
+        >>> # Access raw beat timestamps:
+        >>> for t in beat_info.beat_times:
+        ...     print(t)
     """
     if verbose is None:
         verbose = _settings.features.verbose

@@ -7,7 +7,12 @@
 - Fix: Docker Web UI port mismatch — aligned all container ports from 5000 to 8080 across `docker-compose.yml`, `docker-compose.web.yml`, and `deploy/config.env` to match the Flask app default (#36).
 - Fix: Kustomize ConfigMap hash suffix causing `CreateContainerConfigError` — added `generatorOptions.disableNameSuffixHash: true` so `envFrom.configMapRef` resolves correctly (#38).
 
+### Enhancements
+- `BeatInfo` dataclass now supports `len()` for convenience (`len(beat_info)` returns beat count) (#109).
+- `FFmpegConfig` now exposes `gpu_available`, `gpu_type`, and `encoder` properties for better IDE discoverability (#110).
+
 ### Documentation
+- Clarified `get_beat_times()` return type and added usage examples to `audio_analysis.py` docstrings (#109).
 - Added "Re-running Setup & Idempotency" section to `docs/getting-started.md` with idempotency guarantees, rebuild triggers, and full-reset instructions (#106).
 - Updated `copilot-instructions.md` module table with correct module names (`audio_analysis.py`, `scene_analysis.py`, etc.) and added import examples (#105).
 - Updated `docs/architecture.md` external dependencies: removed librosa (replaced by FFmpeg astats/tempo), corrected version pins, fixed GPU fallback chain.

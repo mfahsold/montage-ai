@@ -296,11 +296,26 @@ class FFmpegConfig:
     def is_gpu_accelerated(self) -> bool:
         """Check if GPU acceleration is active."""
         return self._hw_config.is_gpu if self._hw_config else False
-    
+
+    @property
+    def gpu_available(self) -> bool:
+        """Whether GPU acceleration is available (alias for ``is_gpu_accelerated``)."""
+        return self.is_gpu_accelerated
+
     @property
     def gpu_encoder_type(self) -> Optional[str]:
         """Get the active GPU encoder type (nvenc, vaapi, etc.)."""
         return self._hw_config.type if self._hw_config and self._hw_config.is_gpu else None
+
+    @property
+    def gpu_type(self) -> Optional[str]:
+        """GPU type string, e.g. ``'nvenc'``, ``'vaapi'``, ``'qsv'``, or ``None`` (alias for ``gpu_encoder_type``)."""
+        return self.gpu_encoder_type
+
+    @property
+    def encoder(self) -> str:
+        """Active encoder name (e.g. ``'libx264'``, ``'h264_nvenc'``)."""
+        return self.effective_codec
     
     def get_level_for_resolution(self, width: int, height: int, fps: float) -> str:
         """Determine H.264/H.265 level based on resolution and FPS.
