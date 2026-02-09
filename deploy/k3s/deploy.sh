@@ -70,13 +70,39 @@ fi
 # Build manifests with kustomize (includes registry substitution)
 echo "Building manifests from overlay '${OVERLAY}'..."
 MANIFEST_FILE=$(mktemp)
-trap "rm -f ${MANIFEST_FILE}" EXIT
+NON_PVC_FILE=$(mktemp)
+PVC_DIR=$(mktemp -d)
+trap "rm -f ${MANIFEST_FILE} ${NON_PVC_FILE}; rm -rf ${PVC_DIR}" EXIT
 
 kustomize build --load-restrictor LoadRestrictionsNone "${SCRIPT_DIR}/overlays/${OVERLAY}" > "${MANIFEST_FILE}"
 
-# Apply manifests
+# Apply manifests with PVC guard (immutable fields cannot be updated)
 echo "Applying manifests to namespace ${CLUSTER_NAMESPACE}..."
-kubectl apply -f "${MANIFEST_FILE}"
+csplit -s -f "${PVC_DIR}/doc-" -b "%03d.yaml" "${MANIFEST_FILE}" '/^---$/' '{*}' >/dev/null 2>&1 || true
+
+for doc in "${PVC_DIR}"/doc-*.yaml; do
+  if ! grep -q "[^[:space:]]" "${doc}"; then
+    continue
+  fi
+
+  if grep -q "^kind: PersistentVolumeClaim" "${doc}"; then
+    pvc_name=$(awk '/^  name: /{print $2; exit}' "${doc}")
+    if [ -n "${pvc_name}" ] && kubectl get pvc "${pvc_name}" -n "${CLUSTER_NAMESPACE}" >/dev/null 2>&1; then
+      echo "Skipping existing PVC ${pvc_name}"
+      continue
+    fi
+    echo "Applying PVC ${pvc_name}"
+    kubectl apply -f "${doc}"
+    continue
+  fi
+
+  cat "${doc}" >> "${NON_PVC_FILE}"
+  echo "---" >> "${NON_PVC_FILE}"
+done
+
+if [ -s "${NON_PVC_FILE}" ]; then
+  kubectl apply -f "${NON_PVC_FILE}"
+fi
 
 # Wait for deployment
 echo "Waiting for deployment to be ready (up to 300s)..."

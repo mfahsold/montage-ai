@@ -104,7 +104,7 @@ Includes all optional groups (equivalent to `pip install -r requirements.txt`)
 
 | Package | Version | Purpose | Notes | Size |
 |---------|---------|---------|-------|------|
-| **mediapipe** | ≥0.10.0 | Face detection for smart reframing | Optional; fallback to bounding box detection | ~300 MB |
+| **mediapipe** | ≥0.10.0 | Face detection for smart reframing | Optional; skipped on Linux aarch64 or Python ≥3.13 | ~300 MB |
 | **scipy** | ≥1.10.0 | Path optimization for camera motion | Optional; fallback to linear interpolation | ~45 MB |
 | **librosa** | ≥0.10.0 | Audio analysis fallback | FFmpeg is primary; librosa is conditional | ~25 MB |
 | **color-matcher** | ≥0.5.0 | Shot-to-shot color grading | Optional; fallback: no color matching | ~2 MB |
@@ -189,6 +189,11 @@ Or disable smart reframing:
 ```bash
 SMART_REFRAME_ENABLED=false ./montage-ai.sh run
 ```
+
+### "mediapipe" not installable on aarch64
+On Linux aarch64 (or Python ≥3.13), `mediapipe` wheels are not available. The
+`[ai]` and `[all]` extras skip installing `mediapipe`, and Montage AI falls back
+to non-face-based reframing.
 
 ### "ConnectionError: Can't connect to Redis"
 You're using the web UI but Redis is not running. Either:

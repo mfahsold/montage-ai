@@ -58,6 +58,10 @@ make -C deploy/k3s deploy-cluster
 ./deploy/k3s/deploy.sh
 ```
 
+Note: The cluster deploy flow is idempotent and skips existing PVCs. Configure
+PVC names in `deploy/k3s/config-global.yaml` under `storage.pvc` to reuse
+existing claims.
+
 ## K3s Make Targets
 
 ```bash

@@ -32,7 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ai = [
-    "mediapipe>=0.10.0",    # Smart Reframing: face detection
+    "mediapipe>=0.10.0; python_version < '3.13' and platform_machine != 'aarch64'",    # Smart Reframing: face detection
     "scipy>=1.10.0",        # Smart Reframing: path optimization
     "librosa>=0.10.0",      # Audio analysis fallback (FFmpeg primary)
     "color-matcher>=0.5.0", # Shot-to-shot color consistency
@@ -59,7 +59,7 @@ cloud-private = [
 
 all = [
     # All optional dependencies for: pip install montage-ai[all]
-    "mediapipe>=0.10.0",
+    "mediapipe>=0.10.0; python_version < '3.13' and platform_machine != 'aarch64'",
     "scipy>=1.10.0",
     "librosa>=0.10.0",
     "color-matcher>=0.5.0",

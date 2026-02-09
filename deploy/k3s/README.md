@@ -322,6 +322,10 @@ storage:
     assets: "montage-ai-assets-nfs"
 ```
 
+The canonical deploy flow is idempotent. `deploy/k3s/deploy.sh` skips applying
+PVCs that already exist, and uses `storage.pvc` names when wiring volumes. Set
+these names to match existing claims to avoid immutable PVC conflicts.
+
 ### NFS Storage (Multi-Node)
 
 Provision an RWX storage class via your cluster (NFS/CSI), then set it in

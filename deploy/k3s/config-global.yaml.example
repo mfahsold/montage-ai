@@ -51,7 +51,7 @@ storage:
     path: "/mnt/nfs-montage"
   pvc:
     # Optional split PVCs for distributed jobs (RWX recommended)
-    # Leave empty to use the single PVC_NAME / legacy data PVC.
+    # Set these to match existing PVC names to avoid immutable PVC conflicts.
     input: "montage-ai-input-nfs"
     output: "montage-ai-output-nfs"
     music: "montage-ai-music-nfs"

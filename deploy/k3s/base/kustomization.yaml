@@ -134,6 +134,110 @@ replacements:
   - source:
       kind: ConfigMap
       name: cluster-config
+      fieldPath: data.PVC_INPUT_NAME
+    targets:
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-input
+        fieldPaths:
+          - metadata.name
+      - select:
+          kind: Deployment
+          name: montage-ai-web
+        fieldPaths:
+          - spec.template.spec.volumes.[name=data-input].persistentVolumeClaim.claimName
+          - spec.template.spec.volumes.[name=input].persistentVolumeClaim.claimName
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.volumes.[name=data-input].persistentVolumeClaim.claimName
+      - select:
+          kind: CronJob
+          name: montage-ai-scheduled
+        fieldPaths:
+          - spec.jobTemplate.spec.template.spec.volumes.[name=input].persistentVolumeClaim.claimName
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.PVC_OUTPUT_NAME
+    targets:
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-output
+        fieldPaths:
+          - metadata.name
+      - select:
+          kind: Deployment
+          name: montage-ai-web
+        fieldPaths:
+          - spec.template.spec.volumes.[name=data-output].persistentVolumeClaim.claimName
+          - spec.template.spec.volumes.[name=output].persistentVolumeClaim.claimName
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.volumes.[name=data-output].persistentVolumeClaim.claimName
+      - select:
+          kind: CronJob
+          name: montage-ai-scheduled
+        fieldPaths:
+          - spec.jobTemplate.spec.template.spec.volumes.[name=output].persistentVolumeClaim.claimName
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.PVC_MUSIC_NAME
+    targets:
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-music
+        fieldPaths:
+          - metadata.name
+      - select:
+          kind: Deployment
+          name: montage-ai-web
+        fieldPaths:
+          - spec.template.spec.volumes.[name=data-music].persistentVolumeClaim.claimName
+          - spec.template.spec.volumes.[name=music].persistentVolumeClaim.claimName
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.volumes.[name=data-music].persistentVolumeClaim.claimName
+      - select:
+          kind: CronJob
+          name: montage-ai-scheduled
+        fieldPaths:
+          - spec.jobTemplate.spec.template.spec.volumes.[name=music].persistentVolumeClaim.claimName
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.PVC_ASSETS_NAME
+    targets:
+      - select:
+          kind: PersistentVolumeClaim
+          name: montage-assets
+        fieldPaths:
+          - metadata.name
+      - select:
+          kind: Deployment
+          name: montage-ai-web
+        fieldPaths:
+          - spec.template.spec.volumes.[name=data-assets].persistentVolumeClaim.claimName
+          - spec.template.spec.volumes.[name=assets].persistentVolumeClaim.claimName
+      - select:
+          kind: Deployment
+          name: montage-ai-worker
+        fieldPaths:
+          - spec.template.spec.volumes.[name=data-assets].persistentVolumeClaim.claimName
+      - select:
+          kind: CronJob
+          name: montage-ai-scheduled
+        fieldPaths:
+          - spec.jobTemplate.spec.template.spec.volumes.[name=assets].persistentVolumeClaim.claimName
+  - source:
+      kind: ConfigMap
+      name: cluster-config
       fieldPath: data.WORKER_CPU_REQUEST
     targets:
       - select:

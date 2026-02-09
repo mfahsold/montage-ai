@@ -1,8 +1,8 @@
 # Video Processing
 moviepy>=2.2.1,<2.3  # Align with pyproject; 2.2.x requires pillow<12
 opencv-python-headless>=4.12.0.88
-mediapipe>=0.10.0  # For Smart Reframing (Face Detection)
 soundfile>=0.12.0
+# mediapipe is already in optional dependencies in pyproject.toml, keep base requirements clean.
 Pillow>=10.0.0,<12.0  # moviepy 2.2.x constraint
 tqdm>=4.66.0
 scenedetect[opencv]>=0.6.7.1
