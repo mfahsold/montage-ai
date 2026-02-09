@@ -5,10 +5,32 @@ For an audited snapshot of code-aligned defaults, see `docs/config-defaults.md`.
 
 ---
 
+## How to Set Configuration
+
+Environment variables can be set in three ways (highest priority first):
+
+1. **Shell environment** (highest priority):
+   ```bash
+   WEB_PORT=8081 QUALITY_PROFILE=preview docker compose up
+   ```
+
+2. **`.env` file** in the project root:
+   ```
+   WEB_PORT=8081
+   QUALITY_PROFILE=preview
+   ```
+
+3. **`docker-compose.yml`** `environment:` section (lowest priority for overrides).
+
+**For Kubernetes:** Use `deploy/k3s/config-global.yaml` and run `make -C deploy/k3s config`.
+
+---
+
 ## Core Settings
 
 | Variable          | Default       | Description                                                                         |
 | ----------------- | ------------- | ----------------------------------------------------------------------------------- |
+| `WEB_PORT`        | `8080`        | Web UI port (Docker Compose only; override at runtime)                              |
 | `CUT_STYLE`       | `dynamic`     | Editing style: `dynamic`, `hitchcock`, `mtv`, `action`, `documentary`, `minimalist`, `viral`, `wes_anderson` |
 | `CREATIVE_PROMPT` | *(empty)*     | Natural language editing instructions (overrides `CUT_STYLE`)                       |
 | `NUM_VARIANTS`    | `1`           | Number of output variants to generate                                               |

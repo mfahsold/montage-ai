@@ -69,10 +69,10 @@ If `uv lock` fails locally, either:
 Deployment config centralization
 
 - Build and deploy scripts read a local `deploy/k3s/config-global.yaml` (copied from `deploy/k3s/config-global.yaml.example`) and the generated `deploy/k3s/base/cluster-config.env`. Override via environment variables or by editing your local `deploy/k3s/config-global.yaml`.
-- The `Dockerfile` accepts a build arg `SERVICE_PORT` (default `5000`) and sets `ENV SERVICE_PORT` so the port is configurable at build time. To build with a custom port:
+- The `Dockerfile` accepts a build arg `SERVICE_PORT` (default `8080`) and sets `ENV SERVICE_PORT` so the port is configurable at build time. To build with a custom port:
 
 ```bash
-docker build --build-arg SERVICE_PORT=8080 -t ${REGISTRY}/montage-ai:${TAG} .
+docker build --build-arg SERVICE_PORT=9090 -t ${REGISTRY}/montage-ai:${TAG} .
 ```
 
 - Update your local `deploy/k3s/config-global.yaml` to set `registry.url`, `images.montage_ai.tag`, or `cluster.namespace` as needed for your environment.

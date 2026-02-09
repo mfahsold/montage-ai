@@ -9,7 +9,8 @@ services:
     image: montage-ai:latest
     container_name: montage-ai
     ports:
-      - "${WEB_PORT:-8080}:5000"
+      # Web UI: http://localhost:8080 (override: WEB_PORT=8081 docker compose up)
+      - "${WEB_PORT:-8080}:8080"
     # === RESOURCE LIMITS - CRITICAL FOR STABILITY ===
     # ⚠️  These limits prevent the container from consuming all system resources.
     #
@@ -138,11 +139,6 @@ services:
       
       # Deep Analysis
       - DEEP_ANALYSIS=${DEEP_ANALYSIS:-false}
-
-      # Duration Control
-      - TARGET_DURATION=${TARGET_DURATION:-0}
-      - MUSIC_START=${MUSIC_START:-0}
-      - MUSIC_END=${MUSIC_END:-0}
     # === GPU ACCESS (for hardware video encoding) ===
     # Uncomment for NVIDIA GPU:
     # deploy:

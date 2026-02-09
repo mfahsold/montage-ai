@@ -235,9 +235,24 @@ docker exec montage-ai rm -rf /tmp/*.mp4
 docker ps | grep montage-ai
 
 # Check logs
+docker logs montage-ai
 
 # Port in use? Try different port
-WEB_PORT=5002 docker compose up -d
+WEB_PORT=8081 docker compose up -d
+```
+
+### Port Conflicts
+
+**Symptom:** "Address already in use" or Web UI not reachable
+
+```bash
+# Find what's using port 8080
+lsof -i :8080          # Linux/macOS
+ss -tlnp | grep 8080   # Linux alternative
+
+# Use a different port
+WEB_PORT=8081 docker compose up
+# Then open http://localhost:8081
 ```
 
 ---
