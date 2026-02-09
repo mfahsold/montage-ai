@@ -22,7 +22,6 @@ func Connect(host string, port int, password string) (*Client, error) {
 		MaxRetries:   3,
 		PoolSize:     10,
 		MinIdleConns: 2,
-		MaxConnAge:   time.Hour,
 	})
 
 	// Test connection

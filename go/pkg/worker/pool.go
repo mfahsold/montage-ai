@@ -159,7 +159,7 @@ func (p *Pool) pollQueues(ctx context.Context) error {
 					continue
 				}
 
-				if job != nil {
+				if job != "" {
 					p.log.Debugf("📥 Popped job from queue: %s", queueName)
 					
 					// Parse job
