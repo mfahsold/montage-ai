@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-test-simple
+  namespace: montage-ai
+spec:
+  template:
+    spec:
+      containers:
+      - name: test
+        image: 192.168.1.12:30500/montage-ai:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-c", "import montage_ai; print('✅ Python import OK'); print('montage_ai at:', montage_ai.__file__)"]
+      restartPolicy: Never
+  backoffLimit: 3

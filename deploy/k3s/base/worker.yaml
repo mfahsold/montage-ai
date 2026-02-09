@@ -39,7 +39,7 @@ spec:
         - name: cgpu-credentials-init
           image: <IMAGE_FULL>
           command:
-            - /bin/bash
+            - /bin/sh
             - -c
             - |
               mkdir -p /cgpu/state
@@ -98,16 +98,16 @@ spec:
       volumes:
         - name: data-input
           persistentVolumeClaim:
-            claimName: montage-input
+            claimName: montage-ai-input-nfs
         - name: data-output
           persistentVolumeClaim:
-            claimName: montage-output
+            claimName: montage-ai-output-nfs
         - name: data-music
           persistentVolumeClaim:
-            claimName: montage-music
+            claimName: montage-ai-music-nfs
         - name: data-assets
           persistentVolumeClaim:
-            claimName: montage-assets
+            claimName: montage-ai-assets-nfs
         - name: tmp-segments
           emptyDir:
             sizeLimit: 20Gi

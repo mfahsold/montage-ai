@@ -24,7 +24,7 @@ spec:
       - name: cgpu-credentials-init
         image: <IMAGE_FULL>
         command:
-          - /bin/bash
+          - /bin/sh
           - -c
           - |
             mkdir -p /cgpu/state
