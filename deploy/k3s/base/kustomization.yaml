@@ -20,6 +20,11 @@ resources:
 #   make -C deploy/k3s config
 # Images are updated via replacements using IMAGE_FULL.
 
+# Disable hash suffix on generated ConfigMaps so that envFrom.configMapRef
+# and replacements resolve to the literal name (fixes #38).
+generatorOptions:
+  disableNameSuffixHash: true
+
 # ConfigMap for deployment settings (overlays can patch)
 configMapGenerator:
   - name: cluster-config
