@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "🚀 Setting up montage-ai development environment..."
 
@@ -98,6 +98,6 @@ echo "🎬 Next steps:"
 echo "   1. Generate test media:    ./scripts/ops/create-test-video.sh"
 echo "   2. Build Docker image:     docker compose build"
 echo "   3. Test setup:             docker compose run --rm montage-ai python -c 'import montage_ai; print(\"OK\")'  "
-echo "   4. Run first montage:      QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run"
+echo "   4. Run first montage:      QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh run"
 echo "   5. Or start Web UI:        docker compose up  (then http://localhost:8080)"
 echo ""
