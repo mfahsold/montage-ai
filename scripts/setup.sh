@@ -75,8 +75,14 @@ echo "  ✅ Docker $docker_version installed"
 
 # Check disk space (portable across Linux and macOS)
 DISK_AVAIL=$(df -k "$REPO_ROOT" | tail -1 | awk '{print int($4 / 1024 / 1024)}')
-if [ "$DISK_AVAIL" -lt 30 ]; then
-    echo "⚠️  Warning: Only ${DISK_AVAIL}GB free disk space. Videos need 30GB+."
+if [ "$DISK_AVAIL" -lt 5 ]; then
+    echo "❌ Only ${DISK_AVAIL}GB free disk space. Minimum 5GB required."
+    echo "   Free up space before continuing."
+    exit 1
+elif [ "$DISK_AVAIL" -lt 30 ]; then
+    echo "⚠️  Warning: Only ${DISK_AVAIL}GB free disk space."
+    echo "   • For quick tests: Use QUALITY_PROFILE=preview (works fine)"
+    echo "   • For HQ rendering: 30GB+ recommended"
 fi
 
 # Verify Docker resource allocation

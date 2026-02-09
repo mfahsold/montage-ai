@@ -15,16 +15,16 @@ Full control over 27+ features: styles, enhancement, cloud integration, export, 
 docker compose up
 
 # Preview (fast, 360p)
-docker compose run --rm montage-ai ./montage-ai.sh preview dynamic
+docker compose run --rm montage-ai /app/montage-ai.sh preview dynamic
 
 # Standard montage
-docker compose run --rm montage-ai ./montage-ai.sh run hitchcock --stabilize --captions tiktok
+docker compose run --rm montage-ai /app/montage-ai.sh run hitchcock --stabilize --captions tiktok
 
 # High quality with all effects
-docker compose run --rm montage-ai ./montage-ai.sh hq documentary --upscale --isolate-voice --film-grain 35mm
+docker compose run --rm montage-ai /app/montage-ai.sh hq documentary --upscale --isolate-voice --film-grain 35mm
 
 # Generate 3 variants in parallel
-docker compose run --rm montage-ai ./montage-ai.sh run dynamic --variants 3
+docker compose run --rm montage-ai /app/montage-ai.sh run dynamic --variants 3
 ```
 
 Local Docker note: examples below use `./montage-ai.sh` for brevity. When running locally,
@@ -73,22 +73,22 @@ Use the same `/api/jobs` endpoints as the Web UI, but from the CLI.
 
 ```bash
 # Submit a job
-MONTAGE_API_BASE="http://<MONTAGE_API_HOST>" docker compose run --rm montage-ai ./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser"
+MONTAGE_API_BASE="http://<MONTAGE_API_HOST>" docker compose run --rm montage-ai /app/montage-ai.sh jobs submit --style dynamic --prompt "fast teaser"
 
 # Submit with extra options
-docker compose run --rm montage-ai ./montage-ai.sh jobs submit --style hitchcock --option stabilize=true --option quality_profile=preview
+docker compose run --rm montage-ai /app/montage-ai.sh jobs submit --style hitchcock --option stabilize=true --option quality_profile=preview
 
 # Fetch status
-docker compose run --rm montage-ai ./montage-ai.sh jobs status <JOB_ID>
+docker compose run --rm montage-ai /app/montage-ai.sh jobs status <JOB_ID>
 
 # Cancel a job
-docker compose run --rm montage-ai ./montage-ai.sh jobs cancel <JOB_ID>
+docker compose run --rm montage-ai /app/montage-ai.sh jobs cancel <JOB_ID>
 
 # Submit and auto-download artifacts after completion
-docker compose run --rm montage-ai ./montage-ai.sh jobs submit --style dynamic --prompt "fast teaser" --download --download-dir ~/Downloads
+docker compose run --rm montage-ai /app/montage-ai.sh jobs submit --style dynamic --prompt "fast teaser" --download --download-dir ~/Downloads
 
 # Download and zip artifacts (video + timeline + logs)
-docker compose run --rm montage-ai ./montage-ai.sh jobs submit --style documentary --download --download-zip
+docker compose run --rm montage-ai /app/montage-ai.sh jobs submit --style documentary --download --download-zip
 ```
 
 Notes:

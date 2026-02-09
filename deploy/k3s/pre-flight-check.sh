@@ -64,7 +64,18 @@ fi
 if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null; then
   SC_COUNT=$(kubectl get storageclass --no-headers 2>/dev/null | wc -l || echo "0")
   if [ "${SC_COUNT:-0}" -gt 0 ]; then
-    echo -e "${GREEN}[OK]${NC} ${SC_COUNT} StorageClass(es) available"
+    echo -e "${GREEN}[OK]${NC} ${SC_COUNT} StorageClass(es) available:"
+    # Show details: name, provisioner, and default marker
+    kubectl get storageclass --no-headers 2>/dev/null | while IFS= read -r line; do
+      SC_NAME=$(echo "$line" | awk '{print $1}')
+      SC_PROV=$(echo "$line" | awk '{print $2}')
+      SC_DEFAULT=""
+      if echo "$line" | grep -q "(default)"; then
+        SC_DEFAULT=" (default)"
+      fi
+      echo "       - ${SC_NAME} [${SC_PROV}]${SC_DEFAULT}"
+    done
+    echo "       Shared media volumes require RWX (ReadWriteMany) for multi-node clusters."
   else
     echo -e "${YELLOW}[WARN]${NC} No StorageClass found. Pods requiring PVCs will stay Pending."
     echo "       For single-node: K3s includes local-path by default."

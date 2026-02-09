@@ -84,13 +84,13 @@ All three commands should succeed. If not, see [Troubleshooting](troubleshooting
 
 ```bash
 # Full render
-docker compose run --rm montage-ai ./montage-ai.sh run
+docker compose run --rm montage-ai /app/montage-ai.sh run
 
 # Fast preview (360p, much faster)
-QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
+QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh run
 
 # Specific style
-docker compose run --rm montage-ai ./montage-ai.sh run hitchcock
+docker compose run --rm montage-ai /app/montage-ai.sh run hitchcock
 ```
 
 ---
