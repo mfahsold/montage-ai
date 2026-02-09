@@ -2,11 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - ../../base
-  - keda-scaledobjects.yaml
-
-# NOTE: `keda-scaledobjects.yaml` is generated from `keda-scaledobjects.yaml.in`
-# by `deploy/k3s/prepare-scaledobjects.sh` using values rendered into
-# `deploy/k3s/base/cluster-config.env` (see `make config`). This keeps
-# KEDA thresholds configurable from `deploy/config.env` without runtime
-# in-cluster patching.
+- ../../base
+- keda-scaledobjects.yaml
+namespace: montage-ai-test
