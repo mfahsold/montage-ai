@@ -3,7 +3,7 @@
 # Single entry point for cluster operations
 # ==============================================================================
 
-.PHONY: help config validate validate-config pre-flight diff deploy deploy-cluster status health test-e2e
+.PHONY: help init-config config validate validate-config pre-flight diff deploy deploy-cluster status health test-e2e
 
 GREEN  := $(shell tput -Txterm setaf 2 2>/dev/null || echo '')
 YELLOW := $(shell tput -Txterm setaf 3 2>/dev/null || echo '')
@@ -26,6 +26,9 @@ help: ## Show this help message
 	@echo ''
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  ${YELLOW}%-25s${RESET} %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ''
+
+init-config: ## Generate config-global.yaml from example with sensible defaults (env overridable)
+	@bash ./init-config.sh
 
 config: ## Render deploy/k3s/base/cluster-config.env from config-global.yaml
 	@if [ -x "$(CONFIG_ENV_SCRIPT)" ]; then \
