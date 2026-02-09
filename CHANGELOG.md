@@ -9,10 +9,15 @@
 - Fix: Kustomize ConfigMap hash suffix causing `CreateContainerConfigError` — added `generatorOptions.disableNameSuffixHash: true` so `envFrom.configMapRef` resolves correctly (#38).
 
 ### Enhancements
+- New `verify-deployment` CLI command: single-command system validation covering GPU, storage, LLM backends, Docker, K8s, and codecs. Supports `--format json` and `--verbose` (#122).
 - `BeatInfo` dataclass now supports `len()` for convenience (`len(beat_info)` returns beat count) (#109).
 - `FFmpegConfig` now exposes `gpu_available`, `gpu_type`, and `encoder` properties for better IDE discoverability (#110).
 
 ### Documentation
+- Added `docs/k3s-local-setup.md` — local K3s development guide covering k3d, minikube, kind, storage, registries, and dev workflow tips (#121).
+- Added `docs/high-res-workflow.md` — 4K/6K/8K proxy workflow guide with NLE conform steps for DaVinci Resolve, FCPX, and Premiere Pro, plus performance benchmarks (#121).
+- Expanded GPU troubleshooting section in `docs/troubleshooting.md` with VAAPI permissions, Intel QSV driver installation, NVIDIA verification, AMD ROCm, and `check-hw` output examples (#121).
+- Added high-res workflow and local K3s links to README Documentation Navigator (#121).
 - Added Configuration Lifecycle section, image building options (registry + K3s direct load), multi-arch prerequisites, and common K8s error troubleshooting to `cluster-deploy.md` (#118, #119).
 - Added `setup.sh` purpose table to README explaining all checks and actions (#120).
 - Added cross-links between related docs: README → Installation Test, getting-started → configuration/features/CLI, cluster-deploy → troubleshooting/configuration, features → getting-started (#115).

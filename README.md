@@ -167,10 +167,12 @@ New user?
 Already running?
 ├── Configure settings  → docs/configuration.md
 ├── See all features    → docs/features.md
+├── High-res workflow   → docs/high-res-workflow.md
 ├── Fix an error        → docs/troubleshooting.md
 └── Tune performance    → docs/performance-tuning.md
 
 Deploying to K8s?
+├── Local K3s dev       → docs/k3s-local-setup.md
 ├── Cluster setup       → docs/cluster-deploy.md
 ├── Full K8s reference  → deploy/k3s/README.md
 └── Operations          → docs/operations/README.md

@@ -108,6 +108,159 @@ UPSCALE=false \
 
 ---
 
+## GPU / Hardware Acceleration
+
+### No GPU Detected (`check-hw` shows CPU only)
+
+Run diagnostics first:
+
+```bash
+./montage-ai.sh check-hw
+# Or with details:
+./montage-ai.sh check-hw --verbose
+```
+
+**Expected output (GPU working):**
+
+```
+✅ Hardware acceleration is available (VAAPI)
+----------------------------------------
+✅ NVENC        : missing
+✅ VAAPI        : working
+⚪ QSV          : missing
+```
+
+**Expected output (no GPU):**
+
+```
+⚠️ Hardware acceleration NOT found. Falling back to CPU.
+```
+
+### VAAPI Permission Issues
+
+**Symptom:** `check-hw` shows VAAPI as `BROKEN`, logs show "Permission denied" for `/dev/dri/renderD128`.
+
+**Fix (Linux):**
+
+```bash
+# Check device permissions
+ls -la /dev/dri/
+# Should show: crw-rw---- 1 root render ... renderD128
+
+# Add your user to the render and video groups
+sudo usermod -aG render $USER
+sudo usermod -aG video $USER
+
+# Log out and back in (or restart shell)
+newgrp render
+
+# Verify access
+test -r /dev/dri/renderD128 && echo "OK" || echo "FAIL"
+```
+
+**Docker:** Pass the DRI device into the container:
+
+```bash
+docker compose run --rm --device /dev/dri:/dev/dri montage-ai ./montage-ai.sh check-hw
+```
+
+Or add to `docker-compose.yml`:
+
+```yaml
+services:
+  montage-ai:
+    devices:
+      - /dev/dri:/dev/dri
+```
+
+### Intel QSV Driver Installation
+
+**Ubuntu/Debian:**
+
+```bash
+# Intel Media Driver (iHD) for Broadwell+ (Gen8+)
+sudo apt install intel-media-va-driver-non-free vainfo
+
+# Older Intel (Haswell and earlier, i965 driver)
+sudo apt install i965-va-driver vainfo
+
+# Verify
+vainfo
+# Should show "Driver version" and list profiles/entrypoints
+```
+
+**Fedora/RHEL:**
+
+```bash
+sudo dnf install intel-media-driver libva-utils
+vainfo
+```
+
+**Set driver explicitly (if auto-detection fails):**
+
+```bash
+# For newer Intel GPUs (Gen8+)
+export LIBVA_DRIVER_NAME=iHD
+
+# For older Intel GPUs (Gen4-7)
+export LIBVA_DRIVER_NAME=i965
+
+./montage-ai.sh check-hw
+```
+
+### NVIDIA GPU Verification
+
+```bash
+# Check driver is loaded
+nvidia-smi
+# Should show GPU name, driver version, CUDA version
+
+# Check FFmpeg NVENC support
+ffmpeg -encoders 2>/dev/null | grep nvenc
+# Should list h264_nvenc and hevc_nvenc
+
+# If nvidia-smi works but check-hw shows NVENC missing:
+# Ensure ffmpeg was compiled with --enable-nvenc
+ffmpeg -buildconf 2>/dev/null | grep nvenc
+```
+
+**Docker with NVIDIA GPU:**
+
+```bash
+# Requires nvidia-container-toolkit
+sudo apt install nvidia-container-toolkit
+sudo systemctl restart docker
+
+# Run with GPU access
+docker compose run --rm --gpus all montage-ai ./montage-ai.sh check-hw
+```
+
+### AMD GPU (ROCm / VAAPI)
+
+AMD GPUs use VAAPI for video encoding on Linux:
+
+```bash
+# Install VAAPI driver for AMD
+sudo apt install mesa-va-drivers vainfo
+
+# Set driver
+export LIBVA_DRIVER_NAME=radeonsi
+
+# Verify
+vainfo
+./montage-ai.sh check-hw
+```
+
+### Force CPU Encoding (Skip GPU)
+
+If GPU causes issues, force software encoding:
+
+```bash
+FFMPEG_HWACCEL=none ./montage-ai.sh run
+```
+
+---
+
 ## Cloud GPU Problems
 
 **Symptom:** "CUDA not available", "session expired", upscaling fails

@@ -43,6 +43,7 @@ ${YELLOW}Commands:${NC}
   ${GREEN}generate-proxies${NC} Generate H.264 proxies for high-res footage (6K+/8K/RAW)
   ${GREEN}check-hw${NC}        Diagnose hardware acceleration (NVENC/VAAPI/QSV)
   ${GREEN}check-deps${NC}      Check optional dependencies (cgpu, gemini-cli, Docker)
+  ${GREEN}verify-deployment${NC} Full system verification report (GPU, storage, LLM, K8s)
   ${GREEN}list${NC}            List available styles
   ${GREEN}build${NC}           Build Docker image
   ${GREEN}cgpu-start${NC}      Start cgpu serve (Gemini LLM API)
@@ -570,6 +571,11 @@ case "${1:-run}" in
     check-deps)
         check_deps
         exit 0
+        ;;
+    verify-deployment)
+        shift
+        python3 -m montage_ai.cli verify-deployment "$@"
+        exit $?
         ;;
     help|--help|-h)
         show_help

@@ -446,5 +446,32 @@ def jobs_cancel(ctx: click.Context, job_id: str):
     )
     click.echo(json.dumps(result, indent=2) if isinstance(result, dict) else result)
 
+@cli.command(name="verify-deployment")
+@click.option("--format", "fmt", type=click.Choice(["json", "text"]), default="text", help="Output format")
+@click.option("--verbose", "-v", is_flag=True, help="Show all checks including informational")
+def verify_deployment(fmt: str, verbose: bool):
+    """
+    Run a comprehensive deployment verification.
+
+    Checks system prerequisites, GPU acceleration, storage, LLM backends,
+    Docker, Kubernetes connectivity, and codec support in a single command.
+    """
+    from .verify_deployment import run_verification
+
+    result = run_verification(json_format=(fmt == "json"), verbose=verbose)
+
+    if fmt == "json":
+        click.echo(json.dumps(result, indent=2))
+
+    # Exit 1 if any hard failures
+    all_checks = [
+        c
+        for s in result.get("sections", [])
+        for c in s.get("checks", [])
+    ]
+    if any(c.get("status") == "fail" for c in all_checks):
+        raise SystemExit(1)
+
+
 if __name__ == "__main__":
     cli()
