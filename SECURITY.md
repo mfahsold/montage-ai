@@ -8,7 +8,7 @@ We currently maintain `main` as the active development branch. No formal LTS bra
 
 ## Reporting a Vulnerability
 
-- Email: [security@montage-ai.dev](mailto:security@montage-ai.dev) (or open a private advisory via GitHub Security Advisories if available).
+- Email: [mfahsold@me.com](mailto:mfahsold@me.com) (or open a private advisory via [GitHub Security Advisories](https://github.com/mfahsold/montage-ai/security/advisories)).
 - Please include:
   - A description of the issue and potential impact
   - Steps to reproduce or a proof-of-concept

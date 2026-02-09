@@ -14,7 +14,7 @@ updated: 2026-02-06
 
 ## Deploy & Verify
 - Deploy: `./deploy/k3s/deploy.sh cluster`
-- Inspect image: `docker buildx imagetools inspect 192.168.1.12:30500/montage-ai:TAG`
+- Inspect image: `docker buildx imagetools inspect <REGISTRY_HOST>:<REGISTRY_PORT>/montage-ai:TAG`
 - Smoke in cluster: `./scripts/ci/run-in-cluster-smoke.sh`
 
 ## Job submission (cluster API)

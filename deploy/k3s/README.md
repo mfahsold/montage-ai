@@ -473,7 +473,7 @@ These values are read by the job submitter. Prefer configuring them in
 Example `cluster-config.env` excerpt:
 
 ```env
-REGISTRY_URL=192.168.1.12:30500
+REGISTRY_URL=<REGISTRY_HOST>:<REGISTRY_PORT>
 IMAGE_NAME=montage-ai
 IMAGE_TAG=latest
 PVC_INPUT_NAME=montage-ai-input-nfs
@@ -523,7 +523,7 @@ spec:
         - name: montage-ai
           env:
             - name: REGISTRY_HOST
-              value: 192.168.1.12
+              value: <REGISTRY_HOST>
             - name: REGISTRY_PORT
               value: "30500"
             - name: PVC_INPUT_NAME

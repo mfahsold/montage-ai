@@ -46,7 +46,7 @@ Vertical video creation (UI integration in progress; preview screenshot):
 
 ## 🎬 Demo Videos
 
-> **Note:** Demo videos are available on our [YouTube channel](https://youtube.com/@montageai) and [website](https://montage.ai/demos).
+> **Note:** Demo videos will be published on the project's GitHub page.
 
 ### Quick Start Demo (2 min)
 Basic workflow: upload → style → create → download
