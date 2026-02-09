@@ -305,4 +305,4 @@ See full roadmap in `go/MIGRATION.md`.
 - `go/MIGRATION.md` — Full 4-phase migration plan
 - `deploy/k3s/overlays/cluster/worker-go-canary.yaml` — K8s manifest
 
-**Ready to build & deploy?** 🚀 Run `cd go && ./build-and-push.sh`
+**Build & deploy:** `cd go && ./build-and-push.sh`

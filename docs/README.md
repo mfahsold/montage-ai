@@ -10,9 +10,8 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 
 ## Start Here
 
-Start here:
-- [Getting Started](getting-started.md) — full walkthrough (includes TL;DR commands)
-- [K8s Deployment](../deploy/k3s/README.md) — cluster setup
+- [Getting Started](getting-started.md) — local setup and Kubernetes quick start
+- [K8s Deployment](../deploy/k3s/README.md) — full cluster setup guide
 
 ---
 
@@ -96,4 +95,4 @@ Start here:
 **Archive:** Historical/internal notes live in the private docs set.
 **Contributing:** [CONTRIBUTING.md](../CONTRIBUTING.md)
 
-See `PUBLIC_DOCS_POLICY.md` for the public vs private documentation rules.
+Public vs. private documentation rules are maintained in the private docs set.

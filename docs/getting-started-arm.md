@@ -1,17 +1,14 @@
-# Getting Started on ARM (Snapdragon & Apple Silicon)
+# Getting Started on ARM64 (Snapdragon, Apple Silicon, Raspberry Pi)
 
-This content has been consolidated into the single source of truth:
+This guide covers ARM64-specific setup. For general setup, see the [README](../README.md).
 
-- [README.md](README.md) (see the ARM64 section)
+## Prerequisites
 
-If you want to run automated checks:
+- Docker + Docker Compose v2 ([general requirements](../README.md#system-requirements))
+- USB-C SSD recommended (not SD card: 10x faster I/O)
+- 64-bit OS (Ubuntu 22.04, Raspberry Pi OS 64-bit, macOS, or Windows on Arm)
 
-```bash
-./scripts/quick-setup-arm.sh
-./scripts/validate-onboarding.sh
-```
-- USB-C SSD (not SD card: 10x faster I/O)
-- 64-bit OS (Ubuntu 22.04 or Raspberry Pi OS 64-bit)
+## Setup
 
 ### Step 1: Install Docker
 
@@ -57,7 +54,7 @@ montage-ai:
 docker compose build
 
 # Test (preview render will take 2-3 minutes)
-QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run dynamic
+QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh run dynamic
 ```
 
 ---
@@ -102,10 +99,10 @@ docker compose build --no-cache
 docker compose run --rm montage-ai ffmpeg -hide_banner -encoders | grep hevc_videotoolbox
 
 # If available, enable hardware encoding:
-FFMPEG_PRESET=fast docker compose run --rm montage-ai ./montage-ai.sh run
+FFMPEG_PRESET=fast docker compose run --rm montage-ai /app/montage-ai.sh run
 
 # Or use Preview mode (2x faster):
-QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
+QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh run
 ```
 
 ### Memory usage spikes & container crashes

@@ -4,7 +4,7 @@
 
 ---
 
-## 🎯 Brand Voice
+## Brand Voice
 
 | Aspect | Rule |
 | ------ | ------ |
@@ -28,7 +28,7 @@ beat-sync montages  ← lowercase (description)
 
 ---
 
-## ✨ Condensation Checklist
+## Condensation Checklist
 
 - [ ] Remove "using X technology" → Keep just the tech name
 - [ ] Combine 2-3 short sentences into 1
@@ -127,7 +127,7 @@ Error:           #ff3333 (red)
 
 ---
 
-## 📊 Terminology Standards
+## Terminology Standards
 
 | Tech | Usage | NOT |
 | ------ | ------- | ----- |
@@ -154,7 +154,7 @@ Error:           #ff3333 (red)
 
 ---
 
-## 📋 Update Checklist
+## Update Checklist
 
 When adding new UI text:
 
@@ -169,7 +169,7 @@ When adding new UI text:
 
 ---
 
-## 🎯 Messaging by Context
+## Messaging by Context
 
 ### For Dashboard
 

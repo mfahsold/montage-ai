@@ -56,7 +56,7 @@ Option A: Use synthetic test media (no files needed):
 ./scripts/ops/create-test-video.sh
 
 # Run preview render (fast, low quality)
-QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
+QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh run
 
 # Check output
 ls -lh data/output/*.mp4
@@ -71,7 +71,7 @@ cp ~/path/to/your/video.mp4 data/input/
 cp ~/path/to/your/audio.mp3 data/music/
 
 # Run preview render
-QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
+QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh run
 ```
 
 ### Step 4: Web UI Test (Optional)

@@ -1,10 +1,8 @@
-## Getting Started
+# Getting Started
 
-This file is now a pointer to the single source of truth.
+For local setup (Docker), see the [README](../README.md).
 
-Please use [README.md](../README.md) for onboarding, local setup, and ARM64 notes.
-
-If running in Kubernetes, use the provided manifests in `deploy/k3s`.
+For ARM64 platforms (Snapdragon, Apple Silicon, Raspberry Pi), see [Getting Started on ARM](getting-started-arm.md).
 
 ---
 
@@ -28,10 +26,12 @@ Check job status:
 python3 -m montage_ai.cli jobs --api-base http://<cluster-service> list
 ```
 
+See [deploy/k3s/README.md](../deploy/k3s/README.md) for the full cluster deployment guide.
+
 ---
 
 ## Next Steps
 
-- **[Configuration](configuration.md)** — Tweak every setting
-- **[Features](features.md)** — Learn about styles, effects, timeline export
-- **[Troubleshooting](troubleshooting.md)** — When things go wrong
+- **[Configuration](configuration.md)** — All environment variables and settings
+- **[Features](features.md)** — Styles, effects, timeline export
+- **[Troubleshooting](troubleshooting.md)** — Common issues and fixes

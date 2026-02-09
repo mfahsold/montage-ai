@@ -5,7 +5,7 @@
 ## Provider
 
 - Name: Matthias Fahsold
-- Address: barnerstr. 34a, 22765 Hamburg, Germany
+- Address: Barnerstr. 34a, 22765 Hamburg, Germany
 - Phone: 015734765853
 - Email: [mfahsold@me.com](mailto:mfahsold@me.com)
 
@@ -17,7 +17,7 @@
 
 ## Responsibility
 
-Content responsibility per §5 TMG / §55 RStV: Matthias Fahsold (address above).
+Content responsibility per §5 TMG (German Telemedia Act) / §55 RStV (German Interstate Broadcasting Treaty): Matthias Fahsold (address above).
 
 ## Liability notice
 

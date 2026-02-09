@@ -2,7 +2,6 @@
 
 This document provides a comprehensive reference of all parameters that Montage AI controls and exports to professional NLEs (DaVinci Resolve, Premiere Pro, Final Cut Pro).
 
-**Generated:** 2026-01-06
 **Version:** 1.0
 
 ---

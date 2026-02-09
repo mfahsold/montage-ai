@@ -30,13 +30,6 @@ make -C deploy/k3s deploy-cluster
 3) Montage AI generates rough cut + optional 9:16 clips
 4) Export as `montage.otio` -> Import into DaVinci/Premiere for finishing
 
-## SEO / Search Terms
-- "descript alternative offline"
-- "ai video editor local"
-- "beat sync video editor"
-- "otio export video editor"
-- "podcast to shorts offline"
-
 ## Why OTIO?
 OTIO is an open timeline standard. This enables:
 - Clean handoff to NLEs (Premiere/Resolve/Avid via EDL/XML)

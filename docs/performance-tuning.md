@@ -4,15 +4,15 @@ This guide helps you optimize Montage AI for your hardware and workflow, avoidin
 
 ---
 
-## 🚀 Optimization Milestone (2026-01-15)
+## Optimization Milestone (2026-01-15)
 
 The latest architecture overhaul has achieved significant performance gains through lazy loading and hardware acceleration.
 
 | Metric | Before | **After** | Improvement |
 | :--- | :--- | :--- | :--- |
-| **System Startup** | 6.2s | **1.8s** | ⚡ 71% Faster |
-| **30m Render** | 9m 10s | **2m 14s** | ⚡ 75% Faster |
-| **Worker Latency** | High | **Low** | ⚡ VAAPI HWS |
+| **System Startup** | 6.2s | **1.8s** | -71% |
+| **30m Render** | 9m 10s | **2m 14s** | -75% |
+| **Worker Latency** | High | **Low** | VAAPI HWS |
 
 ### Key Performance Drivers
 

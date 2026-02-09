@@ -56,7 +56,7 @@ You are a **Senior Creative Technologist**.
 
 ---
 
-## 🛠️ Developer Cheatsheet
+## Developer Cheatsheet
 
 ### Running Tests
 ```bash
