@@ -61,12 +61,16 @@ cd deploy/k3s
 
 # Deploy cluster overlay (canonical)
 ./deploy.sh cluster
+
+# Bootstrap storage and initialize .ready markers
+./bootstrap.sh
 ```
 
 Notes:
 
 - Update your local `deploy/k3s/config-global.yaml` to change registry, tag, or storage defaults.
 - `make -C deploy/k3s config` regenerates `deploy/k3s/base/cluster-config.env`.
+- `./bootstrap.sh` creates NFS markers and initializes storage for proper pod startup.
 
 That's it. For manual control, see sections below.
 
@@ -128,12 +132,26 @@ kubectl get pvc -n montage-ai  # After deploy, should show: input, output, music
 
 **Solution:**
 
+**Automated (Recommended):**
+```bash
+# Run bootstrap script after deployment to create .ready markers
+./deploy/k3s/bootstrap.sh
+```
+
+This script:
+- Verifies all PVCs are bound
+- Creates `.ready` markers in storage
+- Verifies the deployment is ready
+- Shows access instructions
+
+**Manual (if needed):**
+
 ```bash
 # Check if NFS is mounted
 kubectl exec -it -n montage-ai <POD_NAME> -- ls -la /data/input/
 # If empty or shows permission denied → NFS not ready yet
 
-# Manually trigger .ready file (for testing)
+# Manually trigger .ready file
 kubectl exec -it -n montage-ai <POD_NAME> -- touch /data/input/.ready
 
 # Restart the job
@@ -141,7 +159,7 @@ kubectl rollout restart job/montage-ai-render -n montage-ai
 kubectl wait --for=condition=complete job/montage-ai-render -n montage-ai --timeout=600s
 ```
 
-**Best Practice:** Let the NFS provisioner handle mounting automatically. If jobs consistently fail on `.ready` check:
+**Best Practice:** Always run `./bootstrap.sh` after `./deploy.sh` to ensure proper initialization. If jobs consistently fail on `.ready` check:
 ```bash
 # Debug NFS mounts
 kubectl describe pod <POD_NAME> -n montage-ai | grep -A 5 "Mounts:"

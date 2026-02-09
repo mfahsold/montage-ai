@@ -47,19 +47,31 @@ docker compose build
 docker compose run --rm montage-ai python -c "import montage_ai; print('✅ Ready!')"
 ```
 
-### Step 3: Run First Montage Locally
+### Step 3: Run First Montage Locally (with test media)
+
+Option A: Use synthetic test media (no files needed):
 
 ```bash
-# Add test media (or your own)
-mkdir -p data/input data/music
-cp test_data/sample_*.mp4 data/input/
-cp test_data/sample_music.mp3 data/music/
+# Create minimal test video (10 seconds, <5MB)
+./scripts/ops/create-test-video.sh
 
 # Run preview render (fast, low quality)
 QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
 
 # Check output
 ls -lh data/output/*.mp4
+```
+
+Option B: Use your own media:
+
+```bash
+# Add your own media
+mkdir -p data/input data/music
+cp ~/path/to/your/video.mp4 data/input/
+cp ~/path/to/your/audio.mp3 data/music/
+
+# Run preview render
+QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
 ```
 
 ### Step 4: Web UI Test (Optional)
@@ -175,6 +187,11 @@ git checkout -b fix/that-annoying-bug
 
 - Write focused code with small, testable commits
 - Add unit tests and small fixtures in `test_data/` for rendering-related changes
+- For testing with media, use the test media generation script:
+  ```bash
+  ./scripts/ops/create-test-video.sh  # Generate synthetic test media
+  # OR add your own media to data/input/ and data/music/
+  ```
 - Update docs when behavior or configuration changes
 
 ### 3. Test it

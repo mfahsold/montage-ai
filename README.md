@@ -65,20 +65,34 @@ If Docker fails to start, reduce the memory limit in docker-compose.yml.
 git clone https://github.com/mfahsold/montage-ai.git
 cd montage-ai
 
-mkdir -p data/input data/music data/output data/assets
+# Run setup script (handles data/ directory creation + permissions)
+./scripts/setup.sh
+
+# Generate test media (optional; or provide your own)
+./scripts/ops/create-test-video.sh
 ```
 
-Add media:
+Add your own media (alternative):
 
 ```bash
+# Copy your videos to data/input/
 cp ~/Videos/*.mp4 data/input/
+
+# Copy music to data/music/
 cp ~/Music/track.mp3 data/music/
+```
+
+**Permission note:** On Linux, if you see "Permission denied" errors, the setup script will help fix `data/` directory ownership. If needed, run:
+
+```bash
+sudo chown -R $USER:$USER data/
 ```
 
 Run:
 
 ```bash
 docker compose up
+# Then open http://localhost:8080
 ```
 
 ## ARM64 (Snapdragon, Apple Silicon)
