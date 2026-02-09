@@ -28,6 +28,8 @@ dependencies = [
     "OpenTimelineIO>=0.18.1",
     # System
     "psutil>=7.1.3",
+    # Data validation
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -47,15 +49,22 @@ web = [
 test = [
     "pytest>=8.0.0",
     "pytest-flask>=1.3.0",
+    # web dependencies needed for testing Flask app
+    "Flask>=3.0.0",
+    "Werkzeug>=3.0.0",
+    "redis>=5.0.0",
+    "rq>=1.16.0",
+    "msgpack>=1.0.0",
+    # optional test dependencies
+    "openai>=1.55.0",
+    "PyYAML>=6.0",
+    "kubernetes>=29.0.0",
 ]
 cloud = [
     "soundfile>=0.12.0",    # Cloud job audio handling
 ]
 
 # Private cloud extras (not included in `all`) — requires private index or manual installation
-cloud-private = [
-    "cgpu>=0.4.0"           # Cloud GPU orchestration (private/organization index)
-]
 
 all = [
     # All optional dependencies for: pip install montage-ai[all]
