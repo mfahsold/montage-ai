@@ -3,7 +3,7 @@
 # Single entry point for cluster operations
 # ==============================================================================
 
-.PHONY: help config validate diff deploy deploy-cluster status health
+.PHONY: help config validate pre-flight diff deploy deploy-cluster status health
 
 GREEN  := $(shell tput -Txterm setaf 2 2>/dev/null || echo '')
 YELLOW := $(shell tput -Txterm setaf 3 2>/dev/null || echo '')
@@ -54,6 +54,9 @@ install-keda: ## Install KEDA via Helm (requires helm available)
 
 check-jobset: ## Check if JobSet CRD is present
 	@kubectl get crd jobs.batch.jobset.sigs.k8s.io >/dev/null 2>&1 && echo "${GREEN}JobSet CRD present${RESET}" || echo "${YELLOW}JobSet CRD not found. See docs for install instructions.${RESET}" 
+
+pre-flight: ## Run pre-flight checks before deploying
+	@bash ./pre-flight-check.sh
 
 diff: config ## Show kubectl diff for cluster overlay
 	@$(KUSTOMIZE_BUILD) ./overlays/cluster | $(KUBECTL) diff -f - || true

@@ -36,7 +36,7 @@ dependencies = [
 ai = [
     "mediapipe>=0.10.0; python_version < '3.13' and platform_machine != 'aarch64'",    # Smart Reframing: face detection
     "scipy>=1.10.0",        # Smart Reframing: path optimization
-    "librosa>=0.10.0",      # Audio analysis fallback (FFmpeg primary)
+    "librosa>=0.10.2",      # Audio analysis fallback (FFmpeg primary); >=0.10.2 for Python 3.12+ (numba/llvmlite compat)
     "color-matcher>=0.5.0", # Shot-to-shot color consistency
 ]
 web = [
@@ -73,7 +73,7 @@ all = [
     # All optional dependencies for: pip install montage-ai[all]
     "mediapipe>=0.10.0; python_version < '3.13' and platform_machine != 'aarch64'",
     "scipy>=1.10.0",
-    "librosa>=0.10.0",
+    "librosa>=0.10.2",
     "color-matcher>=0.5.0",
     "Flask>=3.0.0",
     "Werkzeug>=3.0.0",

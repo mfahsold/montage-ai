@@ -468,6 +468,68 @@ Export your AI rough cut to professional NLEs for finishing.
 
 ---
 
+## Feature Matrix
+
+| Feature | CLI Flag | Env Variable | Status |
+|---------|----------|-------------|--------|
+| Beat-synced editing | *(default)* | `CUT_STYLE` | Stable |
+| Scene detection | *(default)* | — | Stable |
+| Style templates | `run [STYLE]` | `CUT_STYLE` | Stable |
+| Video stabilization | `--stabilize` | `STABILIZE=true` | Stable |
+| AI upscaling | `--upscale` | `UPSCALE=true` | Stable |
+| AI denoising | `--denoise` | `DENOISE=true` | Stable |
+| Film grain | `--film-grain [TYPE]` | `FILM_GRAIN=35mm` | Stable |
+| Color grading | `--color-grade [PRESET]` | `COLOR_GRADING=teal_orange` | Stable |
+| Dialogue ducking | `--dialogue-duck` | — | Stable |
+| Audio normalize | `--audio-normalize` | — | Stable |
+| Voice isolation | `--isolate-voice` | `CGPU_ENABLED=true` | Requires cgpu |
+| Caption burning | `--captions [STYLE]` | — | Stable |
+| Smart reframing (9:16) | `shorts [STYLE]` | — | Stable |
+| Story engine | `--story-engine` | — | Stable |
+| Timeline export | `--export` | `EXPORT_TIMELINE=true` | Stable |
+| Proxy generation | `generate-proxies` | `GENERATE_PROXIES=true` | Stable |
+| Creative loop (LLM) | — | `CREATIVE_LOOP=true` | Requires LLM |
+| Cloud acceleration | `--cgpu --cgpu-gpu` | `CGPU_ENABLED=true` | Optional |
+| Quality profiles | `preview` / `hq` | `QUALITY_PROFILE=high` | Stable |
+
+---
+
+## CLI Examples
+
+```bash
+# Basic montage with default style
+./montage-ai.sh run
+
+# Hitchcock style with stabilization
+./montage-ai.sh run hitchcock --stabilize
+
+# Auto-reframe to 9:16 with captions
+./montage-ai.sh shorts viral --captions tiktok
+
+# Denoise + film grain + color grade
+./montage-ai.sh run documentary --denoise --film-grain 16mm --color-grade warm
+
+# Dialogue ducking + audio normalize
+./montage-ai.sh run --dialogue-duck --audio-normalize
+
+# Quick preview (360p, fast)
+./montage-ai.sh preview mtv
+
+# High quality with timeline export
+./montage-ai.sh hq hitchcock --export
+
+# Cloud GPU upscaling
+./montage-ai.sh run --cgpu --cgpu-gpu --upscale
+
+# Story engine with narrative arc
+./montage-ai.sh run hitchcock --story-engine --story-arc thriller
+
+# Generate proxies for 8K footage
+./montage-ai.sh generate-proxies --input /data/8k/*.mp4 --output /data/proxies
+```
+
+---
+
 ## Core Editing
 
 - Beat-synced cuts using FFmpeg (`astats`/tempo) — librosa optional

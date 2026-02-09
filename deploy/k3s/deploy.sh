@@ -67,6 +67,18 @@ if ! command -v kustomize &> /dev/null; then
   exit 1
 fi
 
+# Validate config-global.yaml has no unreplaced placeholders
+if [ -f "${CONFIG_GLOBAL}" ] && grep -qE '<[A-Z_]+>' "${CONFIG_GLOBAL}"; then
+  echo "⚠️  WARNING: Unreplaced placeholders found in ${CONFIG_GLOBAL}:"
+  grep -n '<[A-Z_]*>' "${CONFIG_GLOBAL}" | while IFS= read -r line; do
+    echo "   ${line}"
+  done
+  echo ""
+  echo "Replace all <...> placeholders before deploying."
+  echo "See: deploy/k3s/config-global.yaml.example for reference."
+  exit 1
+fi
+
 # Inject configured namespace into overlay before kustomize build
 (cd "${SCRIPT_DIR}/overlays/${OVERLAY}" && kustomize edit set namespace "${CLUSTER_NAMESPACE}")
 

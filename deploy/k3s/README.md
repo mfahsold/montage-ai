@@ -5,10 +5,15 @@
 ## Quick Start
 
 ```bash
-# 1. Render cluster config
-make -C deploy/k3s config
+# 1. Copy and edit config (replace ALL <...> placeholders)
+cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
+$EDITOR deploy/k3s/config-global.yaml
 
-# 2. Build & push multi-arch image
+# 2. Render cluster config + validate
+make -C deploy/k3s config
+make -C deploy/k3s pre-flight    # Check tools, placeholders, cluster connectivity
+
+# 3. Build & push multi-arch image
 cd deploy/k3s
 BUILD_MULTIARCH=true ./build-and-push.sh
 
@@ -127,6 +132,25 @@ helm install nfs-provisioner stable/nfs-provisioner \
 kubectl get storageclass
 kubectl get pvc -n montage-ai  # After deploy, should show: input, output, music, assets
 ```
+
+### Bootstrap Script (Required After First Deploy)
+
+Always run `bootstrap.sh` after your initial deployment:
+
+```bash
+./deploy/k3s/bootstrap.sh
+```
+
+**What it does:**
+- Verifies all PVCs are bound and healthy
+- Creates `.ready` markers on shared storage (required for init containers)
+- Pre-provisions data directories (`/data/input`, `/data/output`, `/data/music`, `/data/assets`)
+- Shows deployment access instructions
+
+**When to run it:**
+- After first `./deploy.sh cluster` or `make deploy-cluster`
+- After recreating PVCs or storage
+- If pods are stuck in `Init:0/2` state
 
 ### The `.ready` File Issue
 
@@ -340,6 +364,15 @@ Before running `make deploy-cluster` or `./deploy.sh cluster`, verify:
    only lowercase letters, digits, `-` and `.` (e.g. `montage-ai.example.com`).
    If you don't need Ingress, you can set it to `montage-ai.local` and use
    port-forwarding instead.
+   ```yaml
+   # Valid hostnames:
+   montage: "montage-ai.local"
+   montage: "app.prod.example.com"
+
+   # Invalid (will fail in Ingress):
+   # montage: "montage_ai.local"    # underscores not allowed
+   # montage: "Montage-AI.local"    # uppercase not allowed
+   ```
 
 3. **Storage class matches existing PVCs** — Kubernetes PVC spec fields
    (`storageClassName`, `accessModes`, storage size) are **immutable** after
@@ -616,6 +649,22 @@ curl "http://<REGISTRY_URL>/v2/<IMAGE_NAME>/tags/list"
 
 # Check pod image
 kubectl get pod -n "$CLUSTER_NAMESPACE" -o jsonpath='{.items[0].spec.containers[0].image}'
+```
+
+### Existing PVC Conflicts
+
+If you see "PVC already exists" or immutable field errors:
+
+```bash
+# 1. Check existing PVCs and their storage classes
+kubectl get pvc -n "$CLUSTER_NAMESPACE" -o custom-columns=\
+'NAME:.metadata.name,CLASS:.spec.storageClassName,ACCESS:.spec.accessModes[0],SIZE:.spec.resources.requests.storage'
+
+# 2. Either update config-global.yaml to match existing names:
+#    storage.pvc.input: "existing-pvc-name"
+#
+#    Or delete old PVCs and redeploy (WARNING: data loss!)
+#    kubectl delete pvc <name> -n "$CLUSTER_NAMESPACE"
 ```
 
 ### Storage Issues

@@ -9,7 +9,10 @@
 docker compose up
 
 # Kubernetes cluster (kustomize)
+cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
+$EDITOR deploy/k3s/config-global.yaml  # Replace all <...> placeholders
 make -C deploy/k3s config
+make -C deploy/k3s pre-flight          # Validate before deploying
 make -C deploy/k3s deploy-cluster
 ```
 
@@ -34,6 +37,7 @@ deploy/
     ├── README.md               ← Main K8s deployment guide
     ├── base/                   ← Base manifests
     ├── overlays/               ← Canonical cluster overlay + archived legacy (reference only)
+    ├── pre-flight-check.sh     ← Pre-deploy validation
     ├── deploy.sh               ← Deploy script
     ├── undeploy.sh             ← Cleanup script
     └── build-and-push.sh       ← Build & push image
@@ -90,3 +94,17 @@ cluster:
 ```
 
 See **[CONFIGURATION.md](CONFIGURATION.md)** for full reference.
+
+## CI/CD
+
+Use the vendor-agnostic CI scripts (no GitHub Actions):
+
+```bash
+# Local CI (uv-based, fast)
+./scripts/ci-local.sh
+
+# Full CI (venv, tests, audit, manifest validation, Docker smoke build)
+./scripts/ci.sh
+```
+
+> **Note:** The `.drone.yml` in the repository root is deprecated. Use the scripts above instead.

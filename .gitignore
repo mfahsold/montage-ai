@@ -124,5 +124,10 @@ deploy/k3s/config-global.yaml
 deploy/k3s/base/cluster-config.env
 .venv-ci/
 
+# Shell artifact files (broken CI/job template variable interpolation)
+# These are empty files with shell-fragment names created by broken scripts.
+# Clean up with: find . -maxdepth 1 -name ';*' -delete
+;*
+
 # Local-only Docker variant (QSV experiments)
 Dockerfile.qsv

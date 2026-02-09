@@ -134,6 +134,20 @@ If you want an automated check and a preview render test:
 - [Cluster Deployment](docs/cluster-deploy.md) — Kubernetes/K3s deployment
 - [Full Docs Index](docs/README.md) — All documentation
 
+## Key Features
+
+- Beat-synced editing with 7 built-in style templates
+- Smart reframing (16:9 to 9:16) for TikTok/Shorts
+- AI denoising, stabilization, upscaling, color grading, film grain
+- Dialogue ducking, audio normalization, voice isolation
+- Caption burning (TikTok, Minimal, Bold, Cinematic, Karaoke)
+- Timeline export (OTIO, EDL, CSV) for DaVinci Resolve / Premiere Pro
+- Story engine with narrative arc optimization
+- Cloud GPU acceleration via cgpu (optional)
+- Quality profiles: Preview (360p fast) / Standard / High / Master (4K)
+
+See [Features](docs/features.md) for the complete feature matrix and CLI examples.
+
 ## Development
 
 ```bash

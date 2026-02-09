@@ -8,16 +8,20 @@
 # (e.g. invalid RFC1123 hostnames in Ingress resources).
 
 registry:
-  host: "192.168.1.12"
-  port: 30500
-  url: "192.168.1.12:30500"
+  # Examples:
+  #   Local K3s registry: host: "192.168.1.12", port: 30500, url: "192.168.1.12:30500"
+  #   ghcr.io:            host: "ghcr.io",      port: "",    url: "ghcr.io/your-org"
+  #   Docker Hub:          host: "docker.io",    port: "",    url: "docker.io/your-user"
+  host: "<REGISTRY_HOST>"
+  port: "<REGISTRY_PORT>"
+  url: "<REGISTRY_URL>"
   namespace: "registry"
   images:
-    montage_ai: "192.168.1.12:30500/montage-ai"
+    montage_ai: "<REGISTRY_URL>/montage-ai"
 
 cluster:
-  namespace: "<CLUSTER_NAMESPACE>"
-  clusterDomain: "<CLUSTER_DOMAIN>"
+  namespace: "<CLUSTER_NAMESPACE>"       # e.g. montage-ai, default, prod-montage
+  clusterDomain: "<CLUSTER_DOMAIN>"      # e.g. cluster.local (K3s/K8s default)
   parallelism: 24
   renderTier: "xlarge"
   sceneDetectTier: "xlarge"
@@ -38,9 +42,11 @@ cluster:
     # (only lowercase alphanumeric, '-' and '.'; no angle brackets).
     montage: "montage-ai.local"
   nodes:
+    # VERIFY architecture: kubectl get nodes -o wide (check ARCH column)
+    # Or per node: kubectl get node <name> -o jsonpath='{.status.nodeInfo.architecture}'
     - name: "control-plane"
       ip: "<CONTROL_PLANE_IP>"
-      arch: "arm64"
+      arch: "arm64"              # Verify with: kubectl get node <name> -o jsonpath='{.status.nodeInfo.architecture}'
       role: "control-plane"
     - name: "gpu-node"
       ip: "<GPU_NODE_IP>"
@@ -54,6 +60,10 @@ storage:
     # their storageClassName exactly. Kubernetes PVC spec fields (storageClassName,
     # accessModes, storage size) are IMMUTABLE after creation. Mismatches will
     # cause deploy failures. Check with: kubectl get pvc -n montage-ai -o yaml
+    #
+    # Single-node (minikube, k3s localhost): "local-path" is fine.
+    # Multi-node clusters: use an RWX-capable class (nfs-client, rook-ceph, etc.)
+    #   because multiple pods need ReadWriteMany access to shared storage.
     default: "local-path"
     nfs: "nfs-client"
   nfs:

@@ -710,4 +710,14 @@ NUM_VARIANTS=5 \
 ./montage-ai.sh run
 ```
 
+---
+
+## See Also
+
+- **[Features](features.md)** — Feature matrix and CLI examples
+- **[Config Defaults (code-aligned)](config-defaults.md)** — Audited default values
+- **[Performance Tuning](performance-tuning.md)** — Hardware-specific optimization
+- **[K8s Deployment](../deploy/k3s/README.md)** — Cluster config and deploy flow
+- **[Troubleshooting](troubleshooting.md)** — Common issues and fixes
+
 <!-- markdownlint-enable MD060 MD032 -->

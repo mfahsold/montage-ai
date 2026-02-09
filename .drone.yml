@@ -1,3 +1,6 @@
+# DEPRECATED: Drone CI is no longer the primary CI system.
+# Use ./scripts/ci-local.sh (local) or ./scripts/ci.sh (vendor-agnostic) instead.
+# This file is kept for reference and will be removed in a future release.
 kind: pipeline
 type: docker
 name: Montage AI CI

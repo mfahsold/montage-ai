@@ -130,6 +130,7 @@ See [deploy/k3s/README.md](../deploy/k3s/README.md) for the full cluster deploym
 ## Next Steps
 
 - **[Configuration](configuration.md)** — All environment variables and settings
-- **[Features](features.md)** — Styles, effects, timeline export
+- **[Features](features.md)** — Styles, effects, timeline export, feature matrix
+- **[Optional Dependencies](OPTIONAL_DEPENDENCIES.md)** — SOTA models and AI/ML library options
 - **[Troubleshooting](troubleshooting.md)** — Common issues and fixes
 - **[Performance Tuning](performance-tuning.md)** — Optimization for your hardware
