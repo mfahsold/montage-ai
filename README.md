@@ -22,13 +22,13 @@ Open http://localhost:8080 (or your chosen port).
 CLI run (uses data/input + data/music):
 
 ```bash
-docker compose run --rm montage-ai ./montage-ai.sh run
+docker compose run --rm montage-ai /app/montage-ai.sh run
 ```
 
 Preview mode (faster):
 
 ```bash
-QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
+QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh run
 ```
 
 ## System Requirements

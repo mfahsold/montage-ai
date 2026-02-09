@@ -74,8 +74,8 @@ fi
 docker_version=$(docker --version | grep -oE "[0-9]+\.[0-9]+")
 echo "  ✅ Docker $docker_version installed"
 
-# Check disk space
-DISK_AVAIL=$(df -BG "$REPO_ROOT" | tail -1 | awk '{print $4}' | sed 's/G//')
+# Check disk space (portable across Linux and macOS)
+DISK_AVAIL=$(df -k "$REPO_ROOT" | tail -1 | awk '{print int($4 / 1024 / 1024)}')
 if [ "$DISK_AVAIL" -lt 30 ]; then
     echo "⚠️  Warning: Only ${DISK_AVAIL}GB free disk space. Videos need 30GB+."
 fi
@@ -86,8 +86,8 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     DOCKER_MEMORY=$(docker run --rm ubuntu:22.04 grep MemTotal /proc/meminfo 2>/dev/null | awk '{print int($2 / 1024 / 1024)}' || echo "unknown")
     echo "  Docker memory: ${DOCKER_MEMORY}GB (check Docker Desktop settings if too low)"
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux: Check system memory and Docker memory
-    SYSTEM_MEMORY=$(free -BG | grep Mem | awk '{print $2}' | sed 's/G//')
+    # Linux: Check system memory and Docker memory (portable across Linux versions)
+    SYSTEM_MEMORY=$(awk '/MemTotal/ {print int($2 / 1024 / 1024)}' /proc/meminfo)
     echo "  System memory: ${SYSTEM_MEMORY}GB available"
 fi
 
