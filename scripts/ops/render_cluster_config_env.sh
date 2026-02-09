@@ -19,6 +19,13 @@ if [ -f "$DEPLOY_CONFIG_ENV" ]; then
   source "$DEPLOY_CONFIG_ENV"
 fi
 
+if [ ! -f "$CONFIG_GLOBAL_PATH" ]; then
+  echo "❌ ERROR: Missing ${CONFIG_GLOBAL_PATH}"
+  echo "Copy the template first:"
+  echo "  cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml"
+  exit 1
+fi
+
 if command -v config_global_export >/dev/null 2>&1; then
   eval "$(config_global_export "$CONFIG_GLOBAL_PATH")"
 fi

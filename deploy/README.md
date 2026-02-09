@@ -25,17 +25,18 @@ make -C deploy/k3s deploy-cluster
 
 ```
 deploy/
-├── README.md              ← You are here
-├── CONFIGURATION.md       ← Config reference
+├── README.md                   ← You are here
+├── CONFIGURATION.md            ← Config reference
 └── k3s/
-    ├── config-global.yaml ← Global config (K8s ConfigMap source)
-    ├── base/cluster-config.env ← Generated from config-global.yaml
-    ├── README.md          ← Main K8s deployment guide
-    ├── base/              ← Base manifests
-    ├── overlays/          ← Canonical cluster overlay + archived legacy (reference only)
-    ├── deploy.sh          ← Deploy script
-    ├── undeploy.sh        ← Cleanup script
-    └── build-and-push.sh  ← Build & push image
+    ├── config-global.yaml.example ← Template for cluster config
+    ├── config-global.yaml      ← Local copy (ignored by git)
+    ├── base/cluster-config.env  ← Generated from config-global.yaml
+    ├── README.md               ← Main K8s deployment guide
+    ├── base/                   ← Base manifests
+    ├── overlays/               ← Canonical cluster overlay + archived legacy (reference only)
+    ├── deploy.sh               ← Deploy script
+    ├── undeploy.sh             ← Cleanup script
+    └── build-and-push.sh       ← Build & push image
 ```
 
 ## Deployment Options
@@ -59,8 +60,8 @@ make -C deploy/k3s deploy-cluster
 ```
 
 Note: The cluster deploy flow is idempotent and skips existing PVCs. Configure
-PVC names in `deploy/k3s/config-global.yaml` under `storage.pvc` to reuse
-existing claims.
+PVC names in your local `deploy/k3s/config-global.yaml` (copied from the example)
+under `storage.pvc` to reuse existing claims.
 
 ## K3s Make Targets
 

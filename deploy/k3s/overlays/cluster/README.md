@@ -9,7 +9,7 @@ This overlay assumes the following cluster components are installed before apply
   - Install instructions and upstream links: https://jobset.sigs.k8s.io/
 
 Notes:
-- `keda-scaledobjects.yaml` uses Redis list-length triggers. Set `REDIS_HOST`/`REDIS_PORT` via `deploy/config.env` or `deploy/k3s/config-global.yaml` (rendered into `cluster-config.env`).
+- `keda-scaledobjects.yaml` uses Redis list-length triggers. Set `REDIS_HOST`/`REDIS_PORT` via `deploy/config.env` or a local `deploy/k3s/config-global.yaml` (rendered into `cluster-config.env`).
 
 ## Troubleshooting Scheduling Issues
 

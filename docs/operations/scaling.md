@@ -7,8 +7,8 @@ for scaling background workers and media encoders.
 
 - Queue‑driven autoscaling (KEDA) is primary; HPA (CPU/memory) is a safety net.
 - Keep Web (API) and Worker responsibilities separated (one process per role).
-- Avoid hardcoded values in base manifests — use `deploy/k3s/config-global.yaml` and
-  `deploy/config.env` for environment overrides.
+- Avoid hardcoded values in base manifests — use a local `deploy/k3s/config-global.yaml`
+  (copied from `deploy/k3s/config-global.yaml.example`) and `deploy/config.env` for overrides.
 - **Cluster mode is canonical for distributed jobs**; use local mode only for single‑node/dev runs.
 - Ensure the cluster ServiceAccount (`montage-ai-cluster`) has RBAC for `jobs`,
   `jobs/status`, and `configmaps` (see `deploy/k3s/base/cluster-rbac.yaml`).

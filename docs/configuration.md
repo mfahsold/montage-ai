@@ -39,7 +39,8 @@ For an audited snapshot of code-aligned defaults, see `docs/config-defaults.md`.
 
 ## Deployment Configuration
 
-Deployment defaults and cluster wiring live in `deploy/config.env` and `deploy/k3s/config-global.yaml`.
+Deployment defaults and cluster wiring live in `deploy/config.env` and a local
+`deploy/k3s/config-global.yaml` (copied from `deploy/k3s/config-global.yaml.example`).
 Use those files as the source of truth and re-render the manifests with:
 
 ```bash

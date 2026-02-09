@@ -68,14 +68,14 @@ If `uv lock` fails locally, either:
 
 Deployment config centralization
 
-- Build and deploy scripts read `deploy/k3s/config-global.yaml` (and the generated `deploy/k3s/base/cluster-config.env`) and respect `REGISTRY_URL`, `IMAGE_NAME`, `IMAGE_TAG`, and `CLUSTER_NAMESPACE`. Override via environment variables or by editing `deploy/k3s/config-global.yaml`.
+- Build and deploy scripts read a local `deploy/k3s/config-global.yaml` (copied from `deploy/k3s/config-global.yaml.example`) and the generated `deploy/k3s/base/cluster-config.env`. Override via environment variables or by editing your local `deploy/k3s/config-global.yaml`.
 - The `Dockerfile` accepts a build arg `SERVICE_PORT` (default `5000`) and sets `ENV SERVICE_PORT` so the port is configurable at build time. To build with a custom port:
 
 ```bash
 docker build --build-arg SERVICE_PORT=8080 -t ${REGISTRY}/montage-ai:${TAG} .
 ```
 
-- Update `deploy/k3s/config-global.yaml` to set `registry.url`, `images.montage_ai.tag`, or `cluster.namespace` as needed for your environment.
+- Update your local `deploy/k3s/config-global.yaml` to set `registry.url`, `images.montage_ai.tag`, or `cluster.namespace` as needed for your environment.
 
 - Best practice: pin `UV_VERSION` in `deploy/config.env` (legacy fallback) and in CI workflows to ensure reproducible tooling.
 

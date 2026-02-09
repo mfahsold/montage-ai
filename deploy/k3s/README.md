@@ -26,7 +26,8 @@ open "http://localhost:${LOCAL_PORT}"
 Note: If you build a single-arch image (amd64 only), pin workloads to that
 architecture via an overlay patch or add a node selector before deploying.
 For heterogeneous clusters, prefer a multi-arch build and set
-`cluster.allowMixedArch: true` in `deploy/k3s/config-global.yaml`.
+`cluster.allowMixedArch: true` in `deploy/k3s/config-global.yaml` (local copy from
+`config-global.yaml.example`).
 `build-and-push.sh` now auto-selects an existing native multi-arch builder
 (`montage-multiarch`, `simple-builder`, etc.) before falling back to local QEMU,
 and enables registry layer cache by default (`CACHE_REF`).
@@ -47,7 +48,7 @@ If you operate the Fluxibri cluster stack, deploy core infrastructure via
 those services are already present and focuses on the Montage-AI app layer.
 
 ```bash
-# Copy and edit canonical config
+# Copy and edit canonical config (local copy is ignored by git)
 cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
 $EDITOR deploy/k3s/config-global.yaml
 
@@ -64,7 +65,7 @@ cd deploy/k3s
 
 Notes:
 
-- Update `deploy/k3s/config-global.yaml` to change registry, tag, or storage defaults.
+- Update your local `deploy/k3s/config-global.yaml` to change registry, tag, or storage defaults.
 - `make -C deploy/k3s config` regenerates `deploy/k3s/base/cluster-config.env`.
 
 That's it. For manual control, see sections below.

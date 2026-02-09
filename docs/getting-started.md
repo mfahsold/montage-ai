@@ -2,12 +2,7 @@
 
 This file is now a pointer to the single source of truth.
 
-Please use [README.md](README.md) for onboarding, local setup, and ARM64 notes.
-
-```bash
-REDIS_HOST=redis
-REDIS_PORT=6379
-```
+Please use [README.md](../README.md) for onboarding, local setup, and ARM64 notes.
 
 If running in Kubernetes, use the provided manifests in `deploy/k3s`.
 
