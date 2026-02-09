@@ -10,22 +10,29 @@ Montage AI is a local-first, post-production assistant: we "polish" existing foo
 ## Architecture
 
 ```
-User Prompt → Creative Director (LLM) → JSON Instructions → Editor → FFmpeg → Final Video
+User Prompt → Creative Director (LLM) → JSON → MontageBuilder → SegmentWriter → FFmpeg → /data/output/
 ```
 
 | Module | Purpose |
 |--------|---------|
-| `editor.py` | Main orchestrator - beat detection, scene detection, clip assembly |
+| `core/montage_builder.py` | Central orchestrator — pipeline phases (analyze → plan → enhance → render) |
+| `editor.py` | CLI entry point — initializes MontageBuilder, handles CLI args |
 | `creative_director.py` | LLM-to-JSON translation (Ollama/Gemini/OpenAI) |
+| `audio_analysis.py` | Beat detection, tempo extraction, energy profiling (FFmpeg astats/tempo) |
+| `scene_analysis.py` | Scene detection, content analysis, visual similarity (SceneDetector class) |
+| `segment_writer.py` | Disk-based progressive rendering (SegmentWriter) |
+| `auto_reframe.py` | 9:16 smart reframing (AutoReframeEngine, convex optimization) |
+| `audio_enhancer.py` | Voice isolation, auto-ducking, loudness normalization |
+| `ffmpeg_config.py` | GPU encoder detection, encoding parameters (`get_config()` / `FFmpegConfig`) |
 | `broll_planner.py` | Script-to-clip matching via semantic search |
+| `footage_manager.py` | Clip pool management with story arc awareness |
 | `transcriber.py` | Whisper transcription via cgpu |
 | `cgpu_upscaler.py` | AI upscaling via cloud GPU |
 
-## Quick architecture
-User Prompt → Creative Director (LLM) → JSON → MontageBuilder → SegmentWriter → FFmpeg → /data/output/
-
 ## Essentials & quick refs
 - `src/montage_ai/core/montage_builder.py` — orchestration
+- `src/montage_ai/audio_analysis.py` — beat detection, energy analysis
+- `src/montage_ai/scene_analysis.py` — scene detection (`SceneDetector`)
 - `src/montage_ai/ffmpeg_config.py` — use `get_config()` / `FFmpegConfig`
 - `src/montage_ai/segment_writer.py` — disk-based segment writing
 - `src/montage_ai/auto_reframe.py`, `src/montage_ai/audio_enhancer.py`
@@ -59,6 +66,17 @@ User Prompt → Creative Director (LLM) → JSON → MontageBuilder → SegmentW
 from montage_ai.ffmpeg_config import get_config
 cfg = get_config()
 params = cfg.get_preview_video_params()
+```
+- Audio analysis:
+```python
+from montage_ai.audio_analysis import get_beat_times, calculate_dynamic_cut_length
+beat_info = get_beat_times("/data/music/track.mp3")
+```
+- Scene detection:
+```python
+from montage_ai.scene_analysis import SceneDetector, detect_scenes
+detector = SceneDetector()
+scenes = detector.detect(video_path)
 ```
 - Preview run:
 ```bash

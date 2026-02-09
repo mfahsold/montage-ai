@@ -1,5 +1,5 @@
 # Use a slim python image for smaller size and faster builds
-FROM python:3.10-slim-bookworm
+FROM python:3.12-slim-bookworm
 
 # Enable non-free repositories for Intel QSV drivers
 # Required for intel-media-va-driver-non-free (fixes issue #3299)

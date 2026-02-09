@@ -1,0 +1,96 @@
+# Montage-AI Docker Image with Intel QSV Hardware Acceleration
+# Fixes GitHub Issue #3299: Intel QSV Broken (-9 MFX_ERR_DEVICE_FAILED)
+#
+# This Dockerfile adds the required Intel Media SDK packages for QSV support:
+# - intel-media-va-driver-non-free: Hardware-accelerated video encode/decode
+# - libmfx1: Intel Media SDK runtime library
+# - libvpl2: Intel Video Processing Library
+#
+# === CANONICAL DEPLOYMENT PROCESS ===
+#
+# 1. Copy this Dockerfile to the montage-ai source repository:
+#    cp deploy/k3s/montage-ai/Dockerfile.qsv ~/montage-ai/Dockerfile.qsv
+#
+# 2. In the montage-ai repo, commit and push:
+#    cd ~/montage-ai
+#    git add Dockerfile.qsv
+#    git commit -m "feat: Add QSV hardware acceleration support (fixes #3299)"
+#    git push origin main
+#
+# 3. Trigger Tekton build (from fluxibri_core):
+#    kubectl create -f deploy/ci/tekton/pipelineruns/montage-ai-qsv-pipelinerun.yaml
+#
+# 4. Deploy using Makefile:
+#    cd deploy/k3s && make deploy-montage-ai
+#
+# 5. Verify QSV is working:
+#    make montage-ai-hw-check
+#
+# === MANUAL BUILD (fallback) ===
+# Build: docker build -f Dockerfile.qsv -t montage-ai:qsv-fix-v2 .
+# Push:  docker push registry.registry.svc.cluster.local:5000/montage-ai:qsv-fix-v2
+#
+FROM python:3.12-slim-bookworm
+
+LABEL maintainer="fluxibri"
+LABEL description="Montage-AI with Intel QSV hardware acceleration support"
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Intel QSV environment variables
+ENV LIBVA_DRIVER_NAME=iHD
+ENV MFX_IMPL_DEVICE=/dev/dri/renderD128
+
+# Add non-free and non-free-firmware repos for Intel drivers
+RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list
+
+# Install system dependencies and Intel QSV packages (amd64 only)
+RUN apt-get update && \
+    if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+      QSV_PACKAGES="intel-media-va-driver-non-free libmfx1 libvpl2 intel-gpu-tools"; \
+    else \
+      QSV_PACKAGES=""; \
+    fi; \
+    apt-get install -y --no-install-recommends \
+    # Core utilities
+    curl \
+    ca-certificates \
+    git \
+    # FFmpeg with hardware acceleration
+    ffmpeg \
+    # VA-API (Video Acceleration API) base
+    vainfo \
+    libva2 \
+    libva-drm2 \
+    libva-x11-2 \
+    $QSV_PACKAGES \
+    # Cleanup
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy requirements first for better Docker layer caching
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application source
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY montage-ai.sh ./
+
+# Make scripts executable
+RUN chmod +x montage-ai.sh scripts/*.sh 2>/dev/null || true
+
+# Set Python path for source imports
+ENV PYTHONPATH=/app/src:$PYTHONPATH
+
+# Expose web UI port
+EXPOSE 8080
+
+# Default entrypoint for web UI
+CMD ["python", "-u", "-m", "montage_ai.web_ui.app"]

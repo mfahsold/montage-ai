@@ -106,6 +106,41 @@ QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh ru
 
 Output files appear in `data/output/`.
 
+### 5. Re-running Setup & Idempotency
+
+All setup steps are **idempotent** — safe to re-run without side effects:
+
+| Command | Idempotent? | Notes |
+|---------|-------------|-------|
+| `./scripts/setup.sh` | Yes | Creates directories only if missing |
+| `docker compose build` | Yes | Uses Docker layer cache; fast on repeat runs |
+| `docker compose up` | Yes | Starts or resumes containers |
+| `docker compose down` | Yes | Stops and removes containers (data volumes preserved) |
+
+**When to rebuild from scratch:**
+
+```bash
+# After dependency changes (requirements.txt, pyproject.toml):
+docker compose build --no-cache
+
+# If containers won't start or behave unexpectedly:
+docker compose down
+docker compose build
+docker compose up
+```
+
+**Full reset** (removes all generated output):
+
+```bash
+docker compose down
+rm -rf data/output/*
+./scripts/setup.sh
+docker compose build --no-cache
+docker compose up
+```
+
+> **Tip:** `docker compose up` without a prior `down` is fine — Docker Compose handles container lifecycle automatically. Use `down` only when you need a clean slate or to free resources.
+
 ---
 
 ## Kubernetes

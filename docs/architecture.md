@@ -407,13 +407,16 @@ These constants are automatically determined from input footage using `determine
 
 | Dependency  | Purpose                   | Version |
 | ----------- | ------------------------- | ------- |
-| FFmpeg      | Video encoding/processing | Latest  |
-| librosa     | Audio analysis            | 0.10+   |
-| MoviePy     | Video manipulation        | 1.0+    |
-| OpenCV      | Frame processing          | 4.0+    |
+| FFmpeg      | Video encoding/processing (beat detection via astats/tempo) | Latest  |
+| MoviePy     | Video manipulation        | 2.2+    |
+| OpenCV      | Frame processing          | 4.12+   |
 | scenedetect | Scene detection           | 0.6+    |
+| numpy       | Numerical operations      | 2.0+    |
+| Pydantic    | Data validation           | 2.0+    |
 | Real-ESRGAN | AI upscaling              | Latest  |
 | OpenAI SDK  | cgpu/Gemini client        | 1.0+    |
+
+> **Note:** `librosa` has been removed. Beat detection now uses FFmpeg `astats`/`tempo` filters as the primary engine (portable, no heavy deps). See `audio_analysis.py`.
 
 ---
 
@@ -434,5 +437,5 @@ These constants are automatically determined from input footage using `determine
 ### GPU Utilization
 
 - Auto-detection of available GPU encoders
-- Fallback chain: Vulkan → V4L2 → CPU
+- Fallback chain: NVENC → VAAPI → QSV → CPU
 - Cloud GPU option for heavy workloads

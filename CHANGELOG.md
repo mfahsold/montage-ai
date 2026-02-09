@@ -1,12 +1,16 @@
 ## 2026-02-09
 
 ### Fixes
+- Fix: Dockerfile base image updated from Python 3.10 to 3.12 to match `pyproject.toml` `requires-python = ">=3.12,<3.13"` (#104). Also fixed `Dockerfile.qsv` (was 3.11).
 - Fix: `deploy-cluster` now respects namespace override from `config-global.yaml` (#34). Removed hardcoded `namespace: montage-ai` from base kustomization; namespace is injected dynamically via `kustomize edit set namespace` at deploy time.
 - Fix: CI installation on clean systems — added `cloud-private` optional dependency group and fixed `ci-local.sh` to handle it gracefully in both locked and non-locked sync paths (#35).
 - Fix: Docker Web UI port mismatch — aligned all container ports from 5000 to 8080 across `docker-compose.yml`, `docker-compose.web.yml`, and `deploy/config.env` to match the Flask app default (#36).
 - Fix: Kustomize ConfigMap hash suffix causing `CreateContainerConfigError` — added `generatorOptions.disableNameSuffixHash: true` so `envFrom.configMapRef` resolves correctly (#38).
 
 ### Documentation
+- Added "Re-running Setup & Idempotency" section to `docs/getting-started.md` with idempotency guarantees, rebuild triggers, and full-reset instructions (#106).
+- Updated `copilot-instructions.md` module table with correct module names (`audio_analysis.py`, `scene_analysis.py`, etc.) and added import examples (#105).
+- Updated `docs/architecture.md` external dependencies: removed librosa (replaced by FFmpeg astats/tempo), corrected version pins, fixed GPU fallback chain.
 - Expanded `docs/getting-started.md` from redirect stub to full standalone quickstart with Docker setup, prerequisites, and Kubernetes sections.
 - Added "How to Set Configuration" intro and `WEB_PORT` to `docs/configuration.md`.
 - Added port conflict diagnostics and `docker logs` hint to `docs/troubleshooting.md`.
