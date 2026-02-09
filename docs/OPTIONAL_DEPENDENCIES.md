@@ -178,6 +178,19 @@ All optional features included; can selectively enable via environment variables
 
 ---
 
+## Validate Your Installation
+
+Run the dependency checker to see which features are available:
+
+```bash
+./scripts/validate_optional_deps.sh
+
+# Strict mode (fail if any missing — useful for CI):
+./scripts/validate_optional_deps.sh --strict
+```
+
+---
+
 ## Troubleshooting
 
 ### "No module named 'mediapipe'"

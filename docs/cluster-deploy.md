@@ -10,7 +10,7 @@ Step-by-step guide for deploying Montage AI to a Kubernetes (K3s/K8s) cluster.
 - [ ] `kustomize` installed (`kustomize version`)
 - [ ] `make` available
 - [ ] Container registry accessible from all nodes
-- [ ] Storage class with RWX support (for shared media volumes)
+- [ ] Storage class with RWX support (for shared media volumes) — see [Storage Setup](#storage-setup) below
 
 ---
 
@@ -163,7 +163,62 @@ Check config-global.yaml for remaining `<...>` values:
 grep '<' deploy/k3s/config-global.yaml
 ```
 
+**Need to rollback?** See [Rollback Guide](operations/rollback.md).
+
 See [Troubleshooting: Kubernetes](troubleshooting.md#kubernetes-deploy-errors) for more.
+
+---
+
+## Storage Setup
+
+Montage AI requires shared storage (ReadWriteMany PVCs) for media files across pods.
+
+### Single-Node / Testing
+
+K3s includes `local-path` provisioner by default (no setup needed):
+
+```bash
+kubectl get storageclass
+# NAME         PROVISIONER             RECLAIMPOLICY
+# local-path   rancher.io/local-path   Delete
+```
+
+Set in `config-global.yaml`:
+```yaml
+storage:
+  classes:
+    default: "local-path"
+```
+
+> **Note:** `local-path` does **not** support RWX (ReadWriteMany). For single-node testing this works, but multi-node clusters need NFS or another RWX provider.
+
+### Multi-Node / Production
+
+For multi-node clusters, you need an RWX-capable storage backend:
+
+| Option | Best for | Setup |
+|--------|----------|-------|
+| **NFS provisioner** | On-prem, self-managed | Install `nfs-kernel-server` on a node, then deploy NFS CSI provisioner |
+| **Longhorn** | K3s clusters | `kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/master/deploy/longhorn.yaml` |
+| **Rook/Ceph** | Large clusters | See [Rook documentation](https://rook.io/docs/rook/latest/) |
+| **AWS EFS** | EKS | Use EFS CSI driver |
+| **GCP Filestore** | GKE | Use Filestore CSI driver |
+
+**Quick NFS setup (Ubuntu/Debian):**
+
+```bash
+# On the NFS server node:
+sudo apt install nfs-kernel-server
+sudo mkdir -p /mnt/nfs-montage
+echo "/mnt/nfs-montage *(rw,sync,no_subtree_check,no_root_squash)" | sudo tee -a /etc/exports
+sudo exportfs -ra
+
+# Then set in config-global.yaml:
+# storage.nfs.server: "<NFS_SERVER_IP>"
+# storage.nfs.path: "/mnt/nfs-montage"
+```
+
+**Using Fluxibri Core:** If you run the [Fluxibri Core](https://github.com/mfahsold/fluxibri_core) infrastructure stack, NFS provisioning is handled automatically via `make deploy-core`.
 
 ---
 

@@ -1,181 +1,96 @@
-#!/bin/bash
-# Validate Optional Dependencies Installation
-# Tests each optional dependency group to ensure they install and work correctly
+#!/usr/bin/env bash
+# Validate optional dependencies for Montage AI features.
+# Usage: ./scripts/validate_optional_deps.sh [--strict]
+set -euo pipefail
 
-set -e
+STRICT="${1:-}"
+TOTAL=0
+FOUND=0
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-
-echo "════════════════════════════════════════════════════════════"
-echo "Optional Dependencies Validator"
-echo "════════════════════════════════════════════════════════════"
-echo ""
-
-# Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Test results
-RESULTS=()
-
-# Function to test installation
-test_install() {
-    local group=$1
-    local packages=$2
-    local description=$3
-    
-    echo -n "Testing [$group]: $description... "
-    
-    # Create temp venv
-    VENV_DIR=$(mktemp -d)
-    trap "rm -rf $VENV_DIR" EXIT
-    
-    python3 -m venv "$VENV_DIR" > /dev/null 2>&1
-    source "$VENV_DIR/bin/activate"
-    
-    # Install core first
-    pip install -q -e "$REPO_ROOT" 2>/dev/null || {
-        deactivate
-        echo -e "${RED}✗ Failed${NC} (core install failed)"
-        RESULTS+=("$group:FAIL")
-        return 1
-    }
-    
-    # Install optional group
-    if [ ! -z "$packages" ]; then
-        pip install -q $packages 2>/dev/null || {
-            deactivate
-            echo -e "${RED}✗ Failed${NC} (optional install failed)"
-            RESULTS+=("$group:FAIL")
-            return 1
-        }
-    fi
-    
-    # Test import
-    python3 -c "import montage_ai; from montage_ai.config import ProcessingSettings" 2>/dev/null || {
-        deactivate
-        echo -e "${RED}✗ Failed${NC} (import failed)"
-        RESULTS+=("$group:FAIL")
-        return 1
-    }
-    
-    # Additional tests per group
-    case $group in
-        ai)
-            python3 -c "import mediapipe; import librosa" 2>/dev/null || {
-                deactivate
-                echo -e "${RED}✗ Failed${NC} (AI imports failed)"
-                RESULTS+=("$group:FAIL")
-                return 1
-            }
-            ;;
-        web)
-            python3 -c "import flask; from redis import Redis" 2>/dev/null || {
-                deactivate
-                echo -e "${RED}✗ Failed${NC} (web imports failed)"
-                RESULTS+=("$group:FAIL")
-                return 1
-            }
-            ;;
-        cloud)
-            python3 -c "import soundfile" 2>/dev/null || {
-                deactivate
-                echo -e "${RED}✗ Failed${NC} (cloud imports failed)"
-                RESULTS+=("$group:FAIL")
-                return 1
-            }
-            ;;
-    esac
-    
-    deactivate
-    echo -e "${GREEN}✓ Passed${NC}"
-    RESULTS+=("$group:PASS")
+check_python_module() {
+  local module="$1"
+  local feature="$2"
+  TOTAL=$((TOTAL + 1))
+  if python3 -c "import $module" 2>/dev/null; then
+    echo -e "  ${GREEN}[OK]${NC} $module — $feature"
+    FOUND=$((FOUND + 1))
+    return 0
+  else
+    echo -e "  ${RED}[--]${NC} $module — $feature (not installed)"
+    return 1
+  fi
 }
 
-echo "1. Core Installation (no optional deps)"
-test_install "core" "" "Basic montage-ai"
-
-echo ""
-echo "2. AI Dependencies"
-test_install "ai" "mediapipe scipy librosa color-matcher" "ML & audio analysis"
-
-echo ""
-echo "3. Web Dependencies"
-test_install "web" "flask redis rq msgpack" "Web UI & async jobs"
-
-echo ""
-echo "4. Cloud Dependencies"
-test_install "cloud" "soundfile" "Cloud/GPU offloading"
-
-echo ""
-echo "5. All Combined"
-test_install "all" "mediapipe scipy librosa color-matcher flask redis rq msgpack soundfile" "Complete install"
-
-echo ""
-echo "════════════════════════════════════════════════════════════"
-echo "Installation Size Estimates"
-echo "════════════════════════════════════════════════════════════"
-echo ""
-
-# Estimate sizes for each group
-estimate_size() {
-    local group=$1
-    local packages=$2
-    
-    VENV_DIR=$(mktemp -d)
-    trap "rm -rf $VENV_DIR" EXIT
-    
-    python3 -m venv "$VENV_DIR" > /dev/null 2>&1
-    source "$VENV_DIR/bin/activate"
-    
-    pip install -q -e "$REPO_ROOT" > /dev/null 2>&1
-    if [ ! -z "$packages" ]; then
-        pip install -q $packages > /dev/null 2>&1
-    fi
-    
-    SIZE=$(du -sh "$VENV_DIR" 2>/dev/null | cut -f1)
-    echo "  $group: $SIZE"
-    
-    deactivate
+check_command() {
+  local cmd="$1"
+  local feature="$2"
+  TOTAL=$((TOTAL + 1))
+  if command -v "$cmd" &>/dev/null; then
+    local ver
+    ver=$("$cmd" -version 2>&1 | head -1 || echo "unknown")
+    echo -e "  ${GREEN}[OK]${NC} $cmd — $feature"
+    FOUND=$((FOUND + 1))
+    return 0
+  else
+    echo -e "  ${RED}[--]${NC} $cmd — $feature (not found)"
+    return 1
+  fi
 }
 
-echo "Virtual Environment Sizes:"
-estimate_size "core" ""
-estimate_size "core+ai" "mediapipe scipy librosa color-matcher"
-estimate_size "core+web" "flask redis rq msgpack"
-estimate_size "core+all" "mediapipe scipy librosa color-matcher flask redis rq msgpack soundfile"
+echo "Montage AI — Optional Dependencies Check"
+echo "========================================="
 
 echo ""
-echo "════════════════════════════════════════════════════════════"
-echo "Test Results Summary"
-echo "════════════════════════════════════════════════════════════"
-echo ""
-
-PASS_COUNT=0
-FAIL_COUNT=0
-
-for result in "${RESULTS[@]}"; do
-    IFS=':' read -r group status <<< "$result"
-    if [ "$status" = "PASS" ]; then
-        echo -e "  ${GREEN}✓${NC} $group"
-        ((PASS_COUNT++))
-    else
-        echo -e "  ${RED}✗${NC} $group"
-        ((FAIL_COUNT++))
-    fi
-done
+echo "System Tools:"
+check_command "ffmpeg" "Video processing (required)" || true
+check_command "ffprobe" "Media analysis (required)" || true
 
 echo ""
-echo "Total: $PASS_COUNT passed, $FAIL_COUNT failed"
+echo "Core Python:"
+check_python_module "montage_ai" "Montage AI package" || true
+check_python_module "moviepy" "Video composition" || true
+check_python_module "cv2" "OpenCV (scene detection, stabilization)" || true
+check_python_module "numpy" "Numerical processing" || true
+check_python_module "PIL" "Image processing (Pillow)" || true
+
+echo ""
+echo "AI / ML (pip install montage-ai[ai]):"
+check_python_module "mediapipe" "Smart Reframing (face detection)" || true
+check_python_module "scipy" "Path optimization (camera motion)" || true
+check_python_module "librosa" "Advanced beat detection (FFmpeg is primary)" || true
+check_python_module "color_matcher" "Shot-to-shot color consistency" || true
+
+echo ""
+echo "Web UI (pip install montage-ai[web]):"
+check_python_module "flask" "Web framework" || true
+check_python_module "redis" "Job queue backend" || true
+check_python_module "rq" "Background job processing" || true
+
+echo ""
+echo "Cloud / Integrations:"
+check_python_module "openai" "OpenAI-compatible LLM API" || true
+check_python_module "soundfile" "Cloud audio handling" || true
+check_python_module "torch" "PyTorch (voice isolation, advanced audio)" || true
+check_python_module "webrtcvad" "Voice activity detection" || true
+
+echo ""
+echo "========================================="
+echo -e "Result: ${FOUND}/${TOTAL} dependencies available"
 echo ""
 
-if [ $FAIL_COUNT -eq 0 ]; then
-    echo -e "${GREEN}✓ All optional dependencies validated successfully!${NC}"
-    exit 0
-else
-    echo -e "${RED}✗ Some optional dependencies failed validation${NC}"
+if [ "$FOUND" -lt "$TOTAL" ]; then
+  MISSING=$((TOTAL - FOUND))
+  echo -e "${YELLOW}${MISSING} optional dependencies not installed.${NC}"
+  echo "Install all optional deps: pip install montage-ai[all]"
+  echo "Or selectively: pip install montage-ai[ai], pip install montage-ai[web]"
+  if [ "$STRICT" = "--strict" ]; then
     exit 1
+  fi
+else
+  echo -e "${GREEN}All dependencies available.${NC}"
 fi

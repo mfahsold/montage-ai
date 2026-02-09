@@ -15,7 +15,7 @@ Choose the setup that fits your environment:
 ### Prerequisites
 
 - Docker + Docker Compose v2
-- 16 GB RAM recommended (8 GB minimum with `QUALITY_PROFILE=preview`)
+- 16 GB RAM recommended (8 GB minimum with `DOCKER_MEMORY_LIMIT=6g QUALITY_PROFILE=preview`)
 - 4+ CPU cores recommended
 - 10+ GB free disk space
 

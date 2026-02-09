@@ -37,10 +37,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'              # Match your CPU cores (nproc)
-          memory: 12g            # Default for 16GB system (leaves 4GB for OS)
+          cpus: '${DOCKER_CPU_LIMIT:-4}'              # Match your CPU cores (nproc)
+          memory: ${DOCKER_MEMORY_LIMIT:-12g}          # Default for 16GB system (leaves 4GB for OS)
         reservations:
-          memory: 4g             # Minimum guaranteed memory
+          memory: ${DOCKER_MEMORY_RESERVATION:-4g}     # Minimum guaranteed memory
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

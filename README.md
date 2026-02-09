@@ -120,8 +120,9 @@ If you want an automated check and a preview render test:
 ## Troubleshooting
 
 - Port in use: `WEB_PORT=8081 docker compose up`
-- Low RAM: use `QUALITY_PROFILE=preview`
-- Docker start error: lower memory in docker-compose.yml
+- Low RAM (8 GB): `DOCKER_MEMORY_LIMIT=6g QUALITY_PROFILE=preview docker compose up`
+- Docker OCI error: lower memory limit: `DOCKER_MEMORY_LIMIT=6g docker compose up`
+- High-performance system: `DOCKER_MEMORY_LIMIT=24g DOCKER_CPU_LIMIT=8 docker compose up`
 - aarch64 local venv: `mediapipe` is unavailable on Python >= 3.13; use Docker or skip `[ai]`
 
 ## Docs Index
