@@ -6,6 +6,73 @@ For Kubernetes/on-call fixes, see the public stub at [KUBERNETES_RUNBOOK.md](KUB
 
 ---
 
+## Docker Startup Issues
+
+### "OCI runtime error", "Docker not starting"
+
+**Symptom:** `docker compose up` fails immediately with:
+```
+error: container exited with error: [error] systemd-executor 
+OCI runtime error: memory cgroup out of memory
+```
+
+**Cause:** Your `memory:` limit in `docker-compose.yml` exceeds your system RAM.
+
+**Fix:**
+
+```bash
+# Check your actual RAM:
+free -h | grep Mem
+  # If you see: 16Gi total
+
+# Edit docker-compose.yml and set memory to:
+# memory: 12g (leaves 4GB for OS)
+
+# Then retry:
+docker compose up
+```
+
+### "docker: command not found"
+
+**Fix:**
+
+```bash
+# macOS:
+brew install docker docker-compose
+
+# Ubuntu/Debian:
+sudo apt-get install docker.io docker-compose
+
+# Then restart Docker:
+sudo systemctl restart docker
+
+# Or on macOS:
+open /Applications/Docker.app
+
+# Verify:
+docker --version
+```
+
+### "Cannot connect to Docker daemon"
+
+**Fix:**
+
+```bash
+# Ensure Docker is running
+sudo systemctl start docker   # Linux
+# or
+open /Applications/Docker.app # macOS
+
+# Add yourself to docker group (Linux, restart shell after):
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Verify:
+docker ps
+```
+
+---
+
 ## Memory Issues
 
 **Symptom:** Job crashes, container killed, "Out of Memory" error

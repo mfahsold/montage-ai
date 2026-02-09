@@ -4,7 +4,7 @@ Hey! Thanks for thinking about contributing. Here's how to get started.
 
 ---
 
-## Quick Setup
+## Quick Setup (for Contributors)
 
 ```bash
 # Fork and clone
@@ -14,6 +14,150 @@ cd montage-ai
 # Run tests
 ./scripts/ci.sh
 ```
+
+---
+
+## New Developer Setup (First Time)
+
+### Step 1: System Check
+
+Before cloning, verify your machine meets requirements:
+
+```bash
+# Check Docker + Compose
+docker --version       # >= 20.10
+docker compose version # >= v2.0
+
+# Check resources
+free -h | grep Mem     # At least 16 GB RAM
+nproc                  # At least 4 cores
+```
+
+### Step 2: Clone & Local Test
+
+```bash
+# Clone and enter directory
+git clone https://github.com/YOUR_USERNAME/montage-ai.git
+cd montage-ai
+
+# Test Docker setup (builds image, takes ~2-3 min first time)
+docker compose build
+
+# Verify build succeeded
+docker compose run --rm montage-ai python -c "import montage_ai; print('✅ Ready!')"
+```
+
+### Step 3: Run First Montage Locally
+
+```bash
+# Add test media (or your own)
+mkdir -p data/input data/music
+cp test_data/sample_*.mp4 data/input/
+cp test_data/sample_music.mp3 data/music/
+
+# Run preview render (fast, low quality)
+QUALITY_PROFILE=preview docker compose run --rm montage-ai ./montage-ai.sh run
+
+# Check output
+ls -lh data/output/*.mp4
+```
+
+### Step 4: Web UI Test (Optional)
+
+```bash
+# Start Web UI
+docker compose up
+
+# Open http://localhost:8080 in browser
+# Upload videos, hit "Create Montage"
+```
+
+### Step 5: Run Test Suite
+
+```bash
+# Full CI (includes type checks, tests, linting)
+./scripts/ci.sh
+
+# Or just unit tests
+pytest tests/ -v
+```
+
+### Troubleshooting First Setup
+
+**"OCI runtime error" or Docker won't start?**
+→ Your memory limit is too high. Edit `docker-compose.yml`, reduce `memory:` to 6g or 8g.
+
+**"No videos found" error?**
+→ Verify: `ls data/input/` should show `.mp4` files.
+
+**"No LLM backend available"?**
+→ This is normal on first run. LLM is optional. Use Preview mode: `QUALITY_PROFILE=preview`.
+
+**Still stuck?**
+→ See [troubleshooting.md](docs/troubleshooting.md) or open an issue on GitHub.
+
+---
+
+## Working on the Go Worker (Advanced)
+
+Montage AI is migrating to **Go for distributed concurrency**. Python stays for LLM/analysis.
+
+### Python Developer? This is for you:
+
+You don't need to write Go code. The worker remains compatible with Python APIs. But if interested:
+
+### Building & Testing the Go Worker
+
+```bash
+cd go
+
+# Prerequisites
+go version  # Should be 1.22+
+
+# Build
+go mod download
+go build -o montage-worker ./cmd/worker
+
+# Test locally (requires Redis)
+REDIS_HOST=localhost ./montage-worker
+
+# Deploy to Kubernetes
+./build-and-push.sh
+kubectl apply -f ../deploy/k3s/overlays/cluster/worker-go-canary.yaml
+```
+
+### Go Worker Architecture
+
+- **`cmd/worker/main.go`** — Entry point + signal handling
+- **`pkg/worker/pool.go`** — Goroutine pool + job processing
+- **`pkg/redis/client.go`** — Redis queue integration (RQ-compatible)
+- **`pkg/ffmpeg/`** — FFmpeg subprocess orchestration
+- **`pkg/python/`** — Python subprocess calls (Creative Director)
+
+### Key Concepts
+
+1. **Goroutine pool:** Cheap concurrency (1000 goroutines ≈ 30MB)
+2. **Redis streams:** Shared queue with Python worker
+3. **Subprocess integration:** Go calls Python for LLM while handling FFmpeg
+
+### Monitoring the Migration
+
+```bash
+# Watch Go worker status
+kubectl logs -n montage-ai -l app.kubernetes.io/component=worker-go -f
+
+# Compare resource usage (Python vs. Go)
+kubectl top pods -n montage-ai
+
+# Queue length
+kubectl exec -n montage-ai redis-0 -- redis-cli LLEN "rq:queue:default"
+```
+
+### Further Reading
+
+- [Migration plan](go/MIGRATION.md) — Phase-by-phase rollout
+- [Go worker README](go/README.md) — Architecture deep dive
+- [Performance targets](go/README.md#performance-targets) — Expected improvements
 
 ---
 

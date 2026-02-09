@@ -71,6 +71,84 @@ That's it. For manual control, see sections below.
 
 ---
 
+## Prerequisites Checklist
+
+**Before deploying to Kubernetes, verify you have:**
+
+- [ ] Kubernetes cluster (K3s, K8s, EKS, GKE, etc.)
+- [ ] `kubectl` configured with cluster access:
+  ```bash
+  kubectl cluster-info   # Should show cluster address
+  kubectl get nodes      # Should list your worker nodes
+  ```
+- [ ] Container registry accessible from cluster (ghcr.io, ECR, local registry, etc.)
+- [ ] **Storage setup** (see "NFS Prerequisites" section below)
+- [ ] Cluster resources: ≥ 16 GB RAM, ≥ 4 CPUs available
+
+### NFS Prerequisites
+
+**Why NFS?** The render pods need persistent, shared storage for `/data/input`, `/data/music`, `/data/output`, and `/data/assets`.
+
+**Check if your cluster already has storage:**
+
+```bash
+# List available storage classes
+kubectl get storageclass
+
+# Desired output: At least one class with RWX (ReadWriteMany) capability
+# Example:
+#   NAME                    PROVISIONER       RECLAIMPOLICY  AVAILABLE
+#   nfs-provisioner         nfs.io/nfs        Delete         True
+#   local-path (default)    rancher.io/local  Delete         True
+```
+
+**If NO storage class exists:** Deploy NFS provisioner
+
+```bash
+# Option A: Local-path provisioner (single-node clusters, testing)
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+
+# Option B: External NFS server (production)
+# Contact your cluster admin to mount an NFS share, then:
+helm install nfs-provisioner stable/nfs-provisioner \
+  --set nfs.server=<NFS_SERVER_IP> \
+  --set nfs.path=/exports/montage-ai
+
+# Verify storage is ready:
+kubectl get storageclass
+kubectl get pvc -n montage-ai  # After deploy, should show: input, output, music, assets
+```
+
+### The `.ready` File Issue
+
+**Problem:** Your render job stays in `Init:0/2` status.
+
+**Cause:** The init container is waiting for `/data/input/.ready` file, which signals that NFS is mounted and ready.
+
+**Solution:**
+
+```bash
+# Check if NFS is mounted
+kubectl exec -it -n montage-ai <POD_NAME> -- ls -la /data/input/
+# If empty or shows permission denied → NFS not ready yet
+
+# Manually trigger .ready file (for testing)
+kubectl exec -it -n montage-ai <POD_NAME> -- touch /data/input/.ready
+
+# Restart the job
+kubectl rollout restart job/montage-ai-render -n montage-ai
+kubectl wait --for=condition=complete job/montage-ai-render -n montage-ai --timeout=600s
+```
+
+**Best Practice:** Let the NFS provisioner handle mounting automatically. If jobs consistently fail on `.ready` check:
+```bash
+# Debug NFS mounts
+kubectl describe pod <POD_NAME> -n montage-ai | grep -A 5 "Mounts:"
+
+# Check init container logs
+kubectl logs <POD_NAME> -c wait-for-nfs-ready -n montage-ai
+```
+
 ## Prerequisites
 
 - Kubernetes cluster (K3s, K8s, EKS, GKE, etc.)

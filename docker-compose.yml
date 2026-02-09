@@ -10,18 +10,35 @@ services:
     container_name: montage-ai
     ports:
       - "${WEB_PORT:-8080}:5000"
-    # === RESOURCE LIMITS (IMPORTANT for stability) ===
-    # Uncomment and adjust based on your system:
-    # - For 32GB RAM system: mem_limit: 24g (leaves 8GB for OS)
-    # - For 16GB RAM system: mem_limit: 12g (leaves 4GB for OS)
-    # - For  8GB RAM system: mem_limit:  6g (leaves 2GB for OS)
+    # === RESOURCE LIMITS - CRITICAL FOR STABILITY ===
+    # ⚠️  These limits prevent the container from consuming all system resources.
+    #
+    # 📊 SIZING GUIDE (adjust based on YOUR system):
+    #
+    #   System RAM    |  memory: limit  |  cpus   |  Performance
+    #   --------------|-----------------|---------|------------------
+    #   32 GB         |  24g            |  8      |  Excellent
+    #   16 GB         |  12g            |  4      |  Good (default)
+    #    8 GB         |   6g            |  2      |  Slow preview mode
+    #
+    # ⚠️  WARNING: If memory limit is too HIGH (>= system RAM):
+    #     → Docker won't start (\"OCI runtime error\")
+    # 
+    # ⚠️  WARNING: If memory limit is too LOW (<= 4GB):
+    #     → Video processing will hang or crash (OOM killer)
+    #
+    # 💡 TIP: Leave at least 2-4 GB free for OS (macOS/Linux/Windows)
+    #
+    # To override at runtime:
+    #   docker compose run --rm -e MEMORY_LIMIT_GB=6 montage-ai ...
+    #
     deploy:
       resources:
         limits:
-          cpus: '4'
-          memory: 12g  # Increased to 12g
+          cpus: '4'              # Match your CPU cores (nproc)
+          memory: 12g            # Default for 16GB system (leaves 4GB for OS)
         reservations:
-          memory: 4g   # Increased to 4g
+          memory: 4g             # Minimum guaranteed memory
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

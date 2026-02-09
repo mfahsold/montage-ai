@@ -37,10 +37,45 @@ make -C deploy/k3s deploy-cluster
 
 ---
 
+## Before You Start: System Requirements
+
+**Your laptop needs:**
+- Docker + Docker Compose v2
+- **16 GB RAM minimum** (8 GB will be slow; 32 GB recommended for high quality)
+- 4+ CPU cores (2 cores minimum; will be slower)
+- ~10 GB disk free (for test videos + output)
+
+### ✅ Quick System Check
+
+Run this before proceeding:
+
+```bash
+# On macOS/Linux:
+docker --version       # Should be >= 20.10
+docker compose version # Should be >= v2.0
+free -h | grep Mem     # Check RAM
+nproc                  # Check CPU cores
+df -h /                # Check disk space
+
+# On Windows (PowerShell):
+docker --version
+docker compose version
+RAM: (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+CPU: (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
+```
+
+**If you have low RAM?** Use `QUALITY_PROFILE=preview` instead of full renders, or consider cgpu GPU offload. See [performance-tuning.md](performance-tuning.md) and [cgpu-setup.md](cgpu-setup.md).
+
+### ⚠️ Windows Users
+
+**Important:** If running Docker Desktop for Windows, allocate sufficient resources:
+- Settings → Resources → Memory: ≥ 12 GB
+- Settings → Resources → CPUs: ≥ 4
+
 ## Requirements
 
 - **Docker** + Docker Compose v2
-- **8 GB RAM** (16 GB for high quality)
+- **8 GB RAM** minimum (16 GB for high quality)
 - Optional: [cgpu](https://github.com/RohanAdwankar/cgpu) for cloud GPU/LLM
 
 > **Low RAM?** Use `QUALITY_PROFILE=preview` and consider cgpu offload. See
@@ -54,6 +89,35 @@ make -C deploy/k3s deploy-cluster
 git clone https://github.com/mfahsold/montage-ai.git
 cd montage-ai
 ```
+
+### First Time Setup
+
+**Step 1: Prepare media directories**
+
+```bash
+# Create test directory structure
+mkdir -p data/input data/music data/output
+
+# Add your media files (or use sample test data)
+cp ~/Videos/*.mp4 data/input/        # Your video clips
+cp ~/Music/track.mp3 data/music/     # Your background music
+```
+
+**Step 2: Start Docker containers**
+
+```bash
+# First build (takes ~2-3 min on first run)
+docker compose build
+
+# Then start
+docker compose up
+
+# ✅ When ready, open http://localhost:8080
+```
+
+**Step 3: Create your first montage**
+- Upload videos via Web UI, or
+- Use CLI: `docker compose run --rm montage-ai ./montage-ai.sh run`
 
 The default flow runs in local Docker via `docker compose`.
 If you need optional extras, see [Optional Dependencies](OPTIONAL_DEPENDENCIES.md).

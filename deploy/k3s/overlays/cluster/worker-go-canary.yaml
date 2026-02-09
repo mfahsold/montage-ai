@@ -1,0 +1,185 @@
+# Go Worker Kubernetes Deployment (Phase 2 Migration)
+# This is a CANARY deployment - runs alongside Python RQ worker
+# Gradually route traffic from Python → Go via queue priority
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: montage-ai-go-worker-config
+  namespace: montage-ai
+data:
+  LOG_LEVEL: "info"
+  WORKER_CPUS: "2"
+  WORKER_QUEUES: "default,heavy"
+  PYTHON_BIN: "/usr/bin/python3"
+  MONTAGE_AI_PYTHON_PATH: "/app/src"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-ai-worker-go
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: worker-go
+    app.kubernetes.io/version: go-v1-canary
+spec:
+  replicas: 1  # Start with 1 canary; scale after validation
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: montage-ai
+      app.kubernetes.io/component: worker-go
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: montage-ai
+        app.kubernetes.io/component: worker-go
+    spec:
+      serviceAccountName: default
+      
+      # Priority: Canary runs on same nodes as Python worker (no affinity skew)
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - worker
+              topologyKey: kubernetes.io/hostname
+      
+      # Graceful shutdown
+      terminationGracePeriodSeconds: 60
+
+      containers:
+      - name: montage-ai-worker-go
+        image: "registry.example.com/montage-ai-worker:go-v1-canary"
+        imagePullPolicy: IfNotPresent
+        
+        # Resource requests/limits
+        resources:
+          requests:
+            cpu: 2
+            memory: 512Mi
+          limits:
+            cpu: 4
+            memory: 1Gi
+
+        # Environment from ConfigMap + explicit values
+        envFrom:
+        - configMapRef:
+            name: montage-ai-go-worker-config
+        env:
+        - name: REDIS_HOST
+          value: "redis.montage-ai.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: password
+              optional: true
+        - name: OUTPUT_DIR
+          value: "/data/output"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+
+        # Health checks
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "montage-worker --health-check || exit 1"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          failureThreshold: 3
+
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "montage-worker --health-check || exit 1"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 2
+
+        # Mounts
+        volumeMounts:
+        - name: input
+          mountPath: /data/input
+          readOnly: true
+        - name: music
+          mountPath: /data/music
+          readOnly: true
+        - name: output
+          mountPath: /data/output
+        - name: assets
+          mountPath: /data/assets
+          readOnly: true
+
+        # Signal handling
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 10"]  # Drain in-flight jobs
+
+      # Volumes (shared with Python worker)
+      volumes:
+      - name: input
+        persistentVolumeClaim:
+          claimName: montage-ai-input-pvc
+      - name: music
+        persistentVolumeClaim:
+          claimName: montage-ai-music-pvc
+      - name: output
+        persistentVolumeClaim:
+          claimName: montage-ai-output-pvc
+      - name: assets
+        persistentVolumeClaim:
+          claimName: montage-ai-assets-pvc
+
+---
+# PodDisruptionBudget: Ensure canary always has at least 0 replicas (can be evicted)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: montage-ai-worker-go-pdb
+  namespace: montage-ai
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: worker-go
+
+---
+# Service Monitor (for Prometheus - optional, Phase 2)
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#   name: montage-ai-worker-go
+#   namespace: montage-ai
+# spec:
+#   selector:
+#     matchLabels:
+#       app.kubernetes.io/component: worker-go
+#   endpoints:
+#   - port: metrics
+#     interval: 30s
