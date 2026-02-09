@@ -95,4 +95,4 @@ USER montage
 
 # Default command
 WORKDIR /app/src
-CMD ["sh", "-c", "../montage-ai.sh cgpu-start && python3 -m montage_ai.web_ui.app"]
+CMD ["sh", "-c", "/app/montage-ai.sh cgpu-start && python3 -m montage_ai.web_ui.app"]
