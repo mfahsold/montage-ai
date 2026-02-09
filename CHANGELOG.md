@@ -12,6 +12,9 @@
 - `FFmpegConfig` now exposes `gpu_available`, `gpu_type`, and `encoder` properties for better IDE discoverability (#110).
 
 ### Documentation
+- Made port conflict hint more prominent in README Quick Start section (#111).
+- Added NFS Helm provisioner instructions and Cloud Provider storage table to `cluster-deploy.md` (#112).
+- Expanded `deploy/CONFIGURATION.md` from stub to full deployment config guide with Docker Compose and K8s examples (#113).
 - Clarified `get_beat_times()` return type and added usage examples to `audio_analysis.py` docstrings (#109).
 - Added "Re-running Setup & Idempotency" section to `docs/getting-started.md` with idempotency guarantees, rebuild triggers, and full-reset instructions (#106).
 - Updated `copilot-instructions.md` module table with correct module names (`audio_analysis.py`, `scene_analysis.py`, etc.) and added import examples (#105).

@@ -12,12 +12,11 @@ docker compose build
 
 # Start Web UI
 docker compose up
-
-# If 8080 is busy
-WEB_PORT=8081 docker compose up
 ```
 
-Open http://localhost:8080 (or your chosen port).
+Open http://localhost:8080.
+
+> **Port conflict?** If port 8080 is already in use, override with: `WEB_PORT=8081 docker compose up` (then open http://localhost:8081).
 
 CLI run (uses data/input + data/music):
 

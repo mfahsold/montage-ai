@@ -274,6 +274,40 @@ sudo exportfs -ra
 # storage.nfs.path: "/mnt/nfs-montage"
 ```
 
+**NFS CSI Provisioner (Helm):**
+
+Once the NFS server is running, deploy the Kubernetes provisioner so PVCs are automatically created:
+
+```bash
+helm repo add nfs-subdir-external-provisioner \
+  https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+helm install nfs-provisioner \
+  nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
+  --set nfs.server=<NFS_SERVER_IP> \
+  --set nfs.path=/mnt/nfs-montage \
+  --set storageClass.name=nfs-client
+
+# Verify
+kubectl get storageclass nfs-client
+```
+
+Then set in `config-global.yaml`:
+```yaml
+storage:
+  classes:
+    default: "nfs-client"
+```
+
+### Cloud Provider Storage
+
+| Provider | Service | Driver | Install |
+|----------|---------|--------|---------|
+| **AWS (EKS)** | EFS | EFS CSI Driver | `helm install aws-efs-csi-driver aws-efs-csi-driver/aws-efs-csi-driver` |
+| **GCP (GKE)** | Filestore | Filestore CSI | Enabled by default on GKE 1.23+ |
+| **Azure (AKS)** | Azure Files | Built-in | `kubectl get sc azurefile` (pre-installed) |
+
+See your cloud provider's documentation for RWX StorageClass configuration.
+
 **Using Fluxibri Core:** If you run the [Fluxibri Core](https://github.com/mfahsold/fluxibri_core) infrastructure stack, NFS provisioning is handled automatically via `make deploy-core`.
 
 ---
