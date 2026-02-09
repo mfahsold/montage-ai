@@ -196,7 +196,7 @@ grep '<' deploy/k3s/config-global.yaml
 
 **Need to rollback?** See [Rollback Guide](operations/rollback.md).
 
-See [Troubleshooting: Kubernetes](troubleshooting.md#kubernetes-deploy-errors) for more.
+> **See also:** [Troubleshooting: Kubernetes](troubleshooting.md#kubernetes-deploy-errors) for more issues, [Configuration](configuration.md) for all environment variables, [Installation Test Guide](INSTALLATION_TEST.md) to verify your setup.
 
 ---
 

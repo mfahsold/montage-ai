@@ -35,6 +35,8 @@ QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh ru
 # → 360p output, ~60% faster
 ```
 
+> **See also:** [Installation Test Guide](docs/INSTALLATION_TEST.md) to verify your setup, [Configuration](docs/configuration.md) for all environment variables.
+
 ## System Requirements
 
 - Docker + Docker Compose v2

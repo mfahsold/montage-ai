@@ -68,7 +68,7 @@ docker compose up
 > # 8 GB system:
 > DOCKER_MEMORY_LIMIT=6g DOCKER_CPU_LIMIT=2 QUALITY_PROFILE=preview docker compose up
 > ```
-> See [Performance Tuning](performance-tuning.md) for all options.
+> See [Performance Tuning](performance-tuning.md) for all options and [Configuration](configuration.md) for all environment variables.
 
 Open http://localhost:8080 in your browser.
 
@@ -105,6 +105,8 @@ QUALITY_PROFILE=preview docker compose run --rm montage-ai /app/montage-ai.sh ru
 ```
 
 Output files appear in `data/output/`.
+
+> **See also:** [Features](features.md) for all styles and effects, [CLI Reference](CLI_REFERENCE.md) for all commands.
 
 ### 5. Re-running Setup & Idempotency
 

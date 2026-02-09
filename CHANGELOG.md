@@ -12,6 +12,8 @@
 - `FFmpegConfig` now exposes `gpu_available`, `gpu_type`, and `encoder` properties for better IDE discoverability (#110).
 
 ### Documentation
+- Added cross-links between related docs: README → Installation Test, getting-started → configuration/features/CLI, cluster-deploy → troubleshooting/configuration, features → getting-started (#115).
+- Updated INSTALLATION_TEST.md with detailed verification results and ✅ status markers for all 5 previously fixed issues (#116).
 - Made port conflict hint more prominent in README Quick Start section (#111).
 - Added NFS Helm provisioner instructions and Cloud Provider storage table to `cluster-deploy.md` (#112).
 - Expanded `deploy/CONFIGURATION.md` from stub to full deployment config guide with Docker Compose and K8s examples (#113).

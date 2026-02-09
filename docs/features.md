@@ -2,7 +2,7 @@
 
 > **Philosophy:** We do not generate pixels. We polish them.
 
-Complete guide to Montage AI capabilities.
+Complete guide to Montage AI capabilities. New here? Start with the [Getting Started Guide](getting-started.md).
 
 ---
 
