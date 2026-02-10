@@ -18,6 +18,10 @@ Run a local Kubernetes cluster for developing and testing Montage AI's cluster d
 
 ## k3d Quick Start
 
+> **Port conflict:** Both Docker Compose (`getting-started.md`) and k3d default to
+> port `8080`. If you followed the Docker Compose quickstart, stop it first
+> (`docker compose down`) or choose a different port here (e.g. `9090:80`).
+
 ### 1. Create Cluster
 
 ```bash
