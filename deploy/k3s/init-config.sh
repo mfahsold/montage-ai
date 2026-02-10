@@ -26,18 +26,30 @@ if [ -f "${OUTPUT}" ]; then
   fi
 fi
 
-# Defaults: safe for local k3d/minikube/kind clusters
-_REGISTRY_HOST="${REGISTRY_HOST:-localhost}"
-_REGISTRY_PORT="${REGISTRY_PORT:-5000}"
-_REGISTRY_URL="${REGISTRY_URL:-${_REGISTRY_HOST}:${_REGISTRY_PORT}}"
+# Defaults: safe for local k3d/minikube/kind clusters.
+# Set REGISTRY_HOST="" REGISTRY_PORT="" REGISTRY_URL="" for no-registry mode
+# (k3d image import / kind load docker-image workflow).
+_REGISTRY_HOST="${REGISTRY_HOST-localhost}"
+_REGISTRY_PORT="${REGISTRY_PORT-5000}"
+if [ -n "${REGISTRY_URL+set}" ]; then
+  _REGISTRY_URL="${REGISTRY_URL}"
+elif [ -n "${_REGISTRY_HOST}" ]; then
+  _REGISTRY_URL="${_REGISTRY_HOST}${_REGISTRY_PORT:+:${_REGISTRY_PORT}}"
+else
+  _REGISTRY_URL=""
+fi
 _CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
 _CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-cluster.local}"
 _CONTROL_PLANE_IP="${CONTROL_PLANE_IP:-127.0.0.1}"
 _GPU_NODE_IP="${GPU_NODE_IP:-}"
 _NFS_SERVER_IP="${NFS_SERVER_IP:-}"
 
-echo "Generating ${OUTPUT} with:"
-echo "  REGISTRY_URL:      ${_REGISTRY_URL}"
+if [ -z "${_REGISTRY_URL}" ]; then
+  echo "Generating ${OUTPUT} (no-registry mode — use k3d image import / kind load):"
+else
+  echo "Generating ${OUTPUT} with:"
+  echo "  REGISTRY_URL:      ${_REGISTRY_URL}"
+fi
 echo "  CLUSTER_NAMESPACE: ${_CLUSTER_NAMESPACE}"
 echo "  CLUSTER_DOMAIN:    ${_CLUSTER_DOMAIN}"
 echo "  CONTROL_PLANE_IP:  ${_CONTROL_PLANE_IP}"

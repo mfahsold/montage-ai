@@ -44,19 +44,30 @@ k3d image import montage-ai:latest -c montage-dev
 ### 3. Configure and Deploy
 
 ```bash
-# Copy config
-cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
+# Generate config-global.yaml with local-dev defaults (no registry needed)
+make -C deploy/k3s init-config
 
-# Set minimal values for local dev
-sed -i 's/<CLUSTER_NAMESPACE>/montage-ai/g' deploy/k3s/config-global.yaml
-sed -i 's/<CLUSTER_DOMAIN>/cluster.local/g' deploy/k3s/config-global.yaml
-sed -i 's/<CONTROL_PLANE_IP>/127.0.0.1/g' deploy/k3s/config-global.yaml
-sed -i 's/<NFS_SERVER_IP>/127.0.0.1/g' deploy/k3s/config-global.yaml
+# Or manually: copy and edit
+# cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
+# $EDITOR deploy/k3s/config-global.yaml   # replace ALL <...> placeholders
 
-# Generate config and deploy
+# Install KEDA (required for ScaledObject resources)
+make -C deploy/k3s install-keda
+
+# Generate cluster-config.env and deploy
 make -C deploy/k3s config
 make -C deploy/k3s deploy-cluster
 ```
+
+> **Important:** KEDA must be installed before deploying. Without it, the
+> `ScaledObject` resources will fail with `no matches for kind "ScaledObject"`.
+
+> **No Registry?** When using `k3d image import` (step 2), leave the registry
+> fields empty. `init-config.sh` sets `REGISTRY_URL` to `localhost:5000` by
+> default; for image-import workflows, override with:
+> ```bash
+> REGISTRY_HOST="" REGISTRY_PORT="" REGISTRY_URL="" make -C deploy/k3s init-config
+> ```
 
 ### 4. Access Web UI
 
@@ -83,8 +94,8 @@ minikube start --memory 8192 --cpus 4
 minikube image load montage-ai:latest
 
 # Deploy (same config steps as k3d)
-cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
-# ... replace placeholders ...
+make -C deploy/k3s init-config
+make -C deploy/k3s install-keda
 make -C deploy/k3s config
 make -C deploy/k3s deploy-cluster
 
@@ -104,6 +115,8 @@ kind create cluster --name montage-dev
 kind load docker-image montage-ai:latest --name montage-dev
 
 # Deploy (same config steps)
+make -C deploy/k3s init-config
+make -C deploy/k3s install-keda
 make -C deploy/k3s config
 make -C deploy/k3s deploy-cluster
 
@@ -204,6 +217,13 @@ kubectl exec -it -n montage-ai deploy/montage-ai-web -- /bin/bash
 
 ## Troubleshooting
 
+**`no matches for kind "ScaledObject"`:**
+KEDA is not installed. Run: `make -C deploy/k3s install-keda`
+
+**`InvalidImageName` (image path starts with `/`):**
+`REGISTRY_URL` is empty but the image path includes a leading slash. Either set
+a registry or use `make init-config` which handles this automatically.
+
 **Pods stuck in `Pending`:**
 Check StorageClass exists: `kubectl get storageclass`
 
@@ -212,6 +232,9 @@ Re-import after rebuild: `k3d image import montage-ai:latest -c montage-dev`
 
 **Port already in use:**
 Change the port mapping: `k3d cluster create montage-dev --port "9090:80@loadbalancer"`
+
+**Cluster already exists (k3d):**
+Delete first: `k3d cluster delete montage-dev`, then re-create.
 
 **Insufficient resources:**
 Increase Docker Desktop memory allocation, or use `minikube start --memory 12288`.
