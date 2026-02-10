@@ -43,14 +43,19 @@ def normalize_clip(input_path: Path, output_path: Path, target_fps: float = 30.0
     """
     logger.info(f"  Normalizing {input_path.name} (grade={color_grade})...")
     
-    # FFmpeg filter chains for each preset
+    # FFmpeg filter chains for each preset - STRONG, VISIBLE DIFFERENCES
     GRADING_FILTERS = {
         "none": "",
-        "warm": "eq=contrast=1.05:brightness=0.05:saturation=1.1",
-        "cool": "eq=contrast=1.05:brightness=-0.05:saturation=1.1",
-        "vibrant": "eq=saturation=1.3:contrast=1.1",
-        "high_contrast": "eq=contrast=1.3:brightness=0.05",
-        "cinematic": "eq=saturation=0.9:contrast=1.15",
+        # Warm: Orange/golden tones, bright highlights, boost reds
+        "warm": "colorbalance=rs=60:gs=30:bs=-40:rm=40:gm=20:bm=-30:rh=50:gh=25:bh=-40,eq=brightness=0.15:saturation=1.3",
+        # Cool: Blue/cyan tones, cool shadows
+        "cool": "colorbalance=rs=-80:gs=-20:bs=60:rm=-40:gm=-10:bm=50:rh=-50:gh=-10:bh=40,eq=brightness=-0.1:saturation=1.2",
+        # Vibrant: Maximum saturation, strong contrast
+        "vibrant": "eq=saturation=1.8:contrast=1.5:brightness=0.1,hue=s=1.5",
+        # High contrast: Dramatic blacks and whites
+        "high_contrast": "eq=contrast=2.0:brightness=0.05,curves=m='0 0.05 0.5 0.5 1 0.95'",
+        # Cinematic: Teal shadows + orange highlights (Hollywood look)
+        "cinematic": "colorbalance=rs=-40:gs=-10:bs=60:rm=30:gm=-10:bm=50:rh=40:gh=10:bh=-30,eq=saturation=0.85:contrast=1.3,curves=m='0 0 0.2 0.15 0.5 0.5 0.8 0.85 1 1'",
     }
     
     # Get color grading filter
@@ -298,6 +303,7 @@ def render_with_plan(cut_plan: dict, plan_file: str = None, color_grade: str = "
     """
     Programmatic entry point for web UI integration.
     Returns JSON-serializable result dict.
+    Automatically copies rendered videos to ~/Downloads for easy access.
     
     Args:
         cut_plan: Dict with 'cut_plan' array (or 'cuts' array, both accepted) or loads from plan_file if provided
@@ -305,9 +311,11 @@ def render_with_plan(cut_plan: dict, plan_file: str = None, color_grade: str = "
         color_grade: Color grading preset ('none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic')
     
     Returns:
-        {"success": bool, "output_file": str, "file_size": int, "error": str, "color_grade": str}
+        {"success": bool, "output_file": str, "file_size": int, "error": str, "color_grade": str, "download_path": str}
     """
     import json
+    import shutil
+    from pathlib import Path
     
     try:
         # Load cut plan if file provided
@@ -344,12 +352,24 @@ def render_with_plan(cut_plan: dict, plan_file: str = None, color_grade: str = "
         file_size = output_file.stat().st_size
         logger.info(f"✅ Rendering complete (grade={color_grade})! {file_size / (1024*1024):.1f}MB saved to {output_file}")
         
+        # Auto-copy to ~/Downloads for easy access
+        downloads_dir = Path.home() / "Downloads"
+        downloads_dir.mkdir(parents=True, exist_ok=True)
+        download_path = downloads_dir / output_file.name
+        
+        try:
+            shutil.copy2(output_file, download_path)
+            logger.info(f"📥 Auto-copied to: {download_path}")
+        except Exception as e:
+            logger.warning(f"Could not auto-copy to Downloads: {e}")
+        
         return {
             "success": True,
             "output_file": str(output_file),
             "file_size": file_size,
             "total_cuts": len(cuts),
             "color_grade": color_grade,
+            "download_path": str(download_path),
         }
         
     except Exception as e:

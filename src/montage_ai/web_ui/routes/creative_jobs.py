@@ -189,6 +189,7 @@ print(json.dumps(result))
         _job_registry[job_id]['progress'] = 100
         _job_registry[job_id]['output_file'] = output_file
         _job_registry[job_id]['file_size'] = Path(output_file).stat().st_size
+        _job_registry[job_id]['download_path'] = render_result.get('download_path', output_file)
         _job_registry[job_id]['completed_at'] = time.time()
 
         if user_callback:
@@ -327,6 +328,7 @@ def get_rendering_status(job_id):
         'progress': job.get('progress', 0),
         'error': job.get('error'),
         'output_file': job.get('output_file'),
+        'download_path': job.get('download_path'),
         'file_size': job.get('file_size'),
         'color_grade': job.get('color_grade', 'none'),
         'created_at': job.get('created_at'),
