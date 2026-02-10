@@ -21,6 +21,16 @@ fi
 # cgpu server PID tracking
 CGPU_PID_FILE="/tmp/cgpu_serve.pid"
 
+require_python_module() {
+    # Check if montage_ai is importable; give a clear error if not.
+    if ! python3 -c "import montage_ai" 2>/dev/null; then
+        echo -e "${RED}Error: montage_ai module not found.${NC}"
+        echo -e "Either install locally:  ${CYAN}pip install -e .${NC}"
+        echo -e "Or run via Docker:       ${CYAN}docker compose run --rm montage-ai $*${NC}"
+        exit 1
+    fi
+}
+
 show_help() {
     cat << EOF
 ${CYAN}Montage AI${NC} - Video Montage Creator
@@ -495,6 +505,7 @@ case "${1:-run}" in
         ;;
     k8s-watch)
         shift
+        require_python_module k8s-watch
         echo -e "${GREEN}🚀 Starting K8s Auto-Downloader...${NC}"
         python3 scripts/k8s_auto_downloader.py "$@"
         exit 0
@@ -548,23 +559,27 @@ case "${1:-run}" in
         ;;
     generate-proxies)
         shift
+        require_python_module generate-proxies
         echo -e "${GREEN}📦 Generating proxies for high-res footage...${NC}"
         python3 -m montage_ai.proxy_generator "$@"
         exit $?
         ;;
     export-to-nle)
         shift
+        require_python_module export-to-nle
         echo -e "${GREEN}📤 Exporting timeline to NLE formats...${NC}"
         python3 -m montage_ai.export.cli "$@"
         exit $?
         ;;
     jobs)
         shift
+        require_python_module jobs
         python3 -m montage_ai.cli jobs "$@"
         exit $?
         ;;
     check-hw)
         shift
+        require_python_module check-hw
         python3 -m montage_ai.cli check-hw "$@"
         exit $?
         ;;
@@ -574,6 +589,7 @@ case "${1:-run}" in
         ;;
     verify-deployment)
         shift
+        require_python_module verify-deployment
         python3 -m montage_ai.cli verify-deployment "$@"
         exit $?
         ;;

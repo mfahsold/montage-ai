@@ -98,10 +98,9 @@ fi
 #   fi
 # fi
 
-if [ -z "${OLLAMA_HOST:-}" ] && [ -n "${CLUSTER_NAMESPACE:-}" ]; then
-  cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"
-  OLLAMA_HOST="http://ollama.${CLUSTER_NAMESPACE}.svc.${cluster_domain}:11434"
-fi
+# NOTE: OLLAMA_HOST is intentionally NOT auto-populated from cluster DNS.
+# Set it explicitly in config-global.yaml if you deploy an Ollama service.
+# Auto-populating caused DNS resolution errors in minimal deployments.
 
 if [ -z "${CGPU_HOST:-}" ] && [ -n "${CLUSTER_NAMESPACE:-}" ]; then
   cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"

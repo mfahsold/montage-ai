@@ -26,7 +26,9 @@ Run a local Kubernetes cluster for developing and testing Montage AI's cluster d
 
 ```bash
 # Single-node cluster with port mapping for Web UI
+# --image pins K3s to v1.32 for KEDA 2.16+ compatibility
 k3d cluster create montage-dev \
+  --image rancher/k3s:v1.32.0-k3s1 \
   --port "8080:80@loadbalancer" \
   --agents 0
 
@@ -97,7 +99,22 @@ kubectl port-forward -n montage-ai svc/montage-ai-web 8080:80
 # Open http://localhost:8080
 ```
 
-### 5. Cleanup
+### 5. Seed Test Data into the Cluster
+
+The cluster PVCs (`input`, `music`, `output`) start empty. Copy your local
+test data so you can run a job immediately:
+
+```bash
+# If you ran ./scripts/setup.sh locally, seed that data into the cluster:
+bash scripts/ops/k8s-seed-data.sh
+
+# Or copy individual files manually:
+POD=$(kubectl -n montage-ai get pods -l app.kubernetes.io/component=web-ui -o jsonpath='{.items[0].metadata.name}')
+kubectl cp data/input/my-video.mp4 montage-ai/${POD}:/data/input/
+kubectl cp data/music/track.mp3 montage-ai/${POD}:/data/music/
+```
+
+### 6. Cleanup
 
 ```bash
 k3d cluster delete montage-dev

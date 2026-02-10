@@ -3,7 +3,7 @@
 # Single entry point for cluster operations
 # ==============================================================================
 
-.PHONY: help init-config config validate validate-config pre-flight diff deploy deploy-cluster status health test-e2e
+.PHONY: help init-config config validate validate-config pre-flight diff deploy deploy-cluster status health test-e2e install-keda install-jobset check-jobset
 
 GREEN  := $(shell tput -Txterm setaf 2 2>/dev/null || echo '')
 YELLOW := $(shell tput -Txterm setaf 3 2>/dev/null || echo '')
@@ -50,14 +50,18 @@ validate: config ## Validate kustomize builds
 deps: ## Print/install cluster dependencies (KEDA, JobSet CRD)
 	@echo "${YELLOW}Run 'make install-keda' to install KEDA via Helm, or follow docs/${RESET}"
 
-install-keda: ## Install KEDA via Helm (requires helm available)
+install-keda: ## Install KEDA via Helm (pinned to v2.16 for K8s ≥1.28 compat)
 	@echo "${GREEN}Installing KEDA via Helm...${RESET}"
 	@helm repo add kedacore https://kedacore.github.io/charts || true
 	@helm repo update || true
-	@helm list -n keda | grep keda || helm install keda kedacore/keda --namespace keda --create-namespace || true
+	@helm list -n keda | grep keda || helm install keda kedacore/keda --namespace keda --create-namespace --version 2.16.1 || true
+
+install-jobset: ## Install JobSet CRD (optional, enables parallel render jobs)
+	@echo "${GREEN}Installing JobSet CRD...${RESET}"
+	@kubectl apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/latest/download/manifests.yaml
 
 check-jobset: ## Check if JobSet CRD is present
-	@kubectl get crd jobs.batch.jobset.sigs.k8s.io >/dev/null 2>&1 && echo "${GREEN}JobSet CRD present${RESET}" || echo "${YELLOW}JobSet CRD not found. See docs for install instructions.${RESET}" 
+	@kubectl get crd jobsets.jobset.x-k8s.io >/dev/null 2>&1 && echo "${GREEN}JobSet CRD present${RESET}" || echo "${YELLOW}JobSet CRD not found. Install with: make install-jobset${RESET}"
 
 pre-flight: ## Run pre-flight checks before deploying
 	@bash ./pre-flight-check.sh
