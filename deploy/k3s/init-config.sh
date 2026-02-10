@@ -38,6 +38,7 @@ elif [ -n "${_REGISTRY_HOST}" ]; then
 else
   _REGISTRY_URL=""
 fi
+_ARCH="${ARCH:-$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')}"
 _CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-montage-ai}"
 _CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-cluster.local}"
 _CONTROL_PLANE_IP="${CONTROL_PLANE_IP:-127.0.0.1}"
@@ -53,6 +54,7 @@ fi
 echo "  CLUSTER_NAMESPACE: ${_CLUSTER_NAMESPACE}"
 echo "  CLUSTER_DOMAIN:    ${_CLUSTER_DOMAIN}"
 echo "  CONTROL_PLANE_IP:  ${_CONTROL_PLANE_IP}"
+echo "  ARCH (detected):   ${_ARCH}"
 echo ""
 
 cp "${EXAMPLE}" "${OUTPUT}"
@@ -68,6 +70,9 @@ sed -i \
   -e "s|<GPU_NODE_IP>|${_GPU_NODE_IP}|g" \
   -e "s|<NFS_SERVER_IP>|${_NFS_SERVER_IP}|g" \
   "${OUTPUT}"
+
+# Set detected architecture on all nodes (override with ARCH= env var)
+sed -i "s|arch: \"amd64\"|arch: \"${_ARCH}\"|g; s|arch: \"arm64\"|arch: \"${_ARCH}\"|g" "${OUTPUT}"
 
 # Remove any remaining angle-bracket placeholders (set to empty)
 sed -i 's|<[A-Z_]*>||g' "${OUTPUT}"

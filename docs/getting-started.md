@@ -21,6 +21,8 @@ Choose the setup that fits your environment:
 - 4+ CPU cores recommended
 - 10+ GB free disk space
 
+> **ARM64 (Apple Silicon, Raspberry Pi, Snapdragon):** Auto Reframe uses center-crop fallback (MediaPipe unavailable). All other features work normally.
+
 Verify:
 
 ```bash
@@ -69,6 +71,11 @@ docker compose up
 > DOCKER_MEMORY_LIMIT=6g DOCKER_CPU_LIMIT=2 QUALITY_PROFILE=preview docker compose up
 > ```
 > See [Performance Tuning](performance-tuning.md) for all options and [Configuration](configuration.md) for all environment variables.
+
+> **GPU acceleration (VAAPI):** If `verify-deployment` reports `/dev/dri/renderD128` as "not readable", set the render group GID:
+> ```bash
+> RENDER_GID=$(stat -c %g /dev/dri/renderD128) docker compose up
+> ```
 
 Open http://localhost:8080 in your browser.
 

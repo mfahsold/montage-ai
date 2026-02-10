@@ -153,4 +153,6 @@ services:
     # For AMD/Intel VAAPI, add:
     devices:
       - /dev/dri:/dev/dri  # VAAPI/VA-API access for AMD/Intel GPU
+    group_add:
+      - "${RENDER_GID:-109}"  # /dev/dri/renderD128 access (stat -c %g /dev/dri/renderD128)
     restart: "no"

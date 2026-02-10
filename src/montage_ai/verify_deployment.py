@@ -182,17 +182,23 @@ def _check_storage() -> Section:
     if not data_root.exists():
         data_root = Path("data")
 
+    write_required = {"output"}
     for subdir in ("input", "output", "music", "assets"):
         path = data_root / subdir
         if path.is_dir():
             try:
                 usage = shutil.disk_usage(str(path))
                 size_gb = usage.used / (1024**3)
-                writable = os.access(str(path), os.W_OK)
-                status = "ok" if writable else "warn"
+                if subdir in write_required:
+                    accessible = os.access(str(path), os.W_OK)
+                    flag = "not writable"
+                else:
+                    accessible = os.access(str(path), os.R_OK)
+                    flag = "not readable"
+                status = "ok" if accessible else "warn"
                 detail = f"{size_gb:.1f} GB"
-                if not writable:
-                    detail += " (not writable)"
+                if not accessible:
+                    detail += f" ({flag})"
                 section.checks.append(Check(str(path), status, detail))
             except OSError:
                 section.checks.append(Check(str(path), "ok", "exists"))

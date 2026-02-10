@@ -84,13 +84,30 @@ if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null; then
   fi
 fi
 
-# 6. Check node architectures
+# 6. Check node architectures (compare config vs actual cluster)
 if command -v kubectl &>/dev/null && kubectl cluster-info &>/dev/null; then
   ACTUAL_ARCHS=$(kubectl get nodes -o jsonpath='{.items[*].status.nodeInfo.architecture}' 2>/dev/null | tr ' ' '\n' | sort -u)
   if [ -n "$ACTUAL_ARCHS" ]; then
     echo -e "${GREEN}[OK]${NC} Cluster node architecture(s): $(echo $ACTUAL_ARCHS | tr '\n' ', ' | sed 's/,$//')"
-    echo "       Verify these match your config-global.yaml node definitions."
-    echo "       Run: kubectl get nodes -o wide"
+    # Compare against configured architectures in config-global.yaml
+    if [ -f "$CONFIG_GLOBAL" ]; then
+      CONFIGURED_ARCHS=$(grep 'arch:' "$CONFIG_GLOBAL" 2>/dev/null | sed 's/.*arch:[[:space:]]*["'\'']\?\([a-z0-9]*\)["'\'']\?.*/\1/' | sort -u)
+      if [ -n "$CONFIGURED_ARCHS" ]; then
+        MISMATCH=""
+        for cfg_arch in $CONFIGURED_ARCHS; do
+          if ! echo "$ACTUAL_ARCHS" | grep -q "^${cfg_arch}$"; then
+            MISMATCH="${MISMATCH} ${cfg_arch}"
+          fi
+        done
+        if [ -n "$MISMATCH" ]; then
+          echo -e "${RED}[FAIL]${NC} Architecture mismatch: config-global.yaml defines${MISMATCH} but cluster only has: $(echo $ACTUAL_ARCHS | tr '\n' ' ')"
+          echo "       Update config-global.yaml node arch values or add matching nodes."
+          ERRORS=$((ERRORS + 1))
+        else
+          echo -e "${GREEN}[OK]${NC} Configured architectures match cluster nodes"
+        fi
+      fi
+    fi
   else
     echo -e "${YELLOW}[WARN]${NC} Could not detect node architectures"
   fi

@@ -37,6 +37,7 @@ config: ## Render deploy/k3s/base/cluster-config.env from config-global.yaml
 		echo "${YELLOW}Missing $(CONFIG_ENV_SCRIPT); using cluster-config.env.example${RESET}"; \
 		cp ./base/cluster-config.env.example ./base/cluster-config.env; \
 	fi
+	@bash ./validate-config.sh $(CONFIG_GLOBAL)
 
 validate: config ## Validate kustomize builds
 	@echo "${GREEN}Validating base manifests...${RESET}"
