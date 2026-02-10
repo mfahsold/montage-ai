@@ -33,7 +33,7 @@ fi
 : "${REGISTRY_URL:=}"
 : "${IMAGE_NAME:=montage-ai}"
 : "${IMAGE_TAG:=latest}"
-: "${IMAGE_FULL:=${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}}"
+: "${IMAGE_FULL:=${REGISTRY_URL:+$REGISTRY_URL/}${IMAGE_NAME}:${IMAGE_TAG}}"
 : "${CLUSTER_NAMESPACE:=montage-ai}"
 : "${MONTAGE_HOSTNAME:=${APP_DOMAIN:-montage-ai.local}}"
 : "${STORAGE_CLASS_DEFAULT:=local-path}"
@@ -88,15 +88,15 @@ fi
 : "${CLUSTER_ARCH_SELECTOR_KEY:=}"
 : "${CLUSTER_NODE_SELECTOR:=}"
 
-if [ -z "${REGISTRY_URL:-}" ]; then
-  if [ -n "${REGISTRY_HOST:-}" ]; then
-    REGISTRY_URL="${REGISTRY_HOST}${REGISTRY_PORT:+:${REGISTRY_PORT}}"
-  elif [ -n "${REGISTRY_NAMESPACE}" ] || [ -n "${K3S_CLUSTER_DOMAIN}" ] || [ -n "${CLUSTER_DOMAIN}" ]; then
-    registry_ns="${REGISTRY_NAMESPACE:-registry}"
-    cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"
-    REGISTRY_URL="registry.${registry_ns}.svc.${cluster_domain}:5000"
-  fi
-fi
+# if [ -z "${REGISTRY_URL:-}" ]; then
+#   if [ -n "${REGISTRY_HOST:-}" ]; then
+#     REGISTRY_URL="${REGISTRY_HOST}${REGISTRY_PORT:+:${REGISTRY_PORT}}"
+#   elif [ -n "${REGISTRY_NAMESPACE}" ] || [ -n "${K3S_CLUSTER_DOMAIN}" ] || [ -n "${CLUSTER_DOMAIN}" ]; then
+#     registry_ns="${REGISTRY_NAMESPACE:-registry}"
+#     cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"
+#     REGISTRY_URL="registry.${registry_ns}.svc.${cluster_domain}:5000"
+#   fi
+# fi
 
 if [ -z "${OLLAMA_HOST:-}" ] && [ -n "${CLUSTER_NAMESPACE:-}" ]; then
   cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"
