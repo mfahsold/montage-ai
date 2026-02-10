@@ -13,6 +13,7 @@ This function is designed to be run in a separate thread/process.
 import os
 import shutil
 import subprocess
+import time
 import uuid
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
@@ -120,58 +121,104 @@ def process_clip_task(
     denoise_applied = False
     sharpen_applied = False
     film_grain_applied = False
+    enhancement_timings: Dict[str, Any] = {}
 
     if enhancer:
-        if ctx_stabilize:
-            stab_path = str(clip_temp_dir / f"stab_{temp_clip_name}")
-            result = enhancer.stabilize(current_path, stab_path)
-            if result != current_path:
-                current_path = result
-                temp_files.append(stab_path)
-                stabilize_applied = True
-
+        # 2a. Upscale (BEFORE stabilization per request)
         if ctx_upscale:
+            stage_input = current_path
             upscale_path = str(clip_temp_dir / f"upscale_{temp_clip_name}")
-            result = enhancer.upscale(current_path, upscale_path)
-            if result != current_path:
+            stage_start = time.perf_counter()
+            result = enhancer.upscale(stage_input, upscale_path)
+            stage_duration = time.perf_counter() - stage_start
+            upscale_applied = result != stage_input
+            enhancement_timings["upscale"] = {
+                "seconds": round(stage_duration, 4),
+                "status": "applied" if upscale_applied else "skipped",
+            }
+            if upscale_applied:
                 current_path = result
                 temp_files.append(upscale_path)
-                upscale_applied = True
 
+        # 2b. Stabilize (AFTER upscale)
+        if ctx_stabilize:
+            stage_input = current_path
+            stab_path = str(clip_temp_dir / f"stab_{temp_clip_name}")
+            stage_start = time.perf_counter()
+            result = enhancer.stabilize(stage_input, stab_path)
+            stage_duration = time.perf_counter() - stage_start
+            stabilize_applied = result != stage_input
+            enhancement_timings["stabilize"] = {
+                "seconds": round(stage_duration, 4),
+                "status": "applied" if stabilize_applied else "skipped",
+            }
+            if stabilize_applied:
+                current_path = result
+                temp_files.append(stab_path)
+
+        # 2c. Enhance (color grading)
         if ctx_enhance:
+            stage_input = current_path
             enhance_path = str(clip_temp_dir / f"enhance_{temp_clip_name}")
-            result = enhancer.enhance(current_path, enhance_path, color_grade=ctx_color_grade)
-            if result != current_path:
+            stage_start = time.perf_counter()
+            result = enhancer.enhance(stage_input, enhance_path, color_grade=ctx_color_grade)
+            stage_duration = time.perf_counter() - stage_start
+            enhance_applied = result != stage_input
+            enhancement_timings["enhance"] = {
+                "seconds": round(stage_duration, 4),
+                "status": "applied" if enhance_applied else "skipped",
+            }
+            if enhance_applied:
                 current_path = result
                 temp_files.append(enhance_path)
-                enhance_applied = True
 
-        # 2b. Denoise (NEW)
+        # 2d. Denoise
         if ctx_denoise:
+            stage_input = current_path
             denoise_path = str(clip_temp_dir / f"denoise_{temp_clip_name}")
-            result = enhancer.denoise(current_path, denoise_path)
-            if result != current_path:
+            stage_start = time.perf_counter()
+            result = enhancer.denoise(stage_input, denoise_path)
+            stage_duration = time.perf_counter() - stage_start
+            denoise_applied = result != stage_input
+            enhancement_timings["denoise"] = {
+                "seconds": round(stage_duration, 4),
+                "status": "applied" if denoise_applied else "skipped",
+            }
+            if denoise_applied:
                 current_path = result
                 temp_files.append(denoise_path)
-                denoise_applied = True
 
-        # 2c. Sharpen (NEW)
+        # 2e. Sharpen
         if ctx_sharpen:
+            stage_input = current_path
             sharpen_path = str(clip_temp_dir / f"sharpen_{temp_clip_name}")
-            result = enhancer.sharpen(current_path, sharpen_path)
-            if result != current_path:
+            stage_start = time.perf_counter()
+            result = enhancer.sharpen(stage_input, sharpen_path)
+            stage_duration = time.perf_counter() - stage_start
+            sharpen_applied = result != stage_input
+            enhancement_timings["sharpen"] = {
+                "seconds": round(stage_duration, 4),
+                "status": "applied" if sharpen_applied else "skipped",
+            }
+            if sharpen_applied:
                 current_path = result
                 temp_files.append(sharpen_path)
-                sharpen_applied = True
 
-        # 2d. Film Grain (NEW)
+        # 2f. Film Grain
         if ctx_film_grain and ctx_film_grain != "none":
+            stage_input = current_path
             grain_path = str(clip_temp_dir / f"grain_{temp_clip_name}")
-            result = enhancer.add_film_grain(current_path, grain_path, preset=ctx_film_grain)
-            if result != current_path:
+            stage_start = time.perf_counter()
+            result = enhancer.add_film_grain(stage_input, grain_path, preset=ctx_film_grain)
+            stage_duration = time.perf_counter() - stage_start
+            film_grain_applied = result != stage_input
+            enhancement_timings["film_grain"] = {
+                "seconds": round(stage_duration, 4),
+                "status": "applied" if film_grain_applied else "skipped",
+            }
+            if film_grain_applied:
                 current_path = result
                 temp_files.append(grain_path)
-                film_grain_applied = True
 
     # 3. Normalize (optional)
     final_clip_path = current_path
@@ -303,6 +350,7 @@ def process_clip_task(
         'denoised': denoise_applied,
         'sharpened': sharpen_applied,
         'film_grain': film_grain_applied,
+        'timings': enhancement_timings,
     }
 
     return final_clip_path, enhancements, temp_files

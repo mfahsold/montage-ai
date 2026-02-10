@@ -298,6 +298,16 @@ Fine-tune the length and timing of your montage.
 | `COLORLEVELS`     | `true`        | Apply broadcast-safe levels (16-235)          |
 | `LUMA_NORMALIZE`  | `true`        | Normalize luma for consistency across clips   |
 
+### AI Stabilization Controls
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `STABILIZE_AI` | `false` | Enable ProStabilizationEngine (AI stabilization). |
+| `STABILIZE_MODE` | `professional` | Stabilization profile: `professional`, `cinematic`, `documentary`, `broadcast`, `aggressive`, `extreme`, `super_extreme`. |
+| `AGGRESSIVE_SMOOTHING` | `false` | Force super-extreme smoothing profile. |
+| `FAST_STABILIZATION` | `false` | Skip motion smoothing for faster stabilization. |
+| `SKIP_COLOR_CORRECTION` | `false` | Disable stabilization color correction pass. |
+
 ### Denoising
 
 | Variable            | Default  | Description                                           |

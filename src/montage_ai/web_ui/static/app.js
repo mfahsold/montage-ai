@@ -22,6 +22,10 @@ const FALLBACK_TOGGLE_CONFIG = [
     { id: 'llm_clip_selection', label: 'LLM Clip Selection', desc: 'Semantic scene analysis.', default: false, category: 'advanced', badges: [{ type: 'quality', text: 'Smart Cuts' }, { type: 'cost', text: 'LLM Cost' }] },
     { id: 'creative_loop', label: 'Creative Loop', desc: 'LLM refines cuts iteratively.', default: false, category: 'advanced', badges: [{ type: 'quality', text: 'Agentic' }, { type: 'cost', text: '2-3x Time' }] },
     { id: 'story_engine', label: 'Story Engine', desc: 'Narrative tension-based editing.', default: false, category: 'advanced', badges: [{ type: 'quality', text: 'Cinematic' }] },
+    { id: 'stabilize_ai', label: 'AI Stabilization', desc: 'Enable ProStabilizationEngine.', default: false, category: 'advanced', badges: [{ type: 'quality', text: 'Pro Stabilize' }] },
+    { id: 'aggressive_smoothing', label: 'Aggressive Smoothing', desc: 'Extra motion interpolation (slower).', default: false, category: 'advanced', badges: [{ type: 'quality', text: 'Cinema Smooth' }, { type: 'cost', text: 'Slower' }] },
+    { id: 'fast_stabilization', label: 'Fast Stabilization', desc: 'Skip motion smoothing for previews.', default: false, category: 'advanced', badges: [{ type: 'info', text: 'Preview' }] },
+    { id: 'skip_color_correction', label: 'Skip Stabilization Color', desc: 'Disable color correction inside stabilization pass.', default: false, category: 'advanced', badges: [{ type: 'info', text: 'Original Color' }] },
     
     // Pro export options (collapsible)
     { id: 'generate_proxies', label: 'Generate Proxies', desc: 'Faster NLE editing.', default: false, category: 'pro', badges: [{ type: 'cost', text: 'Extra Files' }] },

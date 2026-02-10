@@ -25,6 +25,11 @@ from ..enhancement_tracking import (
     ColorGradeParams,
 )
 from ..clip_enhancement import DenoiseConfig, SharpenConfig, FilmGrainConfig
+from ..stabilization_integration import (
+    get_stabilization_bridge,
+    should_stabilize,
+    get_stabilization_mode,
+)
 
 class RenderEngine:
     """
@@ -43,7 +48,7 @@ class RenderEngine:
             from ..memory_monitor import get_memory_manager
 
             # Phase 4: Resolution-aware adaptive batch sizing
-            low_memory = self.settings.features.low_memory_mode
+            low_memory = self.settings.stabilization.low_memory_mode
             
             # Get representative clip metadata for resolution detection
             if self.ctx.media.output_profile:
@@ -162,10 +167,11 @@ class RenderEngine:
 
             # Record applied enhancements with parameters
             if enhancements.get('stabilized'):
+                bridge = get_stabilization_bridge()
                 decision.record_stabilize(StabilizeParams(
-                    method="vidstab",
-                    smoothing=30,
-                    crop_mode="black",
+                    method="pro_stabilization",  # Enhanced stabilization engine
+                    smoothing=int(bridge.select_profile().motion_smooth_factor * 100),
+                    crop_mode="preserve",
                 ))
             if enhancements.get('upscaled'):
                 decision.record_upscale(UpscaleParams(
@@ -331,7 +337,7 @@ class RenderEngine:
                 self.render_output()
                 return
 
-            requested_parallelism = int(self.settings.features.cluster_parallelism)
+            requested_parallelism = int(self.settings.stabilization.cluster_parallelism)
             clip_count = len(clips_data)
             parallelism = max(1, min(requested_parallelism, clip_count))
             logger.info(
@@ -341,7 +347,7 @@ class RenderEngine:
                 clip_count,
             )
 
-            cluster_tier = self.settings.features.cluster_render_tier
+            cluster_tier = self.settings.stabilization.cluster_render_tier
             shard_env = {}
             hwaccel = (self.settings.gpu.ffmpeg_hwaccel or "").strip()
             if hwaccel:
@@ -394,7 +400,7 @@ class RenderEngine:
                     submitter.delete_job(job_spec.name, cascade=True)
                     continue
 
-                if self.settings.features.cluster_mode:
+                if self.settings.stabilization.cluster_mode:
                     logger.warning("Falling back to local render after distributed failure.")
                     self.render_output()
                     return

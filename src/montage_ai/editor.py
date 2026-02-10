@@ -297,7 +297,7 @@ FFMPEG_PRESET = _ffmpeg_config.preset
 PARALLEL_ENHANCE = _settings.processing.parallel_enhance
 
 # Low-memory mode: use adaptive values for constrained hardware
-_LOW_MEMORY_MODE = _settings.features.low_memory_mode
+_LOW_MEMORY_MODE = _settings.stabilization.low_memory_mode
 MAX_PARALLEL_JOBS = _settings.processing.get_adaptive_parallel_jobs(_LOW_MEMORY_MODE)
 MAX_CONCURRENT_JOBS = _settings.processing.max_concurrent_jobs
 

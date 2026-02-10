@@ -69,6 +69,16 @@ Note: pool defaults use `os.cpu_count()` and do not apply cgroup limits.
 | `DEEP_ANALYSIS` | `false` | Optional heavier analysis. |
 | `LOW_MEMORY_MODE` | `false` | Enables more conservative limits. |
 
+## AI Stabilization Controls
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `STABILIZE_AI` | `false` | Enable ProStabilizationEngine. |
+| `STABILIZE_MODE` | `professional` | Profile: professional, cinematic, documentary, broadcast, aggressive, extreme, super_extreme. |
+| `AGGRESSIVE_SMOOTHING` | `false` | Force super-extreme profile. |
+| `FAST_STABILIZATION` | `false` | Skip motion smoothing for faster runs. |
+| `SKIP_COLOR_CORRECTION` | `false` | Disable stabilization color correction pass. |
+
 ## Thresholds (Detection)
 
 | Variable | Default | Notes |

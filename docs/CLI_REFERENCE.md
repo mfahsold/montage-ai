@@ -96,6 +96,25 @@ Notes:
 - Use `--option options.<key>=...` to set nested `options` fields in the payload.
 - `--download` waits for job completion and saves artifacts to the local machine.
 
+### AI Stabilization (Jobs API)
+
+Enable ProStabilizationEngine and tune smoothing when submitting jobs:
+
+```bash
+./montage-ai.sh jobs submit --style documentary --stabilize-ai --stabilize-mode cinematic
+./montage-ai.sh jobs submit --style action --stabilize-ai --aggressive-smoothing
+./montage-ai.sh jobs submit --style dynamic --stabilize-ai --fast-stabilization --skip-color-correction
+```
+
+Options:
+
+- `--stabilize-ai` / `--no-stabilize-ai`
+- `--stabilize-mode` = professional | cinematic | documentary | broadcast | aggressive | extreme | super_extreme
+- `--aggressive-smoothing` / `--no-aggressive-smoothing`
+- `--fast-stabilization` / `--no-fast-stabilization`
+- `--skip-color-correction` / `--no-skip-color-correction`
+
+
 ---
 
 ## Cluster Auto-Download (K8s)

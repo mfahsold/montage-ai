@@ -1,0 +1,63 @@
+{
+  "id": "cinematic_stabilized_epic",
+  "name": "Cinematic Stabilized Epic",
+  "description": "Professional cinematic workflow with AI stabilization, dynamic color grading sequences, and epic pacing for feature-quality montages",
+  "params": {
+    "style": {
+      "name": "cinematic_stabilized_epic",
+      "mood": "epic_professional",
+      "technique": "stabilized_grading_sequence"
+    },
+    "pacing": {
+      "speed": "epic",
+      "variation": "crescendo",
+      "intro_duration_beats": 12,
+      "climax_intensity": 1.3,
+      "outro_duration_beats": 8
+    },
+    "cinematography": {
+      "prefer_wide_shots": true,
+      "prefer_high_action": true,
+      "match_cuts_enabled": true,
+      "invisible_cuts_enabled": false,
+      "shot_variation_priority": "maximum",
+      "shot_composition_priority": "leading_lines"
+    },
+    "transitions": {
+      "type": "energy_aware_cinematic",
+      "crossfade_duration_sec": 0.6,
+      "motion_blur_on_cuts": true,
+      "dip_to_black_frequency": 0.15
+    },
+    "effects": {
+      "color_grading": "cinematic_blend",
+      "color_grading_sequence": ["golden_hour", "cinematic", "filmic_warm", "teal_orange", "golden_hour"],
+      "stabilization": true,
+      "stabilization_ai": true,
+      "stabilization_force_fast": false,
+      "sharpness_boost": true,
+      "sharpness_amount": 1.2,
+      "audio_enhancement": true,
+      "audio_ducking_enabled": true,
+      "dynamic_range_compression": 0.8
+    },
+    "energy_mapping": {
+      "sync_to_beats": true,
+      "energy_amplification": 1.4,
+      "energy_smoothing": 0.3,
+      "beat_sync_precision": "strict"
+    },
+    "narrative": {
+      "story_arc": "three_act",
+      "emotional_curve": "building_intensity",
+      "tempo_evolution": "accelerating_climax",
+      "visual_storytelling": "hero_journey"
+    },
+    "quality_control": {
+      "deep_motion_analysis": true,
+      "color_consistency_enabled": true,
+      "exposure_matching": true,
+      "ai_review_enabled": true
+    }
+  }
+}

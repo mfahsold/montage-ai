@@ -229,7 +229,7 @@ class JobSubmitter:
         Submit distributed scene detection job using K8s API.
         """
         if not parallelism or parallelism <= 0:
-            parallelism = min(len(video_paths), settings.features.cluster_parallelism)
+            parallelism = min(len(video_paths), settings.stabilization.cluster_parallelism)
         if threshold is None:
             threshold = settings.thresholds.scene_threshold
         if output_dir is None:

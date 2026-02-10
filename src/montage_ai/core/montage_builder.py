@@ -164,7 +164,7 @@ class MontageBuilder:
                 denoise=self.settings.features.denoise,
                 sharpen=self.settings.features.sharpen,
                 film_grain=self.settings.features.film_grain,
-                dialogue_duck=self.settings.features.dialogue_duck,
+                dialogue_duck=self.settings.stabilization.dialogue_duck,
             ),
             creative=MontageCreative(
                 editing_instructions=self.editing_instructions,
@@ -314,7 +314,7 @@ class MontageBuilder:
         self._init_intelligent_selector()
 
         # Initialize thread pool for parallel clip processing
-        adaptive_workers = self.settings.processing.get_adaptive_parallel_jobs(self.settings.features.low_memory_mode)
+        adaptive_workers = self.settings.processing.get_adaptive_parallel_jobs(self.settings.stabilization.low_memory_mode)
         optimal_workers = self._resource_manager.get_optimal_threads()
         max_workers = max(1, min(adaptive_workers, optimal_workers))
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -431,7 +431,7 @@ class MontageBuilder:
 
             proxy_video_files = list(self.ctx.media.video_files)
             try:
-                if self.settings.features.cluster_mode and self.settings.proxy.distributed_proxy_generation:
+                if self.settings.stabilization.cluster_mode and self.settings.proxy.distributed_proxy_generation:
                     total_mb = 0.0
                     for p in proxy_video_files:
                         try:
@@ -744,7 +744,7 @@ class MontageBuilder:
             preview_limit = int(getattr(self.settings.processing, "preview_max_input_size_mb", 200))
             threshold_mb = max(1024, preview_limit * 4)
 
-            if (not self.settings.features.cluster_mode) and max_size_mb > threshold_mb:
+            if (not self.settings.stabilization.cluster_mode) and max_size_mb > threshold_mb:
                 raise RuntimeError(
                     f"Refusing to run local encode for large input ({int(max_size_mb)} MB) "
                     f"with cluster-mode disabled.\n" 
@@ -758,7 +758,7 @@ class MontageBuilder:
             logger.debug("Unable to evaluate local-encode safety guard; continuing")
 
         # DISTRIBUTED MODE: Phase 2 (Distributed Rendering)
-        if self.settings.features.cluster_mode:
+        if self.settings.stabilization.cluster_mode:
             logger.info("   🌐 Cluster Mode: Switching to Distributed Rendering...")
             self._render_engine.render_distributed()
         else:

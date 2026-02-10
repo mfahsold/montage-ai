@@ -332,8 +332,8 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
     """
     try:
         settings = get_settings()
-        apply_colorlevels = settings.features.colorlevels
-        apply_normalize = settings.features.luma_normalize
+        apply_colorlevels = settings.stabilization.colorlevels
+        apply_normalize = settings.stabilization.luma_normalize
 
         # Build filter chain:
         # 1. Scale to standard resolution (no cropping)

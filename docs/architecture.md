@@ -53,8 +53,8 @@ System design and component overview.
 │  │                    Enhancement Pipeline                           │   │
 │  │                                                                   │   │
 │  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
-│  │   │ Stabilize│  │ Upscale  │  │ Color    │  │ Sharpen  │        │   │
-│  │   │ (FFmpeg) │  │(ESRGAN)  │  │ Grade    │  │          │        │   │
+│  │   │ Upscale  │  │ Stabilize│  │ Color    │  │ Sharpen  │        │   │
+│  │   │(ESRGAN)  │  │ (FFmpeg) │  │ Grade    │  │          │        │   │
 │  │   └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
 │  │                                                                   │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
@@ -321,9 +321,9 @@ Clip Sequence
       │
       ├──▶ Crop/Scale to STANDARD_WIDTH x STANDARD_HEIGHT (1080x1920)
       │
-      ├──▶ Optional: Stabilize (vidstab 2-pass)
-      │
-      ├──▶ Optional: Upscale (Real-ESRGAN)
+        ├──▶ Optional: Upscale (Real-ESRGAN)
+        │
+        ├──▶ Optional: Stabilize (vidstab 2-pass)
       │
       ├──▶ Color Grade (20+ presets)
       │

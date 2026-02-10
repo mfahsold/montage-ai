@@ -417,7 +417,7 @@ class AssetAnalyzer:
         # Cluster-Mode: Parallelize across nodes via K8s
         detected_scenes = {}  # path -> scenes list
 
-        if uncached_videos and self.settings.features.cluster_mode:
+        if uncached_videos and self.settings.stabilization.cluster_mode:
             try:
                 detected_scenes = self._detect_scenes_distributed(uncached_videos, threshold, progress_callback)
             except Exception as e:
@@ -432,7 +432,7 @@ class AssetAnalyzer:
             cfg_workers = self.settings.processing.max_scene_workers
 
             # CRITICAL: Respect LOW_MEMORY_MODE for constrained environments
-            if self.settings.features.low_memory_mode:
+            if self.settings.stabilization.low_memory_mode:
                 # Strict sequential processing in constrained environments.
                 max_workers = 1
                 logger.info("   ⚠️ LOW_MEMORY_MODE: Sequential scene detection (1 worker)")
@@ -586,7 +586,7 @@ class AssetAnalyzer:
 
         # OPTIMIZATION: Scale workers with scene count (up to CPU cores)
         cpu_count = max(1, get_effective_cpu_count())
-        if self.settings.features.low_memory_mode:
+        if self.settings.stabilization.low_memory_mode:
             # LOW_MEMORY_MODE: Sequential AI analysis to minimize memory spikes
             ai_workers = 1
             logger.debug("   ⚠️ LOW_MEMORY_MODE: Sequential AI scene analysis")
@@ -685,7 +685,7 @@ class AssetAnalyzer:
         submitter = JobSubmitter()
         
         # Parallelism matches Cluster settings
-        parallelism = min(len(video_paths), self.settings.features.cluster_parallelism)
+        parallelism = min(len(video_paths), self.settings.stabilization.cluster_parallelism)
         
         try:
             job = submitter.submit_scene_detection(

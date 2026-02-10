@@ -9,7 +9,12 @@ import subprocess
 import tempfile
 from pathlib import Path
 import logging
+import sys
+import os
+import importlib.util
 from typing import List, Dict
+
+NUMPY_AVAILABLE = importlib.util.find_spec("numpy") is not None
 
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
@@ -32,7 +37,33 @@ def load_cut_plan(plan_file: Path) -> Dict:
         return json.load(f)
 
 
-def normalize_clip(input_path: Path, output_path: Path, target_fps: float = 30.0, color_grade: str = "none") -> bool:
+def _ensure_src_on_path() -> None:
+    src_dir = Path(__file__).resolve().parent / "src"
+    if src_dir.exists() and str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+
+def _get_settings():
+    try:
+        from montage_ai.config import settings
+        return settings
+    except Exception:
+        _ensure_src_on_path()
+        try:
+            from montage_ai.config import settings
+            return settings
+        except Exception:
+            return None
+
+
+def normalize_clip(
+    input_path: Path,
+    output_path: Path,
+    target_fps: float = 30.0,
+    color_grade: str = "none",
+    grade_intensity: float = 1.0,
+    adaptive_boost: float = 0.0
+) -> bool:
     """Normalize clip to constant frame rate and consistent codec.
     
     Args:
@@ -47,25 +78,60 @@ def normalize_clip(input_path: Path, output_path: Path, target_fps: float = 30.0
     GRADING_FILTERS = {
         "none": "",
         # Warm: Orange/golden tones, bright highlights, boost reds
-        "warm": "colorbalance=rs=60:gs=30:bs=-40:rm=40:gm=20:bm=-30:rh=50:gh=25:bh=-40,eq=brightness=0.15:saturation=1.3",
+        "warm": "colorbalance=rs=0.35:gs=0.2:bs=-0.25:rm=0.25:gm=0.15:bm=-0.2:rh=0.3:gh=0.15:bh=-0.25,eq=brightness=0.1:saturation=1.25",
         # Cool: Blue/cyan tones, cool shadows
-        "cool": "colorbalance=rs=-80:gs=-20:bs=60:rm=-40:gm=-10:bm=50:rh=-50:gh=-10:bh=40,eq=brightness=-0.1:saturation=1.2",
+        "cool": "colorbalance=rs=-0.35:gs=-0.1:bs=0.3:rm=-0.2:gm=-0.05:bm=0.25:rh=-0.3:gh=-0.1:bh=0.25,eq=brightness=-0.05:saturation=1.2",
         # Vibrant: Maximum saturation, strong contrast
-        "vibrant": "eq=saturation=1.8:contrast=1.5:brightness=0.1,hue=s=1.5",
+        "vibrant": "eq=saturation=1.7:contrast=1.4:brightness=0.08,hue=s=1.4",
         # High contrast: Dramatic blacks and whites
-        "high_contrast": "eq=contrast=2.0:brightness=0.05,curves=m='0 0.05 0.5 0.5 1 0.95'",
+        "high_contrast": "eq=contrast=1.8:brightness=0.04,curves=m='0 0.05 0.5 0.5 1 0.95'",
         # Cinematic: Teal shadows + orange highlights (Hollywood look)
-        "cinematic": "colorbalance=rs=-40:gs=-10:bs=60:rm=30:gm=-10:bm=50:rh=40:gh=10:bh=-30,eq=saturation=0.85:contrast=1.3,curves=m='0 0 0.2 0.15 0.5 0.5 0.8 0.85 1 1'",
+        "cinematic": "colorbalance=rs=-0.25:gs=-0.1:bs=0.3:rm=0.15:gm=-0.05:bm=0.2:rh=0.25:gh=0.1:bh=-0.2,eq=saturation=0.9:contrast=1.25,curves=m='0 0 0.2 0.15 0.5 0.5 0.8 0.85 1 1'",
+        # Teal & Orange: stronger complementary color split
+        "teal_orange": "colorbalance=rs=-0.35:gs=-0.1:bs=0.4:rm=0.2:gm=-0.05:bm=-0.25:rh=0.35:gh=0.1:bh=-0.3,eq=contrast=1.2:saturation=1.1",
+        # Blockbuster: high-impact cinematic
+        "blockbuster": "colorbalance=rs=-0.4:gs=-0.15:bs=0.45:rm=0.25:gm=-0.05:bm=-0.3:rh=0.4:gh=0.15:bh=-0.35,curves=m='0 0 0.2 0.12 0.5 0.5 0.85 0.9 1 1',eq=contrast=1.3:saturation=1.05",
+        # Noir: desaturated, punchy blacks
+        "noir": "eq=saturation=0.2:contrast=1.45:brightness=-0.05,curves=m='0 0 0.2 0.08 0.5 0.5 0.85 0.95 1 1'",
+        # Vintage: lifted blacks, warm fade
+        "vintage": "curves=m='0 0.08 0.5 0.52 1 0.95',eq=saturation=0.75:contrast=1.05,colorbalance=rs=0.2:gs=0.1:bs=-0.15",
+        # Filmic warm: gentle film rolloff
+        "filmic_warm": "colorbalance=rs=0.2:gs=0.1:bs=-0.2,curves=m='0 0 0.25 0.2 0.5 0.5 0.75 0.8 1 1',eq=saturation=0.9:contrast=1.15",
+        # Golden hour: sunset warmth
+        "golden_hour": "colorbalance=rs=0.3:gs=0.2:bs=-0.25,curves=m='0 0.05 0.5 0.5 1 1',eq=saturation=1.2:contrast=1.1",
+        # Blue hour: cool dusk
+        "blue_hour": "colorbalance=rs=-0.25:gs=-0.05:bs=0.3,curves=m='0 0 0.5 0.48 1 0.95',eq=saturation=0.9:contrast=1.1",
     }
     
     # Get color grading filter
     grade_filter = GRADING_FILTERS.get(color_grade, "")
+    try:
+        grade_intensity = float(grade_intensity)
+    except Exception:
+        grade_intensity = 1.0
+    blend_intensity = max(0.0, min(1.0, grade_intensity))
+    extra_boost = max(0.0, grade_intensity - 1.0)
+    try:
+        adaptive_boost = max(0.0, min(0.3, float(adaptive_boost)))
+    except Exception:
+        adaptive_boost = 0.0
     
     # Build video filter chain
     if grade_filter:
-        vfilter = f"{grade_filter},format=yuv420p"
+        if blend_intensity < 1.0:
+            vfilter = (
+                f"split[a][b];[a]{grade_filter}[graded];"
+                f"[b][graded]blend=all_expr='A*{1-blend_intensity}+B*{blend_intensity}',"
+                "format=yuv420p"
+            )
+        else:
+            vfilter = f"{grade_filter},format=yuv420p"
     else:
         vfilter = "format=yuv420p"
+
+    if extra_boost > 0.0 or adaptive_boost > 0.0:
+        boost = min(0.3, extra_boost + adaptive_boost)
+        vfilter = f"{vfilter},eq=contrast={1 + (boost * 0.6)}:saturation={1 + (boost * 1.0)}"
     
     cmd = [
         "ffmpeg",
@@ -83,7 +149,168 @@ def normalize_clip(input_path: Path, output_path: Path, target_fps: float = 30.0
     ]
     
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    return result.returncode == 0
+    if result.returncode == 0:
+        return True
+
+    if result.stderr:
+        logger.warning(f"Normalization failed for {input_path.name}: {result.stderr[:200]}")
+
+    # Fallback: try without grading filters
+    fallback_cmd = [
+        "ffmpeg",
+        "-i", str(input_path),
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "20",
+        "-pix_fmt", "yuv420p",
+        "-vf", "format=yuv420p",
+        "-r", str(target_fps),
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-y",
+        str(output_path)
+    ]
+    fallback = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=120)
+    if fallback.returncode != 0 and fallback.stderr:
+        logger.warning(f"Fallback normalization failed for {input_path.name}: {fallback.stderr[:200]}")
+    return fallback.returncode == 0
+
+
+def stabilize_clip(
+    input_path: Path,
+    output_path: Path,
+    fast_mode: bool = False,
+    shake_score: float = 0.0,
+    motion_type: str = "unknown"
+) -> Path:
+    """Stabilize a clip using the best available method.
+
+    Returns stabilized path on success, otherwise original input path.
+    """
+    settings = _get_settings()
+
+    ai_enabled = bool(getattr(getattr(settings, "stabilization", None), "ai_enabled", False))
+    force_cgpu = bool(getattr(getattr(settings, "stabilization", None), "force_cgpu", False))
+
+    if ai_enabled:
+        try:
+            from src.montage_ai.parameter_suggester import suggest_stabilization
+            params = suggest_stabilization(shake_score=shake_score, motion_type=motion_type)
+            tuning = {
+                "smoothing": int(getattr(params, "smoothing", 10)),
+                "shakiness": int(getattr(params, "shakiness", 5)),
+            }
+        except Exception:
+            tuning = {"smoothing": 10, "shakiness": 5}
+    else:
+        tuning = {"smoothing": 10, "shakiness": 5}
+
+    if force_cgpu or ai_enabled:
+        try:
+            from src.montage_ai.cgpu_jobs.stabilize import stabilize_video as cgpu_stabilize_video
+            from src.montage_ai.cgpu_upscaler import is_cgpu_available
+            if is_cgpu_available():
+                result = cgpu_stabilize_video(
+                    video_path=str(input_path),
+                    output_path=str(output_path),
+                    smoothing=tuning["smoothing"],
+                    shakiness=tuning["shakiness"],
+                )
+                if result and Path(result).exists():
+                    return Path(result)
+            elif force_cgpu:
+                raise RuntimeError("CGPU stabilization requested but unavailable")
+        except Exception as exc:
+            if force_cgpu:
+                raise RuntimeError(f"CGPU stabilization failed: {exc}") from exc
+            logger.warning(f"CGPU stabilization failed for {input_path.name}: {exc}")
+
+    if NUMPY_AVAILABLE:
+        try:
+            from src.montage_ai.clip_enhancement import ClipEnhancer
+            enhancer = ClipEnhancer()
+            result = enhancer.stabilize(str(input_path), str(output_path), fast_mode=fast_mode)
+            if result and Path(result).exists():
+                return Path(result)
+        except Exception as exc:
+            logger.warning(f"Stabilization failed for {input_path.name}: {exc}")
+    else:
+        logger.warning("NumPy not available; using FFmpeg-only stabilization fallback")
+
+    # Local FFmpeg fallback (no numpy dependency)
+    if fast_mode:
+        fallback = _stabilize_with_deshake(input_path, output_path)
+        if fallback:
+            return fallback
+    else:
+        fallback = _stabilize_with_vidstab(input_path, output_path)
+        if fallback:
+            return fallback
+        fallback = _stabilize_with_deshake(input_path, output_path)
+        if fallback:
+            return fallback
+    return input_path
+
+
+def _stabilize_with_vidstab(input_path: Path, output_path: Path) -> Path | None:
+    """Two-pass vidstab stabilization using FFmpeg."""
+    transform_file = output_path.with_suffix(output_path.suffix + ".trf")
+    try:
+        detect_cmd = [
+            "ffmpeg",
+            "-y",
+            "-i", str(input_path),
+            "-vf", f"vidstabdetect=shakiness=6:accuracy=15:result={transform_file}",
+            "-f", "null", "-"
+        ]
+        detect = subprocess.run(detect_cmd, capture_output=True, text=True, timeout=240)
+        if detect.returncode != 0:
+            return None
+
+        transform_cmd = [
+            "ffmpeg",
+            "-y",
+            "-i", str(input_path),
+            "-vf", f"vidstabtransform=smoothing=20:input={transform_file}:optzoom=2:crop=keep",
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "20",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            str(output_path)
+        ]
+        transform = subprocess.run(transform_cmd, capture_output=True, text=True, timeout=240)
+        if transform.returncode == 0 and output_path.exists():
+            return output_path
+    except Exception:
+        return None
+    finally:
+        if transform_file.exists():
+            transform_file.unlink(missing_ok=True)
+    return None
+
+
+def _stabilize_with_deshake(input_path: Path, output_path: Path) -> Path | None:
+    """Single-pass deshake fallback using FFmpeg."""
+    try:
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i", str(input_path),
+            "-vf", "deshake=rx=32:ry=32:blocksize=8:contrast=125",
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "20",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            str(output_path)
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+        if result.returncode == 0 and output_path.exists():
+            return output_path
+    except Exception:
+        return None
+    return None
 
 
 def build_normalized_cuts(cuts: List[Dict], temp_dir: Path, color_grade: str = "none") -> str:
@@ -95,7 +322,31 @@ def build_normalized_cuts(cuts: List[Dict], temp_dir: Path, color_grade: str = "
         color_grade: Color grading preset name (default 'none' for no grading)
     """
     lines = []
+    stabilized_count = 0
     temp_dir.mkdir(parents=True, exist_ok=True)
+
+    settings = _get_settings()
+
+    ai_enabled = bool(getattr(getattr(settings, "stabilization", None), "ai_enabled", False))
+    force_all = ai_enabled or bool(getattr(getattr(settings, "features", None), "stabilize", False))
+    shake_threshold = 0.25
+    fast_mode_max_duration = 1.2
+    if settings and getattr(settings, "stabilization", None):
+        shake_threshold = settings.stabilization.shake_threshold
+        fast_mode_max_duration = settings.stabilization.fast_mode_max_duration
+    if not force_all:
+        env_ai = str(os.environ.get("STABILIZE_AI", "false")).lower() == "true"
+        env_stabilize = str(os.environ.get("STABILIZE", "false")).lower() == "true"
+        ai_enabled = ai_enabled or env_ai
+        force_all = force_all or env_ai or env_stabilize
+
+    if force_all:
+        logger.info(
+            "🧷 Stabilization enabled (ai=%s, threshold=%.2f, fast_max=%.2fs)",
+            ai_enabled,
+            shake_threshold,
+            fast_mode_max_duration,
+        )
     
     for idx, cut in enumerate(cuts):
         clip_path = DATA_INPUT_DIR / cut["clip_file"]
@@ -107,14 +358,69 @@ def build_normalized_cuts(cuts: List[Dict], temp_dir: Path, color_grade: str = "
         norm_path = temp_dir / f"norm_{idx:03d}.mp4"
         
         if not norm_path.exists():
-            if not normalize_clip(clip_path, norm_path, color_grade=color_grade):
-                logger.warning(f"Failed to normalize {clip_path.name}")
-                continue
+            cut_grade = cut.get("color_grade") or ("none" if color_grade == "adaptive" else color_grade)
+            cut_intensity = cut.get("grade_intensity", 1.0)
+            cut_boost = cut.get("adaptive_boost", 0.0)
+            stabilize = cut.get("stabilize", False)
+            fast_mode = cut.get("stabilize_fast", False)
+            shake_score = cut.get("shake_score", 0.0)
+            motion_type = cut.get("motion_type", "unknown")
+            duration = cut.get("duration", 0.0)
+
+            if force_all and not stabilize:
+                if (
+                    shake_score >= shake_threshold
+                    or motion_type in {"handheld", "chaotic", "dynamic"}
+                    or ai_enabled
+                ):
+                    stabilize = True
+                    fast_mode = duration <= fast_mode_max_duration
+
+            source_path = clip_path
+            if stabilize:
+                stabilized_count += 1
+                stab_path = temp_dir / f"stab_{idx:03d}.mp4"
+                if not stab_path.exists():
+                    logger.info(f"  Stabilizing {clip_path.name} (fast={fast_mode})...")
+                    source_path = stabilize_clip(
+                        clip_path,
+                        stab_path,
+                        fast_mode=fast_mode,
+                        shake_score=shake_score,
+                        motion_type=motion_type
+                    )
+                else:
+                    source_path = stab_path
+
+            if not normalize_clip(
+                source_path,
+                norm_path,
+                color_grade=cut_grade,
+                grade_intensity=cut_intensity,
+                adaptive_boost=cut_boost
+            ):
+                if source_path != clip_path:
+                    logger.warning(f"Retrying normalization without stabilization for {clip_path.name}")
+                    if not normalize_clip(
+                        clip_path,
+                        norm_path,
+                        color_grade=cut_grade,
+                        grade_intensity=cut_intensity,
+                        adaptive_boost=cut_boost
+                    ):
+                        logger.warning(f"Failed to normalize {clip_path.name}")
+                        continue
+                else:
+                    logger.warning(f"Failed to normalize {clip_path.name}")
+                    continue
         
         # Use normalized clip in concat
         lines.append(f"file '{norm_path.absolute()}'")
         lines.append(f"inpoint {cut['start']}")
         lines.append(f"outpoint {cut['start'] + cut['duration']}")
+
+    if stabilized_count:
+        logger.info(f"✅ Stabilized {stabilized_count}/{len(cuts)} cuts")
     
     return "\n".join(lines)
 
@@ -157,7 +463,8 @@ def render_creative_video(cut_plan: Dict, output_file: Path, color_grade: str = 
     Args:
         cut_plan: Dictionary with cut_plan and target_duration
         output_file: Output video file path
-        color_grade: Color grading preset ('none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic')
+        color_grade: Color grading preset ('adaptive', 'none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic',
+            'teal_orange', 'blockbuster', 'noir', 'vintage', 'filmic_warm', 'golden_hour', 'blue_hour')
     """
     cuts = cut_plan["cut_plan"]
     target_duration = cut_plan["target_duration"]

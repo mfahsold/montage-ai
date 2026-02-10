@@ -87,6 +87,11 @@ def run_montage(job_id: str, style: str, options: dict):
                     "variant_id": options.get('variant_id', 1),
                     "editing_instructions": editing_instructions,
                     "beat_sync": options.get('beat_sync', True),
+                    "stabilize_ai": options.get('stabilize_ai', False),
+                    "stabilize_mode": options.get('stabilize_mode', 'professional'),
+                    "aggressive_smoothing": options.get('aggressive_smoothing', False),
+                    "fast_stabilization": options.get('fast_stabilization', False),
+                    "skip_color_correction": options.get('skip_color_correction', False),
                     # Audio
                     "music_track": options.get('music_track'),
                     "music_start": options.get('music_start', 0),

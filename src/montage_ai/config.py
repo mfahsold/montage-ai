@@ -377,6 +377,20 @@ class FeatureConfig:
     # Film Grain Simulation: none, 35mm, 16mm, 8mm, digital
     film_grain: str = field(default_factory=ConfigParser.make_str_parser("FILM_GRAIN", "none"))
 
+
+@dataclass
+class StabilizationConfig:
+    """Stabilization tuning and AI preferences."""
+
+    ai_enabled: bool = field(default_factory=ConfigParser.make_bool_parser("STABILIZE_AI", False))
+    force_cgpu: bool = field(default_factory=ConfigParser.make_bool_parser("STABILIZE_FORCE_CGPU", False))
+    mode: str = field(default_factory=ConfigParser.make_str_parser("STABILIZE_MODE", "professional"))
+    aggressive_smoothing: bool = field(default_factory=ConfigParser.make_bool_parser("AGGRESSIVE_SMOOTHING", False))
+    fast_stabilization: bool = field(default_factory=ConfigParser.make_bool_parser("FAST_STABILIZATION", False))
+    skip_color_correction: bool = field(default_factory=ConfigParser.make_bool_parser("SKIP_COLOR_CORRECTION", False))
+    shake_threshold: float = field(default_factory=ConfigParser.make_float_parser("STABILIZE_SHAKE_THRESHOLD", 0.25))
+    fast_mode_max_duration: float = field(default_factory=ConfigParser.make_float_parser("STABILIZE_FAST_MAX_DURATION", 1.2))
+
     # Dialogue Ducking: Auto-duck music during speech
     dialogue_duck: bool = field(default_factory=ConfigParser.make_bool_parser("DIALOGUE_DUCK", False))
     dialogue_duck_level: float = field(default_factory=ConfigParser.make_float_parser("DIALOGUE_DUCK_LEVEL", -12.0))
@@ -1233,6 +1247,7 @@ class Settings:
     high_res: ProcessingSettings = field(default_factory=ProcessingSettings)  # Phase 4: High-res support
     creative: CreativeConfig = field(default_factory=CreativeConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
+    stabilization: StabilizationConfig = field(default_factory=StabilizationConfig)
     thresholds: ThresholdsConfig = field(default_factory=ThresholdsConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
     cache: CacheConfig = field(default_factory=CacheConfig)

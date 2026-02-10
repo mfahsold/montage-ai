@@ -48,12 +48,25 @@ class MontageWorkflow(VideoWorkflow):
         # Extract variant_id from options.extras or default to 1
         variant_id = self.options.extras.get('variant_id', 1)
         editing_instructions = self.options.extras.get('editing_instructions', {}) or {}
+        extras = self.options.extras
         
         # Override quality profile from runtime options (Essential for Preview Mode)
         # This ensures MontageBuilder sees the correct profile for disabling stabilization/upscaling
         if self.options.quality_profile:
             self.settings.encoding.quality_profile = self.options.quality_profile
         
+        # Apply AI stabilization overrides (per job)
+        if "stabilize_ai" in extras:
+            self.settings.stabilization.ai_enabled = bool(extras.get("stabilize_ai"))
+        if "stabilize_mode" in extras:
+            self.settings.stabilization.mode = str(extras.get("stabilize_mode") or "professional")
+        if "aggressive_smoothing" in extras:
+            self.settings.stabilization.aggressive_smoothing = bool(extras.get("aggressive_smoothing"))
+        if "fast_stabilization" in extras:
+            self.settings.stabilization.fast_stabilization = bool(extras.get("fast_stabilization"))
+        if "skip_color_correction" in extras:
+            self.settings.stabilization.skip_color_correction = bool(extras.get("skip_color_correction"))
+
         # Inject Music preferences into instructions (so Builder can find them)
         if self.options.extras.get('music_track'):
             editing_instructions['music_track'] = self.options.extras.get('music_track')
@@ -125,7 +138,6 @@ class MontageWorkflow(VideoWorkflow):
         
         # Apply advanced features from extras
         feats = self.builder.ctx.features
-        extras = self.options.extras
         
         if 'color_grading' in extras:
             feats.color_grade = extras['color_grading']

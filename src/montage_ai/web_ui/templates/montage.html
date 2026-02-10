@@ -114,6 +114,46 @@
                         </div>
                     </div>
                     <div class="option-item">
+                        <input type="checkbox" name="stabilize_ai" id="stabilize_ai" title="AI stabilization" aria-label="AI stabilization">
+                        <div class="option-label">
+                            <div class="option-label-title">AI STABILIZATION (PRO)</div>
+                            <div class="option-label-desc">Enable ProStabilizationEngine for cinematic smoothing.</div>
+                        </div>
+                    </div>
+                    <div class="option-item stacked-option mt-05">
+                        <label for="stabilize_mode" class="option-label-title mb-05">STABILIZATION MODE</label>
+                        <select name="stabilize_mode" id="stabilize_mode" class="voxel-input full-width">
+                            <option value="professional">Professional (default)</option>
+                            <option value="documentary">Documentary</option>
+                            <option value="broadcast">Broadcast</option>
+                            <option value="cinematic">Cinematic (subtle)</option>
+                            <option value="extreme">Extreme (aggressive)</option>
+                            <option value="super_extreme">Super Extreme (ultra)</option>
+                        </select>
+                        <p class="option-label-desc mt-05">Controls stabilization profile when AI mode is enabled.</p>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="aggressive_smoothing" id="aggressive_smoothing" title="Aggressive smoothing" aria-label="Aggressive smoothing">
+                        <div class="option-label">
+                            <div class="option-label-title">AGGRESSIVE SMOOTHING</div>
+                            <div class="option-label-desc">Enable extra motion interpolation (slower, smoother).</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="fast_stabilization" id="fast_stabilization" title="Fast stabilization" aria-label="Fast stabilization">
+                        <div class="option-label">
+                            <div class="option-label-title">FAST STABILIZATION</div>
+                            <div class="option-label-desc">Skip motion smoothing for quicker previews.</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" name="skip_color_correction" id="skip_color_correction" title="Skip stabilization color" aria-label="Skip stabilization color">
+                        <div class="option-label">
+                            <div class="option-label-title">SKIP STABILIZATION COLOR</div>
+                            <div class="option-label-desc">Disable color correction inside stabilization pass.</div>
+                        </div>
+                    </div>
+                    <div class="option-item">
                         <input type="checkbox" name="denoise" id="denoise" title="Denoise footage" aria-label="Denoise footage">
                         <div class="option-label">
                             <div class="option-label-title">AI DENOISE</div>

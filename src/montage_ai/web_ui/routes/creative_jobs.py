@@ -283,7 +283,10 @@ def start_rendering():
         return jsonify({'error': 'cut_plan required'}), 400
 
     # Validate color grade
-    valid_grades = ['none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic']
+    valid_grades = [
+        'adaptive', 'none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic',
+        'teal_orange', 'blockbuster', 'noir', 'vintage', 'filmic_warm', 'golden_hour', 'blue_hour'
+    ]
     if color_grade not in valid_grades:
         return jsonify({'error': f'Invalid color_grade. Must be one of: {", ".join(valid_grades)}'}), 400
 

@@ -323,6 +323,19 @@ def jobs(ctx: click.Context, api_base: Optional[str], timeout: int):
 @click.option("--prompt", help="Creative prompt for the editor.")
 @click.option("--quality-profile", help="Quality profile (preview/standard/high/etc).")
 @click.option("--preset", help="Preset name (e.g. fast for preview).")
+@click.option("--stabilize-ai/--no-stabilize-ai", default=None, help="Enable AI stabilization (ProStabilizationEngine).")
+@click.option("--stabilize-mode", type=click.Choice([
+    "professional",
+    "cinematic",
+    "documentary",
+    "broadcast",
+    "aggressive",
+    "extreme",
+    "super_extreme",
+], case_sensitive=False), help="AI stabilization mode/profile.")
+@click.option("--aggressive-smoothing/--no-aggressive-smoothing", default=None, help="Force super-extreme smoothing profile.")
+@click.option("--fast-stabilization/--no-fast-stabilization", default=None, help="Skip motion smoothing for faster stabilization.")
+@click.option("--skip-color-correction/--no-skip-color-correction", default=None, help="Disable stabilization color correction pass.")
 @click.option("--option", "options", multiple=True, help="Extra key=value fields (use options.<key>=... for nested options).")
 @click.option("--payload", help="Raw JSON payload string to merge.")
 @click.option("--payload-file", type=click.Path(exists=True, dir_okay=False), help="Path to JSON payload file.")
@@ -339,6 +352,11 @@ def jobs_submit(
     prompt: Optional[str],
     quality_profile: Optional[str],
     preset: Optional[str],
+    stabilize_ai: Optional[bool],
+    stabilize_mode: Optional[str],
+    aggressive_smoothing: Optional[bool],
+    fast_stabilization: Optional[bool],
+    skip_color_correction: Optional[bool],
     options: Iterable[str],
     payload: Optional[str],
     payload_file: Optional[str],
@@ -361,6 +379,16 @@ def jobs_submit(
         data["quality_profile"] = quality_profile
     if preset:
         data["preset"] = preset
+    if stabilize_ai is not None:
+        data["stabilize_ai"] = stabilize_ai
+    if stabilize_mode:
+        data["stabilize_mode"] = stabilize_mode
+    if aggressive_smoothing is not None:
+        data["aggressive_smoothing"] = aggressive_smoothing
+    if fast_stabilization is not None:
+        data["fast_stabilization"] = fast_stabilization
+    if skip_color_correction is not None:
+        data["skip_color_correction"] = skip_color_correction
 
     if not data.get("style"):
         raise click.ClickException("Missing required field: style")

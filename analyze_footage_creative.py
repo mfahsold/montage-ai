@@ -13,6 +13,42 @@ from typing import List, Dict, Any, Tuple
 import subprocess
 import logging
 
+def _ensure_src_on_path() -> None:
+    src_dir = Path(__file__).resolve().parent / "src"
+    if src_dir.exists() and str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+
+def _get_settings():
+    try:
+        from montage_ai.config import settings
+        return settings
+    except Exception:
+        _ensure_src_on_path()
+        try:
+            from montage_ai.config import settings
+            return settings
+        except Exception:
+            return None
+
+
+def _get_deep_analyzer():
+    try:
+        from montage_ai.footage_analyzer import DeepFootageAnalyzer
+        return DeepFootageAnalyzer
+    except Exception:
+        _ensure_src_on_path()
+        try:
+            from montage_ai.footage_analyzer import DeepFootageAnalyzer
+            return DeepFootageAnalyzer
+        except Exception:
+            return None
+
+
+settings = _get_settings()
+DeepFootageAnalyzer = _get_deep_analyzer()
+DEEP_ANALYSIS_AVAILABLE = DeepFootageAnalyzer is not None
+
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
@@ -23,7 +59,7 @@ logger = logging.getLogger(__name__)
 DATA_INPUT_DIR = Path("/home/codeai/montage-ai/data/input")
 MEDIA_FOLDER = Path("/home/codeai/montage-ai/data/input")
 
-TARGET_DURATION_SECONDS = 45
+TARGET_DURATION_SECONDS = 60  # Use more material for cinematic_stabilized_epic style
 ANALYSIS_SAMPLE_RATE = 1  # Analyze every Nth frame to speed up
 
 # ============================================================================
@@ -183,6 +219,84 @@ def categorize_clips(clips_data: List[Dict[str, Any]]) -> Dict[str, List[Dict[st
     return categories
 
 
+def suggest_color_grade(clip: Dict[str, Any], phase: str = "") -> Tuple[str, float]:
+    """Suggest a color grade and intensity for a clip based on characteristics.
+
+    Args:
+        clip: Clip analysis data
+        phase: Creative phase hint (opening/build_up/climax/finale)
+
+    Returns:
+        (grade, intensity)
+    """
+    brightness = clip.get("brightness", 0.5)
+    duration = clip.get("duration", 0.0)
+
+    # Phase-driven creative intent
+    if phase == "opening":
+        return ("cinematic", 1.05)
+    if phase == "climax":
+        return ("blockbuster" if brightness >= 0.5 else "high_contrast", 1.15)
+    if phase == "finale":
+        return ("filmic_warm" if brightness >= 0.5 else "cinematic", 1.1)
+
+    # Adaptive fallback based on clip characteristics
+    if brightness < 0.3:
+        return ("noir" if duration < 2.0 else "cinematic", 1.1)
+    if brightness > 0.7:
+        return ("golden_hour" if duration > 3.0 else "vibrant", 1.1)
+
+    # Midtones: balance between cool/filmic
+    if duration > 4.0:
+        return ("filmic_warm", 1.05)
+    return ("cool", 1.0)
+
+
+def compute_adaptive_boost(clip: Dict[str, Any], phase: str = "") -> float:
+    """Compute a small post-grade boost for micro-contrast/saturation."""
+    brightness = clip.get("brightness", 0.5)
+    if phase == "climax":
+        return 0.15
+    if brightness < 0.3:
+        return 0.12
+    if brightness > 0.7:
+        return 0.1
+    return 0.05
+
+
+def suggest_stabilization(clip: Dict[str, Any], phase: str = "") -> Tuple[bool, bool, str]:
+    """Suggest whether to stabilize a clip and whether to use fast mode.
+
+    Returns:
+        (stabilize, fast_mode, reason)
+    """
+    shake_score = clip.get("shake_score", 0.0) or 0.0
+    motion_type = clip.get("motion_type", "unknown") or "unknown"
+    duration = clip.get("duration", 0.0) or 0.0
+
+    shake_threshold = 0.25
+    fast_mode_max_duration = 1.2
+    if settings:
+        shake_threshold = settings.stabilization.shake_threshold
+        fast_mode_max_duration = settings.stabilization.fast_mode_max_duration
+
+    # Strong handheld/chaotic motion should be stabilized
+    if shake_score >= max(0.45, shake_threshold * 1.5) or motion_type in {"chaotic"}:
+        return True, False, "high_shake_or_chaotic"
+
+    # Moderate shake: stabilize longer clips, fast-mode for short cuts
+    if shake_score >= shake_threshold or motion_type in {"dynamic"}:
+        if duration < fast_mode_max_duration:
+            return True, True, "moderate_shake_short_clip"
+        return True, False, "moderate_shake"
+
+    # Opening/finale should be smoother for polish
+    if phase in {"opening", "finale"} and shake_score >= min(0.18, shake_threshold):
+        return True, False, "polish_opening_finale"
+
+    return False, False, "stable"
+
+
 # ============================================================================
 # CREATIVE CUT PLANNING (Heuristic-based, no LLM needed)
 # ============================================================================
@@ -194,7 +308,7 @@ def generate_creative_cut_plan(
 ) -> List[Dict[str, Any]]:
     """
     Generate a creative cut plan using heuristics.
-    Styles: "dynamic_trailer", "cinematic", "montage", "highlights"
+    Styles: "dynamic_trailer", "cinematic_stabilized_epic", "cinematic", "montage", "highlights"
     """
     
     cuts = []
@@ -204,8 +318,162 @@ def generate_creative_cut_plan(
     
     categorized = categorize_clips(clips_data)
     
-    # Strategy 1: DYNAMIC TRAILER
-    if style == "dynamic_trailer":
+    # Strategy: CINEMATIC STABILIZED EPIC (extended duration, color sequences, deep grading)
+    if style in ("cinematic_stabilized_epic", "cinematic"):
+        # Sequence of color grades for creative progression
+        grade_sequence = ["cinematic", "filmic_warm", "teal_orange", "golden_hour", "high_contrast"]
+        grade_idx = 0
+        
+        # Phase 1: OPENING (8-12 seconds) - Establishing cinematic presence
+        logger.info("  Phase 1: Opening (8-12s) - Cinematic establishment...")
+        establishing = [c for c in categorized["establishing"] if c["filename"] not in used_clips]
+        establishing.sort(key=lambda c: c["brightness"])  # Darker/moodier first
+        
+        opening_cuts = min(2, len(establishing))
+        opening_budget = target_duration * 0.15  # 15% for opening
+        for i in range(opening_cuts):
+            if i >= len(establishing) or remaining_budget <= target_duration * 0.60:
+                break
+            opening = establishing[i]
+            cut_duration = min(opening_budget / opening_cuts, opening["duration"] * 0.5)
+            grade = grade_sequence[grade_idx % len(grade_sequence)]
+            grade_idx += 1
+            adaptive_boost = compute_adaptive_boost(opening, phase="opening")
+            stabilize, fast_mode, stab_reason = suggest_stabilization(opening, phase="opening")
+            cuts.append({
+                "clip_file": opening["filename"],
+                "start": 0.0,
+                "duration": cut_duration,
+                "transition": "fade_in" if i == 0 else "cross_dissolve",
+                "effect": "slow_zoom",
+                "reason": f"Opening segment {i+1}",
+                "color_grade": grade,
+                "grade_intensity": 1.1,
+                "adaptive_boost": adaptive_boost,
+                "clip_brightness": opening.get("brightness"),
+                "shake_score": opening.get("shake_score", 0.0),
+                "motion_type": opening.get("motion_type", "unknown"),
+                "stabilize": stabilize,
+                "stabilize_fast": fast_mode,
+                "stabilize_reason": stab_reason
+            })
+            elapsed_time += cut_duration
+            remaining_budget -= cut_duration
+            used_clips.add(opening["filename"])
+        
+        # Phase 2: BUILD-UP (15-20 seconds) - Medium-paced interesting clips with color evolution
+        logger.info("  Phase 2: Build-up (15-20s) - Color & energy progression...")
+        buildup_clips = [c for c in clips_data if c["filename"] not in used_clips]
+        buildup_clips = sorted(buildup_clips, key=lambda c: abs(c["brightness"] - 0.5))[:20]
+        
+        buildup_cut_pattern = [1.5, 1.2, 1.0, 1.3, 1.1, 0.9, 1.2, 1.0, 1.1]
+        pattern_idx = 0
+        for clip in buildup_clips:
+            if remaining_budget <= target_duration * 0.35:  # Reserve 35% for climax/finale
+                break
+            cut_duration = buildup_cut_pattern[pattern_idx % len(buildup_cut_pattern)]
+            cut_duration = min(cut_duration, clip["duration"] * 0.7, remaining_budget - (target_duration * 0.35))
+            grade = grade_sequence[grade_idx % len(grade_sequence)]
+            grade_idx += 1
+            adaptive_boost = compute_adaptive_boost(clip, phase="build_up")
+            stabilize, fast_mode, stab_reason = suggest_stabilization(clip, phase="build_up")
+            cuts.append({
+                "clip_file": clip["filename"],
+                "start": 0.0,
+                "duration": cut_duration,
+                "transition": "cut",
+                "effect": "none",
+                "reason": f"Build-up segment {pattern_idx + 1}",
+                "color_grade": grade,
+                "grade_intensity": 1.0,
+                "adaptive_boost": adaptive_boost,
+                "clip_brightness": clip.get("brightness"),
+                "shake_score": clip.get("shake_score", 0.0),
+                "motion_type": clip.get("motion_type", "unknown"),
+                "stabilize": stabilize,
+                "stabilize_fast": fast_mode,
+                "stabilize_reason": stab_reason
+            })
+            elapsed_time += cut_duration
+            remaining_budget -= cut_duration
+            used_clips.add(clip["filename"])
+            pattern_idx += 1
+        
+        # Phase 3: CLIMAX (15-25 seconds) - Fast, intense cuts with high-contrast grading
+        logger.info("  Phase 3: Climax (15-25s) - Intense progression...")
+        climax_clips = [c for c in clips_data if c["filename"] not in used_clips]
+        climax_clips = sorted(climax_clips, key=lambda c: c["brightness"], reverse=True)[:25]
+        
+        climax_pattern = [0.8, 0.6, 0.75, 0.65, 0.7, 0.6, 0.75, 0.55, 0.65, 0.7]
+        pattern_idx = 0
+        for clip in climax_clips:
+            if remaining_budget <= target_duration * 0.10:  # Keep 10% buffer for outro
+                break
+            cut_duration = climax_pattern[pattern_idx % len(climax_pattern)]
+            cut_duration = min(cut_duration, clip["duration"] * 0.6, remaining_budget - (target_duration * 0.10))
+            grade = grade_sequence[grade_idx % len(grade_sequence)]
+            grade_idx += 1
+            adaptive_boost = compute_adaptive_boost(clip, phase="climax")
+            stabilize, fast_mode, stab_reason = suggest_stabilization(clip, phase="climax")
+            cuts.append({
+                "clip_file": clip["filename"],
+                "start": 0.0,
+                "duration": cut_duration,
+                "transition": "cut",
+                "effect": "zoom_in" if pattern_idx % 3 == 0 else ("zoom_out" if pattern_idx % 3 == 1 else "none"),
+                "reason": f"Climax cut {pattern_idx + 1}",
+                "color_grade": grade,
+                "grade_intensity": 1.2,
+                "adaptive_boost": adaptive_boost,
+                "clip_brightness": clip.get("brightness"),
+                "shake_score": clip.get("shake_score", 0.0),
+                "motion_type": clip.get("motion_type", "unknown"),
+                "stabilize": stabilize,
+                "stabilize_fast": fast_mode,
+                "stabilize_reason": stab_reason
+            })
+            elapsed_time += cut_duration
+            remaining_budget -= cut_duration
+            used_clips.add(clip["filename"])
+            pattern_idx += 1
+        
+        # Phase 4: FINALE (5-10 seconds) - Epic conclusion with fade
+        logger.info("  Phase 4: Finale (5-10s) - Epic resolution...")
+        finale_clips = [c for c in clips_data if c["filename"] not in used_clips]
+        finale_clips = sorted(finale_clips, key=lambda c: c["duration"], reverse=True)
+        
+        for clip_idx, clip in enumerate(finale_clips[:4]):
+            if remaining_budget <= 0.5:
+                break
+            cut_duration = min(remaining_budget - 0.3, clip["duration"] * 0.6)
+            if cut_duration > 0.3:
+                grade = grade_sequence[grade_idx % len(grade_sequence)]
+                grade_idx += 1
+                adaptive_boost = compute_adaptive_boost(clip, phase="finale")
+                stabilize, fast_mode, stab_reason = suggest_stabilization(clip, phase="finale")
+                cuts.append({
+                    "clip_file": clip["filename"],
+                    "start": 0.0,
+                    "duration": cut_duration,
+                    "transition": "fade_out" if clip_idx == len(finale_clips) - 1 else "cross_dissolve",
+                    "effect": "none",
+                    "reason": "Epic finale",
+                    "color_grade": grade,
+                    "grade_intensity": 1.15,
+                    "adaptive_boost": adaptive_boost,
+                    "clip_brightness": clip.get("brightness"),
+                    "shake_score": clip.get("shake_score", 0.0),
+                    "motion_type": clip.get("motion_type", "unknown"),
+                    "stabilize": stabilize,
+                    "stabilize_fast": fast_mode,
+                    "stabilize_reason": stab_reason
+                })
+                elapsed_time += cut_duration
+                remaining_budget -= cut_duration
+                used_clips.add(clip["filename"])
+    
+    # Strategy 2: DYNAMIC TRAILER (original logic)
+    elif style == "dynamic_trailer":
         # Phase 1: OPENING (5 seconds) - Establishing/cinematic
         logger.info("  Phase 1: Opening (5s)...")
         establishing = [c for c in categorized["establishing"] if c["filename"] not in used_clips]
@@ -214,13 +482,25 @@ def generate_creative_cut_plan(
         if establishing:
             opening = establishing[0]
             cut_duration = min(5.0, opening["duration"] * 0.6)
+            grade, intensity = suggest_color_grade(opening, phase="opening")
+            adaptive_boost = compute_adaptive_boost(opening, phase="opening")
+            stabilize, fast_mode, stab_reason = suggest_stabilization(opening, phase="opening")
             cuts.append({
                 "clip_file": opening["filename"],
                 "start": 0.0,
                 "duration": cut_duration,
                 "transition": "fade_in",
                 "effect": "slow_zoom",
-                "reason": "Cinematic opening"
+                "reason": "Cinematic opening",
+                "color_grade": grade,
+                "grade_intensity": intensity,
+                "adaptive_boost": adaptive_boost,
+                "clip_brightness": opening.get("brightness"),
+                "shake_score": opening.get("shake_score", 0.0),
+                "motion_type": opening.get("motion_type", "unknown"),
+                "stabilize": stabilize,
+                "stabilize_fast": fast_mode,
+                "stabilize_reason": stab_reason
             })
             elapsed_time += cut_duration
             remaining_budget -= cut_duration
@@ -238,14 +518,25 @@ def generate_creative_cut_plan(
                 break
             cut_duration = buildup_cut_pattern[pattern_idx % len(buildup_cut_pattern)]
             cut_duration = min(cut_duration, clip["duration"] * 0.7, remaining_budget - 15)
-            
+            grade, intensity = suggest_color_grade(clip, phase="build_up")
+            adaptive_boost = compute_adaptive_boost(clip, phase="build_up")
+            stabilize, fast_mode, stab_reason = suggest_stabilization(clip, phase="build_up")
             cuts.append({
                 "clip_file": clip["filename"],
                 "start": 0.0,
                 "duration": cut_duration,
                 "transition": "cut",
                 "effect": "none",
-                "reason": f"Build-up segment {pattern_idx + 1}"
+                "reason": f"Build-up segment {pattern_idx + 1}",
+                "color_grade": grade,
+                "grade_intensity": intensity,
+                "adaptive_boost": adaptive_boost,
+                "clip_brightness": clip.get("brightness"),
+                "shake_score": clip.get("shake_score", 0.0),
+                "motion_type": clip.get("motion_type", "unknown"),
+                "stabilize": stabilize,
+                "stabilize_fast": fast_mode,
+                "stabilize_reason": stab_reason
             })
             elapsed_time += cut_duration
             remaining_budget -= cut_duration
@@ -264,14 +555,25 @@ def generate_creative_cut_plan(
                 break
             cut_duration = climax_pattern[pattern_idx % len(climax_pattern)]
             cut_duration = min(cut_duration, clip["duration"] * 0.6, remaining_budget - 5)
-            
+            grade, intensity = suggest_color_grade(clip, phase="climax")
+            adaptive_boost = compute_adaptive_boost(clip, phase="climax")
+            stabilize, fast_mode, stab_reason = suggest_stabilization(clip, phase="climax")
             cuts.append({
                 "clip_file": clip["filename"],
                 "start": 0.0,
                 "duration": cut_duration,
                 "transition": "cut",
                 "effect": "zoom_in" if pattern_idx % 2 == 0 else "none",
-                "reason": f"Climax cut {pattern_idx + 1}"
+                "reason": f"Climax cut {pattern_idx + 1}",
+                "color_grade": grade,
+                "grade_intensity": intensity,
+                "adaptive_boost": adaptive_boost,
+                "clip_brightness": clip.get("brightness"),
+                "shake_score": clip.get("shake_score", 0.0),
+                "motion_type": clip.get("motion_type", "unknown"),
+                "stabilize": stabilize,
+                "stabilize_fast": fast_mode,
+                "stabilize_reason": stab_reason
             })
             elapsed_time += cut_duration
             remaining_budget -= cut_duration
@@ -289,13 +591,25 @@ def generate_creative_cut_plan(
             # Use remaining budget intelligently
             cut_duration = min(remaining_budget - 0.5, clip["duration"] * 0.5)
             if cut_duration > 0.3:
+                grade, intensity = suggest_color_grade(clip, phase="finale")
+                adaptive_boost = compute_adaptive_boost(clip, phase="finale")
+                stabilize, fast_mode, stab_reason = suggest_stabilization(clip, phase="finale")
                 cuts.append({
                     "clip_file": clip["filename"],
                     "start": 0.0,
                     "duration": cut_duration,
                     "transition": "fade",
                     "effect": "none",
-                    "reason": "Epic finale"
+                    "reason": "Epic finale",
+                    "color_grade": grade,
+                    "grade_intensity": intensity,
+                    "adaptive_boost": adaptive_boost,
+                    "clip_brightness": clip.get("brightness"),
+                    "shake_score": clip.get("shake_score", 0.0),
+                    "motion_type": clip.get("motion_type", "unknown"),
+                    "stabilize": stabilize,
+                    "stabilize_fast": fast_mode,
+                    "stabilize_reason": stab_reason
                 })
                 elapsed_time += cut_duration
                 remaining_budget -= cut_duration
@@ -344,14 +658,14 @@ def main():
     
     # Generate creative cut plan
     logger.info(f"🎨 Generating creative cut plan (target: {TARGET_DURATION_SECONDS}s)...")
-    cut_plan = generate_creative_cut_plan(clips_data, TARGET_DURATION_SECONDS, "dynamic_trailer")
+    cut_plan = generate_creative_cut_plan(clips_data, TARGET_DURATION_SECONDS, "cinematic_stabilized_epic")
     
     # Export results
     output_json = Path("/tmp/creative_cut_plan.json")
     total_duration = sum(c["duration"] for c in cut_plan)
     
     result = {
-        "style": "dynamic_trailer",
+        "style": "cinematic_stabilized_epic",
         "target_duration": TARGET_DURATION_SECONDS,
         "actual_duration": total_duration,
         "num_cuts": len(cut_plan),
@@ -373,7 +687,7 @@ def main():
     print("\n" + "="*70)
     print("CREATIVE CUT PLAN SUMMARY")
     print("="*70)
-    print(f"Style: Dynamic Trailer")
+    print(f"Style: Cinematic Stabilized Epic")
     print(f"Target Duration: {TARGET_DURATION_SECONDS}s")
     print(f"Actual Duration: {total_duration:.1f}s")
     print(f"Number of Cuts: {len(cut_plan)}\n")
@@ -406,6 +720,19 @@ def analyze_and_plan_creative_cut(target_duration: int = 45, style: str = "dynam
     
     logger.info(f"   Found {len(video_files)} video files")
     
+    deep_analyzer = None
+    deep_analysis_enabled = DEEP_ANALYSIS_AVAILABLE
+    if settings:
+        deep_analysis_enabled = settings.features.deep_analysis or settings.stabilization.ai_enabled
+
+    if deep_analysis_enabled:
+        try:
+            deep_analyzer = DeepFootageAnalyzer(sample_frames=6, verbose=False)
+            logger.info("🧠 Deep motion analysis enabled for stabilization hints")
+        except Exception as exc:
+            logger.warning(f"   ⚠️  Deep analysis unavailable: {exc}")
+            deep_analyzer = None
+
     # Analyze each clip
     clips_data = []
     for i, video_file in enumerate(video_files, 1):
@@ -414,12 +741,23 @@ def analyze_and_plan_creative_cut(target_duration: int = 45, style: str = "dynam
             duration = get_video_duration(str(video_file))
             fps = get_video_fps(str(video_file))
             brightness = analyze_video_brightness(str(video_file))
+            shake_score = 0.0
+            motion_type = "unknown"
+            if deep_analyzer:
+                try:
+                    analysis = deep_analyzer.analyze_clip(str(video_file))
+                    shake_score = getattr(analysis.motion, "camera_shake", 0.0) or 0.0
+                    motion_type = getattr(analysis.motion, "motion_type", "unknown") or "unknown"
+                except Exception as exc:
+                    logger.warning(f"   ⚠️  Deep analysis failed for {video_file.name}: {exc}")
             clips_data.append({
                 "file": str(video_file),
                 "filename": video_file.name,
                 "duration": duration,
                 "fps": fps,
                 "brightness": brightness,
+                "shake_score": shake_score,
+                "motion_type": motion_type,
             })
         except Exception as e:
             logger.warning(f"   ⚠️  Error analyzing {video_file.name}: {str(e)}")

@@ -312,7 +312,7 @@ class ClipEnhancer:
         # Feature flags
         self.cgpu_enabled = self.settings.llm.cgpu_gpu_enabled
         self.parallel_enhance = self.settings.processing.parallel_enhance
-        self.low_memory_mode = self.settings.features.low_memory_mode
+        self.low_memory_mode = self.settings.stabilization.low_memory_mode
         self.max_parallel_jobs = self.settings.processing.get_adaptive_parallel_jobs(self.low_memory_mode)
 
         if self.low_memory_mode:
@@ -524,6 +524,54 @@ class ClipEnhancer:
         logger.info(f"Stabilizing {os.path.basename(input_path)}{'(fast)' if fast_mode else ''}...")
         if self._skip_output_if_present(output_path, "Stabilize"):
             return output_path
+
+        if self.settings.stabilization.ai_enabled:
+            try:
+                from .pro_stabilization_engine import (
+                    ProStabilizationEngine,
+                    PROFILE_EXTREME,
+                    PROFILE_SUPER_EXTREME,
+                    PROFILE_VLOG_ACTION,
+                    PROFILE_DOCUMENTARY,
+                    PROFILE_BROADCAST,
+                    PROFILE_CINEMATIC,
+                )
+
+                mode = (self.settings.stabilization.mode or "professional").lower()
+                profile_map = {
+                    "extreme": PROFILE_EXTREME,
+                    "super_extreme": PROFILE_SUPER_EXTREME,
+                    "aggressive": PROFILE_VLOG_ACTION,
+                    "professional": PROFILE_VLOG_ACTION,
+                    "documentary": PROFILE_DOCUMENTARY,
+                    "broadcast": PROFILE_BROADCAST,
+                    "cinematic": PROFILE_CINEMATIC,
+                }
+                profile = profile_map.get(mode, PROFILE_VLOG_ACTION)
+                if self.settings.stabilization.aggressive_smoothing and profile != PROFILE_SUPER_EXTREME:
+                    profile = PROFILE_SUPER_EXTREME
+
+                include_motion_smooth = not (fast_mode or self.settings.stabilization.fast_stabilization)
+                include_color_correction = not self.settings.stabilization.skip_color_correction
+
+                logger.info(
+                    "AI stabilization enabled (mode=%s, motion_smooth=%s, color_correction=%s)",
+                    profile.name,
+                    include_motion_smooth,
+                    include_color_correction,
+                )
+                engine = ProStabilizationEngine(profile=profile)
+                success, msg = engine.stabilize_video_twopass(
+                    input_path,
+                    output_path,
+                    include_motion_smooth=include_motion_smooth,
+                    include_color_correction=include_color_correction,
+                )
+                if success:
+                    return output_path
+                logger.warning("AI stabilization failed: %s", msg)
+            except Exception as exc:
+                logger.warning("AI stabilization error: %s", exc)
 
         # Fast mode: use single-pass deshake (3-5x faster for previews)
         if fast_mode:
