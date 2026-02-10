@@ -104,26 +104,29 @@ print(json.dumps(result))
             user_callback(job_id, 'failed', str(e))
 
 
-def _run_rendering_threaded(job_id: str, cut_plan: Dict, user_callback=None):
-    """Run render_creative_cut.py in background thread."""
+def _run_rendering_threaded(job_id: str, cut_plan: Dict, color_grade: str = "none", user_callback=None):
+    """Run render_creative_cut.py in background thread with optional color grading."""
     try:
-        logger.info(f"[{job_id}] Starting creative cut rendering...")
+        logger.info(f"[{job_id}] Starting creative cut rendering (grade={color_grade})...")
         _job_registry[job_id]['status'] = 'rendering'
         _job_registry[job_id]['progress'] = 0
         _job_registry[job_id]['render_started_at'] = time.time()
+        _job_registry[job_id]['color_grade'] = color_grade
 
         # Save cut plan to temp location
         plan_file = Path('/tmp/creative_cut_plan_ui.json')
         plan_file.write_text(json.dumps(cut_plan))
 
-        # Run rendering script
+        # Run rendering script with color grading
         cmd = [
             'python3', '-c',
-            """
+            f"""
 import sys
 sys.path.insert(0, '/home/codeai/montage-ai')
-from render_creative_cut import render_creative_video
-result = render_creative_video(plan_file='/tmp/creative_cut_plan_ui.json')
+from render_creative_cut import render_with_plan
+cut_plan = {cut_plan}
+result = render_with_plan(cut_plan, color_grade='{color_grade}')
+import json
 print(json.dumps(result))
 """,
         ]
@@ -148,13 +151,28 @@ print(json.dumps(result))
         # Parse rendering result
         try:
             output = result.stdout.strip()
-            render_result = json.loads(output)
+            # Find JSON in output (might be mixed with logs)
+            import re
+            json_match = re.search(r'\{.*\}', output, re.DOTALL)
+            if json_match:
+                render_result = json.loads(json_match.group())
+            else:
+                render_result = json.loads(output)
         except json.JSONDecodeError as e:
             logger.error(f"[{job_id}] Failed to parse rendering output: {e}")
             _job_registry[job_id]['status'] = 'failed'
             _job_registry[job_id]['error'] = f"JSON parse error: {str(e)}"
             if user_callback:
                 user_callback(job_id, 'failed', str(e))
+            return
+
+        if not render_result.get('success'):
+            error_msg = render_result.get('error', 'Unknown rendering error')
+            logger.error(f"[{job_id}] Rendering failed: {error_msg}")
+            _job_registry[job_id]['status'] = 'failed'
+            _job_registry[job_id]['error'] = error_msg
+            if user_callback:
+                user_callback(job_id, 'failed', error_msg)
             return
 
         output_file = render_result.get('output_file')
@@ -166,7 +184,7 @@ print(json.dumps(result))
                 user_callback(job_id, 'failed', 'Output file not created')
             return
 
-        logger.info(f"[{job_id}] Rendering complete. Output: {output_file}")
+        logger.info(f"[{job_id}] Rendering complete (grade={color_grade}). Output: {output_file}")
         _job_registry[job_id]['status'] = 'completed'
         _job_registry[job_id]['progress'] = 100
         _job_registry[job_id]['output_file'] = output_file
@@ -248,13 +266,25 @@ def get_analysis_status(job_id):
 
 @creative_bp.route('/render', methods=['POST'])
 def start_rendering():
-    """Start creative cut rendering job."""
+    """Start creative cut rendering job with optional color grading.
+    
+    Request JSON:
+        cut_plan (dict): The cut plan from analysis
+        session_id (str): Session identifier
+        color_grade (str): Color grading preset ('none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic')
+    """
     data = request.json or {}
     cut_plan = data.get('cut_plan')
     session_id = data.get('session_id', 'default')
+    color_grade = data.get('color_grade', 'none')  # Default to no grading
 
     if not cut_plan:
         return jsonify({'error': 'cut_plan required'}), 400
+
+    # Validate color grade
+    valid_grades = ['none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic']
+    if color_grade not in valid_grades:
+        return jsonify({'error': f'Invalid color_grade. Must be one of: {", ".join(valid_grades)}'}), 400
 
     job_id = _get_job_id(session_id) + '_render'
     _job_registry[job_id] = {
@@ -262,15 +292,16 @@ def start_rendering():
         'session_id': session_id,
         'status': 'queued',
         'progress': 0,
+        'color_grade': color_grade,
         'created_at': time.time(),
     }
 
-    logger.info(f"Starting rendering job {job_id} for session {session_id}")
+    logger.info(f"Starting rendering job {job_id} (grade={color_grade}) for session {session_id}")
 
-    # Run rendering in background
+    # Run rendering in background with color grading
     thread = threading.Thread(
         target=_run_rendering_threaded,
-        args=(job_id, cut_plan),
+        args=(job_id, cut_plan, color_grade),
         daemon=True
     )
     thread.start()
@@ -278,7 +309,8 @@ def start_rendering():
     return jsonify({
         'job_id': job_id,
         'status': 'queued',
-        'message': 'Rendering job queued'
+        'message': f'Rendering job queued (color_grade={color_grade})',
+        'color_grade': color_grade,
     })
 
 
@@ -296,6 +328,7 @@ def get_rendering_status(job_id):
         'error': job.get('error'),
         'output_file': job.get('output_file'),
         'file_size': job.get('file_size'),
+        'color_grade': job.get('color_grade', 'none'),
         'created_at': job.get('created_at'),
         'completed_at': job.get('completed_at'),
     })

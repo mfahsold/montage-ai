@@ -32,9 +32,35 @@ def load_cut_plan(plan_file: Path) -> Dict:
         return json.load(f)
 
 
-def normalize_clip(input_path: Path, output_path: Path, target_fps: float = 30.0) -> bool:
-    """Normalize clip to constant frame rate and consistent codec."""
-    logger.info(f"  Normalizing {input_path.name}...")
+def normalize_clip(input_path: Path, output_path: Path, target_fps: float = 30.0, color_grade: str = "none") -> bool:
+    """Normalize clip to constant frame rate and consistent codec.
+    
+    Args:
+        input_path: Source video file
+        output_path: Destination normalized file
+        target_fps: Target frame rate (default 30)
+        color_grade: Color grading preset name (default 'none' for no grading)
+    """
+    logger.info(f"  Normalizing {input_path.name} (grade={color_grade})...")
+    
+    # FFmpeg filter chains for each preset
+    GRADING_FILTERS = {
+        "none": "",
+        "warm": "eq=contrast=1.05:brightness=0.05:saturation=1.1",
+        "cool": "eq=contrast=1.05:brightness=-0.05:saturation=1.1",
+        "vibrant": "eq=saturation=1.3:contrast=1.1",
+        "high_contrast": "eq=contrast=1.3:brightness=0.05",
+        "cinematic": "eq=saturation=0.9:contrast=1.15",
+    }
+    
+    # Get color grading filter
+    grade_filter = GRADING_FILTERS.get(color_grade, "")
+    
+    # Build video filter chain
+    if grade_filter:
+        vfilter = f"{grade_filter},format=yuv420p"
+    else:
+        vfilter = "format=yuv420p"
     
     cmd = [
         "ffmpeg",
@@ -43,6 +69,7 @@ def normalize_clip(input_path: Path, output_path: Path, target_fps: float = 30.0
         "-preset", "fast",
         "-crf", "20",
         "-pix_fmt", "yuv420p",
+        "-vf", vfilter,
         "-r", str(target_fps),  # Force constant frame rate
         "-c:a", "aac",
         "-b:a", "128k",
@@ -54,8 +81,14 @@ def normalize_clip(input_path: Path, output_path: Path, target_fps: float = 30.0
     return result.returncode == 0
 
 
-def build_normalized_cuts(cuts: List[Dict], temp_dir: Path) -> str:
-    """Build concat file with normalized clips (CFR + consistent codec)."""
+def build_normalized_cuts(cuts: List[Dict], temp_dir: Path, color_grade: str = "none") -> str:
+    """Build concat file with normalized clips (CFR + consistent codec).
+    
+    Args:
+        cuts: List of cut dictionaries
+        temp_dir: Temporary directory for normalized clips
+        color_grade: Color grading preset name (default 'none' for no grading)
+    """
     lines = []
     temp_dir.mkdir(parents=True, exist_ok=True)
     
@@ -69,7 +102,7 @@ def build_normalized_cuts(cuts: List[Dict], temp_dir: Path) -> str:
         norm_path = temp_dir / f"norm_{idx:03d}.mp4"
         
         if not norm_path.exists():
-            if not normalize_clip(clip_path, norm_path):
+            if not normalize_clip(clip_path, norm_path, color_grade=color_grade):
                 logger.warning(f"Failed to normalize {clip_path.name}")
                 continue
         
@@ -110,15 +143,21 @@ def find_music_file() -> Path:
     return None
 
 
-def render_creative_video(cut_plan: Dict, output_file: Path) -> bool:
+def render_creative_video(cut_plan: Dict, output_file: Path, color_grade: str = "none") -> bool:
     """
     Render the video using FFmpeg with the cut plan.
     Normalizes all clips first to ensure smooth playback (constant frame rate).
+    Applies color grading if specified.
+    
+    Args:
+        cut_plan: Dictionary with cut_plan and target_duration
+        output_file: Output video file path
+        color_grade: Color grading preset ('none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic')
     """
     cuts = cut_plan["cut_plan"]
     target_duration = cut_plan["target_duration"]
     
-    logger.info(f"🎬 Rendering creative cut video (with normalization)...")
+    logger.info(f"🎬 Rendering creative cut video (grade={color_grade})...")
     logger.info(f"   Cuts: {len(cuts)}")
     logger.info(f"   Target duration: {target_duration}s")
     logger.info(f"   Output: {output_file}")
@@ -128,9 +167,9 @@ def render_creative_video(cut_plan: Dict, output_file: Path) -> bool:
     temp_dir.mkdir(parents=True, exist_ok=True)
     
     # Normalize all clips to CFR (this ensures smooth playback)
-    logger.info(f"📊 Normalizing {len(cuts)} clips to constant 30 FPS...")
+    logger.info(f"📊 Normalizing {len(cuts)} clips to constant 30 FPS (grade={color_grade})...")
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-        concat_content = build_normalized_cuts(cuts, temp_dir)
+        concat_content = build_normalized_cuts(cuts, temp_dir, color_grade=color_grade)
         f.write(concat_content)
         concat_file = Path(f.name)
     
@@ -255,17 +294,18 @@ if __name__ == "__main__":
     exit(0 if success else 1)
 
 
-def render_with_plan(cut_plan: dict, plan_file: str = None) -> dict:
+def render_with_plan(cut_plan: dict, plan_file: str = None, color_grade: str = "none") -> dict:
     """
     Programmatic entry point for web UI integration.
     Returns JSON-serializable result dict.
     
     Args:
-        cut_plan: Dict with cuts array (or loads from plan_file if provided)
+        cut_plan: Dict with 'cut_plan' array (or 'cuts' array, both accepted) or loads from plan_file if provided
         plan_file: Optional path to cut_plan JSON file
+        color_grade: Color grading preset ('none', 'warm', 'cool', 'vibrant', 'high_contrast', 'cinematic')
     
     Returns:
-        {"success": bool, "output_file": str, "file_size": int, "error": str}
+        {"success": bool, "output_file": str, "file_size": int, "error": str, "color_grade": str}
     """
     import json
     
@@ -275,18 +315,25 @@ def render_with_plan(cut_plan: dict, plan_file: str = None) -> dict:
             with open(plan_file, 'r') as f:
                 cut_plan = json.load(f)
         
-        if not cut_plan or 'cuts' not in cut_plan:
-            return {"success": False, "error": "Invalid cut plan: missing 'cuts' array"}
+        # Handle both 'cuts' and 'cut_plan' keys
+        cuts = cut_plan.get('cuts') or cut_plan.get('cut_plan')
+        if not cuts:
+            return {"success": False, "error": "Invalid cut plan: missing 'cuts' or 'cut_plan' array"}
         
-        cuts = cut_plan['cuts']
         if not cuts:
             return {"success": False, "error": "No cuts in plan"}
         
-        logger.info(f"🎬 Rendering creative cut ({len(cuts)} cuts, target duration)...")
+        logger.info(f"🎬 Rendering creative cut ({len(cuts)} cuts, grade={color_grade})...")
         
-        # Render video
-        output_file = OUTPUT_DIR / "gallery_montage_creative_trailer_rendered.mp4"
-        success = render_creative_video(cut_plan, output_file)
+        # Build proper cut_plan structure for render_creative_video
+        render_cut_plan = {
+            "cut_plan": cuts,
+            "target_duration": cut_plan.get("target_duration", 30),
+        }
+        
+        # Render video with color grading
+        output_file = OUTPUT_DIR / f"gallery_montage_creative_trailer_rendered_{color_grade}.mp4"
+        success = render_creative_video(render_cut_plan, output_file, color_grade=color_grade)
         
         if not success:
             return {"success": False, "error": "FFmpeg rendering failed"}
@@ -295,13 +342,14 @@ def render_with_plan(cut_plan: dict, plan_file: str = None) -> dict:
             return {"success": False, "error": f"Output file not created: {output_file}"}
         
         file_size = output_file.stat().st_size
-        logger.info(f"✅ Rendering complete! {file_size / (1024*1024):.1f}MB saved to {output_file}")
+        logger.info(f"✅ Rendering complete (grade={color_grade})! {file_size / (1024*1024):.1f}MB saved to {output_file}")
         
         return {
             "success": True,
             "output_file": str(output_file),
             "file_size": file_size,
             "total_cuts": len(cuts),
+            "color_grade": color_grade,
         }
         
     except Exception as e:

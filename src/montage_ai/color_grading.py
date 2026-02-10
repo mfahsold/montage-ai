@@ -77,11 +77,11 @@ PRESET_FILTERS: Dict[str, str] = {
     # Neutral - broadcast safe levels only (16-235 range)
     "neutral": "colorlevels=rimin=0.0625:gimin=0.0625:bimin=0.0625:rimax=0.92:gimax=0.92:bimax=0.92",
 
-    # Warm - golden/sunset warmth (6500K)
-    "warm": "colortemperature=6500,colorbalance=rs=0.08:gs=0.04:bs=-0.08,eq=saturation=1.08",
+    # Warm - golden/sunset warmth
+    "warm": "eq=contrast=1.05:brightness=0.05:saturation=1.1",
 
-    # Cool - blue/teal coolness (8000K)
-    "cool": "colortemperature=8000,colorbalance=rs=-0.05:gs=0:bs=0.08,eq=saturation=0.95",
+    # Cool - blue/teal coolness
+    "cool": "eq=contrast=1.05:brightness=-0.05:saturation=1.1",
 
     # Golden Hour - sunset warmth with lifted shadows
     "golden_hour": "colortemperature=5500,colorbalance=rs=0.12:gs=0.06:bs=-0.1,curves=m='0 0.05 0.5 0.5 1 1',eq=saturation=1.1",
