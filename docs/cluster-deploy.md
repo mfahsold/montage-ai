@@ -40,6 +40,8 @@ kubectl port-forward -n montage-ai svc/montage-ai-web 8080:80
 # Open http://localhost:8080
 ```
 
+> **Ingress / Host header:** If your cluster uses an Ingress with `host: montage-ai.local`, curl commands need `-H "Host: montage-ai.local"` or you must add an `/etc/hosts` entry pointing to the node IP. See [K3s Local Setup — Section 4](k3s-local-setup.md#4-access-the-application) for details.
+
 ---
 
 ## Detailed Steps

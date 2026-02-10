@@ -151,7 +151,7 @@ def run_test_job(job_id: str, duration: int = 5):
     with telemetry.job_context(job_id, "dev-test"):
         try:
             logger.info("[DevTestJob] Starting lightweight test job %s (duration=%ss)", job_id, duration)
-            store.update_job_with_retry(job_id, {"status": "started", "phase": {"name": "running", "label": "Running test job"}}, retries=2)
+            store.update_job_with_retry(job_id, {"status": "running", "phase": {"name": "running", "label": "Running test job"}}, retries=2)
 
             # Sleep in small increments so the job can be more responsive to interrupts
             remaining = duration
@@ -166,7 +166,7 @@ def run_test_job(job_id: str, duration: int = 5):
                     return
                 remaining -= step
 
-            store.update_job_with_retry(job_id, {"status": "finished", "phase": {"name": "finished", "label": "Completed test job"}}, retries=3)
+            store.update_job_with_retry(job_id, {"status": "completed", "phase": {"name": "completed", "label": "Completed test job"}}, retries=3)
             logger.info("[DevTestJob] Completed %s", job_id)
             try:
                 telemetry.record_event("dev_test_job", {"status": "success", "job_id": job_id})

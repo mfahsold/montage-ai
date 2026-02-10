@@ -294,7 +294,7 @@ def _wait_for_job(
             log(message, err=True)
             last_status = status
 
-        if status in {"completed", "success", "finished"}:
+        if status in {"completed", "success"}:
             return job
         if status in {"failed", "cancelled", "error"}:
             raise click.ClickException(f"Job {job_id} ended with status: {status}")

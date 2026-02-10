@@ -1137,7 +1137,10 @@ def api_upload():
 
     if file_type == 'video':
         if not _settings.file_types.allowed_file(file.filename, video_extensions):
-            return jsonify({"error": f"Invalid video format. Allowed: {format_extensions(video_extensions)}"}), 400
+            hint = ""
+            if _settings.file_types.allowed_file(file.filename, music_extensions):
+                hint = " Did you mean to upload music? Set type='music'."
+            return jsonify({"error": f"Invalid video format. Allowed: {format_extensions(video_extensions)}.{hint}"}), 400
         target_dir = INPUT_DIR
     elif file_type == 'music':
         if not _settings.file_types.allowed_file(file.filename, music_extensions):

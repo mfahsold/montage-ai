@@ -187,7 +187,7 @@ class VideoWorkflow(ABC):
                         "result": self._result.to_dict(),
                         "output_file": os.path.basename(output_path),
                         "metadata": self.get_metadata(),
-                        "status": "finished",
+                        "status": "completed",
                     },
                     retries=4,
                 )

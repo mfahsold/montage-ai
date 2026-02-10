@@ -79,6 +79,8 @@ docker compose up
 
 Open http://localhost:8080 in your browser.
 
+> **Kubernetes users:** The Kubernetes deployment uses Ingress routing instead of direct port access. See [K3s Local Setup](k3s-local-setup.md) for access instructions including Host header configuration.
+
 If port 8080 is already in use:
 
 ```bash
@@ -102,6 +104,8 @@ docker compose run --rm montage-ai ls /data/input /data/music /data/output
 For a comprehensive test, see [Installation Test Guide](INSTALLATION_TEST.md).
 
 ### 4. CLI usage (alternative to Web UI)
+
+All CLI commands go through the `montage-ai.sh` wrapper script (e.g. `./montage-ai.sh run`, `./montage-ai.sh check-deps`). Helper commands like `check-deps` are built into this script, not standalone executables.
 
 ```bash
 # Full render
