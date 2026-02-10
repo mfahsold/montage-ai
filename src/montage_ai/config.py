@@ -630,6 +630,11 @@ class ClusterConfig:
     @property
     def image_full(self) -> str:
         """Full remote image path for Kubernetes."""
+        # Respect IMAGE_FULL environment variable if set (Single Source of Truth)
+        env_full = os.environ.get("IMAGE_FULL")
+        if env_full:
+            return env_full
+
         host = self.registry_host
         port = self.registry_port
         name = self.image_name

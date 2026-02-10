@@ -328,7 +328,7 @@ class RenderEngine:
             submitter = JobSubmitter()
             if not submitter.batch_v1:
                 logger.warning("Cluster API unavailable; falling back to local render.")
-                self.render()
+                self.render_output()
                 return
 
             requested_parallelism = int(self.settings.features.cluster_parallelism)
@@ -396,7 +396,7 @@ class RenderEngine:
 
                 if self.settings.features.cluster_mode:
                     logger.warning("Falling back to local render after distributed failure.")
-                    self.render()
+                    self.render_output()
                     return
 
                 raise RuntimeError("Cluster rendering failed. Check K8s logs.")

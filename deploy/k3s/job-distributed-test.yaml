@@ -17,12 +17,13 @@ spec:
         app.kubernetes.io/name: montage-ai
         app.kubernetes.io/component: renderer
     spec:
+      serviceAccountName: montage-ai-cluster
       restartPolicy: Never
       imagePullSecrets:
         - name: ghcr-pull
       containers:
         - name: montage-ai
-          image: <IMAGE_FULL>
+          image: montage-ai:latest
           imagePullPolicy: IfNotPresent
           resources:
             requests:
@@ -55,9 +56,9 @@ spec:
             - name: ENHANCE
               value: "true"
             - name: INPUT_DIR
-              value: "/data/input/curated"
+              value: "/data/input"
             - name: MUSIC_DIR
-              value: "/data/music/curated"
+              value: "/data/music"
             - name: TARGET_DURATION
               value: "45"
             - name: MUSIC_END
@@ -81,6 +82,8 @@ spec:
               value: "false"
           envFrom:
             - configMapRef:
+                name: cluster-config
+            - configMapRef:
                 name: montage-ai-config
           command: ["/bin/sh", "-c", "echo 'Starting Distributed Run...'; python -u -m montage_ai.editor"]
           volumeMounts:
@@ -98,16 +101,16 @@ spec:
       volumes:
         - name: input
           persistentVolumeClaim:
-            claimName: montage-input
+            claimName: montage-ai-input-nfs
         - name: music
           persistentVolumeClaim:
-            claimName: montage-music
+            claimName: montage-ai-music-nfs
         - name: assets
           persistentVolumeClaim:
-            claimName: montage-assets
+            claimName: montage-ai-assets-nfs
         - name: output
           persistentVolumeClaim:
-            claimName: montage-output
+            claimName: montage-ai-output-nfs
       # Affinity to spread pods across different failure domains (avoid host-specific anti-patterns)
       affinity:
         podAntiAffinity:
