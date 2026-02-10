@@ -37,7 +37,13 @@ If CGPU offload is enabled (`CGPU_GPU_ENABLED=true`), ensure the credentials sec
 kubectl get secret -n "${CLUSTER_NAMESPACE:-montage-ai}" cgpu-credentials
 ```
 
-If missing, CGPU jobs will fall back to local CPU/GPU.
+If missing, CGPU jobs will fall back to local CPU/GPU. To create or refresh the secret:
+
+```bash
+./scripts/ops/cgpu-refresh-session.sh
+```
+
+See [docs/cgpu-setup.md](docs/cgpu-setup.md) for prerequisites and the OAuth flow.
 
 ## Architecture Mismatch (exec format error)
 

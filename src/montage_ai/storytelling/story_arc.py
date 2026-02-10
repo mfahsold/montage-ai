@@ -114,6 +114,11 @@ class StoryArc:
         if not spec:
             return cls.from_preset("hero_journey")
 
+        if hasattr(spec, "model_dump"):
+            spec = spec.model_dump()
+        elif hasattr(spec, "dict"):
+            spec = spec.dict()
+
         arc_type = (spec.get("type") or "").lower().strip().replace(" ", "_").replace("-", "_")
         tension_target = coerce_float(spec.get("tension_target"))
         if tension_target is not None:

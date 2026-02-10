@@ -57,6 +57,14 @@ except ImportError:
     YAML_AVAILABLE = False
 
 try:
+    from kubernetes import client as k8s_client
+    from kubernetes import config as k8s_config
+    from kubernetes.client.rest import ApiException as K8sApiException
+    K8S_CLIENT_AVAILABLE = True
+except ImportError:
+    K8S_CLIENT_AVAILABLE = False
+
+try:
     from ..cgpu_utils import is_cgpu_available
 except ImportError:
     def is_cgpu_available(*args, **kwargs): return False
@@ -578,7 +586,14 @@ def detect_local_hardware() -> NodeCapability:
 # =============================================================================
 
 def _is_k8s_available() -> bool:
-    """Check if kubectl is available and can connect to a cluster."""
+    """Check if Kubernetes is available via in-cluster config or kubectl."""
+    if K8S_CLIENT_AVAILABLE and os.environ.get("KUBERNETES_SERVICE_HOST"):
+        try:
+            k8s_config.load_incluster_config()
+            return True
+        except Exception:
+            pass
+
     if shutil.which("kubectl") is None:
         return False
 
@@ -594,7 +609,23 @@ def _is_k8s_available() -> bool:
 
 def _discover_k8s_nodes() -> List[NodeCapability]:
     """Discover nodes from Kubernetes cluster."""
-    nodes = []
+    nodes: List[NodeCapability] = []
+
+    if K8S_CLIENT_AVAILABLE and os.environ.get("KUBERNETES_SERVICE_HOST"):
+        try:
+            k8s_config.load_incluster_config()
+            api = k8s_client.CoreV1Api()
+            data = api.list_node().to_dict()
+            for item in data.get("items", []):
+                node = _parse_k8s_node(item)
+                if node:
+                    nodes.append(node)
+            if nodes:
+                return nodes
+        except K8sApiException as exc:
+            logger.warning(f"K8s node discovery failed (API): {exc}")
+        except Exception as exc:
+            logger.warning(f"K8s node discovery failed (in-cluster): {exc}")
 
     try:
         result = subprocess.run(

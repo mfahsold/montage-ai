@@ -2,12 +2,14 @@
 
 High-level overview of what's shipped and what's planned. Detailed strategic documents are maintained internally.
 
+For a structured, research-driven backlog, see [BACKLOG.md](BACKLOG.md).
+
 ---
 
 ## Shipped
 
 | Feature | Status | Since |
-|---------|--------|-------|
+| --- | --- | --- |
 | Beat-sync montage (8 styles) | Stable | v0.1 |
 | Web UI (Montage, Shorts, Transcript) | Stable | v0.3 |
 | OTIO/EDL export (DaVinci, Premiere) | Stable | v0.3 |

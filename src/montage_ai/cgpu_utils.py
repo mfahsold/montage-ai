@@ -102,6 +102,29 @@ def cgpu_slot() -> None:
 
 _CGPU_AVAIL_CACHE = {"ok": None, "checked_at": 0.0}
 _CGPU_AVAIL_TTL = 300  # seconds
+_CGPU_MISSING_CREDS_LOGGED = False
+
+
+def _maybe_log_missing_cgpu_credentials() -> None:
+    """Log a helpful warning if cgpu credentials are missing."""
+    global _CGPU_MISSING_CREDS_LOGGED
+    if _CGPU_MISSING_CREDS_LOGGED:
+        return
+
+    config_path = Path.home() / ".config" / "cgpu" / "config.json"
+    session_path = Path.home() / ".config" / "cgpu" / "state" / "session.json"
+
+    missing_paths = [path for path in (config_path, session_path) if not path.exists()]
+    if not missing_paths:
+        return
+
+    missing_list = ", ".join(str(path) for path in missing_paths)
+    logger.warning(
+        "cgpu credentials missing (%s). For Kubernetes, create the cgpu-credentials secret "
+        "(docs/cgpu-setup.md) and restart worker pods.",
+        missing_list,
+    )
+    _CGPU_MISSING_CREDS_LOGGED = True
 
 def is_cgpu_available(require_gpu: bool = True) -> bool:
     """
@@ -132,6 +155,8 @@ def is_cgpu_available(require_gpu: bool = True) -> bool:
     
     if not require_gpu and not CGPU_ENABLED:
         return False
+
+    _maybe_log_missing_cgpu_credentials()
     
     try:
         with cgpu_slot():
@@ -144,6 +169,8 @@ def is_cgpu_available(require_gpu: bool = True) -> bool:
         logger.debug(f"DEBUG: cgpu status returncode={result.returncode}")
         
         if result.returncode != 0:
+            if result.stderr:
+                logger.warning("cgpu status failed: %s", result.stderr.strip())
             if require_gpu: _CGPU_AVAIL_CACHE.update({"ok": False, "checked_at": now})
             return False
 
