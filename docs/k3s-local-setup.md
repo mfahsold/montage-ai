@@ -47,9 +47,12 @@ k3d image import montage-ai:latest -c montage-dev
 
 ### 3. Configure and Deploy
 
+Since step 2 imports the image directly into k3d, no container registry is
+needed. Pass empty registry overrides so manifests reference the local image:
+
 ```bash
-# Generate config-global.yaml with local-dev defaults (no registry needed)
-make -C deploy/k3s init-config
+# Generate config-global.yaml with local-dev defaults (no registry)
+REGISTRY_HOST="" REGISTRY_PORT="" REGISTRY_URL="" make -C deploy/k3s init-config
 
 # Or manually: copy and edit
 # cp deploy/k3s/config-global.yaml.example deploy/k3s/config-global.yaml
@@ -66,14 +69,28 @@ make -C deploy/k3s deploy-cluster
 > **Important:** KEDA must be installed before deploying. Without it, the
 > `ScaledObject` resources will fail with `no matches for kind "ScaledObject"`.
 
-> **No Registry?** When using `k3d image import` (step 2), leave the registry
-> fields empty. `init-config.sh` sets `REGISTRY_URL` to `localhost:5000` by
-> default; for image-import workflows, override with:
-> ```bash
-> REGISTRY_HOST="" REGISTRY_PORT="" REGISTRY_URL="" make -C deploy/k3s init-config
-> ```
+> **Using a registry?** If you created a k3d registry (`--registry-create`) or
+> use an external registry, run `make -C deploy/k3s init-config` without the
+> overrides — it defaults to `localhost:5000`. See
+> [Registry Alternatives](#registry-alternatives) for details.
 
 ### 4. Access Web UI
+
+**Option A — LoadBalancer port (k3d)**
+
+k3d's `--port "8080:80@loadbalancer"` routes through the Traefik Ingress,
+which matches on `host: montage-ai.local`. Add a hosts entry first:
+
+```bash
+# Add the hostname (one-time setup)
+echo '127.0.0.1 montage-ai.local' | sudo tee -a /etc/hosts
+
+# Then open http://montage-ai.local:8080
+```
+
+**Option B — port-forward (always works)**
+
+Bypasses Ingress entirely — works with any local cluster tool:
 
 ```bash
 kubectl port-forward -n montage-ai svc/montage-ai-web 8080:80

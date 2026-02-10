@@ -106,7 +106,7 @@ kubectl label namespace "${CLUSTER_NAMESPACE}" \
   app.kubernetes.io/component=web-ui \
   fluxibri.ai/tier=app \
   "fluxibri.ai/adaptive-quota=true" \
-  --overwrite 2>/dev/null
+  --overwrite >/dev/null 2>&1
 
 # Build manifests with kustomize (includes registry substitution)
 echo "Building manifests from overlay '${OVERLAY}'..."
