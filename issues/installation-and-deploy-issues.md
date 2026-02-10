@@ -40,3 +40,40 @@ Vorgeschlagtes Issue-Template (falls gewünscht als GitHub-Issue):
 Wenn du möchtest, kann ich:
 - das vorgeschlagene `deploy/k3s/validate-config.sh`-Skript anlegen (kleine Bash-Datei, grep auf `<[A-Z_]+>` und klare exit-codes),
 - oder ein lokales Issue direkt auf GitHub öffnen (brauche Erlaubnis, das zu tun).
+
+---
+
+# Addendum (10.02.2026) - Verification Run
+
+I have performed a verification run on a local ARM64 machine with Docker an K3d.
+
+Findings:
+
+1) **ARM64 Feature Parity (MediaPipe)**
+   - Docker build works on ARM64.
+   - Runtime warning: `[WARN] MediaPipe not installed. Auto Reframe will fallback to center crop.` - Expected due to lack of aarch64 wheels for MediaPipe in default configuration.
+   - Recommendation: Explicitly document this feature limitation for ARM users in `getting-started.md`.
+
+2) **Default Configuration 'arch' Mismatch**
+   - `deploy/k3s/config-global.yaml.example` defaults to `arch: "amd64"`.
+   - On an ARM64 cluster, `make pre-flight` warns about architecture mismatch (`[OK] Cluster node architecture(s): arm64 ... Verify these match your config-global.yaml`) but DOES NOT fail.
+   - Deployment proceeds but pods remain Pending (node affinity mismatch) without clear error message in deploy output.
+   - Recommendation: Make pre-flight check fail (exit 1) on architecture mismatch to prevent "silent" deployment hanging.
+
+3) **'verify-deployment' False Positives**
+   - When run inside Docker (as recommended), `./montage-ai.sh verify-deployment` flags read-only mounts (`/data/input`, etc.) as `⚠️ ... (not writable)` and counts them as issues.
+   - These mounts are read-only by design in `docker-compose.yml`.
+   - Recommendation: Update verification script to detect container environment or accept RO mounts for input/assets.
+
+4) **Dependency Management Consistency**
+   - `deploy/config.env` defines `UV_VERSION`, but `Dockerfile` uses standard `pip` for installation.
+   - Recommendation: Align Dockerfile to use `uv` for faster and more consistent builds, or clarify that `uv` is for local dev only.
+
+5) **Local Cluster Idempotence**
+   - Verified that `make -C deploy/k3s deploy-cluster` is idempotent (resources unchanged on second run).
+   - `scripts/ops/create-test-video.sh` is idempotent.
+
+Status:
+- Docker Build: ✅ Success
+- Local Run (Preview): ✅ Success (generated video)
+- Cluster Deploy (K3d): ✅ Success (after config adjustment)
