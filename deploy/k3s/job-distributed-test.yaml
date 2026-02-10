@@ -1,14 +1,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: montage-ai-distributed-test
+  name: montage-ai-trailer
   namespace: montage-ai
   labels:
     app.kubernetes.io/name: montage-ai
     app.kubernetes.io/component: renderer
 spec:
-  parallelism: 3  # Run 3 pods in parallel to test distribution
-  completions: 3
+  parallelism: 2
+  completions: 2
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
   template:
@@ -36,7 +36,7 @@ spec:
               # The application will auto-detect available hardware
           env:
             - name: CUT_STYLE
-              value: "dynamic"
+              value: "cinema_trailer"
             - name: EXPORT_TIMELINE
               value: "true"
             - name: LOG_LEVEL
