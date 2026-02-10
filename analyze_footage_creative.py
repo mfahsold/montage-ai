@@ -386,3 +386,60 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def analyze_and_plan_creative_cut(target_duration: int = 45, style: str = "dynamic_trailer"):
+    """
+    Programmatic entry point for web UI integration.
+    Returns JSON-serializable cut plan dict.
+    """
+    import json
+    
+    logger.info(f"🎬 Creative Footage Analysis (target: {target_duration}s, style: {style})")
+    
+    # Get all clips
+    logger.info(f"📹 Scanning {MEDIA_FOLDER}...")
+    video_files = sorted(MEDIA_FOLDER.glob("*.mp4")) + sorted(MEDIA_FOLDER.glob("*.mov"))
+    if not video_files:
+        logger.error(f"No video files found in {MEDIA_FOLDER}")
+        return {"error": f"No video files found in {MEDIA_FOLDER}", "clips": [], "cuts": []}
+    
+    logger.info(f"   Found {len(video_files)} video files")
+    
+    # Analyze each clip
+    clips_data = []
+    for i, video_file in enumerate(video_files, 1):
+        try:
+            logger.info(f"   [{i}/{len(video_files)}] Analyzing {video_file.name}...")
+            duration = get_video_duration(str(video_file))
+            fps = get_video_fps(str(video_file))
+            brightness = analyze_video_brightness(str(video_file))
+            clips_data.append({
+                "file": str(video_file),
+                "filename": video_file.name,
+                "duration": duration,
+                "fps": fps,
+                "brightness": brightness,
+            })
+        except Exception as e:
+            logger.warning(f"   ⚠️  Error analyzing {video_file.name}: {str(e)}")
+    
+    if not clips_data:
+        return {"error": "Failed to analyze any clips", "clips": [], "cuts": []}
+    
+    logger.info(f"📊 Categorizing clips...")
+    categorized = categorize_clips(clips_data)
+    
+    # Generate creative cut plan
+    logger.info(f"🎨 Generating creative cut plan (target: {target_duration}s)...")
+    cut_plan = generate_creative_cut_plan(clips_data, target_duration, style)
+    
+    # Return as JSON-serializable dict
+    return {
+        "target_duration": target_duration,
+        "style": style,
+        "clips_analyzed": len(clips_data),
+        "total_cuts": len(cut_plan),
+        "cuts": cut_plan,
+        "categorized": {k: len(v) for k, v in categorized.items()},
+    }

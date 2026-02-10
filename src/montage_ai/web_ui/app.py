@@ -690,9 +690,11 @@ def check_shutdown_status():
 # Register Blueprints
 from .routes.session import session_bp
 from .routes.analysis import analysis_bp
+from .routes.creative_jobs import creative_bp
 
 app.register_blueprint(session_bp)
 app.register_blueprint(analysis_bp)
+app.register_blueprint(creative_bp)
 
 # =============================================================================
 # ROUTES
@@ -714,6 +716,12 @@ def montage_creator():
         music_tracks = [f for f in os.listdir(music_dir) if f.lower().endswith(('.mp3', '.wav', '.m4a'))]
     
     return render_template('montage.html', version=VERSION, music_tracks=sorted(music_tracks))
+
+
+@app.route('/creative')
+def creative_cut_planner():
+    """Creative Cut Planning - AI-powered footage analysis and cut planning."""
+    return render_template('creative_cut.html', version=VERSION)
 
 
 @app.route('/shorts')

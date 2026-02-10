@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block title %}Creative Cut Planning - Montage AI{% endblock %}
+
+{% block extra_css %}
+<style>
+  .creative-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+
+  .phase-header {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .cut-item {
+    background: #f9f9f9;
+    border-left: 4px solid #007acc;
+    padding: 0.8rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+
+  .progress-bar {
+    background: #e0e0e0;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+
+  .status-queued { background: #e3f2fd; color: #1976d2; }
+  .status-analyzing { background: #fff3e0; color: #f57c00; }
+  .status-analyzed { background: #f3e5f5; color: #7b1fa2; }
+  .status-rendering { background: #fff3e0; color: #f57c00; }
+  .status-completed { background: #e8f5e9; color: #388e3c; }
+  .status-failed { background: #ffebee; color: #c62828; }
+
+  .button-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary {
+    background: #007acc;
+    color: white;
+  }
+
+  .btn-primary:hover { background: #005a9e; }
+
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+  }
+
+  .btn-secondary:hover { background: #d0d0d0; }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .error-message {
+    background: #ffebee;
+    color: #c62828;
+    border-left: 4px solid #c62828;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 4px;
+  }
+
+  .info-message {
+    background: #e3f2fd;
+    color: #1976d2;
+    border-left: 4px solid #1976d2;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 4px;
+  }
+
+  .cut-plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .cut-plan-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .cut-plan-card h4 {
+    margin-top: 0;
+    color: #007acc;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .stat-item {
+    background: #f5f5f5;
+    padding: 0.5rem;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.85rem;
+  }
+
+  .stat-value {
+    font-weight: 600;
+    color: #007acc;
+  }
+
+  .video-preview {
+    width: 100%;
+    max-width: 600px;
+    margin-top: 1rem;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="creative-container">
+  <h1>🎬 Creative Cut Planning</h1>
+  <p>Analyze your footage and generate an intelligent, creative video cut plan.</p>
+
+  <!-- Phase 1: Analysis -->
+  <div class="cut-plan-card">
+    <h3>Phase 1: Footage Analysis</h3>
+    <p>
+      Automatically analyze all video files in your project folder.
+      The system will detect scene boundaries, measure brightness/energy,
+      and categorize clips for creative decision-making.
+    </p>
+    
+    <div id="analysis-controls">
+      <div>
+        <label for="target-duration">Target Duration (seconds):</label>
+        <input type="number" id="target-duration" value="45" min="10" max="300" step="5">
+      </div>
+      <div class="button-group">
+        <button id="btn-analyze" class="btn btn-primary">Start Analysis</button>
+        <button id="btn-cancel-analysis" class="btn btn-secondary" style="display: none;">Cancel</button>
+      </div>
+    </div>
+
+    <div id="analysis-status" style="display: none;">
+      <span class="status-badge status-analyzing">Analyzing...</span>
+      <span id="analysis-status-text"></span>
+      <div class="progress-bar">
+        <div class="progress-fill" id="analysis-progress" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <div id="analysis-result" style="display: none;">
+      <span class="status-badge status-completed">Complete</span>
+      <div id="analysis-summary"></div>
+    </div>
+
+    <div id="analysis-error" class="error-message" style="display: none;"></div>
+  </div>
+
+  <!-- Phase 2: Cut Plan Review -->
+  <div class="cut-plan-card" id="cut-plan-section" style="display: none;">
+    <h3>Phase 2: Cut Plan Review</h3>
+    <p>Review the automatically generated cut plan before rendering.</p>
+
+    <div id="cut-plan-summary"></div>
+    <div id="cut-plan-details"></div>
+
+    <div class="button-group">
+      <button id="btn-render" class="btn btn-primary">Render Video</button>
+      <button id="btn-new-analysis" class="btn btn-secondary">New Analysis</button>
+    </div>
+  </div>
+
+  <!-- Phase 3: Rendering -->
+  <div class="cut-plan-card" id="render-section" style="display: none;">
+    <h3>Phase 3: Video Rendering</h3>
+    <p>Rendering your creative cut...</p>
+
+    <div id="render-status">
+      <span class="status-badge status-rendering">Rendering...</span>
+      <span id="render-status-text"></span>
+      <div class="progress-bar">
+        <div class="progress-fill" id="render-progress" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <div id="render-result" style="display: none;">
+      <span class="status-badge status-completed">Complete</span>
+      <div id="render-summary"></div>
+      <div class="button-group">
+        <button id="btn-download" class="btn btn-primary">Download Video</button>
+      </button>
+    </div>
+
+    <div id="render-error" class="error-message" style="display: none;"></div>
+  </div>
+
+  <!-- Active Jobs -->
+  <div class="cut-plan-card" id="jobs-section" style="display: none;">
+    <h3>Active Jobs</h3>
+    <div id="jobs-list"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let currentAnalysisJobId = null;
+  let currentRenderJobId = null;
+  let currentCutPlan = null;
+
+  // Start Analysis
+  document.getElementById('btn-analyze').addEventListener('click', async () => {
+    const targetDuration = parseInt(document.getElementById('target-duration').value);
+    
+    try {
+      const response = await fetch('/api/creative/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_duration: targetDuration })
+      });
+
+      const data = await response.json();
+      currentAnalysisJobId = data.job_id;
+
+      // Show status UI
+      document.getElementById('analysis-controls').style.display = 'none';
+      document.getElementById('analysis-status').style.display = 'block';
+      document.getElementById('btn-analyze').disabled = true;
+
+      // Poll for status
+      pollAnalysisStatus();
+    } catch (error) {
+      showAnalysisError(`Failed to start analysis: ${error.message}`);
+    }
+  });
+
+  async function pollAnalysisStatus() {
+    if (!currentAnalysisJobId) return;
+
+    try {
+      const response = await fetch(`/api/creative/analyze/${currentAnalysisJobId}`);
+      const data = await response.json();
+
+      document.getElementById('analysis-status-text').textContent = 
+        `Status: ${data.status} | Progress: ${data.progress || 0}%`;
+      document.getElementById('analysis-progress').style.width = `${data.progress || 0}%`;
+
+      if (data.status === 'analyzed') {
+        currentCutPlan = data.cut_plan;
+        showCutPlanReview(data.cut_plan);
+        document.getElementById('analysis-status').style.display = 'none';
+        document.getElementById('analysis-result').style.display = 'block';
+        document.getElementById('cut-plan-section').style.display = 'block';
+      } else if (data.status === 'failed') {
+        showAnalysisError(data.error || 'Analysis failed');
+        document.getElementById('analysis-status').style.display = 'none';
+        document.getElementById('btn-analyze').disabled = false;
+      } else {
+        setTimeout(pollAnalysisStatus, 1000);
+      }
+    } catch (error) {
+      console.error('Poll error:', error);
+      setTimeout(pollAnalysisStatus, 2000);
+    }
+  }
+
+  function showCutPlanReview(cutPlan) {
+    const summary = `
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div>Clips Analyzed</div>
+          <div class="stat-value">${cutPlan.clips_analyzed || 0}</div>
+        </div>
+        <div class="stat-item">
+          <div>Total Cuts</div>
+          <div class="stat-value">${cutPlan.total_cuts || 0}</div>
+        </div>
+        <div class="stat-item">
+          <div>Target Duration</div>
+          <div class="stat-value">${cutPlan.target_duration}s</div>
+        </div>
+        <div class="stat-item">
+          <div>Style</div>
+          <div class="stat-value">${cutPlan.style || 'dynamic'}</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('analysis-summary').innerHTML = summary;
+
+    const details = cutPlan.cuts.map((cut, idx) => `
+      <div class="cut-item">
+        <strong>Cut #${idx + 1}</strong> | ${cut.clip_file} | ${cut.duration.toFixed(2)}s<br>
+        <small>${cut.reason} | Effect: ${cut.effect || 'none'}</small>
+      </div>
+    `).join('');
+    
+    document.getElementById('cut-plan-details').innerHTML = details;
+  }
+
+  // Start Rendering
+  document.getElementById('btn-render').addEventListener('click', async () => {
+    if (!currentCutPlan) {
+      showRenderError('No cut plan available');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/creative/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cut_plan: currentCutPlan })
+      });
+
+      const data = await response.json();
+      currentRenderJobId = data.job_id;
+
+      document.getElementById('cut-plan-section').style.display = 'none';
+      document.getElementById('render-section').style.display = 'block';
+
+      pollRenderStatus();
+    } catch (error) {
+      showRenderError(`Failed to start rendering: ${error.message}`);
+    }
+  });
+
+  async function pollRenderStatus() {
+    if (!currentRenderJobId) return;
+
+    try {
+      const response = await fetch(`/api/creative/render/${currentRenderJobId}`);
+      const data = await response.json();
+
+      document.getElementById('render-status-text').textContent = 
+        `Status: ${data.status} | Progress: ${data.progress || 0}%`;
+      document.getElementById('render-progress').style.width = `${data.progress || 0}%`;
+
+      if (data.status === 'completed') {
+        showRenderComplete(data);
+      } else if (data.status === 'failed') {
+        showRenderError(data.error || 'Rendering failed');
+      } else {
+        setTimeout(pollRenderStatus, 1500);
+      }
+    } catch (error) {
+      console.error('Render poll error:', error);
+      setTimeout(pollRenderStatus, 2000);
+    }
+  }
+
+  function showRenderComplete(data) {
+    const summary = `
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div>File Size</div>
+          <div class="stat-value">${(data.file_size / (1024*1024)).toFixed(1)}MB</div>
+        </div>
+        <div class="stat-item">
+          <div>Total Cuts</div>
+          <div class="stat-value">${data.total_cuts || 0}</div>
+        </div>
+      </div>
+      <div class="info-message">✅ Video rendering complete!</div>
+    `;
+    document.getElementById('render-summary').innerHTML = summary;
+    document.getElementById('render-result').style.display = 'block';
+    document.getElementById('render-status').style.display = 'none';
+
+    document.getElementById('btn-download').addEventListener('click', () => {
+      window.location.href = `/api/creative/download/${currentRenderJobId}`;
+    });
+  }
+
+  function showAnalysisError(msg) {
+    document.getElementById('analysis-error').textContent = `❌ Error: ${msg}`;
+    document.getElementById('analysis-error').style.display = 'block';
+    document.getElementById('analysis-status').style.display = 'none';
+  }
+
+  function showRenderError(msg) {
+    document.getElementById('render-error').textContent = `❌ Error: ${msg}`;
+    document.getElementById('render-error').style.display = 'block';
+    document.getElementById('render-status').style.display = 'none';
+  }
+
+  // Reset controls
+  document.getElementById('btn-new-analysis').addEventListener('click', () => {
+    location.reload();
+  });
+</script>
+{% endblock %}

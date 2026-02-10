@@ -253,3 +253,57 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
+
+
+def render_with_plan(cut_plan: dict, plan_file: str = None) -> dict:
+    """
+    Programmatic entry point for web UI integration.
+    Returns JSON-serializable result dict.
+    
+    Args:
+        cut_plan: Dict with cuts array (or loads from plan_file if provided)
+        plan_file: Optional path to cut_plan JSON file
+    
+    Returns:
+        {"success": bool, "output_file": str, "file_size": int, "error": str}
+    """
+    import json
+    
+    try:
+        # Load cut plan if file provided
+        if plan_file:
+            with open(plan_file, 'r') as f:
+                cut_plan = json.load(f)
+        
+        if not cut_plan or 'cuts' not in cut_plan:
+            return {"success": False, "error": "Invalid cut plan: missing 'cuts' array"}
+        
+        cuts = cut_plan['cuts']
+        if not cuts:
+            return {"success": False, "error": "No cuts in plan"}
+        
+        logger.info(f"🎬 Rendering creative cut ({len(cuts)} cuts, target duration)...")
+        
+        # Render video
+        output_file = OUTPUT_DIR / "gallery_montage_creative_trailer_rendered.mp4"
+        success = render_creative_video(cut_plan, output_file)
+        
+        if not success:
+            return {"success": False, "error": "FFmpeg rendering failed"}
+        
+        if not output_file.exists():
+            return {"success": False, "error": f"Output file not created: {output_file}"}
+        
+        file_size = output_file.stat().st_size
+        logger.info(f"✅ Rendering complete! {file_size / (1024*1024):.1f}MB saved to {output_file}")
+        
+        return {
+            "success": True,
+            "output_file": str(output_file),
+            "file_size": file_size,
+            "total_cuts": len(cuts),
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error during rendering: {str(e)}")
+        return {"success": False, "error": str(e)}
