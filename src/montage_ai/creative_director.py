@@ -193,10 +193,50 @@ class CreativeDirector:
         self._regisseur_memory = get_regisseur_memory()
         self._base_system_prompt = get_director_prompt(persona, styles_list)
         self.system_prompt = self._base_system_prompt
+        
+        # One-time backend availability check (not per-call logging)
+        # This prevents log spam from repeated failed attempts
+        self._backends_available = self._check_backends_available()
+        if not self._backends_available:
+            logger.info(
+                "LLM backends unavailable (disabled or unreachable). "
+                "Using style template & heuristic fallback. "
+                "To enable LLM: set OPENAI_API_BASE, GOOGLE_API_KEY, "
+                "CGPU_ENABLED=true, or OLLAMA_HOST. See docs/configuration.md."
+            )
 
     @staticmethod
     def _is_auto_model(model: str) -> bool:
         return model.strip().lower() in ("auto", "discover", "dynamic", "default")
+
+    def _check_backends_available(self) -> bool:
+        """
+        Check if any LLM backend is actually available.
+        
+        Returns True if at least one backend is configured and potentially reachable.
+        This is called once at init to avoid per-call logging.
+        
+        Returns:
+            bool: True if backends are available
+        """
+        # Quick checks without network calls
+        if self.use_openai_api and self.openai_client:
+            return True
+        if self.use_cgpu and self.cgpu_client:
+            return True
+        if self.use_google_ai and self.llm_config.google_api_key:
+            return True
+        # Ollama: check if host is accessible (basic connectivity)
+        if self.ollama_host:
+            try:
+                import socket
+                host, port = self.ollama_host.split(':') if ':' in self.ollama_host else (self.ollama_host, 11434)
+                socket.create_connection((host, int(port)), timeout=0.5)
+                return True
+            except (socket.error, socket.timeout, ValueError, AttributeError):
+                pass
+        
+        return False
 
     def _models_url(self) -> str:
         base = (self.llm_config.openai_api_base or "").strip()
@@ -320,13 +360,11 @@ class CreativeDirector:
 
         # Consolidated message — INFO not ERROR because LLM is optional.
         # Style templates and beat-synced editing work without any LLM backend.
-        error_summary = "; ".join(f"{k}: {v}" for k, v in backend_errors.items())
-        logger.info(
-            f"No LLM backend available ({', '.join(backends_attempted)}). "
-            "Using style template fallback — this works fine for most workflows. "
-            f"Details: {error_summary}. "
-            "To enable LLM features: set OPENAI_API_BASE, GOOGLE_API_KEY, "
-            "CGPU_ENABLED=true, or OLLAMA_HOST. See docs/configuration.md."
+        # Per-backend errors already logged at DEBUG level and init-time.
+        logger.debug(
+            f"All LLM backends unavailable for this query. "
+            f"Attempted: {', '.join(backends_attempted)}. "
+            "Using template fallback."
         )
         return None
 
@@ -551,7 +589,7 @@ class CreativeDirector:
                 return response.json().get("response", "")
             return None
         except Exception as e:
-            logger.warning(f"Ollama unified query error: {e}")
+            logger.debug(f"Ollama query error (expected if Ollama unavailable): {e}")
             raise
 
     def _clean_llm_response(self, text: str) -> str:
@@ -623,6 +661,9 @@ class CreativeDirector:
         """
         Retry wrapper with exponential backoff.
         
+        Per-call logging is suppressed here to avoid spam.
+        Backend availability is checked once at init (__init__ sets _backends_available).
+        
         Args:
             query_fn: Callable to invoke
             *args: Positional args for query_fn
@@ -644,8 +685,8 @@ class CreativeDirector:
                     logger.debug(f"Retry {attempt + 1}/{max_retries + 1} in {wait_time}s (error: {e})")
                     time.sleep(wait_time)
                 else:
-                    logger.warning(f"Max retries exceeded, final error: {e}")
-                    raise
+                    # Silent failure: already logged at __init__ if no backends available
+                    logger.debug(f"Max retries exceeded: {e}")
         
         return None
     
