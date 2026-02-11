@@ -88,6 +88,12 @@ spec:
                   name: litellm-auth
                   key: api-key
                   optional: true  # Don't fail if secret doesn't exist
+            # LiteLLM Unified Proxy endpoint (canonical fluxibri_core pattern)
+            - name: OPENAI_API_BASE
+              value: "http://litellm.llama-box-system.svc.cluster.local:4000/v1"
+            # Model auto-discovery (eco/perf/heavy models available)
+            - name: OPENAI_MODEL
+              value: "eco"
           volumeMounts:
             - name: data-input
               mountPath: /data/input
