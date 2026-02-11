@@ -60,6 +60,12 @@ spec:
         env:
         - name: FLASK_ENV
           value: "production"
+        - name: LITELLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: litellm-auth
+              key: api-key
+              optional: true  # Don't fail if secret doesn't exist
         volumeMounts:
         - name: data-input
           mountPath: /data/input
