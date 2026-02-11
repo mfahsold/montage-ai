@@ -73,11 +73,14 @@ services:
       - MONTAGE_CLOUD_API_KEY=${MONTAGE_CLOUD_API_KEY:-}
       
       # AI / LLM Configuration
-      # Priority: OPENAI_API_BASE > GOOGLE_API_KEY > CGPU > OLLAMA
+      # Priority: OPENAI_API_BASE (LiteLLM/llama-box CANONICAL) > GOOGLE_API_KEY > CGPU > OLLAMA
       
-      # OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.) - PREFERRED
+      # LiteLLM Unified Proxy (in-cluster, canonical fluxibri_core pattern)
+      - LITELLM_API_KEY=${LITELLM_API_KEY:-}
+      
+      # OpenAI-compatible API (KubeAI, vLLM, LocalAI, etc.)
       - OPENAI_API_BASE=${OPENAI_API_BASE:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-not-needed}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-${LITELLM_API_KEY}}
       - OPENAI_MODEL=${OPENAI_MODEL:-}  # Creative Director (e.g. gemma3-4b, qwen2-5-32b)
       - OPENAI_VISION_MODEL=${OPENAI_VISION_MODEL:-}  # Scene analysis (e.g. moondream2, llava-7b)
       

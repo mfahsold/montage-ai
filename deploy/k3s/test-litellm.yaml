@@ -1,0 +1,119 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: montage-ai-litellm-test
+  namespace: montage-ai
+  labels:
+    app: montage-ai
+    component: test
+    test-type: litellm-integration
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: montage-ai
+        image: ghcr.io/your-org/montage-ai:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        # LiteLLM Configuration (canonical pattern)
+        - name: OPENAI_API_BASE
+          value: "http://litellm.llama-box-system.svc.cluster.local:4000"
+        - name: OPENAI_MODEL
+          value: "auto"
+        - name: OPENAI_VISION_MODEL
+          value: "auto"
+        - name: LITELLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: litellm-auth
+              key: api-key
+        - name: LLM_TIMEOUT
+          value: "120"
+        # Disable other backends for this test
+        - name: CGPU_ENABLED
+          value: "false"
+        command:
+        - python
+        - -c
+        - |
+          import sys
+          import os
+          import json
+          from montage_ai.creative_director import CreativeDirector
+          from montage_ai.logger import logger
+          
+          logger.info("=== LiteLLM Integration Test ===")
+          
+          # Test 1: Configuration loaded
+          print("Test 1: Configuration loading...")
+          os.environ['TEST_NO_LLM'] = '0'  # Enable LLM backends
+          try:
+              director = CreativeDirector()
+              print("✓ CreativeDirector initialized")
+          except Exception as e:
+              print(f"✗ Failed to initialize: {e}")
+              sys.exit(1)
+          
+          # Test 2: Backend detection
+          print("\nTest 2: Backend detection...")
+          if director.use_openai_api:
+              print("✓ OpenAI-compatible API backend detected")
+          else:
+              print("✗ OpenAI-compatible API backend NOT detected")
+              sys.exit(1)
+          
+          if director.openai_client is None:
+              print("✗ OpenAI client not initialized")
+              sys.exit(1)
+          else:
+              print("✓ OpenAI client successfully initialized")
+          
+          # Test 3: Model discovery
+          print("\nTest 3: Model discovery...")
+          try:
+              models = director._discover_openai_model()
+              if models:
+                  print(f"✓ Model discovery successful: {models}")
+              else:
+                  print("⚠ Model discovery returned None (may retry later)")
+          except Exception as e:
+              print(f"⚠ Model discovery error (expected in some cases): {e}")
+          
+          # Test 4: Simple text query (if models available)
+          print("\nTest 4: Simple query test...")
+          try:
+              response = director.query(
+                  "List 3 fast-cut editing techniques in JSON format",
+                  json_mode=False,
+                  max_tokens=256,
+                  temperature=0.5
+              )
+              if response:
+                  print(f"✓ Query successful. Response length: {len(response)} chars")
+                  print(f"  First 200 chars: {response[:200]}")
+              else:
+                  print("⚠ Query returned None (LiteLLM may be temporarily unavailable)")
+          except Exception as e:
+              print(f"✗ Query failed: {e}")
+              sys.exit(1)
+          
+          print("\n=== All tests completed ===")
+          sys.exit(0)
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      # Run on any amd64 node (LiteLLM doesn't require GPU)
+      nodeSelector:
+        kubernetes.io/arch: amd64

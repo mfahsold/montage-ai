@@ -23,6 +23,15 @@ spec:
           image: <IMAGE_FULL>
           # Hardware Nah: Use IfNotPresent to avoid unnecessary network traffic
           imagePullPolicy: IfNotPresent
+          env:
+            # LiteLLM API Key (for unified proxy in-cluster access)
+            # Only injected if litellm-auth secret exists
+            - name: LITELLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-auth
+                  key: api-key
+                  optional: true  # Don't fail if secret doesn't exist
           resources:
             requests:
               cpu: "2"

@@ -8,15 +8,19 @@ or Google Gemini via cgpu.
 Architecture (2024/2025 industry standard):
   User Prompt → LLM → JSON Instructions → Validation → Editing Engine
 
-Backends:
-  - LiteLLM / llama-box (cluster): OPENAI_API_BASE environment variable
-  - Ollama (local): OLLAMA_HOST environment variable
-  - cgpu/Gemini (cloud): CGPU_ENABLED=true, requires cgpu serve running
+Backends (priority order):
+  1. LiteLLM / llama-box (in-cluster): OPENAI_API_BASE + LITELLM_API_KEY [CANONICAL - fluxibri_core pattern]
+  2. OpenAI-compatible API: OPENAI_API_BASE + OPENAI_API_KEY
+  3. Google AI: GOOGLE_API_KEY + GOOGLE_AI_MODEL
+  4. cgpu/Gemini (cloud): CGPU_ENABLED=true, requires cgpu serve running
+  5. Ollama (local fallback): OLLAMA_HOST + OLLAMA_MODEL
 
 Based on research:
 - Descript Underlord: Conversational editing interface
 - DirectorLLM: Llama-based cinematography orchestration
 - LAVE: Structured JSON output for video editing
+
+See docs/LLM_MODEL_INTEGRATION.md for backend comparison.
 """
 
 import os
@@ -135,7 +139,12 @@ class CreativeDirector:
         # Log backend selection (primary)
         if self.use_openai_api:
             model_hint = self.llm_config.openai_model or "auto"
-            logger.info(f"Creative Director primary backend: OpenAI-compatible API ({model_hint})")
+            base_url = self.llm_config.openai_api_base or "not-configured"
+            # Detect if this is LiteLLM (canonical fluxibri_core pattern)
+            if "litellm" in base_url.lower() or "llama-box" in base_url.lower():
+                logger.info(f"Creative Director primary backend: LiteLLM/Unified Proxy (canonical fluxibri pattern) - {model_hint}")
+            else:
+                logger.info(f"Creative Director primary backend: OpenAI-compatible API ({model_hint})")
         elif self.use_cgpu:
             cgpu_url = f"http://{self.llm_config.cgpu_host}:{self.llm_config.cgpu_port}"
             logger.info(f"Creative Director primary backend: cgpu/Gemini at {cgpu_url}")

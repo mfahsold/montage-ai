@@ -540,8 +540,13 @@ class LLMConfig:
     """LLM backend configuration."""
 
     # OpenAI-compatible API (LiteLLM/llama-box, vLLM, LocalAI)
+    # Priority: LITELLM_API_KEY (fluxibri_core convention) > OPENAI_API_KEY
     openai_api_base: str = field(default_factory=lambda: os.environ.get("OPENAI_API_BASE", ""))
-    openai_api_key: str = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", "not-needed"))
+    openai_api_key: str = field(default_factory=lambda: (
+        os.environ.get("LITELLM_API_KEY") or  # fluxibri_core/llama-box convention
+        os.environ.get("OPENAI_API_KEY") or
+        "not-needed"
+    ))
     openai_model: str = field(default_factory=lambda: os.environ.get("OPENAI_MODEL", ""))
     openai_vision_model: str = field(default_factory=lambda: os.environ.get("OPENAI_VISION_MODEL", ""))
 
