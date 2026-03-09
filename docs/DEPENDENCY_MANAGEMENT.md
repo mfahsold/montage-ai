@@ -5,7 +5,7 @@ This repository adopts `uv` (Astral) as the recommended dependency and project m
 Why `uv`?
 - Fast dependency resolution and install (10-100× faster than pip in many benchmarks).
 - Supports `pyproject.toml` projects and produces a reproducible `uv.lock` lockfile.
-- Integrates well with Docker and GitHub Actions via `astral-sh/setup-uv`.
+- Works well in local and vendor-neutral CI pipelines.
 
 Quick start
 
@@ -36,9 +36,9 @@ uv sync --all-extras --dev            # fallback when uv.lock not present
 
 CI integration
 
-- We prefer *local CI* to avoid GitHub Actions costs: run `./scripts/ci-local.sh` on a developer machine or self-hosted runner. The local CI script installs `uv` (if missing), syncs dependencies and runs `uv run pytest`.
-- A lightweight GitHub Actions workflow (`.github/workflows/uv-ci.yml`) exists but **automatic triggers are disabled** and it is set to `workflow_dispatch` only. This avoids incurring recurring GitHub Actions costs.
-- The workflow currently uses `uv sync --dev` to avoid installing private extras during CI while `uv.lock` is being adopted.
+- Use *local CI* for contributor validation: run `./scripts/ci-local.sh` on a developer machine or self-hosted runner.
+- Use `./scripts/ci.sh` as the vendor-neutral canonical pipeline entrypoint in external CI systems.
+- This repository does not use active GitHub Actions workflows. Disabled historical workflow examples are kept under `.github/workflows.disabled/` for reference only.
 
 Agent instructions
 
@@ -77,9 +77,9 @@ docker build --build-arg SERVICE_PORT=9090 -t ${REGISTRY}/montage-ai:${TAG} .
 
 - Update your local `deploy/k3s/config-global.yaml` to set `registry.url`, `images.montage_ai.tag`, or `cluster.namespace` as needed for your environment.
 
-- Best practice: pin `UV_VERSION` in `deploy/config.env` (legacy fallback) and in CI workflows to ensure reproducible tooling.
+- Best practice: pin `UV_VERSION` in `deploy/config.env` and align CI runner environments accordingly.
 
 Next steps
 
-- Commit `uv.lock` once optional/private packages (like `cgpu`) are available in the resolved indexes, or when maintainers can generate it locally.
+- Keep `uv.lock` updated whenever dependency sets change.
 - Consider moving CI to `uv sync --locked` after `uv.lock` is in repo.

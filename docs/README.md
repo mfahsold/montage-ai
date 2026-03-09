@@ -71,6 +71,7 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 | [Design System](DESIGN_SYSTEM.md) | UI tokens and styling rules |
 | [Web UI Architecture](WEB_UI_ARCHITECTURE.md) | Frontend structure & flows |
 | [Dependency Management](DEPENDENCY_MANAGEMENT.md) | Update policy, pins, drift control |
+| [MoE Editing Concept](MOE_EDITING_CONCEPT.md) | Multi-expert editing control-plane concept |
 | [LLM Agent Guidelines](llm-agents.md) | AI coding principles |
 | [CI](ci.md) | Continuous integration notes |
 | [Test Assets](test-assets.md) | Test media policy |
@@ -83,12 +84,20 @@ Free, open-source, privacy-first AI rough-cut tool for creators and professional
 | [Parameter Reference](PARAMETER_REFERENCE.md) | All configurable parameters |
 | [Style Quick Reference](STYLE_QUICK_REFERENCE.md) | Editing styles |
 | [Roadmap](roadmap/README.md) | Public roadmap overview |
+| [Historical Reports](reports/README.md) | Dated status reports and session notes |
 | [Privacy](privacy.md) | Privacy policy |
 | [Imprint](imprint.md) | Legal imprint |
 
 ---
 
-**Archive:** Historical/internal notes live in the private docs set.
+## Documentation Lifecycle
+
+- Canonical guidance lives in `docs/` and should stay concise and current.
+- Dated one-off summaries are indexed under [Historical Reports](reports/README.md).
+- When a report contains durable guidance, migrate it into canonical docs and leave the report as context.
+- All public documentation and report Markdown files are English-only.
+
+**Archive:** Historical/internal notes also live in the private docs set.
 **Contributing:** [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 Public vs. private documentation rules are maintained in the private docs set.

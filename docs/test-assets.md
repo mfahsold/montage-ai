@@ -185,27 +185,31 @@ tests/
 
 ---
 
-## CI/CD Considerations
+## CI Considerations
 
-### GitHub Actions
+This repository follows a no-GitHub-Actions policy. Use local or vendor-neutral CI runners.
 
-Unit tests run without any media downloads:
+### Fast Local Validation
 
-```yaml
-- name: Run Tests
-  run: pytest tests/ -v --ignore=tests/integration/
+Unit tests run without media downloads:
+
+```bash
+pytest tests/ -v --ignore=tests/integration/
 ```
 
-### Integration Tests (Manual)
+### Full Integration Validation (Manual)
 
-For full integration testing:
+For full integration checks with downloaded assets:
 
-```yaml
-- name: Download Test Assets
-  run: python ./scripts/archive/prepare_trailer_assets.py
+```bash
+python ./scripts/archive/prepare_trailer_assets.py
+pytest tests/integration/ -v
+```
 
-- name: Run Integration Tests
-  run: pytest tests/integration/ -v
+For standardized full checks, prefer:
+
+```bash
+./scripts/ci-local.sh
 ```
 
 ---

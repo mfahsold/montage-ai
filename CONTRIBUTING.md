@@ -15,6 +15,13 @@ cd montage-ai
 ./scripts/ci.sh
 ```
 
+## Documentation Language Policy
+
+- All repository documentation and report-style Markdown files must be written in English.
+- This includes files under `docs/`, `issues/`, and top-level Markdown documents.
+- If you migrate historical non-English notes, preserve technical meaning and date context, but keep wording fully English.
+- Pull requests that add or update docs should include an English-language pass before merge.
+
 ---
 
 ## New Developer Setup (First Time)

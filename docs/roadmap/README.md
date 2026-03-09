@@ -1,8 +1,8 @@
 # Roadmap
 
-High-level overview of what's shipped and what's planned. Detailed strategic documents are maintained internally.
+High-level overview of what is shipped and where the roadmap is heading.
 
-For a structured, research-driven backlog, see [BACKLOG.md](BACKLOG.md).
+For the structured, research-driven roadmap plus critical SWOT update, see [BACKLOG.md](BACKLOG.md).
 
 ---
 
@@ -10,7 +10,7 @@ For a structured, research-driven backlog, see [BACKLOG.md](BACKLOG.md).
 
 | Feature | Status | Since |
 | --- | --- | --- |
-| Beat-sync montage (8 styles) | Stable | v0.1 |
+| Beat-sync montage (7 styles) | Stable | v0.1 |
 | Web UI (Montage, Shorts, Transcript) | Stable | v0.3 |
 | OTIO/EDL export (DaVinci, Premiere) | Stable | v0.3 |
 | Kubernetes distributed deployment | Stable | v0.3 |
@@ -31,11 +31,15 @@ For a structured, research-driven backlog, see [BACKLOG.md](BACKLOG.md).
 
 ## Planned
 
-- Style Marketplace (community director personas)
-- Multi-user collaboration
-- Hosted SaaS option
+- Style marketplace concepts (community director personas)
+- Collaboration and review workflows
 - Podcast editing support
 - Mobile preview companion
+
+## Notes
+
+- This page is intentionally concise. Use [BACKLOG.md](BACKLOG.md) for rationale, prioritization, and current external trend signals.
+- Historical status reports are indexed under [../reports/README.md](../reports/README.md).
 
 ---
 

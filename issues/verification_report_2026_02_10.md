@@ -1,42 +1,45 @@
-# Verifikationsbericht: Installation und Deployment
+# Verification Report: Installation and Deployment
 
-**Datum:** 10. Februar 2026
-**Autor:** GitHub Copilot (CodeAI)
+**Date:** February 10, 2026  
+**Author:** GitHub Copilot (CodeAI)
 
-## Zusammenfassung
-Die Installation, das Deployment im lokalen Cluster und der Testjob wurden erfolgreich verifiziert. Es wurden jedoch einige Punkte zur Verbesserung der Dokumentation und der Tool-Integrität festgestellt.
+## Summary
 
-## Durchgeführte Tests
+Installation, local-cluster deployment, and test-job execution were successfully verified. A few documentation and tooling integrity improvements were identified.
 
-1.  **Installation & Setup (`scripts/setup.sh`)**:
-    *   Erfolgreich ausgeführt.
-    *   Erkennt `ARM64` Umgebung (MediaPipe deaktiviert), was korrekt behandelt wird.
-    *   Testdaten (`data/input`, `data/music`) wurden erfolgreich generiert.
+## Executed Checks
 
-2.  **Cluster Deployment (`deploy/k3s`)**:
-    *   `k3d` CLI fehlte im System, aber ein Cluster war bereits via `kubectl` erreichbar (`k3d-montage-dev`).
-    *   Idempotenz-Test (`scripts/test-cluster-idempotency.sh`) war **erfolgreich**. Mehrfaches Deployment führte zu keinen Änderungen an PVCs oder unerwarteten Pod-Restarts.
+1. **Installation and setup (`scripts/setup.sh`)**
+   - Ran successfully.
+   - Correctly detects ARM64 environment (MediaPipe disabled path).
+   - Test assets (`data/input`, `data/music`) were generated successfully.
 
-3.  **Features (LLM & CGPU)**:
-    *   `verify-deps` (via `montage-ai.sh`) zeigte fehlende lokale Tools (`gemini-cli`), die aber im Cluster-Betrieb (`cgpu-server` pod) vorhanden sind.
-    *   Job-Submission mit `"cgpu": true` wurde vom System akzeptiert und verarbeitet.
+2. **Cluster deployment (`deploy/k3s`)**
+   - `k3d` CLI was missing locally, but a cluster was already reachable via `kubectl` (`k3d-montage-dev`).
+   - Idempotence test (`scripts/test-cluster-idempotency.sh`) passed. Repeated deploys did not change PVCs and did not trigger unexpected pod restarts.
 
-4.  **Test-Job**:
-    *   Medien-Upload (Video & Audio) via API (`/api/upload`) erfolgreich. Hinweis: Audio benötigt `type=music` im Form-Data, sonst lehnt der Videofilter es ab.
-    *   Job konnte via API gestartet werden.
-    *   Resultat wurde erfolgreich in den lokalen `downloads/` Ordner heruntergeladen (`montage_20260210_133050.mp4`, ~258KB).
+3. **Features (LLM and CGPU)**
+   - `verify-deps` (through `montage-ai.sh`) reported missing local tools (`gemini-cli`), while equivalent functionality was available in cluster mode (`cgpu-server` pod).
+   - Job submission with `"cgpu": true` was accepted and processed.
 
-## Gefundene Probleme & Verbesserungen
+4. **Test job**
+   - Media upload (video and audio) via `/api/upload` succeeded.
+   - Note: audio upload requires `type=music` in form-data; otherwise upload is rejected by video validation.
+   - Job start via API succeeded.
+   - Output was downloaded successfully to local `downloads/` (`montage_20260210_133050.mp4`, ~258 KB).
 
-### 1. Dokumentation & Zugänglichkeit
-*   **Host Header:** Für den Zugriff auf die API im lokalen Cluster (`k3d`/Traefik) ist der Host-Header `montage-ai.local` zwingend erforderlich. Ein direkter Zugriff via IP/Port führt zu 404. Dies ist in der Dokumentation für Browser erwähnt (`/etc/hosts`), sollte aber für API-Calls deutlicher hervorgehoben werden.
-*   **Job Status:** Die API liefert den Status `finished` zurück, während man intuitiv `completed` oder `succeeded` erwarten könnte. Eine Vereinheitlichung oder explizite Dokumentation der Status-Enums wäre hilfreich.
+## Findings and Improvements
+
+### 1. Documentation and accessibility
+- **Host header:** For local cluster API access (`k3d`/Traefik), `Host: montage-ai.local` is required. Direct IP/port calls return 404. This is documented for browser setup (`/etc/hosts`) but should be clearer for API usage.
+- **Job status naming:** API currently returns `finished`, while users may expect `completed` or `succeeded`. Consider standardization or explicit status-enum documentation.
 
 ### 2. Tooling
-*   **check-deps.sh:** Der direkte Aufruf von `scripts/check-deps.sh` schlug fehl (Datei nicht gefunden), aber `montage-ai.sh check-deps` funktionierte (wahrscheinlich anderer Pfad oder eingebettete Logik).
+- **check-deps path:** Direct call to `scripts/check-deps.sh` failed (file not found), while `montage-ai.sh check-deps` worked. The command pathing should be documented more clearly.
 
-### 3. API
-*   **Upload-Typen:** Der Fehler `Invalid video format` beim Hochladen von `.mp3` ohne `type=music` ist technisch korrekt, aber die Fehlermeldung könnte hilfreicher sein ("Did you mean to upload music?").
+### 3. API UX
+- **Upload type messaging:** `Invalid video format` for `.mp3` uploads without `type=music` is technically correct but could be more helpful (for example: "Did you mean to upload music?").
 
-## Fazit
-Das System ist funktionsfähig, idempotent und die Kern-Features lassen sich nutzen. Die Dokumentation ist qualitativ gut, mit kleinen Lücken bei API-Details.
+## Conclusion
+
+The system is functional, idempotent, and core features are usable. Documentation quality is generally good, with small gaps around API details and operator guidance.

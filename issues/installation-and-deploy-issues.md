@@ -1,79 +1,80 @@
-# Installation & Deploy Checks — Findings
+# Installation and Deployment Checks - Findings
 
-Datum: 2026-02-09
+Date: 2026-02-09
 
-Kurzüberblick:
-- Ich habe README, `docs/getting-started.md`, `montage-ai.sh`, `scripts/ci-local.sh` und `deploy/config.env` geprüft.
-- `./montage-ai.sh --help` lief und zeigt die erwarteten Kommandos.
-- `scripts/check-hardcoded-registries.sh` meldet keine offensichtlichen harten Registry-Strings.
-- `deploy/` enthält viele `<...>`-Platzhalter, wie erwartet; die Dokumentation weist klar auf das Ersetzen hin.
-- `scripts/ci-local.sh` hat einen Syntax-Check (`bash -n`) bestanden.
+Overview:
+- Reviewed `README.md`, `docs/getting-started.md`, `montage-ai.sh`, `scripts/ci-local.sh`, and `deploy/config.env`.
+- `./montage-ai.sh --help` works and shows expected commands.
+- `scripts/check-hardcoded-registries.sh` reported no obvious hardcoded registry strings.
+- `deploy/` contains placeholder tokens (`<...>`) as expected, and docs already describe replacing them.
+- `scripts/ci-local.sh` passes syntax check (`bash -n`).
 
-Gefundene Punkte / Empfehlungen (nicht-blockierend):
+Findings and recommendations (non-blocking):
 
-1) Cluster-Placeholder-Ersetzung (erwartet, aber kritisch)
-- Viele Manifeste und Beispielkonfigurationen enthalten `<IMAGE_FULL>`, `<REGISTRY_URL>`, `<MONTAGE_HOSTNAME>` und ähnliche Platzhalter.
-- Empfehlung: Ergänze ein kurzes Skript `deploy/k3s/validate-config.sh` oder erweitere `pre-flight-check.sh`, das automatisch prüft und eine checklist-basierte Ausgabe liefert (z.B. "No placeholders remain").
+1) Cluster placeholder replacement (expected but critical)
+- Many manifests and examples still contain `<IMAGE_FULL>`, `<REGISTRY_URL>`, `<MONTAGE_HOSTNAME>` and similar placeholders.
+- Recommendation: Add `deploy/k3s/validate-config.sh` or extend `pre-flight-check.sh` to validate placeholders and print checklist-style output (for example, "No placeholders remain").
 
-2) `setup.sh` Docker-Compose-Prüfung
-- `scripts/setup.sh` prüft Docker und `docker-compose` in einer leicht inkonsistenten Bedingung (prüft `command -v docker || command -v docker-compose` und dann `docker compose version`). Funktional, aber verwirrend.
-- Empfehlung: Vereinheitliche Prüfung auf Compose v2: zuerst prüfen ob `docker` vorhanden ist, dann `docker compose version`.
+2) `setup.sh` Docker Compose check
+- `scripts/setup.sh` mixes Docker and Compose checks in a slightly inconsistent way (`command -v docker || command -v docker-compose`, then `docker compose version`).
+- Recommendation: Standardize on Compose v2 check: verify `docker` first, then run `docker compose version`.
 
-3) Remote/Cloud LLMs und `cgpu`
-- `montage-ai.sh` startet `cgpu` automatisch für einige Befehle; das ist praktisch, aber können Reproduzierbarkeit/Idempotenz beeinträchtigen, wenn `cgpu` nicht installiert ist.
-- Empfehlung: Erwähne in der Getting-Started klar, welche features optional sind (cgpu, gemini, mediapipe) und wie man in Docker-only Setups deterministisch ohne sie läuft (z.B. `CGPU_ENABLED=false`).
+3) Remote/cloud LLMs and `cgpu`
+- `montage-ai.sh` can auto-start `cgpu` for some commands, which is useful but may impact reproducibility/idempotence if `cgpu` is missing.
+- Recommendation: Clarify in Getting Started which features are optional (`cgpu`, Gemini, MediaPipe) and how to run deterministic Docker-only mode (for example `CGPU_ENABLED=false`).
 
-4) Test/CI side-effects
-- `scripts/ci-local.sh` kann `pipx`/`pip`-Installationen auslösen und `uv sync` ausführen (Netzwerk/Install-IO). Das ist normal für ein dev-CI, aber erwähnenswerte Seiteneffekte.
-- Empfehlung: Dokumentiere einen "dry-run" oder einen `CI_DRY_RUN=1` Modus für lokale Syntax-/static checks ohne Pakete zu installieren.
+4) Test/CI side effects
+- `scripts/ci-local.sh` can trigger `pipx`/`pip` installs and `uv sync` (network and install I/O). This is normal for local CI, but worth documenting.
+- Recommendation: Document a dry-run mode (`CI_DRY_RUN=1`) for local syntax/static checks without package installation.
 
-5) Docs — Lesbarkeit & Idempotenz
-- Dokumentation ist insgesamt gut strukturiert und ausführlich.
-- Idempotenz: Cluster-Deploy-Anweisungen erfordern manuelles Ersetzen von Platzhaltern — akzeptabel, aber ein `render`-Schritt (envsubst) oder ein templating helper wäre hilfreich.
+5) Docs readability and idempotence
+- Docs are generally clear and structured.
+- Cluster deployment still requires manual placeholder replacement. Acceptable, but `envsubst` rendering or a small templating helper would improve reliability.
 
-Vorgeschlagtes Issue-Template (falls gewünscht als GitHub-Issue):
-- Titel: "Improve deploy config validation and add dry-run for local CI"
-- Body: Kurze Zusammenfassung + Reproduktionsschritte + vorgeschlagene PR-Inhalte (validate script + CI dry-run env var + small docs update)
-
----
-
-Wenn du möchtest, kann ich:
-- das vorgeschlagene `deploy/k3s/validate-config.sh`-Skript anlegen (kleine Bash-Datei, grep auf `<[A-Z_]+>` und klare exit-codes),
-- oder ein lokales Issue direkt auf GitHub öffnen (brauche Erlaubnis, das zu tun).
+Suggested issue template (if needed on GitHub):
+- Title: "Improve deploy config validation and add dry-run for local CI"
+- Body: short summary + repro steps + proposed PR scope (validation script + CI dry-run env var + docs update)
 
 ---
 
-# Addendum (10.02.2026) - Verification Run
+If needed, I can:
+- create `deploy/k3s/validate-config.sh` (small Bash script, regex check for `<[A-Z_]+>`, clear exit codes),
+- or open a GitHub issue directly (with your approval).
 
-I have performed a verification run on a local ARM64 machine with Docker an K3d.
+---
+
+# Addendum (2026-02-10) - Verification Run
+
+Performed an additional verification run on a local ARM64 machine with Docker and K3d.
 
 Findings:
 
-1) **ARM64 Feature Parity (MediaPipe)**
+1) **ARM64 feature parity (MediaPipe)**
    - Docker build works on ARM64.
-   - Runtime warning: `[WARN] MediaPipe not installed. Auto Reframe will fallback to center crop.` - Expected due to lack of aarch64 wheels for MediaPipe in default configuration.
-   - Recommendation: Explicitly document this feature limitation for ARM users in `getting-started.md`.
+   - Runtime warning: `[WARN] MediaPipe not installed. Auto Reframe will fallback to center crop.`
+   - This is expected due to missing aarch64 wheels in the default setup.
+   - Recommendation: Document this limitation explicitly in `docs/getting-started.md`.
 
-2) **Default Configuration 'arch' Mismatch**
+2) **Default `arch` mismatch risk**
    - `deploy/k3s/config-global.yaml.example` defaults to `arch: "amd64"`.
-   - On an ARM64 cluster, `make pre-flight` warns about architecture mismatch (`[OK] Cluster node architecture(s): arm64 ... Verify these match your config-global.yaml`) but DOES NOT fail.
-   - Deployment proceeds but pods remain Pending (node affinity mismatch) without clear error message in deploy output.
-   - Recommendation: Make pre-flight check fail (exit 1) on architecture mismatch to prevent "silent" deployment hanging.
+   - On ARM64 clusters, `make pre-flight` warns but does not fail.
+   - Deployment can continue with pods stuck in Pending (node affinity mismatch) without strong deploy-time signaling.
+   - Recommendation: Fail pre-flight (`exit 1`) on architecture mismatch.
 
-3) **'verify-deployment' False Positives**
-   - When run inside Docker (as recommended), `./montage-ai.sh verify-deployment` flags read-only mounts (`/data/input`, etc.) as `⚠️ ... (not writable)` and counts them as issues.
-   - These mounts are read-only by design in `docker-compose.yml`.
-   - Recommendation: Update verification script to detect container environment or accept RO mounts for input/assets.
+3) **`verify-deployment` false positives**
+   - In Docker mode, `./montage-ai.sh verify-deployment` can report read-only mounts (`/data/input`, etc.) as issues.
+   - Those mounts are read-only by design in `docker-compose.yml`.
+   - Recommendation: Detect container mode or allow read-only mounts for input/assets.
 
-4) **Dependency Management Consistency**
-   - `deploy/config.env` defines `UV_VERSION`, but `Dockerfile` uses standard `pip` for installation.
-   - Recommendation: Align Dockerfile to use `uv` for faster and more consistent builds, or clarify that `uv` is for local dev only.
+4) **Dependency management consistency**
+   - `deploy/config.env` defines `UV_VERSION`, while `Dockerfile` currently installs via `pip`.
+   - Recommendation: Align Dockerfile with `uv` usage or clearly document `uv` as local-dev-only.
 
-5) **Local Cluster Idempotence**
-   - Verified that `make -C deploy/k3s deploy-cluster` is idempotent (resources unchanged on second run).
+5) **Local cluster idempotence**
+   - `make -C deploy/k3s deploy-cluster` is idempotent (no changes on second run).
    - `scripts/ops/create-test-video.sh` is idempotent.
 
 Status:
-- Docker Build: ✅ Success
-- Local Run (Preview): ✅ Success (generated video)
-- Cluster Deploy (K3d): ✅ Success (after config adjustment)
+- Docker build: success
+- Local preview run: success (video generated)
+- K3d deployment: success (after config adjustment)
