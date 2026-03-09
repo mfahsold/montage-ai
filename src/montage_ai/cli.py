@@ -22,7 +22,8 @@ from .config import get_settings
 from .core.hardware import hwaccel_probe
 
 # Setting up basic logging for the CLI
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 
 @click.group()
 @click.version_option(package_name="montage-ai")
@@ -30,21 +31,26 @@ def cli():
     """Montage AI - Post-Production Assistant."""
     pass
 
+
 @cli.command(name="check-hw")
-@click.option("--json", "json_format", is_flag=True, help="Output results in JSON format")
-@click.option("--verbose", "-v", is_flag=True, help="Include detailed error diagnostics")
+@click.option(
+    "--json", "json_format", is_flag=True, help="Output results in JSON format"
+)
+@click.option(
+    "--verbose", "-v", is_flag=True, help="Include detailed error diagnostics"
+)
 def check_hw(json_format: bool, verbose: bool):
     """
     Diagnose available hardware accelerators (NVENC, VAAPI, QSV).
-    
+
     Performs functional probes to ensure drivers and permissions are correctly
     configured for video encoding.
     """
     if not json_format:
         click.echo("🔍 Probing hardware accelerators...")
-    
+
     report = hwaccel_probe()
-    
+
     if json_format:
         click.echo(json.dumps(report, indent=2))
         return
@@ -52,21 +58,29 @@ def check_hw(json_format: bool, verbose: bool):
     # Visual reporting
     best = report.get("best_available", {})
     best_type = best.get("type", "cpu")
-    
+
     if best.get("is_gpu"):
-        click.secho(f"\n✅ Hardware acceleration is available ({best_type.upper()})", fg="green", bold=True)
+        click.secho(
+            f"\n✅ Hardware acceleration is available ({best_type.upper()})",
+            fg="green",
+            bold=True,
+        )
     else:
-        click.secho(f"\n⚠️ Hardware acceleration NOT found. Falling back to CPU.", fg="yellow", bold=True)
-        
+        click.secho(
+            f"\n⚠️ Hardware acceleration NOT found. Falling back to CPU.",
+            fg="yellow",
+            bold=True,
+        )
+
     click.echo("-" * 40)
-    
+
     # Detail table-like output
     accelerators = report.get("accelerators", [])
     for acc in accelerators:
         acc_type = acc.get("type", "unknown")
         available = acc.get("available", False)
         functional = acc.get("functional", False)
-        
+
         if not available:
             status = "missing"
             icon = "⚪"
@@ -79,11 +93,11 @@ def check_hw(json_format: bool, verbose: bool):
             status = "working"
             icon = "✅"
             color = "green"
-        
+
         click.echo(f"{icon} ", nl=False)
         click.secho(f"{acc_type.upper():<12}", fg="blue", bold=True, nl=False)
         click.secho(f" : {status}", fg=color)
-        
+
         if verbose and acc.get("error"):
             click.echo(f"   Diagnostic: {acc.get('error')}")
         elif status == "BROKEN" and not verbose:
@@ -91,19 +105,24 @@ def check_hw(json_format: bool, verbose: bool):
 
     if best_type == "cpu" and os.getuid() != 0:
         click.echo("\n💡 Tip: If you have the hardware but it's not detected,")
-        click.echo("   ensure you have the right drivers and group permissions (e.g. 'render' or 'video').")
+        click.echo(
+            "   ensure you have the right drivers and group permissions (e.g. 'render' or 'video')."
+        )
+
 
 @cli.command(name="run")
 @click.argument("prompt", required=False)
 @click.option("--style", "-s", help="Editing style (e.g. hitchcock, dynamic, mtv)")
 @click.option("--output", "-o", help="Output file path")
 @click.pass_context
-def run_montage(ctx, prompt: Optional[str], style: Optional[str], output: Optional[str]):
+def run_montage(
+    ctx, prompt: Optional[str], style: Optional[str], output: Optional[str]
+):
     """Run the montage creation pipeline (Legacy facade)."""
     # This currently delegates back to editor.py's logic
     # In the future, we will move more logic here or common/core
     from .editor import main as editor_main
-    
+
     # Inject values into environment or config as handled by editor.py
     if style:
         os.environ["CUT_STYLE"] = style
@@ -111,10 +130,11 @@ def run_montage(ctx, prompt: Optional[str], style: Optional[str], output: Option
         os.environ["CREATIVE_PROMPT"] = prompt
     if output:
         os.environ["OUTPUT_PATH"] = output
-        
+
     # editor_main() uses sys.argv indirectly via its global configs
     # For now, just call it.
     editor_main()
+
 
 def _normalize_api_base(api_base: str) -> str:
     base = (api_base or "").strip()
@@ -145,7 +165,7 @@ def _parse_option_pairs(pairs: Iterable[str]) -> Dict[str, Any]:
         except json.JSONDecodeError:
             value = raw_value
         if key.startswith("options."):
-            opt_key = key[len("options."):]
+            opt_key = key[len("options.") :]
             if not opt_key:
                 raise click.ClickException("Option key cannot end with 'options.'.")
             parsed.setdefault("options", {})[opt_key] = value
@@ -154,7 +174,9 @@ def _parse_option_pairs(pairs: Iterable[str]) -> Dict[str, Any]:
     return parsed
 
 
-def _load_payload(payload: Optional[str], payload_file: Optional[str]) -> Dict[str, Any]:
+def _load_payload(
+    payload: Optional[str], payload_file: Optional[str]
+) -> Dict[str, Any]:
     data: Dict[str, Any] = {}
     if payload_file:
         try:
@@ -176,7 +198,9 @@ def _load_payload(payload: Optional[str], payload_file: Optional[str]) -> Dict[s
     return data
 
 
-def _request_json(api_base: str, method: str, path: str, timeout: int, **kwargs: Any) -> Any:
+def _request_json(
+    api_base: str, method: str, path: str, timeout: int, **kwargs: Any
+) -> Any:
     url = _build_api_url(api_base, path)
     try:
         response = requests.request(method, url, timeout=timeout, **kwargs)
@@ -188,7 +212,9 @@ def _request_json(api_base: str, method: str, path: str, timeout: int, **kwargs:
             detail = response.json()
         except ValueError:
             detail = response.text.strip()
-        raise click.ClickException(f"{response.status_code} {response.reason}: {detail}")
+        raise click.ClickException(
+            f"{response.status_code} {response.reason}: {detail}"
+        )
 
     try:
         return response.json()
@@ -201,7 +227,9 @@ def _download_file(api_base: str, url_path: str, dest_path: Path, timeout: int) 
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     with requests.get(url, stream=True, timeout=timeout) as response:
         if response.status_code >= 400:
-            raise click.ClickException(f"{response.status_code} {response.reason}: {response.text}")
+            raise click.ClickException(
+                f"{response.status_code} {response.reason}: {response.text}"
+            )
         with dest_path.open("wb") as handle:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 if chunk:
@@ -285,7 +313,9 @@ def _wait_for_job(
             raise click.ClickException("Unexpected job status response from API.")
 
         status = job.get("status", "unknown")
-        phase = job.get("phase", {}).get("label") or job.get("phase", {}).get("name", "")
+        phase = job.get("phase", {}).get("label") or job.get("phase", {}).get(
+            "name", ""
+        )
 
         if status != last_status:
             message = f"Job {job_id}: {status}"
@@ -306,8 +336,16 @@ def _wait_for_job(
 
 
 @cli.group()
-@click.option("--api-base", "--api", default=None, envvar="MONTAGE_API_BASE", help="API base URL (no /api suffix required).")
-@click.option("--timeout", default=20, show_default=True, help="HTTP timeout in seconds.")
+@click.option(
+    "--api-base",
+    "--api",
+    default=None,
+    envvar="MONTAGE_API_BASE",
+    help="API base URL (no /api suffix required).",
+)
+@click.option(
+    "--timeout", default=20, show_default=True, help="HTTP timeout in seconds."
+)
 @click.pass_context
 def jobs(ctx: click.Context, api_base: Optional[str], timeout: int):
     """Submit and manage jobs via the Montage API."""
@@ -323,28 +361,87 @@ def jobs(ctx: click.Context, api_base: Optional[str], timeout: int):
 @click.option("--prompt", help="Creative prompt for the editor.")
 @click.option("--quality-profile", help="Quality profile (preview/standard/high/etc).")
 @click.option("--preset", help="Preset name (e.g. fast for preview).")
-@click.option("--stabilize-ai/--no-stabilize-ai", default=None, help="Enable AI stabilization (ProStabilizationEngine).")
-@click.option("--stabilize-mode", type=click.Choice([
-    "professional",
-    "cinematic",
-    "documentary",
-    "broadcast",
-    "aggressive",
-    "extreme",
-    "super_extreme",
-], case_sensitive=False), help="AI stabilization mode/profile.")
-@click.option("--aggressive-smoothing/--no-aggressive-smoothing", default=None, help="Force super-extreme smoothing profile.")
-@click.option("--fast-stabilization/--no-fast-stabilization", default=None, help="Skip motion smoothing for faster stabilization.")
-@click.option("--skip-color-correction/--no-skip-color-correction", default=None, help="Disable stabilization color correction pass.")
-@click.option("--option", "options", multiple=True, help="Extra key=value fields (use options.<key>=... for nested options).")
+@click.option(
+    "--stabilize-ai/--no-stabilize-ai",
+    default=None,
+    help="Enable AI stabilization (ProStabilizationEngine).",
+)
+@click.option(
+    "--stabilize-mode",
+    type=click.Choice(
+        [
+            "professional",
+            "cinematic",
+            "documentary",
+            "broadcast",
+            "aggressive",
+            "extreme",
+            "super_extreme",
+        ],
+        case_sensitive=False,
+    ),
+    help="AI stabilization mode/profile.",
+)
+@click.option(
+    "--aggressive-smoothing/--no-aggressive-smoothing",
+    default=None,
+    help="Force super-extreme smoothing profile.",
+)
+@click.option(
+    "--fast-stabilization/--no-fast-stabilization",
+    default=None,
+    help="Skip motion smoothing for faster stabilization.",
+)
+@click.option(
+    "--skip-color-correction/--no-skip-color-correction",
+    default=None,
+    help="Disable stabilization color correction pass.",
+)
+@click.option(
+    "--option",
+    "options",
+    multiple=True,
+    help="Extra key=value fields (use options.<key>=... for nested options).",
+)
 @click.option("--payload", help="Raw JSON payload string to merge.")
-@click.option("--payload-file", type=click.Path(exists=True, dir_okay=False), help="Path to JSON payload file.")
-@click.option("--output", type=click.Choice(["id", "json"], case_sensitive=False), default="id", show_default=True)
-@click.option("--download", is_flag=True, help="Wait for completion and download artifacts to this machine.")
-@click.option("--download-dir", type=click.Path(file_okay=False), default="./downloads", show_default=True, help="Directory to store downloaded artifacts.")
-@click.option("--download-zip", is_flag=True, help="Create a ZIP from downloaded artifacts.")
-@click.option("--poll-interval", default=10, show_default=True, help="Polling interval (seconds) when waiting for completion.")
-@click.option("--wait-timeout", default=0, show_default=True, help="Max seconds to wait (0 = no timeout).")
+@click.option(
+    "--payload-file",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Path to JSON payload file.",
+)
+@click.option(
+    "--output",
+    type=click.Choice(["id", "json"], case_sensitive=False),
+    default="id",
+    show_default=True,
+)
+@click.option(
+    "--download",
+    is_flag=True,
+    help="Wait for completion and download artifacts to this machine.",
+)
+@click.option(
+    "--download-dir",
+    type=click.Path(file_okay=False),
+    default="./downloads",
+    show_default=True,
+    help="Directory to store downloaded artifacts.",
+)
+@click.option(
+    "--download-zip", is_flag=True, help="Create a ZIP from downloaded artifacts."
+)
+@click.option(
+    "--poll-interval",
+    default=10,
+    show_default=True,
+    help="Polling interval (seconds) when waiting for completion.",
+)
+@click.option(
+    "--wait-timeout",
+    default=0,
+    show_default=True,
+    help="Max seconds to wait (0 = no timeout).",
+)
 @click.pass_context
 def jobs_submit(
     ctx: click.Context,
@@ -432,7 +529,12 @@ def jobs_submit(
 
 @jobs.command("status")
 @click.argument("job_id")
-@click.option("--output", type=click.Choice(["json", "status"], case_sensitive=False), default="json", show_default=True)
+@click.option(
+    "--output",
+    type=click.Choice(["json", "status"], case_sensitive=False),
+    default="json",
+    show_default=True,
+)
 @click.pass_context
 def jobs_status(ctx: click.Context, job_id: str, output: str):
     """Fetch job status via GET /api/jobs/<id>."""
@@ -474,9 +576,18 @@ def jobs_cancel(ctx: click.Context, job_id: str):
     )
     click.echo(json.dumps(result, indent=2) if isinstance(result, dict) else result)
 
+
 @cli.command(name="verify-deployment")
-@click.option("--format", "fmt", type=click.Choice(["json", "text"]), default="text", help="Output format")
-@click.option("--verbose", "-v", is_flag=True, help="Show all checks including informational")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["json", "text"]),
+    default="text",
+    help="Output format",
+)
+@click.option(
+    "--verbose", "-v", is_flag=True, help="Show all checks including informational"
+)
 def verify_deployment(fmt: str, verbose: bool):
     """
     Run a comprehensive deployment verification.
@@ -492,13 +603,95 @@ def verify_deployment(fmt: str, verbose: bool):
         click.echo(json.dumps(result, indent=2))
 
     # Exit 1 if any hard failures
-    all_checks = [
-        c
-        for s in result.get("sections", [])
-        for c in s.get("checks", [])
-    ]
+    all_checks = [c for s in result.get("sections", []) for c in s.get("checks", [])]
     if any(c.get("status") == "fail" for c in all_checks):
         raise SystemExit(1)
+
+
+@cli.command(name="moe")
+@click.option("--style", "-s", default="documentary", help="Editing style")
+@click.option("--show-deltas", is_flag=True, help="Show all proposed deltas")
+def moe_edit(style: str, show_deltas: bool):
+    """
+    Edit video using Mixture of Experts (MoE) system.
+
+    Orchestrates multiple AI experts (Rhythm, Narrative, Audio) to collaboratively
+    edit video with human-in-the-loop conflict resolution.
+
+    Example:
+        montage-ai moe --style hitchcock
+        montage-ai moe --style dynamic --show-deltas
+    """
+    from .moe import MoEControlPlane, RhythmExpert, NarrativeExpert, AudioExpert
+    from .moe.contracts import EditingState
+
+    click.echo("🎬 Initializing MoE Editing System...")
+    click.echo(f"   Style: {style}")
+
+    # Setup control plane with all experts
+    moe = MoEControlPlane()
+    moe.register_expert(RhythmExpert())
+    moe.register_expert(NarrativeExpert())
+    moe.register_expert(AudioExpert())
+
+    click.echo(f"   Registered {len(moe.experts)} experts:")
+    for expert in moe.experts:
+        click.echo(f"     • {expert.expert_id} (weight: {expert.config.weight})")
+
+    # Create initial state
+    state = EditingState(style_template=style)
+
+    # Mock media analysis (in real usage, this comes from analyze_assets())
+    media_context = {
+        "beat_times": [0.5, 1.2, 2.0, 2.8, 3.5, 4.2],
+        "energy_profile": [0.3, 0.5, 0.8, 0.9, 0.6, 0.4],
+        "scenes": [
+            {"type": "action", "energy": 0.8},
+            {"type": "dialogue", "energy": 0.3},
+            {"type": "action", "energy": 0.9},
+        ],
+        "audio_analysis": {
+            "has_voice": True,
+            "has_music": True,
+            "integrated_lufs": -20.0,
+            "voice_regions": [(0, 5), (10, 15)],
+            "music_regions": [(0, 20)],
+        },
+    }
+
+    click.echo("\n🧠 Executing experts...")
+
+    # Execute MoE
+    new_state, conflicts = moe.execute(state, media_context)
+
+    # Show results
+    status = moe.get_status()
+    click.echo(f"\n📊 Execution Summary:")
+    click.echo(f"   Deltas proposed: {status['last_execution']['deltas_proposed']}")
+    click.echo(f"   Auto-applied: {status['last_execution']['auto_applied']}")
+    click.echo(f"   Pending human review: {status['last_execution']['pending_human']}")
+    click.echo(f"   Conflicts detected: {status['last_execution']['conflicts']}")
+
+    if show_deltas and new_state.applied_deltas:
+        click.echo("\n✅ Applied Deltas:")
+        for delta in new_state.applied_deltas:
+            click.echo(f"   • {delta.expert_id}: {delta.parameter.value}")
+            click.echo(f"     Value: {delta.value}")
+            click.echo(f"     Confidence: {delta.confidence:.0%}")
+            click.echo(f"     Impact: {delta.impact.value}")
+
+    if conflicts:
+        click.echo("\n⚠️  Conflicts Requiring Human Review:")
+        for i, conflict in enumerate(conflicts, 1):
+            click.echo(f"   {i}. {conflict.description}")
+            click.echo(f"      Severity: {conflict.severity}")
+            click.echo(f"      {conflict.delta1.expert_id}: {conflict.delta1.value}")
+            click.echo(f"      {conflict.delta2.expert_id}: {conflict.delta2.value}")
+    else:
+        click.echo("\n✨ No conflicts detected!")
+
+    click.echo(f"\n🎯 Final State: {new_state.to_dict()}")
+    click.echo("\n💡 Use --show-deltas to see detailed proposals")
 
 
 if __name__ == "__main__":
