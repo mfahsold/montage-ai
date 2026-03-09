@@ -47,6 +47,7 @@ def _detect_gpu_backend() -> Optional[str]:
     # Try PyTorch first (most portable)
     try:
         import torch
+
         if torch.cuda.is_available():
             _gpu_backend = "torch-cuda"
             logger.debug(f"Audio GPU: PyTorch CUDA ({torch.cuda.get_device_name(0)})")
@@ -65,6 +66,7 @@ def _detect_gpu_backend() -> Optional[str]:
     # Try CuPy (CUDA only, faster for pure FFT)
     try:
         import cupy as cp
+
         cp.cuda.Device(0).compute_capability
         _gpu_backend = "cupy"
         logger.debug("Audio GPU: CuPy CUDA")
@@ -86,6 +88,7 @@ def is_gpu_audio_available() -> bool:
 @dataclass
 class SpectralFeatures:
     """Spectral analysis results."""
+
     frequencies: np.ndarray
     magnitudes: np.ndarray
     spectral_centroid: np.ndarray
@@ -120,13 +123,22 @@ def _load_audio_raw(audio_path: str, sr: int = 22050) -> np.ndarray:
         tmp_path = tmp.name
 
     try:
-        cmd = build_ffmpeg_cmd([
-            "-i", audio_path,
-            "-ac", "1",  # Mono
-            "-ar", str(sr),  # Sample rate
-            "-f", "f32le",  # 32-bit float little-endian
-            tmp_path
-        ], overwrite=True, hide_banner=True, loglevel="error")
+        cmd = build_ffmpeg_cmd(
+            [
+                "-i",
+                audio_path,
+                "-ac",
+                "1",  # Mono
+                "-ar",
+                str(sr),  # Sample rate
+                "-f",
+                "f32le",  # 32-bit float little-endian
+                tmp_path,
+            ],
+            overwrite=True,
+            hide_banner=True,
+            loglevel="error",
+        )
 
         subprocess.run(cmd, check=True, capture_output=True)
 
@@ -140,10 +152,7 @@ def _load_audio_raw(audio_path: str, sr: int = 22050) -> np.ndarray:
 
 
 def _stft_torch(
-    audio: np.ndarray,
-    n_fft: int = 2048,
-    hop_length: int = 512,
-    device: str = "cuda"
+    audio: np.ndarray, n_fft: int = 2048, hop_length: int = 512, device: str = "cuda"
 ) -> np.ndarray:
     """Compute STFT using PyTorch on GPU."""
     import torch
@@ -159,7 +168,7 @@ def _stft_torch(
         hop_length=hop_length,
         win_length=n_fft,
         window=window,
-        return_complex=True
+        return_complex=True,
     )
 
     # Magnitude spectrum
@@ -168,9 +177,7 @@ def _stft_torch(
 
 
 def _stft_cupy(
-    audio: np.ndarray,
-    n_fft: int = 2048,
-    hop_length: int = 512
+    audio: np.ndarray, n_fft: int = 2048, hop_length: int = 512
 ) -> np.ndarray:
     """Compute STFT using CuPy on GPU."""
     import cupy as cp
@@ -188,9 +195,7 @@ def _stft_cupy(
 
 
 def _stft_numpy(
-    audio: np.ndarray,
-    n_fft: int = 2048,
-    hop_length: int = 512
+    audio: np.ndarray, n_fft: int = 2048, hop_length: int = 512
 ) -> np.ndarray:
     """Compute STFT using NumPy (CPU fallback)."""
     from scipy.signal import stft
@@ -230,7 +235,9 @@ def gpu_spectral_analysis(
     elif backend == "torch-mps":
         magnitude = _stft_torch(audio, n_fft, hop_length, "mps")
     elif backend == "torch-rocm":
-        magnitude = _stft_torch(audio, n_fft, hop_length, "cuda")  # ROCm uses cuda interface
+        magnitude = _stft_torch(
+            audio, n_fft, hop_length, "cuda"
+        )  # ROCm uses cuda interface
     elif backend == "cupy":
         magnitude = _stft_cupy(audio, n_fft, hop_length)
     else:
@@ -241,7 +248,9 @@ def gpu_spectral_analysis(
 
     # Compute spectral features
     # Spectral centroid (center of mass of spectrum)
-    spectral_centroid = np.sum(frequencies[:, np.newaxis] * magnitude, axis=0) / (np.sum(magnitude, axis=0) + 1e-6)
+    spectral_centroid = np.sum(frequencies[:, np.newaxis] * magnitude, axis=0) / (
+        np.sum(magnitude, axis=0) + 1e-6
+    )
 
     # Spectral rolloff (frequency below which X% of energy is contained)
     cumsum = np.cumsum(magnitude, axis=0)
@@ -251,7 +260,7 @@ def gpu_spectral_analysis(
 
     # Spectral flux (rate of change)
     diff = np.diff(magnitude, axis=1)
-    spectral_flux = np.sqrt(np.sum(diff ** 2, axis=0))
+    spectral_flux = np.sqrt(np.sum(diff**2, axis=0))
     spectral_flux = np.concatenate([[0], spectral_flux])  # Pad to match length
 
     return SpectralFeatures(
@@ -261,7 +270,7 @@ def gpu_spectral_analysis(
         spectral_rolloff=spectral_rolloff,
         spectral_flux=spectral_flux,
         sample_rate=sr,
-        hop_length=hop_length
+        hop_length=hop_length,
     )
 
 
@@ -291,7 +300,10 @@ def gpu_onset_detection(
 
     # Find peaks above threshold
     from scipy.signal import find_peaks
-    peaks, _ = find_peaks(flux_normalized, height=threshold, distance=sr // features.hop_length // 8)
+
+    peaks, _ = find_peaks(
+        flux_normalized, height=threshold, distance=sr // features.hop_length // 8
+    )
 
     # Convert to time
     onset_times = peaks * features.hop_length / sr
@@ -299,12 +311,23 @@ def gpu_onset_detection(
     return onset_times
 
 
+import warnings
+
+
 def benchmark_audio_gpu(audio_path: str) -> dict:
     """
-    Benchmark GPU vs CPU audio analysis.
+    DEPRECATED: Benchmark GPU vs CPU audio analysis.
+
+    This function is for development/testing only and not used in production.
+    Will be removed in v2.0.
 
     Returns timing comparison dict.
     """
+    warnings.warn(
+        "benchmark_audio_gpu() is deprecated. Development utility only.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     import time
 
     global _gpu_backend

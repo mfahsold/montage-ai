@@ -41,6 +41,15 @@ from ..enhancement_tracking import (
     UpscaleParams,
     ColorGradeParams,
 )
+from ..monitoring import (
+    record_render_duration,
+    record_cache_hit,
+    record_cache_miss,
+    RENDER_DURATION,
+    ACTIVE_JOBS,
+    CLIP_SELECTIONS,
+    SCENE_DETECTIONS,
+)
 from .models import EditingInstructions
 from .context import (
     MontagePaths,
@@ -150,6 +159,9 @@ class MontageBuilder:
 
     def _create_context(self) -> MontageContext:
         """Create a fresh MontageContext from settings."""
+        stabilization_cfg = getattr(self.settings, "stabilization", None)
+        dialogue_duck = bool(getattr(stabilization_cfg, "dialogue_duck", False))
+
         return MontageContext(
             job_id=self.settings.job_id,
             variant_id=self.variant_id,
@@ -168,12 +180,19 @@ class MontageBuilder:
                 denoise=self.settings.features.denoise,
                 sharpen=self.settings.features.sharpen,
                 film_grain=self.settings.features.film_grain,
-                dialogue_duck=self.settings.stabilization.dialogue_duck,
+                dialogue_duck=dialogue_duck,
             ),
             creative=MontageCreative(
                 editing_instructions=self.editing_instructions,
             ),
         )
+
+    def _cluster_mode_enabled(self) -> bool:
+        """Return cluster mode using legacy and current config paths."""
+        features_mode = getattr(getattr(self.settings, "features", None), "cluster_mode", None)
+        if features_mode is not None:
+            return bool(features_mode)
+        return bool(getattr(getattr(self.settings, "stabilization", None), "cluster_mode", False))
 
     # =========================================================================
     # Lazy-Initialized Providers
@@ -206,15 +225,25 @@ class MontageBuilder:
         Returns:
             MontageResult with success status and output path
         """
+        from datetime import datetime
+
+        start_time = time.time()
+        ACTIVE_JOBS.inc()
+
         try:
             logger.info(f"\n🎬 Starting Montage Variant #{self.variant_id}")
             self.progress.finalization_start()  # Initialize progress tracker
 
             # Phase 1: Setup
+            phase_start = time.time()
             self.setup_workspace()
+            logger.debug(f"Phase 1 (Setup): {time.time() - phase_start:.2f}s")
 
             # Phase 2: Analyze
+            phase_start = time.time()
             self.analyze_assets()
+            logger.debug(f"Phase 2 (Analyze): {time.time() - phase_start:.2f}s")
+            SCENE_DETECTIONS.inc(len(self.ctx.media.video_files))
 
             # Phase 3: Plan (Agentic Creative Loop)
             iteration = 0
@@ -228,6 +257,7 @@ class MontageBuilder:
             while iteration < max_iters and not approved:
                 logger.info(f"\n   🔄 Planning Iteration {iteration + 1}/{max_iters}")
                 self.plan_montage()
+                CLIP_SELECTIONS.inc(len(self.ctx.timeline.clip_sequence))
 
                 if max_iters > 1:
                     # SOTA 2026: Agentic Review Pass (Plan-and-ReAct)
@@ -250,10 +280,19 @@ class MontageBuilder:
                 or self.ctx.features.upscale
                 or self.ctx.features.enhance
             ):
+                phase_start = time.time()
                 self.enhance_assets()
+                logger.debug(f"Phase 4 (Enhance): {time.time() - phase_start:.2f}s")
 
             # Phase 5: Render
+            phase_start = time.time()
             self.render_output()
+            render_duration = time.time() - phase_start
+            logger.debug(f"Phase 5 (Render): {render_duration:.2f}s")
+            RENDER_DURATION.observe(
+                render_duration,
+                {"style": self.ctx.creative.style_template_id or "default"},
+            )
 
             # Phase 6: Export Timeline
             self.export_timeline()
@@ -268,6 +307,10 @@ class MontageBuilder:
             output_path = self.ctx.render.output_filename
             self.progress.finalization_complete(output_path)
             logger.info(self.progress.summary())
+
+            # Record successful render
+            total_duration = time.time() - start_time
+            ACTIVE_JOBS.dec()
 
             return MontageResult(
                 success=True,
@@ -286,6 +329,7 @@ class MontageBuilder:
             logger.error(f"❌ Montage build failed: {e}")
             self.progress.log_error(error_msg=str(e))
             self.cleanup()
+            ACTIVE_JOBS.dec()
             return MontageResult(
                 success=False,
                 output_path=None,
@@ -440,7 +484,7 @@ class MontageBuilder:
                 try:
                     if self._executor:
                         # best-effort: shrink pool by creating a new executor for analysis
-                        self._executor._shutdown(wait=False)
+                        self._executor.shutdown(wait=False)
                         from concurrent.futures import ThreadPoolExecutor
 
                         self._executor = ThreadPoolExecutor(max_workers=1)
@@ -476,7 +520,7 @@ class MontageBuilder:
             proxy_video_files = list(self.ctx.media.video_files)
             try:
                 if (
-                    self.settings.stabilization.cluster_mode
+                    self._cluster_mode_enabled()
                     and self.settings.proxy.distributed_proxy_generation
                 ):
                     total_mb = 0.0
@@ -872,7 +916,7 @@ class MontageBuilder:
             threshold_mb = max(1024, preview_limit * 4)
 
             if (
-                not self.settings.stabilization.cluster_mode
+                not self._cluster_mode_enabled()
             ) and max_size_mb > threshold_mb:
                 raise RuntimeError(
                     f"Refusing to run local encode for large input ({int(max_size_mb)} MB) "
@@ -887,7 +931,7 @@ class MontageBuilder:
             logger.debug("Unable to evaluate local-encode safety guard; continuing")
 
         # DISTRIBUTED MODE: Phase 2 (Distributed Rendering)
-        if self.settings.stabilization.cluster_mode:
+        if self._cluster_mode_enabled():
             logger.info("   🌐 Cluster Mode: Switching to Distributed Rendering...")
             self._render_engine.render_distributed()
         else:

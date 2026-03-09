@@ -31,6 +31,7 @@ from .logger import logger
 # Color Grading Presets (FFmpeg Filter Chains)
 # =============================================================================
 
+
 class ColorGradePreset(str, Enum):
     """
     Built-in color grading presets using FFmpeg filters.
@@ -38,6 +39,7 @@ class ColorGradePreset(str, Enum):
     These work without external LUT files and are NLE-compatible.
     Designed for Rec.709 output (standard for HD/web delivery).
     """
+
     # No processing
     NONE = "none"
 
@@ -73,52 +75,36 @@ class ColorGradePreset(str, Enum):
 PRESET_FILTERS: Dict[str, str] = {
     # No grading - pass through
     "none": "",
-
     # Neutral - broadcast safe levels only (16-235 range)
     "neutral": "colorlevels=rimin=0.0625:gimin=0.0625:bimin=0.0625:rimax=0.92:gimax=0.92:bimax=0.92",
-
     # Warm - golden/sunset warmth
     "warm": "eq=contrast=1.05:brightness=0.05:saturation=1.1",
-
     # Cool - blue/teal coolness
     "cool": "eq=contrast=1.05:brightness=-0.05:saturation=1.1",
-
     # Golden Hour - sunset warmth with lifted shadows
     "golden_hour": "colortemperature=5500,colorbalance=rs=0.12:gs=0.06:bs=-0.1,curves=m='0 0.05 0.5 0.5 1 1',eq=saturation=1.1",
-
     # Blue Hour - dawn/dusk with cool shadows
     "blue_hour": "colortemperature=9000,colorbalance=rs=-0.08:gs=0:bs=0.12,curves=m='0 0 0.5 0.48 1 0.95',eq=saturation=0.9",
-
     # Teal & Orange - Hollywood blockbuster complementary colors
     "teal_orange": "colorbalance=rs=-0.1:gs=-0.05:bs=0.15:rm=0.05:gm=0:bm=-0.05:rh=0.1:gh=0.05:bh=-0.1",
-
     # Cinematic - Teal & Orange with S-curve contrast
     "cinematic": "colorbalance=rs=-0.1:gs=-0.05:bs=0.15:rm=0.05:gm=0:bm=-0.05:rh=0.1:gh=0.05:bh=-0.1,curves=m='0 0 0.25 0.22 0.5 0.5 0.75 0.78 1 1'",
-
     # Blockbuster - high contrast cinematic
     "blockbuster": "colorbalance=rs=-0.12:gs=-0.06:bs=0.18:rm=0.06:gm=0:bm=-0.06:rh=0.12:gh=0.06:bh=-0.12,curves=m='0 0 0.2 0.15 0.5 0.5 0.8 0.85 1 1',eq=contrast=1.1",
-
     # Vibrant - punchy, saturated (MTV, action)
     "vibrant": "eq=saturation=1.25:contrast=1.1,unsharp=3:3:0.4",
-
     # Desaturated - muted, filmic (documentary, minimalist)
     "desaturated": "eq=saturation=0.75:contrast=1.05",
-
     # High Contrast - strong blacks/whites
     "high_contrast": "eq=contrast=1.3:brightness=0.02,curves=m='0 0 0.15 0.05 0.5 0.5 0.85 0.95 1 1'",
-
     # Filmic Warm - classic film warmth (wedding)
     "filmic_warm": "colorbalance=rs=0.08:gs=0.04:bs=-0.08,curves=m='0 0 0.25 0.22 0.5 0.5 0.75 0.78 1 1',eq=saturation=0.92",
-
     # Vintage - faded film look with lifted blacks
     "vintage": "curves=m='0 0.05 0.5 0.5 1 0.95',eq=saturation=0.8,colorbalance=rs=0.1:gs=0.05:bs=-0.05",
-
     # Noir - desaturated high contrast (B&W friendly)
     "noir": "eq=saturation=0.3:contrast=1.4,curves=m='0 0 0.2 0.1 0.5 0.5 0.8 0.9 1 1'",
-
     # Documentary - natural with slight sharpening
     "documentary": "eq=saturation=1.0:contrast=1.02,unsharp=3:3:0.3",
-
     # Natural - minimal processing, true to source
     "natural": "eq=saturation=1.02:contrast=1.01",
 }
@@ -146,6 +132,7 @@ class ColorGradeConfig:
         lut_path: Optional path to .cube/.3dl LUT file
         normalize_first: Apply broadcast safe levels before grading
     """
+
     preset: str = "teal_orange"
     intensity: float = 1.0
     lut_path: Optional[str] = None
@@ -195,9 +182,13 @@ def find_lut_file(name: str, lut_dir: Path) -> Optional[Path]:
     return None
 
 
+import warnings
+
+
 def list_available_luts(lut_dir: Path) -> List[str]:
     """
-    List all available LUT files in directory.
+    DEPRECATED: List all available LUT files in directory.
+    Planned for future UI integration but currently unused.
 
     Args:
         lut_dir: Directory to scan
@@ -205,6 +196,11 @@ def list_available_luts(lut_dir: Path) -> List[str]:
     Returns:
         List of LUT names (without extension)
     """
+    warnings.warn(
+        "list_available_luts() is planned for future UI integration but currently unused.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not lut_dir.exists():
         return []
 
@@ -220,9 +216,9 @@ def list_available_luts(lut_dir: Path) -> List[str]:
 # Filter Chain Builder
 # =============================================================================
 
+
 def build_color_grade_filter(
-    config: ColorGradeConfig,
-    lut_dir: Optional[Path] = None
+    config: ColorGradeConfig, lut_dir: Optional[Path] = None
 ) -> str:
     """
     Build FFmpeg filter chain for color grading.
@@ -255,7 +251,9 @@ def build_color_grade_filter(
             if config.intensity < 1.0:
                 # Use split/blend for partial LUT application
                 # This creates: original -> [split] -> lut3d -> [blend with original]
-                filters.append(f"split[a][b];[a]lut3d={lut_path}[graded];[b][graded]blend=all_expr='A*{1-config.intensity}+B*{config.intensity}'")
+                filters.append(
+                    f"split[a][b];[a]lut3d={lut_path}[graded];[b][graded]blend=all_expr='A*{1 - config.intensity}+B*{config.intensity}'"
+                )
             else:
                 filters.append(f"lut3d={lut_path}")
 
@@ -272,7 +270,9 @@ def build_color_grade_filter(
             preset_filter = _scale_eq_intensity(preset_filter, config.intensity)
 
         filters.append(preset_filter)
-        logger.debug(f"Applied preset '{config.preset}' at {config.intensity:.0%} intensity")
+        logger.debug(
+            f"Applied preset '{config.preset}' at {config.intensity:.0%} intensity"
+        )
 
     return ",".join(f for f in filters if f)
 
@@ -299,47 +299,135 @@ def _scale_eq_intensity(filter_str: str, intensity: float) -> str:
 
         return match.group(0)
 
-    return re.sub(r'(saturation|contrast|brightness)=([\d.]+)', scale_param, filter_str)
+    return re.sub(r"(saturation|contrast|brightness)=([\d.]+)", scale_param, filter_str)
 
 
 # =============================================================================
 # UI Helpers
 # =============================================================================
 
+
 def get_preset_display_info() -> List[Dict[str, str]]:
     """
-    Get display information for all presets (for UI dropdowns).
+    DEPRECATED: Get display information for all presets (for UI dropdowns).
+    Planned for future UI integration but currently unused.
 
     Returns:
         List of dicts with 'id', 'name', 'description', 'category'
     """
+    warnings.warn(
+        "get_preset_display_info() is planned for future UI integration but currently unused.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     presets = [
         # No grading
-        {"id": "none", "name": "None", "description": "No color grading applied", "category": "Basic"},
-        {"id": "neutral", "name": "Neutral", "description": "Broadcast safe levels only", "category": "Basic"},
-        {"id": "natural", "name": "Natural", "description": "Minimal processing, true to source", "category": "Basic"},
-
+        {
+            "id": "none",
+            "name": "None",
+            "description": "No color grading applied",
+            "category": "Basic",
+        },
+        {
+            "id": "neutral",
+            "name": "Neutral",
+            "description": "Broadcast safe levels only",
+            "category": "Basic",
+        },
+        {
+            "id": "natural",
+            "name": "Natural",
+            "description": "Minimal processing, true to source",
+            "category": "Basic",
+        },
         # Temperature
-        {"id": "warm", "name": "Warm", "description": "Golden sunset warmth", "category": "Temperature"},
-        {"id": "cool", "name": "Cool", "description": "Blue/teal coolness", "category": "Temperature"},
-        {"id": "golden_hour", "name": "Golden Hour", "description": "Sunset warmth with lifted shadows", "category": "Temperature"},
-        {"id": "blue_hour", "name": "Blue Hour", "description": "Dawn/dusk cool tones", "category": "Temperature"},
-
+        {
+            "id": "warm",
+            "name": "Warm",
+            "description": "Golden sunset warmth",
+            "category": "Temperature",
+        },
+        {
+            "id": "cool",
+            "name": "Cool",
+            "description": "Blue/teal coolness",
+            "category": "Temperature",
+        },
+        {
+            "id": "golden_hour",
+            "name": "Golden Hour",
+            "description": "Sunset warmth with lifted shadows",
+            "category": "Temperature",
+        },
+        {
+            "id": "blue_hour",
+            "name": "Blue Hour",
+            "description": "Dawn/dusk cool tones",
+            "category": "Temperature",
+        },
         # Cinematic
-        {"id": "teal_orange", "name": "Teal & Orange", "description": "Hollywood blockbuster look", "category": "Cinematic"},
-        {"id": "cinematic", "name": "Cinematic", "description": "Teal & Orange with S-curve contrast", "category": "Cinematic"},
-        {"id": "blockbuster", "name": "Blockbuster", "description": "High contrast action movie", "category": "Cinematic"},
-
+        {
+            "id": "teal_orange",
+            "name": "Teal & Orange",
+            "description": "Hollywood blockbuster look",
+            "category": "Cinematic",
+        },
+        {
+            "id": "cinematic",
+            "name": "Cinematic",
+            "description": "Teal & Orange with S-curve contrast",
+            "category": "Cinematic",
+        },
+        {
+            "id": "blockbuster",
+            "name": "Blockbuster",
+            "description": "High contrast action movie",
+            "category": "Cinematic",
+        },
         # Stylized
-        {"id": "vibrant", "name": "Vibrant", "description": "Punchy, saturated colors", "category": "Stylized"},
-        {"id": "desaturated", "name": "Desaturated", "description": "Muted, filmic look", "category": "Stylized"},
-        {"id": "high_contrast", "name": "High Contrast", "description": "Strong blacks and whites", "category": "Stylized"},
-        {"id": "vintage", "name": "Vintage", "description": "Faded film with lifted blacks", "category": "Stylized"},
-        {"id": "filmic_warm", "name": "Filmic Warm", "description": "Classic warm film look", "category": "Stylized"},
-        {"id": "noir", "name": "Noir", "description": "Desaturated high contrast", "category": "Stylized"},
-
+        {
+            "id": "vibrant",
+            "name": "Vibrant",
+            "description": "Punchy, saturated colors",
+            "category": "Stylized",
+        },
+        {
+            "id": "desaturated",
+            "name": "Desaturated",
+            "description": "Muted, filmic look",
+            "category": "Stylized",
+        },
+        {
+            "id": "high_contrast",
+            "name": "High Contrast",
+            "description": "Strong blacks and whites",
+            "category": "Stylized",
+        },
+        {
+            "id": "vintage",
+            "name": "Vintage",
+            "description": "Faded film with lifted blacks",
+            "category": "Stylized",
+        },
+        {
+            "id": "filmic_warm",
+            "name": "Filmic Warm",
+            "description": "Classic warm film look",
+            "category": "Stylized",
+        },
+        {
+            "id": "noir",
+            "name": "Noir",
+            "description": "Desaturated high contrast",
+            "category": "Stylized",
+        },
         # Documentary
-        {"id": "documentary", "name": "Documentary", "description": "Natural with slight sharpening", "category": "Documentary"},
+        {
+            "id": "documentary",
+            "name": "Documentary",
+            "description": "Natural with slight sharpening",
+            "category": "Documentary",
+        },
     ]
 
     return presets
@@ -347,16 +435,29 @@ def get_preset_display_info() -> List[Dict[str, str]]:
 
 def get_preset_categories() -> Dict[str, List[str]]:
     """
-    Get presets organized by category.
+    DEPRECATED: Get presets organized by category.
+    Planned for future UI integration but currently unused.
 
     Returns:
         Dict mapping category name to list of preset IDs
     """
+    warnings.warn(
+        "get_preset_categories() is planned for future UI integration but currently unused.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     categories = {
         "Basic": ["none", "neutral", "natural"],
         "Temperature": ["warm", "cool", "golden_hour", "blue_hour"],
         "Cinematic": ["teal_orange", "cinematic", "blockbuster"],
-        "Stylized": ["vibrant", "desaturated", "high_contrast", "vintage", "filmic_warm", "noir"],
+        "Stylized": [
+            "vibrant",
+            "desaturated",
+            "high_contrast",
+            "vintage",
+            "filmic_warm",
+            "noir",
+        ],
         "Documentary": ["documentary"],
     }
     return categories
@@ -377,7 +478,6 @@ STYLE_TO_PRESET: Dict[str, str] = {
     "vibrant": "vibrant",
     "desaturated": "desaturated",
     "high_contrast": "high_contrast",
-
     # Style template specific mappings
     "cinematic_teal_orange": "cinematic",
     "filmic_warm": "filmic_warm",
@@ -386,7 +486,6 @@ STYLE_TO_PRESET: Dict[str, str] = {
     "vintage": "vintage",
     "noir": "noir",
     "documentary": "documentary",
-
     # Legacy/compatibility mappings
     "film_fade": "vintage",
     "blockbuster": "blockbuster",

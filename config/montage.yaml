@@ -1,0 +1,77 @@
+# Montage AI Configuration
+# Place this file as 'montage.yaml' in your project root
+# or in ~/.config/montage/config.yaml
+
+# Paths - can be absolute or relative
+paths:
+  input_dir: /data/input
+  music_dir: /data/music
+  output_dir: /data/output
+  assets_dir: /data/assets
+  lut_dir: /data/luts
+
+# Feature toggles
+features:
+  upscale: true
+  stabilize: true
+  color_grade: true
+  auto_reframe: true
+  normalize_audio: true
+  ducking: true
+  scene_detection: true
+  beat_detection: true
+  face_detection: true
+
+# Processing settings
+processing:
+  quality_profile: standard  # preview, standard, high, master
+  max_workers: 8
+  scene_detection_workers: 4
+  batch_size: 25
+  max_memory_gb: 8.0
+  
+  stabilization:
+    enabled: true
+    smoothing: 10
+    max_shift: 0.05
+    crop_ratio: 0.95
+
+# LLM backends
+llm:
+  use_ollama: true
+  ollama_host: http://host.docker.internal:11434
+  ollama_model: llama3.1:70b
+  timeout: 60
+
+# Hardware acceleration
+hardware:
+  auto_detect: true
+  gpu_id: 0
+  encoder_priority:
+    - h264_nvenc
+    - h264_vaapi
+    - h264_qsv
+    - libx264
+
+# Encoding settings
+encoding:
+  codec: libx264
+  profile: high
+  level: "4.1"
+  pixel_format: yuv420p
+  preset: medium
+  audio_codec: aac
+  audio_bitrate: 192k
+
+# Cloud offloading (optional)
+cloud:
+  cgpu_enabled: false
+  offload_upscale: true
+  offload_llm: true
+  max_cloud_jobs: 5
+
+# Cluster mode (optional)
+cluster:
+  enabled: false
+  namespace: default
+  shard_count: 1

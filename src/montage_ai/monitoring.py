@@ -1,19 +1,22 @@
 """
 Montage AI - Live Monitoring System
 
-Provides detailed real-time logging for:
+Provides detailed real-time logging AND Prometheus-compatible metrics for:
 - Decision tracking (why certain clips/cuts were chosen)
 - Data flow visualization (input → processing → output)
 - Performance metrics (timing, memory, throughput)
 - Analysis results (scene detection, energy mapping, beat sync)
 
 Usage:
-    from monitoring import Monitor
+    from monitoring import Monitor, record_render, get_metrics
     monitor = Monitor(job_id="preview_20231201_120000")
     monitor.log_decision("clip_selection", "Selected clip A over B", {"reason": "higher_energy"})
-    monitor.log_metric("processing_time", 2.5, "seconds")
 
-Version: 1.0.0
+    # Automatic metrics recording
+    with record_render_duration("hitchcock"):
+        render_video(...)
+
+Version: 2.0.0
 """
 
 import os
@@ -47,6 +50,7 @@ class LogLevel(Enum):
 @dataclass
 class MonitorEvent:
     """Single monitoring event with full context"""
+
     timestamp: str
     level: str
     category: str
@@ -58,10 +62,10 @@ class MonitorEvent:
 class Monitor:
     """
     Central monitoring hub for the video editing pipeline.
-    
+
     Tracks decisions, data flows, metrics, and provides live console output.
     """
-    
+
     def __init__(self, job_id: str, verbose: bool = True):
         self.job_id = job_id
         self.verbose = verbose
@@ -80,7 +84,7 @@ class Monitor:
         self._stop_event = threading.Event()
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
-        
+
         # Performance tracking
         self.phase_times: Dict[str, float] = {}
         self.phase_start: Optional[float] = None
@@ -92,15 +96,15 @@ class Monitor:
         self._setup_tee()
         self._print_header()
         self._start_mem_probe()
-    
+
     def __del__(self):
         """Cleanup resources on object destruction (memory leak prevention)."""
         self.cleanup()
-    
+
     def __enter__(self):
         """Context manager support."""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, _exc_tb):
         """Ensure cleanup on context manager exit."""
         self.cleanup()
@@ -124,17 +128,19 @@ class Monitor:
                     rss = proc.memory_info().rss / (1024 * 1024)
                     vms = proc.memory_info().vms / (1024 * 1024)
                     virt = psutil.virtual_memory()
-                    
-                    msg = (f"[monitor] mem: rss={rss:.1f}Mi vms={vms:.1f}Mi "
-                           f"sys_used={virt.used/1024/1024:.1f}Mi "
-                           f"sys_free={virt.available/1024/1024:.1f}Mi "
-                           f"sys_pct={virt.percent:.1f}%")
-                    
+
+                    msg = (
+                        f"[monitor] mem: rss={rss:.1f}Mi vms={vms:.1f}Mi "
+                        f"sys_used={virt.used / 1024 / 1024:.1f}Mi "
+                        f"sys_free={virt.available / 1024 / 1024:.1f}Mi "
+                        f"sys_pct={virt.percent:.1f}%"
+                    )
+
                     # Add cgpu metrics if available
                     cgpu_stats = get_cgpu_metrics()
                     if cgpu_stats:
                         msg += f" | {cgpu_stats}"
-                        
+
                     logger.debug(msg)
                 except ImportError:
                     pass  # psutil not available
@@ -194,16 +200,16 @@ class Monitor:
             atexit.register(self.cleanup)
         except Exception as exc:
             logger.warning(f"[monitor] ⚠️ Could not enable tee logging: {exc}")
-    
+
     def cleanup(self):
         """
         Cleanup resources (file handles, threads, restore stdout/stderr).
-        
+
         Called by:
         - __del__() on object destruction
         - __exit__() on context manager exit
         - atexit on normal program termination
-        
+
         Safe to call multiple times (idempotent).
         """
         try:
@@ -230,7 +236,7 @@ class Monitor:
                 self._log_file = None
         except (IOError, OSError) as e:
             logger.debug(f"Log file cleanup error: {e}")
-    
+
     def _print_header(self):
         """Print startup banner with job info"""
         logger.info("\n" + "=" * 70)
@@ -241,8 +247,15 @@ class Monitor:
         logger.info(f"   PID:        {os.getpid()}")
         logger.info(f"   Verbose:    {self.verbose}")
         logger.info("=" * 70 + "\n")
-    
-    def _log(self, level: LogLevel, category: str, message: str, data: Dict = None, duration_ms: float = None):
+
+    def _log(
+        self,
+        level: LogLevel,
+        category: str,
+        message: str,
+        data: Dict = None,
+        duration_ms: float = None,
+    ):
         """Internal logging with formatted output"""
         event = MonitorEvent(
             timestamp=datetime.now().strftime("%H:%M:%S.%f")[:-3],
@@ -250,26 +263,31 @@ class Monitor:
             category=category,
             message=message,
             data=data or {},
-            duration_ms=duration_ms
+            duration_ms=duration_ms,
         )
         self.events.append(event)
-        
-        if self.verbose or level in [LogLevel.DECISION, LogLevel.WARNING, LogLevel.ERROR, LogLevel.SUCCESS]:
+
+        if self.verbose or level in [
+            LogLevel.DECISION,
+            LogLevel.WARNING,
+            LogLevel.ERROR,
+            LogLevel.SUCCESS,
+        ]:
             # Format output
             time_str = f"[{event.timestamp}]"
             icon = level.value
             cat_str = f"[{category}]".ljust(20)
-            
+
             # Duration suffix
             dur_str = ""
             if duration_ms is not None:
                 if duration_ms >= 1000:
-                    dur_str = f" ({duration_ms/1000:.1f}s)"
+                    dur_str = f" ({duration_ms / 1000:.1f}s)"
                 else:
                     dur_str = f" ({duration_ms:.0f}ms)"
-            
+
             logger.info(f"{time_str} {icon} {cat_str} {message}{dur_str}")
-            
+
             # Print data details if present
             if data and self.verbose:
                 for key, value in data.items():
@@ -278,52 +296,60 @@ class Monitor:
                     elif isinstance(value, list) and len(value) <= 5:
                         logger.info(f"           └─ {key}: {value}")
                     elif isinstance(value, dict):
-                        logger.info(f"           └─ {key}: {json.dumps(value, indent=2)[:100]}...")
+                        logger.info(
+                            f"           └─ {key}: {json.dumps(value, indent=2)[:100]}..."
+                        )
                     else:
                         val_str = str(value)[:80]
                         logger.info(f"           └─ {key}: {val_str}")
-    
+
     # ==================== PHASE TRACKING ====================
-    
+
     def start_phase(self, phase_name: str):
         """Mark the start of a processing phase"""
         if self.phase_start is not None:
             # Close previous phase
             elapsed = (time.time() - self.phase_start) * 1000
             self.phase_times[self.phase] = elapsed
-        
+
         self.phase = phase_name
         self.phase_start = time.time()
-        
+
         logger.info(f"\n{'─' * 60}")
         logger.info(f"📍 PHASE: {phase_name.upper()}")
         logger.info(f"{'─' * 60}")
-    
+
     def end_phase(self, summary: Dict = None):
         """Mark the end of current phase with optional summary"""
         if self.phase_start is None:
             return
-        
+
         elapsed = (time.time() - self.phase_start) * 1000
         self.phase_times[self.phase] = elapsed
-        
-        logger.info(f"\n   ✓ Phase '{self.phase}' completed in {elapsed/1000:.1f}s")
+
+        logger.info(f"\n   ✓ Phase '{self.phase}' completed in {elapsed / 1000:.1f}s")
         if summary:
             for key, value in summary.items():
                 logger.info(f"      • {key}: {value}")
-        
+
         self.phase_start = None
-    
+
     # ==================== DECISION LOGGING ====================
-    
-    def log_decision(self, decision_type: str, choice: str, alternatives: List[str] = None, 
-                     reason: str = None, scores: Dict[str, float] = None):
+
+    def log_decision(
+        self,
+        decision_type: str,
+        choice: str,
+        alternatives: List[str] = None,
+        reason: str = None,
+        scores: Dict[str, float] = None,
+    ):
         """
         Log a creative or algorithmic decision with full context.
-        
+
         Examples:
             monitor.log_decision(
-                "clip_selection", 
+                "clip_selection",
                 "VID_001.mp4 @ 2.5s",
                 alternatives=["VID_002.mp4 @ 1.0s", "VID_003.mp4 @ 4.2s"],
                 reason="highest_energy_match",
@@ -336,38 +362,51 @@ class Monitor:
             "alternatives": alternatives or [],
             "reason": reason,
             "scores": scores,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
         self.decisions.append(decision)
-        
+
         self._log(
-            LogLevel.DECISION, 
-            f"decision:{decision_type}", 
+            LogLevel.DECISION,
+            f"decision:{decision_type}",
             f"→ {choice}",
-            {"reason": reason, "scores": scores} if scores else {"reason": reason}
+            {"reason": reason, "scores": scores} if scores else {"reason": reason},
         )
-    
-    def log_cut_decision(self, cut_index: int, source_clip: str, start_time: float, 
-                         duration: float, beat_aligned: bool, reason: str):
+
+    def log_cut_decision(
+        self,
+        cut_index: int,
+        source_clip: str,
+        start_time: float,
+        duration: float,
+        beat_aligned: bool,
+        reason: str,
+    ):
         """Log detailed cut/edit decision"""
         self._log(
             LogLevel.DECISION,
             "cut",
-            f"Cut #{cut_index}: {os.path.basename(source_clip)} [{start_time:.2f}s → {start_time+duration:.2f}s]",
+            f"Cut #{cut_index}: {os.path.basename(source_clip)} [{start_time:.2f}s → {start_time + duration:.2f}s]",
             {
                 "duration": f"{duration:.2f}s",
                 "beat_aligned": beat_aligned,
-                "reason": reason
-            }
+                "reason": reason,
+            },
         )
-    
+
     # ==================== DATA FLOW LOGGING ====================
-    
-    def log_data_flow(self, stage: str, input_desc: str, output_desc: str, 
-                      transform: str = None, details: Dict = None):
+
+    def log_data_flow(
+        self,
+        stage: str,
+        input_desc: str,
+        output_desc: str,
+        transform: str = None,
+        details: Dict = None,
+    ):
         """
         Log data transformation between pipeline stages.
-        
+
         Example:
             monitor.log_data_flow(
                 "scene_detection",
@@ -381,11 +420,18 @@ class Monitor:
             LogLevel.DATA,
             f"flow:{stage}",
             f"{input_desc} → {output_desc}",
-            {"transform": transform, **(details or {})}
+            {"transform": transform, **(details or {})},
         )
-    
-    def log_input_analysis(self, filename: str, width: int, height: int, 
-                           duration: float, fps: float, codec: str = None):
+
+    def log_input_analysis(
+        self,
+        filename: str,
+        width: int,
+        height: int,
+        duration: float,
+        fps: float,
+        codec: str = None,
+    ):
         """Log video file analysis results"""
         self._log(
             LogLevel.DATA,
@@ -395,29 +441,24 @@ class Monitor:
                 "resolution": f"{width}x{height}",
                 "duration": f"{duration:.1f}s",
                 "fps": fps,
-                "codec": codec or "unknown"
-            }
+                "codec": codec or "unknown",
+            },
         )
-    
+
     # ==================== METRIC LOGGING ====================
-    
+
     def log_metric(self, name: str, value: float, unit: str = None):
         """Log a performance or quality metric"""
         if name not in self.metrics:
             self.metrics[name] = []
         self.metrics[name].append(value)
-        
+
         unit_str = f" {unit}" if unit else ""
         self._log(LogLevel.METRIC, "metric", f"{name}: {value:.3f}{unit_str}")
-    
+
     def log_timing(self, operation: str, duration_ms: float):
         """Log operation timing"""
-        self._log(
-            LogLevel.METRIC,
-            "timing",
-            f"{operation}",
-            duration_ms=duration_ms
-        )
+        self._log(LogLevel.METRIC, "timing", f"{operation}", duration_ms=duration_ms)
 
     # ==================== KPI TRACKING ====================
 
@@ -433,7 +474,7 @@ class Monitor:
             LogLevel.METRIC,
             "kpi:ttfp",
             f"Time-to-First-Preview: {duration_s:.2f}s",
-            {"target_s": 30.0, "met": duration_s <= 30.0}
+            {"target_s": 30.0, "met": duration_s <= 30.0},
         )
 
     def log_feature_usage(self, features: Dict[str, bool]):
@@ -446,11 +487,7 @@ class Monitor:
         self.feature_usage.update(features)
         enabled = [k for k, v in features.items() if v]
         if enabled:
-            self._log(
-                LogLevel.INFO,
-                "feature_usage",
-                f"Enabled: {', '.join(enabled)}"
-            )
+            self._log(LogLevel.INFO, "feature_usage", f"Enabled: {', '.join(enabled)}")
 
     def log_render_kpi(self, input_duration_s: float, render_time_s: float):
         """
@@ -463,23 +500,25 @@ class Monitor:
         self._log(
             LogLevel.METRIC,
             "kpi:render",
-            f"Render {input_duration_s:.1f}s video in {render_time_s:.1f}s ({factor:.2f}x realtime)"
+            f"Render {input_duration_s:.1f}s video in {render_time_s:.1f}s ({factor:.2f}x realtime)",
         )
-    
+
     def log_progress(self, current: int, total: int, item: str = "items"):
         """Log progress update"""
         pct = (current / total * 100) if total > 0 else 0
         bar_len = 20
         filled = int(bar_len * current / total) if total > 0 else 0
         bar = "█" * filled + "░" * (bar_len - filled)
-        
+
         print(f"\r   [{bar}] {current}/{total} {item} ({pct:.0f}%)", end="", flush=True)
         if current >= total:
             print()  # Newline when complete
-    
+
     # ==================== ANALYSIS RESULTS ====================
-    
-    def log_scene_detection(self, video_path: str, scenes: List[Dict], threshold: float):
+
+    def log_scene_detection(
+        self, video_path: str, scenes: List[Dict], threshold: float
+    ):
         """Log scene detection results"""
         self._log(
             LogLevel.DATA,
@@ -488,12 +527,14 @@ class Monitor:
             {
                 "threshold": threshold,
                 "scene_count": len(scenes),
-                "avg_duration": sum(s.get('duration', 0) for s in scenes) / max(len(scenes), 1)
-            }
+                "avg_duration": sum(s.get("duration", 0) for s in scenes)
+                / max(len(scenes), 1),
+            },
         )
-    
-    def log_beat_analysis(self, audio_path: str, bpm: float, beat_count: int, 
-                          energy_profile: str = None):
+
+    def log_beat_analysis(
+        self, audio_path: str, bpm: float, beat_count: int, energy_profile: str = None
+    ):
         """Log music/beat analysis results"""
         self._log(
             LogLevel.DATA,
@@ -502,31 +543,32 @@ class Monitor:
             {
                 "bpm": bpm,
                 "beat_count": beat_count,
-                "energy_profile": energy_profile or "mixed"
-            }
+                "energy_profile": energy_profile or "mixed",
+            },
         )
-    
-    def log_energy_mapping(self, time_point: float, energy: float, 
-                           suggested_cut_length: float, reason: str):
+
+    def log_energy_mapping(
+        self, time_point: float, energy: float, suggested_cut_length: float, reason: str
+    ):
         """Log energy-based editing decision"""
         self._log(
             LogLevel.DECISION,
             "energy_map",
             f"@{time_point:.1f}s: energy={energy:.2f} → cut={suggested_cut_length:.2f}s",
-            {"reason": reason}
+            {"reason": reason},
         )
-    
+
     # ==================== CLIP PROCESSING ====================
-    
+
     def log_clip_start(self, clip_index: int, source: str, operation: str):
         """Log start of clip processing"""
         self.clip_count = max(self.clip_count, clip_index)
         self._log(
             LogLevel.INFO,
             "clip_process",
-            f"[{clip_index}] {operation}: {os.path.basename(source)}"
+            f"[{clip_index}] {operation}: {os.path.basename(source)}",
         )
-    
+
     def log_clip_complete(self, clip_index: int, output: str, duration_ms: float):
         """Log completion of clip processing"""
         self.processed_count += 1
@@ -534,66 +576,90 @@ class Monitor:
             LogLevel.SUCCESS,
             "clip_complete",
             f"[{clip_index}] → {os.path.basename(output)}",
-            duration_ms=duration_ms
+            duration_ms=duration_ms,
         )
-    
+
     # ==================== ASSEMBLING PHASE ====================
-    
-    def log_assembling_start(self, total_clips: int, target_duration: float, tempo: float):
+
+    def log_assembling_start(
+        self, total_clips: int, target_duration: float, tempo: float
+    ):
         """Log start of assembling phase"""
         self._log(
             LogLevel.INFO,
             "assembling",
-            f"Starting assembly: {total_clips} clips → {target_duration:.1f}s @ {tempo:.0f} BPM"
+            f"Starting assembly: {total_clips} clips → {target_duration:.1f}s @ {tempo:.0f} BPM",
         )
-    
-    def log_cut_placed(self, cut_num: int, total_cuts: int, clip_name: str, 
-                       start: float, duration: float, beat_idx: int, beats_per_cut: int,
-                       energy: float, score: int, reason: str):
+
+    def log_cut_placed(
+        self,
+        cut_num: int,
+        total_cuts: int,
+        clip_name: str,
+        start: float,
+        duration: float,
+        beat_idx: int,
+        beats_per_cut: int,
+        energy: float,
+        score: int,
+        reason: str,
+    ):
         """Log each cut placement with full context"""
         # Progress bar
         pct = (cut_num / total_cuts * 100) if total_cuts > 0 else 0
         bar_len = 15
         filled = int(bar_len * cut_num / total_cuts) if total_cuts > 0 else 0
         bar = "█" * filled + "░" * (bar_len - filled)
-        
+
         logger.info(f"\n   ┌─ Cut #{cut_num} [{bar}] {pct:.0f}%")
         logger.info(f"   │  📹 {os.path.basename(clip_name)}")
-        logger.info(f"   │  ⏱️  {start:.2f}s → {start+duration:.2f}s ({duration:.2f}s)")
+        logger.info(
+            f"   │  ⏱️  {start:.2f}s → {start + duration:.2f}s ({duration:.2f}s)"
+        )
         logger.info(f"   │  🎵 Beat {beat_idx} + {beats_per_cut} beats")
         logger.info(f"   │  ⚡ Energy: {energy:.2f} | Score: {score}")
         logger.info(f"   └─ 💡 {reason}")
-    
+
     def log_cut_summary(self, cut_num: int, total_expected: int, timeline_pos: float):
         """Quick progress update for cuts"""
         if cut_num % 5 == 0 or cut_num == total_expected:  # Every 5th cut
-            logger.info(f"   📍 Progress: {cut_num} cuts placed, timeline @ {timeline_pos:.1f}s")
-    
-    def log_clip_selection(self, selected: str, candidates: List[Dict], 
-                           winning_score: int, selection_reason: str):
+            logger.info(
+                f"   📍 Progress: {cut_num} cuts placed, timeline @ {timeline_pos:.1f}s"
+            )
+
+    def log_clip_selection(
+        self,
+        selected: str,
+        candidates: List[Dict],
+        winning_score: int,
+        selection_reason: str,
+    ):
         """Log clip selection decision with alternatives"""
         alt_list = [f"{c['name']}({c['score']})" for c in candidates[:3]]
         self._log(
             LogLevel.DECISION,
             "clip_selection",
             f"→ {selected} (score={winning_score})",
-            {
-                "alternatives": alt_list,
-                "reason": selection_reason
-            }
+            {"alternatives": alt_list, "reason": selection_reason},
         )
-    
-    def log_transition_applied(self, transition_type: str, duration: float, reason: str):
+
+    def log_transition_applied(
+        self, transition_type: str, duration: float, reason: str
+    ):
         """Log transition decision"""
-        logger.info(f"   │  🔄 Transition: {transition_type} ({duration:.2f}s) - {reason}")
-    
-    def log_enhancement_applied(self, _clip_num: int, enhancements: List[str], duration_ms: float):
+        logger.info(
+            f"   │  🔄 Transition: {transition_type} ({duration:.2f}s) - {reason}"
+        )
+
+    def log_enhancement_applied(
+        self, _clip_num: int, enhancements: List[str], duration_ms: float
+    ):
         """Log applied enhancements"""
         enh_str = " + ".join(enhancements) if enhancements else "none"
         logger.info(f"   │  ✨ Enhancements: {enh_str} ({duration_ms:.0f}ms)")
-    
+
     # ==================== RENDERING PHASE ====================
-    
+
     def log_render_start(self, output_path: str, settings: Dict):
         """Log render start"""
         logger.info(f"\n{'─' * 60}")
@@ -602,7 +668,7 @@ class Monitor:
         logger.info(f"   Output: {os.path.basename(output_path)}")
         for key, value in settings.items():
             logger.info(f"   • {key}: {value}")
-    
+
     def log_render_progress(self, frame: int, total_frames: int, fps: float):
         """Log render progress"""
         pct = (frame / total_frames * 100) if total_frames > 0 else 0
@@ -610,50 +676,56 @@ class Monitor:
         filled = int(bar_len * frame / total_frames) if total_frames > 0 else 0
         bar = "█" * filled + "░" * (bar_len - filled)
         eta = ((total_frames - frame) / fps) if fps > 0 else 0
-        
-        print(f"\r   [{bar}] {pct:.0f}% | {frame}/{total_frames} frames | ETA: {eta:.0f}s", end="", flush=True)
+
+        print(
+            f"\r   [{bar}] {pct:.0f}% | {frame}/{total_frames} frames | ETA: {eta:.0f}s",
+            end="",
+            flush=True,
+        )
         if frame >= total_frames:
             print()
-    
-    def log_render_complete(self, output_path: str, file_size_mb: float, duration_ms: float):
+
+    def log_render_complete(
+        self, output_path: str, file_size_mb: float, duration_ms: float
+    ):
         """Log render completion"""
         self._log(
             LogLevel.SUCCESS,
             "render",
             f"✅ Complete: {os.path.basename(output_path)} ({file_size_mb:.1f}MB)",
-            duration_ms=duration_ms
+            duration_ms=duration_ms,
         )
-    
+
     # ==================== STATUS METHODS ====================
-    
+
     def log_info(self, category: str, message: str, data: Dict = None):
         """General info logging"""
         self._log(LogLevel.INFO, category, message, data)
-    
+
     def log_warning(self, category: str, message: str, data: Dict = None):
         """Warning logging"""
         self._log(LogLevel.WARNING, category, message, data)
-    
+
     def log_error(self, category: str, message: str, data: Dict = None):
         """Error logging"""
         self._log(LogLevel.ERROR, category, message, data)
-    
+
     def log_success(self, category: str, message: str, data: Dict = None):
         """Success logging"""
         self._log(LogLevel.SUCCESS, category, message, data)
-    
+
     # ==================== RESOURCE MONITORING ====================
-    
+
     def log_resources(self):
         """Log current system resource usage"""
         try:
             process = psutil.Process()
             mem = process.memory_info()
             cpu = process.cpu_percent()
-            
+
             # System memory
             sys_mem = psutil.virtual_memory()
-            
+
             self._log(
                 LogLevel.METRIC,
                 "resources",
@@ -662,34 +734,34 @@ class Monitor:
                     "process_rss_gb": mem.rss / 1024**3,
                     "process_cpu_pct": cpu,
                     "system_mem_pct": sys_mem.percent,
-                    "system_available_gb": sys_mem.available / 1024**3
-                }
+                    "system_available_gb": sys_mem.available / 1024**3,
+                },
             )
         except Exception as e:
             self._log(LogLevel.WARNING, "resources", f"Could not read resources: {e}")
-    
+
     # ==================== SUMMARY ====================
-    
+
     def print_summary(self):
         """Print final job summary"""
         total_time = time.time() - self.start_time
-        
+
         logger.info("\n" + "=" * 70)
         logger.info("📋 JOB SUMMARY")
         logger.info("=" * 70)
         logger.info(f"   Job ID:         {self.job_id}")
-        logger.info(f"   Total Duration: {total_time:.1f}s ({total_time/60:.1f}min)")
+        logger.info(f"   Total Duration: {total_time:.1f}s ({total_time / 60:.1f}min)")
         logger.info(f"   Clips Processed: {self.processed_count}")
         logger.info(f"   Decisions Made: {len(self.decisions)}")
         logger.info(f"   Events Logged:  {len(self.events)}")
-        
+
         # Phase breakdown
         if self.phase_times:
             logger.info(f"\n   ⏱️ Phase Timing:")
             for phase, ms in self.phase_times.items():
                 pct = (ms / (total_time * 1000)) * 100
-                logger.info(f"      • {phase}: {ms/1000:.1f}s ({pct:.0f}%)")
-        
+                logger.info(f"      • {phase}: {ms / 1000:.1f}s ({pct:.0f}%)")
+
         # Metric summaries
         if self.metrics:
             logger.info(f"\n   📈 Metrics:")
@@ -706,10 +778,12 @@ class Monitor:
         # Feature usage
         if self.feature_usage:
             enabled = [k for k, v in self.feature_usage.items() if v]
-            logger.info(f"\n   🔧 Features: {', '.join(enabled) if enabled else 'none'}")
+            logger.info(
+                f"\n   🔧 Features: {', '.join(enabled) if enabled else 'none'}"
+            )
 
         logger.info("=" * 70 + "\n")
-    
+
     def export_json(self, filepath: str):
         """Export all monitoring data as JSON"""
         data = {
@@ -720,12 +794,12 @@ class Monitor:
             "feature_usage": self.feature_usage,
             "decisions": self.decisions,
             "metrics": self.metrics,
-            "events": [asdict(e) for e in self.events]
+            "events": [asdict(e) for e in self.events],
         }
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, "w") as f:
             json.dump(data, f, indent=2)
-        
+
         self._log(LogLevel.SUCCESS, "export", f"Monitoring data exported to {filepath}")
 
 
@@ -743,3 +817,232 @@ def init_monitor(job_id: str, verbose: bool = True) -> Monitor:
     global _monitor
     _monitor = Monitor(job_id, verbose)
     return _monitor
+
+
+# =============================================================================
+# Prometheus-Compatible Metrics
+# =============================================================================
+
+import threading
+from collections import defaultdict
+from contextlib import contextmanager
+
+
+class Counter:
+    """Monotonically increasing counter for metrics."""
+
+    def __init__(self, name: str, description: str = ""):
+        self.name = name
+        self.description = description
+        self._values: Dict[tuple, float] = defaultdict(float)
+        self._lock = threading.Lock()
+
+    def inc(self, amount: float = 1.0, labels: Optional[Dict[str, str]] = None):
+        """Increment counter."""
+        label_tuple = tuple(sorted((labels or {}).items()))
+        with self._lock:
+            self._values[label_tuple] += amount
+
+    def get(self, labels: Optional[Dict[str, str]] = None) -> float:
+        """Get current counter value."""
+        label_tuple = tuple(sorted((labels or {}).items()))
+        with self._lock:
+            return self._values[label_tuple]
+
+
+class Histogram:
+    """Histogram for measuring distributions."""
+
+    DEFAULT_BUCKETS = [
+        0.005,
+        0.01,
+        0.025,
+        0.05,
+        0.075,
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+        2.5,
+        5.0,
+        7.5,
+        10.0,
+        30.0,
+        60.0,
+    ]
+
+    def __init__(
+        self, name: str, description: str = "", buckets: Optional[list] = None
+    ):
+        self.name = name
+        self.description = description
+        self.buckets = buckets or self.DEFAULT_BUCKETS
+        self._values: Dict[tuple, list] = defaultdict(list)
+        self._lock = threading.Lock()
+
+    def observe(self, value: float, labels: Optional[Dict[str, str]] = None):
+        """Observe a value."""
+        label_tuple = tuple(sorted((labels or {}).items()))
+        with self._lock:
+            self._values[label_tuple].append(value)
+
+
+class Gauge:
+    """Gauge that can go up and down."""
+
+    def __init__(self, name: str, description: str = ""):
+        self.name = name
+        self.description = description
+        self._values: Dict[tuple, float] = {}
+        self._lock = threading.Lock()
+
+    def set(self, value: float, labels: Optional[Dict[str, str]] = None):
+        """Set gauge value."""
+        label_tuple = tuple(sorted((labels or {}).items()))
+        with self._lock:
+            self._values[label_tuple] = value
+
+    def inc(self, amount: float = 1.0, labels: Optional[Dict[str, str]] = None):
+        """Increment gauge."""
+        label_tuple = tuple(sorted((labels or {}).items()))
+        with self._lock:
+            self._values[label_tuple] = self._values.get(label_tuple, 0) + amount
+
+    def dec(self, amount: float = 1.0, labels: Optional[Dict[str, str]] = None):
+        """Decrement gauge."""
+        self.inc(-amount, labels)
+
+
+class MetricsRegistry:
+    """Central registry for all metrics."""
+
+    def __init__(self):
+        self._counters: Dict[str, Counter] = {}
+        self._gauges: Dict[str, Gauge] = {}
+        self._histograms: Dict[str, Histogram] = {}
+        self._lock = threading.Lock()
+
+    def counter(self, name: str, description: str = "") -> Counter:
+        """Get or create counter."""
+        with self._lock:
+            if name not in self._counters:
+                self._counters[name] = Counter(name, description)
+            return self._counters[name]
+
+    def gauge(self, name: str, description: str = "") -> Gauge:
+        """Get or create gauge."""
+        with self._lock:
+            if name not in self._gauges:
+                self._gauges[name] = Gauge(name, description)
+            return self._gauges[name]
+
+    def histogram(
+        self, name: str, description: str = "", buckets: Optional[list] = None
+    ) -> Histogram:
+        """Get or create histogram."""
+        with self._lock:
+            if name not in self._histograms:
+                self._histograms[name] = Histogram(name, description, buckets)
+            return self._histograms[name]
+
+    def to_prometheus(self) -> str:
+        """Export metrics in Prometheus format."""
+        lines = []
+
+        # Counters
+        for name, counter in self._counters.items():
+            lines.append(f"# HELP {name} {counter.description}")
+            lines.append(f"# TYPE {name} counter")
+            for labels, value in counter._values.items():
+                label_str = self._format_labels(labels)
+                lines.append(f"{name}{label_str} {value}")
+
+        # Gauges
+        for name, gauge in self._gauges.items():
+            lines.append(f"# HELP {name} {gauge.description}")
+            lines.append(f"# TYPE {name} gauge")
+            for labels, value in gauge._values.items():
+                label_str = self._format_labels(labels)
+                lines.append(f"{name}{label_str} {value}")
+
+        # Histograms
+        for name, hist in self._histograms.items():
+            lines.append(f"# HELP {name} {hist.description}")
+            lines.append(f"# TYPE {name} histogram")
+            for labels in hist._values.keys():
+                values = hist._values[labels]
+                buckets = {b: sum(1 for v in values if v <= b) for b in hist.buckets}
+                buckets[float("inf")] = len(values)
+
+                for bucket, count in buckets.items():
+                    label_str = self._format_labels(labels, le=bucket)
+                    lines.append(f"{name}_bucket{label_str} {count}")
+
+                label_str = self._format_labels(labels)
+                lines.append(f"{name}_sum{label_str} {sum(values)}")
+                lines.append(f"{name}_count{label_str} {len(values)}")
+
+        return "\n".join(lines)
+
+    def _format_labels(self, labels: tuple, **extra) -> str:
+        """Format labels for Prometheus."""
+        if not labels and not extra:
+            return ""
+
+        all_labels = dict(labels)
+        all_labels.update(extra)
+
+        parts = [f'{k}="{v}"' for k, v in sorted(all_labels.items())]
+        return "{" + ",".join(parts) + "}"
+
+
+# Global registry
+METRICS = MetricsRegistry()
+
+# Pre-defined metrics
+RENDERS_TOTAL = METRICS.counter("montage_renders_total", "Total number of renders")
+RENDER_DURATION = METRICS.histogram(
+    "montage_render_duration_seconds", "Render duration"
+)
+CLIP_SELECTIONS = METRICS.counter(
+    "montage_clip_selections_total", "Total clip selections"
+)
+SCENE_DETECTIONS = METRICS.counter(
+    "montage_scene_detections_total", "Total scene detections"
+)
+CACHE_HITS = METRICS.counter("montage_cache_hits_total", "Cache hits")
+CACHE_MISSES = METRICS.counter("montage_cache_misses_total", "Cache misses")
+ACTIVE_JOBS = METRICS.gauge("montage_active_jobs", "Currently active jobs")
+QUEUE_DEPTH = METRICS.gauge("montage_queue_depth", "Job queue depth")
+
+
+@contextmanager
+def record_render_duration(style: str):
+    """Context manager for timing render operations."""
+    start = time.time()
+    ACTIVE_JOBS.inc()
+    try:
+        yield
+        RENDERS_TOTAL.inc(1, {"style": style, "status": "success"})
+    except Exception:
+        RENDERS_TOTAL.inc(1, {"style": style, "status": "error"})
+        raise
+    finally:
+        RENDER_DURATION.observe(time.time() - start, {"style": style})
+        ACTIVE_JOBS.dec()
+
+
+def record_cache_hit(cache_type: str):
+    """Record a cache hit."""
+    CACHE_HITS.inc(1, {"type": cache_type})
+
+
+def record_cache_miss(cache_type: str):
+    """Record a cache miss."""
+    CACHE_MISSES.inc(1, {"type": cache_type})
+
+
+def get_metrics() -> str:
+    """Get all metrics in Prometheus format."""
+    return METRICS.to_prometheus()

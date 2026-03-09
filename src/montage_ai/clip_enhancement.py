@@ -270,13 +270,15 @@ def _check_vidstab_available() -> bool:
         return _VIDSTAB_AVAILABLE
 
     try:
-        result = run_command(
+        result = subprocess.run(
             build_ffmpeg_cmd(["-filters"], overwrite=False),
             capture_output=True,
+            text=True,
             timeout=_settings.processing.ffmpeg_short_timeout,
-            check=False
+            check=False,
         )
-        _VIDSTAB_AVAILABLE = "vidstabdetect" in result.stdout
+        filters_text = f"{result.stdout or ''}\n{result.stderr or ''}"
+        _VIDSTAB_AVAILABLE = "vidstabdetect" in filters_text
         if _VIDSTAB_AVAILABLE:
             logger.info("vidstab (libvidstab) available - using 2-pass stabilization")
         else:

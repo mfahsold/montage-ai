@@ -35,11 +35,18 @@ from .config import get_settings
 from .style_templates import get_style_template, list_available_styles
 from .logger import logger
 from .utils import clamp, coerce_float, strip_markdown_json
-from .prompts import get_director_prompt, get_broll_planner_prompt, DirectorOutput, BRollPlan, SCHEMA_VERSION
+from .prompts import (
+    get_director_prompt,
+    get_broll_planner_prompt,
+    DirectorOutput,
+    BRollPlan,
+    SCHEMA_VERSION,
+)
 
 # Try importing OpenAI client for cgpu/Gemini support
 try:
     from openai import OpenAI
+
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -50,11 +57,41 @@ VERSION = "0.3.0"
 # Heuristic style detection (shared by template selection + memory hints)
 STYLE_KEYWORDS = {
     "hitchcock": ["hitchcock", "suspense", "thriller", "tension", "mystery"],
-    "action": ["action", "blockbuster", "explosive", "michael bay", "fast cuts", "adrenaline"],
+    "action": [
+        "action",
+        "blockbuster",
+        "explosive",
+        "michael bay",
+        "fast cuts",
+        "adrenaline",
+    ],
     "mtv": ["mtv", "music video", "fast-paced", "fast paced", "energetic", "rapid"],
-    "documentary": ["documentary", "doc", "realism", "natural", "observational", "vérité", "verite"],
-    "minimalist": ["minimalist", "art film", "meditative", "calm", "contemplative", "long takes", "slow"],
-    "wes_anderson": ["wes anderson", "whimsical", "symmetry", "symmetrical", "pastel", "quirky"],
+    "documentary": [
+        "documentary",
+        "doc",
+        "realism",
+        "natural",
+        "observational",
+        "vérité",
+        "verite",
+    ],
+    "minimalist": [
+        "minimalist",
+        "art film",
+        "meditative",
+        "calm",
+        "contemplative",
+        "long takes",
+        "slow",
+    ],
+    "wes_anderson": [
+        "wes anderson",
+        "whimsical",
+        "symmetry",
+        "symmetrical",
+        "pastel",
+        "quirky",
+    ],
 }
 
 MOOD_TO_STYLE = {
@@ -68,9 +105,45 @@ MOOD_TO_STYLE = {
     "artistic": "minimalist",
 }
 
+# Color grading detection from natural language
+COLOR_GRADING_KEYWORDS = {
+    "teal_orange": [
+        "teal and orange",
+        "hollywood",
+        "blockbuster",
+        "cinematic look",
+        "orange and teal",
+        "summer blockbuster",
+    ],
+    "warm": ["warm", "golden", "sunset", "sunrise", "cozy", "autumn", "fall colors"],
+    "cool": ["cool", "blue", "cold", "winter", "icy", "frost", "night"],
+    "vintage": ["vintage", "retro", "old film", "classic", "60s", "70s", "80s", "90s"],
+    "noir": ["noir", "black and white", "bw", "monochrome", "film noir", "detective"],
+    "vibrant": ["vibrant", "saturated", "colorful", "pop", "vivid", "bright"],
+    "desaturated": ["desaturated", "muted", "faded", "matte", "flat", "low saturation"],
+    "golden_hour": ["golden hour", "magic hour", "sunset glow", "warm glow"],
+    "blue_hour": ["blue hour", "twilight", "dusk", "dawn"],
+    "high_contrast": ["high contrast", "dramatic", "punchy", "bold"],
+    "natural": ["natural", "true to life", "authentic", "realistic", "neutral"],
+}
+
+MOOD_TO_COLOR_GRADING = {
+    "cinematic": "teal_orange",
+    "dramatic": "high_contrast",
+    "warm": "warm",
+    "cool": "cool",
+    "vintage": "vintage",
+    "professional": "natural",
+    "artistic": "vibrant",
+    "documentary": "documentary",
+    "minimalist": "desaturated",
+    "beautiful": "golden_hour",
+}
+
 # Backend configuration
 # Priority: OPENAI_API_BASE (LiteLLM/llama-box or other OpenAI-compatible) > GOOGLE_API_KEY (direct Gemini)
 #           > CGPU_ENABLED (cgpu serve) > Ollama (local)
+
 
 def _get_llm_config():
     return get_settings().llm
@@ -99,7 +172,7 @@ class CreativeDirector:
         persona: str = (
             "the Creative Director for the Montage AI system - intent-in/decisions-out, "
             "export-friendly (EDL/OTIO/NLE), polish don't generate"
-        )
+        ),
     ):
         """
         Initialize Creative Director.
@@ -119,7 +192,7 @@ class CreativeDirector:
         self.timeout = timeout if timeout is not None else self.llm_config.timeout
         self._resolved_openai_model = None
         self._resolved_openai_vision_model = None
-        
+
         # Determine available backends (allow multiple for fallback)
         if use_openai_api is None:
             self.use_openai_api = self.llm_config.has_openai_backend
@@ -130,29 +203,37 @@ class CreativeDirector:
             self.use_cgpu = self.llm_config.cgpu_enabled and OPENAI_AVAILABLE
         else:
             self.use_cgpu = use_cgpu and OPENAI_AVAILABLE
-            
+
         if use_google_ai is None:
             self.use_google_ai = self.llm_config.has_google_backend
         else:
             self.use_google_ai = use_google_ai
-        
+
         # Log backend selection (primary)
         if self.use_openai_api:
             model_hint = self.llm_config.openai_model or "auto"
             base_url = self.llm_config.openai_api_base or "not-configured"
             # Detect if this is LiteLLM (canonical fluxibri_core pattern)
             if "litellm" in base_url.lower() or "llama-box" in base_url.lower():
-                logger.info(f"Creative Director primary backend: LiteLLM/Unified Proxy (canonical fluxibri pattern) - {model_hint}")
+                logger.info(
+                    f"Creative Director primary backend: LiteLLM/Unified Proxy (canonical fluxibri pattern) - {model_hint}"
+                )
             else:
-                logger.info(f"Creative Director primary backend: OpenAI-compatible API ({model_hint})")
+                logger.info(
+                    f"Creative Director primary backend: OpenAI-compatible API ({model_hint})"
+                )
         elif self.use_cgpu:
             cgpu_url = f"http://{self.llm_config.cgpu_host}:{self.llm_config.cgpu_port}"
             logger.info(f"Creative Director primary backend: cgpu/Gemini at {cgpu_url}")
         elif self.use_google_ai:
-            logger.info(f"Creative Director primary backend: Google AI ({self.llm_config.google_ai_model})")
+            logger.info(
+                f"Creative Director primary backend: Google AI ({self.llm_config.google_ai_model})"
+            )
         else:
-            logger.info(f"Creative Director primary backend: Ollama ({self.ollama_model})")
-        
+            logger.info(
+                f"Creative Director primary backend: Ollama ({self.ollama_model})"
+            )
+
         # Initialize OpenAI client for OpenAI-compatible backend
         self.openai_client = None
         if self.use_openai_api and OPENAI_AVAILABLE:
@@ -160,12 +241,12 @@ class CreativeDirector:
                 self.openai_client = OpenAI(
                     base_url=self.llm_config.openai_api_base,
                     api_key=self.llm_config.openai_api_key,
-                    timeout=self.timeout
+                    timeout=self.timeout,
                 )
             except Exception as e:
                 logger.warning(f"Failed to initialize OpenAI client: {e}")
                 self.use_openai_api = False
-        
+
         # Initialize cgpu client if enabled (even if OpenAI is also enabled, for fallback)
         self.cgpu_client = None
         if self.use_cgpu:
@@ -176,7 +257,7 @@ class CreativeDirector:
                 self.cgpu_client = OpenAI(
                     base_url=cgpu_url,
                     api_key="unused",  # cgpu ignores API key
-                    timeout=self.timeout
+                    timeout=self.timeout,
                 )
             except Exception as e:
                 logger.warning(f"Failed to initialize cgpu client: {e}")
@@ -185,15 +266,19 @@ class CreativeDirector:
         # Build system prompt with available styles from presets
         available_styles = list_available_styles()
         styles_list = "\n".join(
-            [f"- {name}: {get_style_template(name)['description']}" for name in available_styles]
+            [
+                f"- {name}: {get_style_template(name)['description']}"
+                for name in available_styles
+            ]
         )
-        
+
         # SOTA 2026: Directorial Memory (Experience-driven)
         from .regisseur_memory import get_regisseur_memory
+
         self._regisseur_memory = get_regisseur_memory()
         self._base_system_prompt = get_director_prompt(persona, styles_list)
         self.system_prompt = self._base_system_prompt
-        
+
         # One-time backend availability check (not per-call logging)
         # This prevents log spam from repeated failed attempts
         self._backends_available = self._check_backends_available()
@@ -212,10 +297,10 @@ class CreativeDirector:
     def _check_backends_available(self) -> bool:
         """
         Check if any LLM backend is actually available.
-        
+
         Returns True if at least one backend is configured and potentially reachable.
         This is called once at init to avoid per-call logging.
-        
+
         Returns:
             bool: True if backends are available
         """
@@ -230,12 +315,17 @@ class CreativeDirector:
         if self.ollama_host:
             try:
                 import socket
-                host, port = self.ollama_host.split(':') if ':' in self.ollama_host else (self.ollama_host, 11434)
+
+                host, port = (
+                    self.ollama_host.split(":")
+                    if ":" in self.ollama_host
+                    else (self.ollama_host, 11434)
+                )
                 socket.create_connection((host, int(port)), timeout=0.5)
                 return True
             except (socket.error, socket.timeout, ValueError, AttributeError):
                 pass
-        
+
         return False
 
     def _models_url(self) -> str:
@@ -291,14 +381,14 @@ class CreativeDirector:
         temperature: float = 0.3,
         max_tokens: int = 1024,
         max_retries: int = 2,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
     ) -> Optional[str]:
         """
         Unified query interface for all LLM/VLM tasks.
-        
+
         Supports standard text prompts and vision (images).
         Automatically falls back between backends.
-        
+
         Args:
             prompt: User prompt
             system_prompt: Optional system prompt
@@ -308,7 +398,7 @@ class CreativeDirector:
             max_tokens: Max output tokens
             max_retries: Number of retries per backend
             timeout: Request timeout
-            
+
         Returns:
             Raw response text or None if all backends fail
         """
@@ -322,7 +412,7 @@ class CreativeDirector:
 
         formatted_prompt = self._format_user_prompt(prompt)
         effective_timeout = timeout if timeout else self.timeout
-        
+
         # Track attempted backends for fallback
         backends_attempted = []
         backend_errors = {}
@@ -344,10 +434,14 @@ class CreativeDirector:
                 # Use retry wrapper
                 response = self._query_with_retry(
                     query_fn,
-                    system_prompt, formatted_prompt, image_b64,
-                    json_mode, temperature, max_tokens,
+                    system_prompt,
+                    formatted_prompt,
+                    image_b64,
+                    json_mode,
+                    temperature,
+                    max_tokens,
                     max_retries=max_retries,
-                    timeout=effective_timeout
+                    timeout=effective_timeout,
                 )
 
                 if response:
@@ -376,36 +470,46 @@ class CreativeDirector:
         json_mode: bool = True,
         temperature: float = 0.3,
         max_tokens: int = 1024,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
     ) -> Optional[str]:
         """Unified OpenAI query handling text and vision."""
         content = [{"type": "text", "text": user_prompt}]
         if image_b64:
-            content.append({
-                "type": "image_url", 
-                "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
-            })
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                }
+            )
 
         base_model = self.llm_config.openai_model or ""
         vision_model = self.llm_config.openai_vision_model or base_model
-        resolved_model = self._resolve_openai_model(base_model, "_resolved_openai_model")
-        resolved_vision_model = self._resolve_openai_model(vision_model, "_resolved_openai_vision_model") if image_b64 else None
+        resolved_model = self._resolve_openai_model(
+            base_model, "_resolved_openai_model"
+        )
+        resolved_vision_model = (
+            self._resolve_openai_model(vision_model, "_resolved_openai_vision_model")
+            if image_b64
+            else None
+        )
         model_id = resolved_vision_model or resolved_model
         if not model_id:
-            raise RuntimeError("OpenAI backend configured but no model available (set OPENAI_MODEL or ensure /v1/models works)")
+            raise RuntimeError(
+                "OpenAI backend configured but no model available (set OPENAI_MODEL or ensure /v1/models works)"
+            )
 
         kwargs = {
             "model": model_id,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": content if image_b64 else user_prompt}
+                {"role": "user", "content": content if image_b64 else user_prompt},
             ],
             "temperature": temperature,
             "max_tokens": max_tokens,
-            "timeout": timeout or self.timeout
+            "timeout": timeout or self.timeout,
         }
-        
-        if json_mode and not image_b64: # Some v1 vision models don't support JSON mode
+
+        if json_mode and not image_b64:  # Some v1 vision models don't support JSON mode
             kwargs["response_format"] = {"type": "json_object"}
 
         try:
@@ -430,7 +534,7 @@ class CreativeDirector:
         json_mode: bool = True,
         temperature: float = 0.3,
         max_tokens: int = 1024,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
     ) -> Optional[str]:
         """Unified cgpu query supporting chat/completions and vision if possible."""
         # Use chat completions if no image, as it's more stable on cgpu serve
@@ -440,11 +544,11 @@ class CreativeDirector:
                     model=self.llm_config.cgpu_model,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
+                        {"role": "user", "content": user_prompt},
                     ],
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    timeout=timeout or self.timeout
+                    timeout=timeout or self.timeout,
                 )
                 if response.choices and response.choices[0].message.content:
                     return self._clean_llm_response(response.choices[0].message.content)
@@ -456,22 +560,29 @@ class CreativeDirector:
                     response = self.cgpu_client.responses.create(
                         model=self.llm_config.cgpu_model,
                         instructions=system_prompt,
-                        input=[{
-                            "role": "user",
-                            "content": [
-                                {"type": "input_text", "text": user_prompt},
-                                {"type": "input_image", "image_url": f"data:image/jpeg;base64,{image_b64}"}
-                            ]
-                        }],
+                        input=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "input_text", "text": user_prompt},
+                                    {
+                                        "type": "input_image",
+                                        "image_url": f"data:image/jpeg;base64,{image_b64}",
+                                    },
+                                ],
+                            }
+                        ],
                         max_output_tokens=max_tokens,
                         temperature=temperature,
-                        timeout=timeout or self.timeout
+                        timeout=timeout or self.timeout,
                     )
-                    
+
                     content = getattr(response, "output_text", None)
-                    if not content and hasattr(response, "choices"): # Try chat-like response
-                         content = response.choices[0].message.content
-                    
+                    if not content and hasattr(
+                        response, "choices"
+                    ):  # Try chat-like response
+                        content = response.choices[0].message.content
+
                     return self._clean_llm_response(content) if content else None
                 except Exception:
                     # Try standard Chat Completions with Vision formatting
@@ -480,19 +591,26 @@ class CreativeDirector:
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {
-                                "role": "user", 
+                                "role": "user",
                                 "content": [
                                     {"type": "text", "text": user_prompt},
-                                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
-                                ]
-                            }
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{image_b64}"
+                                        },
+                                    },
+                                ],
+                            },
                         ],
                         temperature=temperature,
                         max_tokens=max_tokens,
-                        timeout=timeout or self.timeout
+                        timeout=timeout or self.timeout,
                     )
                     if response.choices and response.choices[0].message.content:
-                        return self._clean_llm_response(response.choices[0].message.content)
+                        return self._clean_llm_response(
+                            response.choices[0].message.content
+                        )
             return None
         except Exception as e:
             logger.warning(f"cgpu unified query error: {e}")
@@ -506,37 +624,38 @@ class CreativeDirector:
         json_mode: bool = True,
         temperature: float = 0.3,
         max_tokens: int = 1024,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
     ) -> Optional[str]:
         """Unified Google AI query handling text and vision."""
         try:
             url = f"{self.llm_config.google_ai_endpoint}/{self.llm_config.google_ai_model}:generateContent"
-            
+
             parts = [{"text": f"{system_prompt}\n\nUser request: {user_prompt}"}]
             if image_b64:
-                parts.append({
-                    "inline_data": {
-                        "mime_type": "image/jpeg",
-                        "data": image_b64
-                    }
-                })
+                parts.append(
+                    {"inline_data": {"mime_type": "image/jpeg", "data": image_b64}}
+                )
 
             payload = {
                 "contents": [{"parts": parts}],
                 "generationConfig": {
                     "temperature": temperature,
                     "maxOutputTokens": max_tokens,
-                    "responseMimeType": "application/json" if json_mode else "text/plain"
-                }
+                    "responseMimeType": "application/json"
+                    if json_mode
+                    else "text/plain",
+                },
             }
-            
+
             headers = {
                 "Content-Type": "application/json",
-                "X-goog-api-key": self.llm_config.google_api_key
+                "X-goog-api-key": self.llm_config.google_api_key,
             }
-            
-            response = requests.post(url, json=payload, headers=headers, timeout=timeout or self.timeout)
-            
+
+            response = requests.post(
+                url, json=payload, headers=headers, timeout=timeout or self.timeout
+            )
+
             if response.status_code == 200:
                 result = response.json()
                 candidates = result.get("candidates", [])
@@ -557,7 +676,7 @@ class CreativeDirector:
         json_mode: bool = True,
         temperature: float = 0.3,
         max_tokens: int = 1024,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
     ) -> Optional[str]:
         """Unified Ollama query handling text and vision."""
         if not self.ollama_host:
@@ -565,14 +684,13 @@ class CreativeDirector:
 
         try:
             payload = {
-                "model": self.ollama_model if image_b64 else (self.llm_config.director_model or self.ollama_model),
+                "model": self.ollama_model
+                if image_b64
+                else (self.llm_config.director_model or self.ollama_model),
                 "prompt": user_prompt,
                 "system": system_prompt,
                 "stream": False,
-                "options": {
-                    "temperature": temperature,
-                    "num_predict": max_tokens
-                }
+                "options": {"temperature": temperature, "num_predict": max_tokens},
             }
             if json_mode:
                 payload["format"] = "json"
@@ -582,7 +700,7 @@ class CreativeDirector:
             response = requests.post(
                 f"{self.ollama_host}/api/generate",
                 json=payload,
-                timeout=timeout or self.timeout
+                timeout=timeout or self.timeout,
             )
 
             if response.status_code == 200:
@@ -603,22 +721,22 @@ class CreativeDirector:
         max_tokens: int = 1024,
         system_prompt: Optional[str] = None,
         max_retries: int = 2,
-        timeout_override: Optional[int] = None
+        timeout_override: Optional[int] = None,
     ) -> str:
         """
         Generic LLM query method for non-editing tasks (parameter suggestion, etc.).
-        
+
         This is a simplified interface for querying the LLM backend without
         the full editing instruction parsing logic. Used by ParameterSuggester
         and other utility modules.
-        
+
         **Robust error handling:**
         - Retry logic with exponential backoff (configurable)
         - Timeout override for specific queries
         - JSON parsing fallback (extracts JSON from malformed responses)
         - Circuit breaker: skip failing backends temporarily
         - Comprehensive logging for debugging
-        
+
         Args:
             prompt: User prompt
             temperature: Sampling temperature (0.0-2.0)
@@ -626,28 +744,28 @@ class CreativeDirector:
             system_prompt: Optional system prompt (defaults to generic assistant)
             max_retries: Maximum retry attempts per backend (default 2)
             timeout_override: Override default timeout for this query
-            
+
         Returns:
             Raw LLM response text
-            
+
         Raises:
             RuntimeError: If all backends fail after retries
         """
         if system_prompt is None:
             system_prompt = "You are an expert AI assistant for video post-production."
-        
+
         response = self.query(
             prompt=prompt,
             system_prompt=system_prompt,
             temperature=temperature,
             max_tokens=max_tokens,
             max_retries=max_retries,
-            timeout=timeout_override
+            timeout=timeout_override,
         )
-        
+
         if response:
             return response
-            
+
         raise RuntimeError(f"All LLM backends failed for query: {prompt[:50]}...")
 
     def _query_with_retry(
@@ -656,45 +774,47 @@ class CreativeDirector:
         *args,
         max_retries: int = 2,
         timeout: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> Optional[str]:
         """
         Retry wrapper with exponential backoff.
-        
+
         Per-call logging is suppressed here to avoid spam.
         Backend availability is checked once at init (__init__ sets _backends_available).
-        
+
         Args:
             query_fn: Callable to invoke
             *args: Positional args for query_fn
             max_retries: Max retry attempts (default 2)
             timeout: Timeout in seconds
             **kwargs: Keyword args for query_fn
-            
+
         Returns:
             Response from query_fn or None if all retries fail
         """
         import time
-        
+
         for attempt in range(max_retries + 1):
             try:
                 return query_fn(*args, timeout=timeout, **kwargs)
             except Exception as e:
                 if attempt < max_retries:
-                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s, ...
-                    logger.debug(f"Retry {attempt + 1}/{max_retries + 1} in {wait_time}s (error: {e})")
+                    wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s, ...
+                    logger.debug(
+                        f"Retry {attempt + 1}/{max_retries + 1} in {wait_time}s (error: {e})"
+                    )
                     time.sleep(wait_time)
                 else:
                     # Silent failure: already logged at __init__ if no backends available
                     logger.debug(f"Max retries exceeded: {e}")
-        
+
         return None
-    
+
     def _infer_style_from_prompt(self, user_prompt: str) -> Optional[str]:
         """Heuristic style detection for template selection and memory hints."""
         user_lower = user_prompt.lower()
         for style_name in list_available_styles():
-            if style_name in user_lower or style_name.replace('_', ' ') in user_lower:
+            if style_name in user_lower or style_name.replace("_", " ") in user_lower:
                 return style_name
         for style_name, keywords in STYLE_KEYWORDS.items():
             for keyword in keywords:
@@ -724,7 +844,7 @@ class CreativeDirector:
             "MEMORY_HINT_END\n"
             "Use this as a soft hint only. Do not change the required JSON-only output format."
         )
-    
+
     def interpret_prompt(self, user_prompt: str) -> Optional[Dict[str, Any]]:
         """
         Interpret natural language prompt and return editing instructions.
@@ -765,30 +885,40 @@ class CreativeDirector:
                 logger.error("LLM returned empty response")
                 return None
 
-            # Parse and validate JSON
-            instructions = self._parse_and_validate(response)
+            # Parse and validate JSON (pass prompt for color grading detection)
+            instructions = self._parse_and_validate(response, user_prompt)
             if instructions:
                 style_from_output = None
                 if isinstance(instructions, dict):
                     style_from_output = instructions.get("style", {}).get("name")
-                memory_advice = self._get_memory_advice(style_from_output) if style_from_output else None
+                memory_advice = (
+                    self._get_memory_advice(style_from_output)
+                    if style_from_output
+                    else None
+                )
                 used_memory_prompt = False
                 if memory_advice and style_name is None:
                     retry_prompt = self._build_director_prompt(memory_advice)
                     retry_response = self._query_llm(retry_prompt, user_prompt)
                     if retry_response:
-                        retry_instructions = self._parse_and_validate(retry_response)
+                        retry_instructions = self._parse_and_validate(
+                            retry_response, user_prompt
+                        )
                         if retry_instructions:
                             instructions = retry_instructions
                             used_memory_prompt = True
                 if memory_advice and not used_memory_prompt:
                     existing = instructions.get("director_commentary", "")
                     if existing:
-                        instructions["director_commentary"] = f"{existing} Memory hint: {memory_advice}"
+                        instructions["director_commentary"] = (
+                            f"{existing} Memory hint: {memory_advice}"
+                        )
                     else:
                         instructions["director_commentary"] = memory_advice
                 instructions.setdefault("schema_version", SCHEMA_VERSION)
-                logger.info(f"Generated editing instructions (style: {instructions['style']['name']})")
+                logger.info(
+                    f"Generated editing instructions (style: {instructions['style']['name']})"
+                )
                 return instructions
             else:
                 logger.info("LLM response incomplete, using defaults")
@@ -841,7 +971,7 @@ class CreativeDirector:
             system_prompt=system_prompt,
             json_mode=True,
             temperature=0.3,
-            max_tokens=1024
+            max_tokens=1024,
         )
 
     def _repair_json(self, text: str) -> str:
@@ -858,22 +988,22 @@ class CreativeDirector:
         import re
 
         # Remove JS-style comments
-        text = re.sub(r'//[^\n]*', '', text)
-        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+        text = re.sub(r"//[^\n]*", "", text)
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
 
         # Replace single quotes with double quotes for property names and values
         text = re.sub(r"'(\w+)':", r'"\1":', text)
         text = re.sub(r":\s*'([^']*)'", r': "\1"', text)
 
         # Remove trailing commas before } or ]
-        text = re.sub(r',\s*([}\]])', r'\1', text)
+        text = re.sub(r",\s*([}\]])", r"\1", text)
 
         # Check for unclosed strings by counting non-escaped quotes
         # Simple approach: count quotes outside of escaped sequences
         in_string = False
-        last_char = ''
+        last_char = ""
         for c in text:
-            if c == '"' and last_char != '\\':
+            if c == '"' and last_char != "\\":
                 in_string = not in_string
             last_char = c
 
@@ -882,18 +1012,20 @@ class CreativeDirector:
             text = text.rstrip() + '"'
 
         # Try to fix truncated JSON by closing open structures
-        open_braces = text.count('{') - text.count('}')
-        open_brackets = text.count('[') - text.count(']')
+        open_braces = text.count("{") - text.count("}")
+        open_brackets = text.count("[") - text.count("]")
 
         if open_braces > 0 or open_brackets > 0:
             # Strip trailing incomplete content
-            text = text.rstrip(',\n\t ')
+            text = text.rstrip(",\n\t ")
             # Close brackets/braces in correct order
-            text += ']' * open_brackets + '}' * open_braces
+            text += "]" * open_brackets + "}" * open_braces
 
         return text
 
-    def _parse_and_validate(self, llm_response: str) -> Optional[Dict[str, Any]]:
+    def _parse_and_validate(
+        self, llm_response: str, user_prompt: str = ""
+    ) -> Optional[Dict[str, Any]]:
         """
         Parse and validate LLM JSON response using Pydantic with robust fallback.
 
@@ -903,9 +1035,10 @@ class CreativeDirector:
         3. Extract JSON object using regex (find {...})
         4. Repair truncated JSON (auto-close unclosed braces)
         5. Return safe defaults if all parsing fails
-        
+
         Args:
             llm_response: Raw text from LLM (should be JSON)
+            user_prompt: Original user prompt for color grading detection
 
         Returns:
             Validated editing instructions dict, or None if invalid
@@ -915,8 +1048,11 @@ class CreativeDirector:
             cleaned_response = strip_markdown_json(llm_response)
 
             # Step 2: More aggressive search for the JSON object if it still looks like text
-            if not cleaned_response.startswith("{") or not cleaned_response.endswith("}"):
+            if not cleaned_response.startswith("{") or not cleaned_response.endswith(
+                "}"
+            ):
                 import re
+
                 # Find the first { and the last }
                 match = re.search(r"(\{.*\})", cleaned_response, re.DOTALL)
                 if match:
@@ -927,39 +1063,43 @@ class CreativeDirector:
 
             # Validate with Pydantic
             output = DirectorOutput.model_validate_json(cleaned_response)
-            
+
             # Convert to dict for internal use
             instructions = output.model_dump()
-            
-            # Merge with defaults to ensure all keys exist
-            defaults = self.get_default_instructions()
+
+            # Merge with defaults to ensure all keys exist (pass prompt for color grading detection)
+            defaults = self.get_default_instructions(user_prompt)
             return self._merge_defaults(defaults, instructions)
 
         except (json.JSONDecodeError, ValidationError) as e:
             logger.debug(f"First parse attempt failed: {str(e)[:100]}...")
-            
+
             # Fallback: try to extract JSON structure more aggressively if we haven't already
             try:
                 import re
+
                 match = re.search(r"(\{.*\})", llm_response, re.DOTALL)
                 if match:
                     fallback_json = self._repair_json(match.group(1))
                     output = DirectorOutput.model_validate_json(fallback_json)
-                    return self._merge_defaults(self.get_default_instructions(), output.model_dump())
+                    return self._merge_defaults(
+                        self.get_default_instructions(user_prompt), output.model_dump()
+                    )
             except Exception as final_e:
                 logger.error(f"Unexpected LLM validation error: {final_e}")
                 logger.debug(f"Raw problematic response: {llm_response}")
-            
-            # Final fallback: return safe defaults
+
+            # Final fallback: return safe defaults (with prompt for color grading detection)
             logger.warning("LLM response parsing exhausted, returning safe defaults")
-            return self.get_default_instructions()
-        
+            return self.get_default_instructions(user_prompt)
+
         except Exception as e:
             logger.error(f"Unexpected LLM validation error: {e}")
-            return self.get_default_instructions()
+            return self.get_default_instructions(user_prompt)
 
-
-    def _merge_defaults(self, defaults: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_defaults(
+        self, defaults: Dict[str, Any], overrides: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Deep-merge defaults with overrides (overrides win)."""
         merged: Dict[str, Any] = {}
         for key, value in defaults.items():
@@ -976,19 +1116,66 @@ class CreativeDirector:
                 merged[key] = value
         return merged
 
-    def get_default_instructions(self) -> Dict[str, Any]:
+    def _detect_color_grading_from_prompt(self, prompt: str) -> str:
+        """
+        Detect color grading preference from natural language prompt.
+
+        Args:
+            prompt: User's natural language editing request
+
+        Returns:
+            Color grading preset name
+        """
+        prompt_lower = prompt.lower()
+
+        # Check for explicit color grading keywords
+        for preset, keywords in COLOR_GRADING_KEYWORDS.items():
+            for keyword in keywords:
+                if keyword in prompt_lower:
+                    return preset
+
+        # Check mood-based mapping
+        for mood, grading in MOOD_TO_COLOR_GRADING.items():
+            if mood in prompt_lower:
+                return grading
+
+        # Check style-based mapping
+        for style_name, style_keywords in STYLE_KEYWORDS.items():
+            for keyword in style_keywords:
+                if keyword in prompt_lower:
+                    # Map style to appropriate color grading
+                    if style_name == "hitchcock":
+                        return "high_contrast"
+                    elif style_name == "action":
+                        return "blockbuster"
+                    elif style_name == "wes_anderson":
+                        return "vibrant"
+                    elif style_name == "documentary":
+                        return "documentary"
+                    elif style_name == "minimalist":
+                        return "desaturated"
+
+        return "neutral"
+
+    def get_default_instructions(self, prompt: str = "") -> Dict[str, Any]:
         """
         Get safe default editing instructions (elegant cinematic style).
+
+        Args:
+            prompt: Optional user prompt to detect color grading preferences
 
         Returns:
             Default editing parameters - balanced, professional look
         """
+        # Detect color grading from prompt if provided
+        color_grading = "neutral"
+        if prompt:
+            color_grading = self._detect_color_grading_from_prompt(prompt)
+            logger.info(f"Detected color grading from prompt: {color_grading}")
+
         return {
             "schema_version": SCHEMA_VERSION,
-            "style": {
-                "name": "documentary",
-                "mood": "calm"
-            },
+            "style": {"name": "documentary", "mood": "calm"},
             "story_arc": {
                 "type": "hero_journey",
                 "tension_target": 0.6,
@@ -1009,23 +1196,20 @@ class CreativeDirector:
                 "match_cuts_enabled": True,
                 "invisible_cuts_enabled": False,
                 "shot_variation_priority": "medium",
-                "continuity_weight": 0.4,    # PRIORITY: Smooth flow
-                "kuleshov_weight": 0.15,     # SUBTLE: Psychological connection
-                "variety_weight": 0.2,       # MODEST: Keep it interesting
+                "continuity_weight": 0.4,  # PRIORITY: Smooth flow
+                "kuleshov_weight": 0.15,  # SUBTLE: Psychological connection
+                "variety_weight": 0.2,  # MODEST: Keep it interesting
             },
             "transitions": {
                 "type": "energy_aware",  # Smart crossfade on low energy
-                "crossfade_duration_sec": 0.5
+                "crossfade_duration_sec": 0.5,
             },
-            "energy_mapping": {
-                "sync_to_beats": True,
-                "energy_amplification": 1.0
-            },
+            "energy_mapping": {"sync_to_beats": True, "energy_amplification": 1.0},
             "effects": {
-                "color_grading": "neutral",
+                "color_grading": color_grading,
                 "stabilization": True,
                 "upscale": False,
-                "sharpness_boost": False
+                "sharpness_boost": False,
             },
             "constraints": {
                 "target_duration_sec": None,
@@ -1038,6 +1222,7 @@ class CreativeDirector:
 # Convenience function for direct usage
 _default_director = None
 
+
 def get_creative_director(**kwargs) -> CreativeDirector:
     """
     Get the default CreativeDirector instance.
@@ -1047,6 +1232,7 @@ def get_creative_director(**kwargs) -> CreativeDirector:
     if _default_director is None or kwargs:
         _default_director = CreativeDirector(**kwargs)
     return _default_director
+
 
 def interpret_natural_language(prompt: str) -> Dict[str, Any]:
     """
@@ -1069,7 +1255,7 @@ def interpret_natural_language(prompt: str) -> Dict[str, Any]:
         return instructions
     else:
         logger.info("Falling back to default editing style")
-        return director.get_default_instructions()
+        return director.get_default_instructions(prompt)
 
 
 if __name__ == "__main__":
@@ -1084,13 +1270,13 @@ if __name__ == "__main__":
         "Make it calm and meditative",
         "Fast-paced MTV style",
         "Documentary realism",
-        "Create suspense with long takes then explosive action"
+        "Create suspense with long takes then explosive action",
     ]
 
     for prompt in test_prompts:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Prompt: '{prompt}'")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         result = director.interpret_prompt(prompt)
 

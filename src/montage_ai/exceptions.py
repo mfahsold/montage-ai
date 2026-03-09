@@ -13,33 +13,70 @@ Usage:
         logger.error(f"Analysis failed: {e}")
 """
 
+from typing import Optional
+
 
 class MontageError(Exception):
-    """Base exception for all Montage AI errors."""
-    pass
+    """Base exception for all Montage AI errors.
+
+    Supports enhanced error messages with user-friendly and technical details,
+    inspired by the deprecated exceptions_custom.py module.
+    """
+
+    def __init__(
+        self,
+        message: str = "",
+        user_message: Optional[str] = None,
+        technical_details: Optional[str] = None,
+        suggestion: Optional[str] = None,
+    ):
+        """
+        Initialize exception with optional enhanced fields.
+
+        Args:
+            message: Standard error message (backward compatible)
+            user_message: Human-readable error message for users
+            technical_details: Technical debug info (for logs, not users)
+            suggestion: How to fix or work around the error
+        """
+        # Use user_message as primary message if provided
+        super().__init__(user_message or message)
+
+        self.user_message = user_message or message
+        self.technical_details = technical_details or ""
+        self.suggestion = suggestion or ""
+
+    def __str__(self) -> str:
+        """Return user-friendly message."""
+        return self.user_message
 
 
 # =============================================================================
 # Video Analysis Errors
 # =============================================================================
 
+
 class VideoAnalysisError(MontageError):
     """Error during video analysis (scene detection, beat detection, etc.)."""
+
     pass
 
 
 class SceneDetectionError(VideoAnalysisError):
     """Error during scene detection."""
+
     pass
 
 
 class BeatDetectionError(VideoAnalysisError):
     """Error during audio beat detection."""
+
     pass
 
 
 class MetadataExtractionError(VideoAnalysisError):
     """Error extracting video/audio metadata via ffprobe."""
+
     pass
 
 
@@ -47,8 +84,10 @@ class MetadataExtractionError(VideoAnalysisError):
 # Rendering Errors
 # =============================================================================
 
+
 class RenderError(MontageError):
     """Error during video rendering."""
+
     pass
 
 
@@ -63,11 +102,13 @@ class FFmpegError(RenderError):
 
 class MemoryError(RenderError):
     """Out of memory during rendering."""
+
     pass
 
 
 class EncoderError(RenderError):
     """Hardware encoder not available or failed."""
+
     pass
 
 
@@ -75,23 +116,28 @@ class EncoderError(RenderError):
 # LLM/AI Errors
 # =============================================================================
 
+
 class LLMError(MontageError):
     """Error communicating with LLM backend."""
+
     pass
 
 
 class LLMTimeoutError(LLMError):
     """LLM request timed out."""
+
     pass
 
 
 class LLMParseError(LLMError):
     """Failed to parse LLM response."""
+
     pass
 
 
 class NoLLMBackendError(LLMError):
     """No LLM backend available."""
+
     pass
 
 
@@ -99,13 +145,16 @@ class NoLLMBackendError(LLMError):
 # Cloud GPU (cgpu) Errors
 # =============================================================================
 
+
 class CGPUError(MontageError):
     """Error with cgpu cloud GPU service."""
+
     pass
 
 
 class CGPUConnectionError(CGPUError):
     """Failed to connect to cgpu service."""
+
     pass
 
 
@@ -120,6 +169,7 @@ class CGPUJobError(CGPUError):
 
 class CGPUQuotaError(CGPUError):
     """cgpu quota exceeded."""
+
     pass
 
 
@@ -127,18 +177,22 @@ class CGPUQuotaError(CGPUError):
 # Timeline/Export Errors
 # =============================================================================
 
+
 class TimelineError(MontageError):
     """Error building or exporting timeline."""
+
     pass
 
 
 class OTIOExportError(TimelineError):
     """Error exporting to OTIO format."""
+
     pass
 
 
 class EDLExportError(TimelineError):
     """Error exporting to EDL format."""
+
     pass
 
 
@@ -146,18 +200,22 @@ class EDLExportError(TimelineError):
 # Configuration Errors
 # =============================================================================
 
+
 class ConfigurationError(MontageError):
     """Invalid configuration or missing required settings."""
+
     pass
 
 
 class InvalidStyleError(ConfigurationError):
     """Unknown or invalid style template."""
+
     pass
 
 
 class MissingMediaError(ConfigurationError):
     """Required media files not found."""
+
     pass
 
 
@@ -165,16 +223,20 @@ class MissingMediaError(ConfigurationError):
 # Web UI Errors
 # =============================================================================
 
+
 class WebUIError(MontageError):
     """Error in web UI operations."""
+
     pass
 
 
 class SessionError(WebUIError):
     """Session management error."""
+
     pass
 
 
 class UploadError(WebUIError):
     """File upload failed."""
+
     pass

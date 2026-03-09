@@ -15,7 +15,12 @@ from pathlib import Path
 from typing import Optional, Any, Tuple, Dict, List
 from ..logger import logger
 from .context import MontageContext, ClipMetadata
-from ..segment_writer import SegmentWriter, ProgressiveRenderer, STANDARD_WIDTH, STANDARD_HEIGHT
+from ..segment_writer import (
+    SegmentWriter,
+    ProgressiveRenderer,
+    STANDARD_WIDTH,
+    STANDARD_HEIGHT,
+)
 from .clip_processor import process_clip_task
 from ..enhancement_tracking import (
     EnhancementTracker,
@@ -27,14 +32,14 @@ from ..enhancement_tracking import (
 from ..clip_enhancement import DenoiseConfig, SharpenConfig, FilmGrainConfig
 from ..stabilization_integration import (
     get_stabilization_bridge,
-    should_stabilize,
-    get_stabilization_mode,
 )
+
 
 class RenderEngine:
     """
     Handles final rendering of the montage.
     """
+
     def __init__(self, context: MontageContext):
         self.ctx = context
         self.settings = context.settings
@@ -49,28 +54,34 @@ class RenderEngine:
 
             # Phase 4: Resolution-aware adaptive batch sizing
             low_memory = self.settings.stabilization.low_memory_mode
-            
+
             # Get representative clip metadata for resolution detection
             if self.ctx.media.output_profile:
                 width = self.ctx.media.output_profile.width
                 height = self.ctx.media.output_profile.height
-                batch_size = self.settings.high_res.get_adaptive_batch_size_for_resolution(
-                    width=width,
-                    height=height,
-                    low_memory=low_memory
+                batch_size = (
+                    self.settings.high_res.get_adaptive_batch_size_for_resolution(
+                        width=width, height=height, low_memory=low_memory
+                    )
                 )
                 if width * height >= 15_000_000:  # 6K+
-                    logger.info(f"   📐 High-res output: {width}x{height}, batch_size={batch_size}")
+                    logger.info(
+                        f"   📐 High-res output: {width}x{height}, batch_size={batch_size}"
+                    )
             else:
                 # Fallback to general adaptive batch size
-                batch_size = self.settings.processing.get_adaptive_batch_size(low_memory)
+                batch_size = self.settings.processing.get_adaptive_batch_size(
+                    low_memory
+                )
 
             if low_memory:
                 logger.info(f"   ⚠️ LOW_MEMORY_MODE: Batch size reduced to {batch_size}")
 
             self._progressive_renderer = ProgressiveRenderer(
                 batch_size=batch_size,
-                output_dir=os.path.join(str(self.ctx.paths.temp_dir), f"segments_{self.ctx.job_id}"),
+                output_dir=os.path.join(
+                    str(self.ctx.paths.temp_dir), f"segments_{self.ctx.job_id}"
+                ),
                 memory_manager=get_memory_manager(),
                 job_id=self.ctx.job_id,
                 enable_xfade=self.ctx.timeline.enable_xfade,
@@ -78,8 +89,12 @@ class RenderEngine:
                 ffmpeg_crf=self.settings.encoding.crf,
                 normalize_clips=self.settings.encoding.normalize_clips,
                 target_width=width if self.ctx.media.output_profile else STANDARD_WIDTH,
-                target_height=height if self.ctx.media.output_profile else STANDARD_HEIGHT,
-                target_fps=self.ctx.media.output_profile.fps if self.ctx.media.output_profile else 30.0,
+                target_height=height
+                if self.ctx.media.output_profile
+                else STANDARD_HEIGHT,
+                target_fps=self.ctx.media.output_profile.fps
+                if self.ctx.media.output_profile
+                else 30.0,
             )
             logger.info(f"   ✅ Progressive Renderer initialized (batch={batch_size})")
             return self._progressive_renderer
@@ -100,18 +115,20 @@ class RenderEngine:
         current_pattern_beat: float,  # Pass the value from pattern if available
         executor: Any,
         enhancer: Any,
-        resource_manager: Any
+        resource_manager: Any,
     ) -> Tuple[Any, ClipMetadata]:
         """Submit clip processing task and create initial metadata."""
-        
+
         # Generate temp paths
-        temp_clip_name = f"temp_clip_{self.ctx.job_id}_{beat_idx}_{uuid.uuid4().hex}.mp4"
-        
+        temp_clip_name = (
+            f"temp_clip_{self.ctx.job_id}_{beat_idx}_{uuid.uuid4().hex}.mp4"
+        )
+
         # Submit task
         if executor:
             future = executor.submit(
                 process_clip_task,
-                scene_path=scene['path'],
+                scene_path=scene["path"],
                 clip_start=clip_start,
                 cut_duration=cut_duration,
                 temp_dir=str(self.ctx.paths.temp_dir),
@@ -126,32 +143,29 @@ class RenderEngine:
                 enhancer=enhancer,
                 output_profile=self.ctx.media.output_profile,
                 settings=self.settings,
-                resource_manager=resource_manager
+                resource_manager=resource_manager,
             )
         else:
             raise RuntimeError("Executor not initialized")
 
         # Create metadata (enhancements will be updated later)
         clip_meta = ClipMetadata(
-            source_path=scene['path'],
+            source_path=scene["path"],
             start_time=clip_start,
             duration=cut_duration,
             timeline_start=self.ctx.timeline.current_time,
             energy=current_energy,
-            action=scene.get('meta', {}).get('action', 'medium'),
-            shot=scene.get('meta', {}).get('shot', 'medium'),
+            action=scene.get("meta", {}).get("action", "medium"),
+            shot=scene.get("meta", {}).get("shot", "medium"),
             beat_idx=beat_idx,
             beats_per_cut=beats_per_cut if beats_per_cut else current_pattern_beat,
             selection_score=selection_score,
-            enhancements={} # Updated on completion
+            enhancements={},  # Updated on completion
         )
         return future, clip_meta
 
     def process_completed_task(
-        self,
-        future: Any,
-        meta: ClipMetadata,
-        enhancement_tracker: EnhancementTracker
+        self, future: Any, meta: ClipMetadata, enhancement_tracker: EnhancementTracker
     ):
         """Process result of a clip task and feed progressive renderer."""
         try:
@@ -166,30 +180,44 @@ class RenderEngine:
             )
 
             # Record applied enhancements with parameters
-            if enhancements.get('stabilized'):
+            if enhancements.get("stabilized"):
                 bridge = get_stabilization_bridge()
-                decision.record_stabilize(StabilizeParams(
-                    method="pro_stabilization",  # Enhanced stabilization engine
-                    smoothing=int(bridge.select_profile().motion_smooth_factor * 100),
-                    crop_mode="preserve",
-                ))
-            if enhancements.get('upscaled'):
-                decision.record_upscale(UpscaleParams(
-                    method="realesrgan" if self.settings.features.upscale else "lanczos",
-                    scale_factor=2,
-                ))
-            if enhancements.get('enhanced'):
-                decision.record_color_grade(ColorGradeParams(
-                    preset=self.ctx.features.color_grade or "teal_orange",
-                    intensity=self.ctx.features.color_intensity,
-                ))
-            
-            if enhancements.get('denoised'):
+                decision.record_stabilize(
+                    StabilizeParams(
+                        method="pro_stabilization",  # Enhanced stabilization engine
+                        smoothing=int(
+                            bridge.select_profile().motion_smooth_factor * 100
+                        ),
+                        crop_mode="preserve",
+                    )
+                )
+            if enhancements.get("upscaled"):
+                decision.record_upscale(
+                    UpscaleParams(
+                        method="realesrgan"
+                        if self.settings.features.upscale
+                        else "lanczos",
+                        scale_factor=2,
+                    )
+                )
+            if enhancements.get("enhanced"):
+                decision.record_color_grade(
+                    ColorGradeParams(
+                        preset=self.ctx.features.color_grade or "teal_orange",
+                        intensity=self.ctx.features.color_intensity,
+                    )
+                )
+
+            if enhancements.get("denoised"):
                 decision.record_denoise(DenoiseConfig(spatial_strength=0.3))
-            if enhancements.get('sharpened'):
+            if enhancements.get("sharpened"):
                 decision.record_sharpen(SharpenConfig(amount=0.5))
-            if enhancements.get('film_grain'):
-                decision.record_film_grain(FilmGrainConfig(grain_type=self.ctx.features.film_grain, enabled=True))
+            if enhancements.get("film_grain"):
+                decision.record_film_grain(
+                    FilmGrainConfig(
+                        grain_type=self.ctx.features.film_grain, enabled=True
+                    )
+                )
 
             meta.enhancement_decision = decision
 
@@ -213,7 +241,7 @@ class RenderEngine:
                         pass
         except Exception as e:
             logger.error(f"Error processing clip {meta.source_path}: {e}")
-    
+
     def set_renderer(self, renderer: SegmentWriter):
         self._progressive_renderer = renderer
 
@@ -224,7 +252,9 @@ class RenderEngine:
         logger.info("\n   🎬 Rendering output...")
 
         if self.settings.processing.should_skip_output(self.ctx.render.output_filename):
-            logger.info(f"   ♻️ Output exists, skipping render: {os.path.basename(self.ctx.render.output_filename)}")
+            logger.info(
+                f"   ♻️ Output exists, skipping render: {os.path.basename(self.ctx.render.output_filename)}"
+            )
             self.ctx.render.render_duration = 0.0
             return
 
@@ -232,11 +262,15 @@ class RenderEngine:
 
         if self._progressive_renderer:
             # Progressive path: finalize with FFmpeg
-            logger.info(f"   🔗 Finalizing with Progressive Renderer ({self._progressive_renderer.get_segment_count()} segments)...")
+            logger.info(
+                f"   🔗 Finalizing with Progressive Renderer ({self._progressive_renderer.get_segment_count()} segments)..."
+            )
 
             output_path = getattr(self.ctx.render, "output_filename", "")
             current_item = os.path.basename(output_path) if output_path else "render"
-            self._report_render_progress(10, "Rendering final segments", current_item=current_item)
+            self._report_render_progress(
+                10, "Rendering final segments", current_item=current_item
+            )
 
             audio_duration = self.ctx.timeline.target_duration
             audio_path = self.ctx.media.audio_result.music_path
@@ -245,16 +279,22 @@ class RenderEngine:
             if self.ctx.features.dialogue_duck and audio_path:
                 try:
                     from ..dialogue_ducking import apply_ducking_to_audio
+
                     # Use voice track if available (from voice isolation), else try original audio
-                    voice_path = getattr(self.ctx.media.audio_result, 'voice_path', None) or audio_path
-                    ducked_audio_path = os.path.join(str(self.ctx.paths.temp_dir), "ducked_audio.m4a")
+                    voice_path = (
+                        getattr(self.ctx.media.audio_result, "voice_path", None)
+                        or audio_path
+                    )
+                    ducked_audio_path = os.path.join(
+                        str(self.ctx.paths.temp_dir), "ducked_audio.m4a"
+                    )
                     duck_level = self.settings.features.dialogue_duck_level
                     logger.info(f"   🔇 Applying dialogue ducking ({duck_level}dB)...")
                     result = apply_ducking_to_audio(
                         music_path=audio_path,
                         voice_path=voice_path,
                         output_path=ducked_audio_path,
-                        duck_level_db=duck_level
+                        duck_level_db=duck_level,
                     )
                     if result and os.path.exists(result):
                         audio_path = result
@@ -262,34 +302,44 @@ class RenderEngine:
                 except Exception as e:
                     logger.warning(f"   ⚠️ Dialogue ducking failed: {e}")
 
-            self._report_render_progress(60, "Finalizing segments", current_item=current_item)
+            self._report_render_progress(
+                60, "Finalizing segments", current_item=current_item
+            )
             success = self._progressive_renderer.finalize(
                 output_path=self.ctx.render.output_filename,
                 audio_path=audio_path,
                 audio_duration=audio_duration,
-                logo_path=self.ctx.render.logo_path
+                logo_path=self.ctx.render.logo_path,
             )
 
             if success:
                 method_str = "xfade" if self.ctx.timeline.enable_xfade else "-c copy"
                 self.ctx.render.render_duration = time.time() - render_start_time
-                logger.info(f"   ✅ Final video rendered via FFmpeg ({method_str}) in {self.ctx.render.render_duration:.1f}s")
+                logger.info(
+                    f"   ✅ Final video rendered via FFmpeg ({method_str}) in {self.ctx.render.render_duration:.1f}s"
+                )
                 if self.ctx.render.logo_path:
-                    logger.info(f"   🏷️ Logo overlay: {os.path.basename(self.ctx.render.logo_path)}")
-                self._report_render_progress(100, "Render complete", current_item=current_item)
+                    logger.info(
+                        f"   🏷️ Logo overlay: {os.path.basename(self.ctx.render.logo_path)}"
+                    )
+                self._report_render_progress(
+                    100, "Render complete", current_item=current_item
+                )
             else:
                 raise RuntimeError("Progressive render failed")
         else:
             # Legacy path
-            raise NotImplementedError("Legacy rendering not implemented in RenderEngine")
+            raise NotImplementedError(
+                "Legacy rendering not implemented in RenderEngine"
+            )
 
     def cleanup(self):
         """Cleanup render resources."""
         if self._progressive_renderer:
-             try:
-                 self._progressive_renderer.cleanup()
-             except Exception:
-                 pass
+            try:
+                self._progressive_renderer.cleanup()
+            except Exception:
+                pass
 
     def set_progress_callback(self, callback: Optional[Any]) -> None:
         """Register progress callback for render-phase updates."""
@@ -300,18 +350,18 @@ class RenderEngine:
         Distributed Phase 5: Render final output across multiple nodes.
         """
         logger.info("\n   🌐 Entering Distributed Render Mode (Phase 2)...")
-        
+
         if not self.ctx.timeline.clips_metadata:
             logger.warning("   ⚠️ No clips in timeline to render.")
             return
 
         render_start_time = time.time()
         job_id = self.ctx.job_id
-        
+
         # 1. Prepare shared storage path for clips metadata
         temp_dir = Path(self.ctx.paths.temp_dir)
         clips_json_path = temp_dir / f"clips_{job_id}.json"
-        
+
         # Convert ClipMetadata objects to dicts for JSON
         import dataclasses
         from ..utils import NumpyEncoder
@@ -319,18 +369,23 @@ class RenderEngine:
         clips_data = []
         for clip in self.ctx.timeline.clips_metadata:
             clip_dict = dataclasses.asdict(clip)
-            if clip.enhancement_decision and hasattr(clip.enhancement_decision, "to_dict"):
+            if clip.enhancement_decision and hasattr(
+                clip.enhancement_decision, "to_dict"
+            ):
                 clip_dict["enhancement_decision"] = clip.enhancement_decision.to_dict()
             clips_data.append(clip_dict)
 
         with open(clips_json_path, "w") as f:
             json.dump(clips_data, f, cls=NumpyEncoder)
-            
-        logger.info(f"   📝 Saved timeline metadata ({len(clips_data)} clips) to {clips_json_path}")
+
+        logger.info(
+            f"   📝 Saved timeline metadata ({len(clips_data)} clips) to {clips_json_path}"
+        )
 
         # 2. Submit K8s Jobs
         try:
             from ..cluster.job_submitter import JobSubmitter
+
             submitter = JobSubmitter()
             if not submitter.batch_v1:
                 logger.warning("Cluster API unavailable; falling back to local render.")
@@ -366,27 +421,39 @@ class RenderEngine:
             while attempts < max_attempts:
                 attempts += 1
                 if attempts > 1 and forced_selector:
-                    logger.warning("Retrying distributed render with node selector: %s", forced_selector)
+                    logger.warning(
+                        "Retrying distributed render with node selector: %s",
+                        forced_selector,
+                    )
 
                 job_spec = submitter.submit_generic_job(
                     job_id=f"render-{job_id}",
                     command=[
-                        "python", "-m", "montage_ai.cluster.distributed_rendering",
-                        "--clips-json", str(clips_json_path),
-                        "--shard-count", str(parallelism),
-                        "--output-dir", str(temp_dir / f"segments_{job_id}"),
-                        "--job-id", job_id,
-                        "--quality", self.settings.encoding.quality_profile
+                        "python",
+                        "-m",
+                        "montage_ai.cluster.distributed_rendering",
+                        "--clips-json",
+                        str(clips_json_path),
+                        "--shard-count",
+                        str(parallelism),
+                        "--output-dir",
+                        str(temp_dir / f"segments_{job_id}"),
+                        "--job-id",
+                        job_id,
+                        "--quality",
+                        self.settings.encoding.quality_profile,
                     ],
                     parallelism=parallelism,
                     component="distributed-rendering",
                     env=shard_env or None,
                     tier=cluster_tier,
-                    node_selector=forced_selector
+                    node_selector=forced_selector,
                 )
 
                 # 3. Wait for completion
-                self._report_render_progress(20, "Waiting for cluster nodes to render segments...")
+                self._report_render_progress(
+                    20, "Waiting for cluster nodes to render segments..."
+                )
                 submitter.wait_for_job(job_spec.name)
 
                 if submitter.is_job_successful(job_spec.name):
@@ -395,13 +462,18 @@ class RenderEngine:
                 failure = submitter.summarize_job_failure(job_spec.name)
                 logger.error("Distributed render failed: %s", failure)
 
-                if failure.get("reason") == "exec_format_error" and forced_selector is None:
+                if (
+                    failure.get("reason") == "exec_format_error"
+                    and forced_selector is None
+                ):
                     forced_selector = submitter.build_arch_selector()
                     submitter.delete_job(job_spec.name, cascade=True)
                     continue
 
                 if self.settings.stabilization.cluster_mode:
-                    logger.warning("Falling back to local render after distributed failure.")
+                    logger.warning(
+                        "Falling back to local render after distributed failure."
+                    )
                     self.render_output()
                     return
 
@@ -416,11 +488,16 @@ class RenderEngine:
 
             # Search for shard reports
             import glob
-            report_files = glob.glob(str(segments_dir / "shard_*" / "shard_report.json"))
+
+            report_files = glob.glob(
+                str(segments_dir / "shard_*" / "shard_report.json")
+            )
             report_files.sort()  # Ensure shards stay in order
 
             if len(report_files) < parallelism:
-                raise RuntimeError(f"Missing shard reports ({len(report_files)}/{parallelism}).")
+                raise RuntimeError(
+                    f"Missing shard reports ({len(report_files)}/{parallelism})."
+                )
 
             for report_path in report_files:
                 with open(report_path, "r") as f:
@@ -430,7 +507,9 @@ class RenderEngine:
             if not all_segments:
                 raise RuntimeError("No segments produced by distributed render.")
 
-            logger.info(f"   🔗 Aggregated {len(all_segments)} segments from {len(report_files)} shards")
+            logger.info(
+                f"   🔗 Aggregated {len(all_segments)} segments from {len(report_files)} shards"
+            )
 
             # Finalize using ProgressiveRenderer logic
             output_path = self.ctx.render.output_filename
@@ -439,9 +518,11 @@ class RenderEngine:
 
             # We use ProgressiveRenderer to wrap SegmentWriter
             from ..segment_writer import ProgressiveRenderer
+
             pr = ProgressiveRenderer(output_dir=str(segments_dir))
             # Manually inject segments into the inner segment_writer
             from ..segment_writer import SegmentInfo
+
             for idx, seg_path in enumerate(all_segments):
                 pr.segment_writer.segments.append(
                     SegmentInfo(path=seg_path, index=idx, duration=0, clip_count=0)
@@ -451,12 +532,14 @@ class RenderEngine:
                 output_path=output_path,
                 audio_path=audio_path,
                 audio_duration=audio_duration,
-                logo_path=self.ctx.render.logo_path
+                logo_path=self.ctx.render.logo_path,
             )
 
             if success:
                 self.ctx.render.render_duration = time.time() - render_start_time
-                logger.info(f"   ✅ Distributed render complete in {self.ctx.render.render_duration:.1f}s")
+                logger.info(
+                    f"   ✅ Distributed render complete in {self.ctx.render.render_duration:.1f}s"
+                )
                 self._report_render_progress(100, "Render complete")
             else:
                 raise RuntimeError("Final concatenation failed")
@@ -469,6 +552,7 @@ class RenderEngine:
         """Grab CPU/memory/GPU metrics for progress updates."""
         try:
             from .analysis_engine import get_resource_snapshot
+
             return get_resource_snapshot()
         except Exception as exc:
             logger.debug(f"Render resource snapshot skipped: {exc}")
@@ -511,27 +595,33 @@ class RenderEngine:
             return
 
         logger.info("\n   📝 Exporting timeline...")
-        
+
         # Convert ClipMetadata to format expected by exporter
         clips_data = []
         for clip in self.ctx.timeline.clips_metadata:
-            clips_data.append({
-                'source_path': clip.source_path,
-                'start_time': clip.start_time,
-                'duration': clip.duration,
-                'timeline_start': clip.timeline_start,
-                'metadata': {
-                    'energy': clip.energy,
-                    'action': clip.action,
-                    'shot': clip.shot,
-                    'selection_score': clip.selection_score,
-                    'enhancements': clip.enhancements
-                },
-                'enhancement_decision': clip.enhancement_decision,  # NLE export tracking
-            })
+            clips_data.append(
+                {
+                    "source_path": clip.source_path,
+                    "start_time": clip.start_time,
+                    "duration": clip.duration,
+                    "timeline_start": clip.timeline_start,
+                    "metadata": {
+                        "energy": clip.energy,
+                        "action": clip.action,
+                        "shot": clip.shot,
+                        "selection_score": clip.selection_score,
+                        "enhancements": clip.enhancements,
+                    },
+                    "enhancement_decision": clip.enhancement_decision,  # NLE export tracking
+                }
+            )
 
         # Get audio path safely
-        audio_path = self.ctx.media.audio_result.music_path if self.ctx.media.audio_result else ""
+        audio_path = (
+            self.ctx.media.audio_result.music_path
+            if self.ctx.media.audio_result
+            else ""
+        )
         if not audio_path:
             logger.warning("   ⚠️ No audio path found for export, using placeholder")
             audio_path = "audio_track_missing.mp3"
@@ -544,8 +634,15 @@ class RenderEngine:
                 output_dir=str(self.ctx.paths.output_dir),
                 project_name=f"{self.ctx.job_id}_v{self.ctx.variant_id}",
                 generate_proxies=self.settings.features.generate_proxies,
-                resolution=(self.ctx.media.output_profile.width, self.ctx.media.output_profile.height) if self.ctx.media.output_profile else (1920, 1080),
-                fps=self.ctx.media.output_profile.fps if self.ctx.media.output_profile else 30.0
+                resolution=(
+                    self.ctx.media.output_profile.width,
+                    self.ctx.media.output_profile.height,
+                )
+                if self.ctx.media.output_profile
+                else (1920, 1080),
+                fps=self.ctx.media.output_profile.fps
+                if self.ctx.media.output_profile
+                else 30.0,
             )
         except Exception as e:
             logger.error(f"   ❌ Timeline export failed: {e}")

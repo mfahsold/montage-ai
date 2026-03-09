@@ -46,6 +46,7 @@ LOG_LEVEL_MAP = {
     "CRITICAL": logging.CRITICAL,
 }
 
+
 def get_log_level() -> int:
     """Get log level from environment variable."""
     level_str = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -86,7 +87,7 @@ class FileFormatter(logging.Formatter):
     def __init__(self):
         super().__init__(
             fmt="%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
 
@@ -96,7 +97,7 @@ class FileFormatter(logging.Formatter):
 def setup_logger(
     name: str = "montage_ai",
     log_file: Optional[Path] = None,
-    level: Optional[int] = None
+    level: Optional[int] = None,
 ) -> logging.Logger:
     """
     Create and configure a logger instance.
@@ -139,6 +140,7 @@ def setup_logger(
                         self.stream.flush()
                 except Exception:
                     pass
+
     console_handler = SafeStreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
     console_handler.setFormatter(MontageFormatter())
@@ -217,7 +219,8 @@ def print_banner() -> None:
 
 
 def log_phase(phase: str) -> None:
-    """Log a major phase transition with visual separator."""
+    """DEPRECATED: Use monitoring.Monitor.start_phase() instead."""
+    _warn_deprecated("log_phase")
     separator = "═" * 60
     logger.info(f"\n{separator}")
     logger.info(f"  {phase}")
@@ -225,25 +228,50 @@ def log_phase(phase: str) -> None:
 
 
 def log_step(step: str, emoji: str = "▶") -> None:
-    """Log a processing step."""
+    """DEPRECATED: Use monitoring.Monitor.log_step() instead."""
+    _warn_deprecated("log_step")
     logger.info(f"{emoji} {step}")
 
 
+import warnings
+
+# DEPRECATED: These functions are deprecated. Use monitoring.Monitor class instead.
+# They are kept for backward compatibility but will be removed in v2.0
+
+_log_deprecation_shown = set()
+
+
+def _warn_deprecated(func_name: str) -> None:
+    """Show deprecation warning once per function."""
+    if func_name not in _log_deprecation_shown:
+        _log_deprecation_shown.add(func_name)
+        warnings.warn(
+            f"{func_name}() is deprecated. Use monitoring.Monitor class instead. "
+            "Will be removed in v2.0.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+
 def log_success(message: str) -> None:
-    """Log a success message with checkmark."""
+    """DEPRECATED: Use monitoring.Monitor.log_success() instead."""
+    _warn_deprecated("log_success")
     logger.info(f"   ✅ {message}")
 
 
 def log_error(message: str) -> None:
     """Log an error message with X mark."""
+    # Not deprecated - this is the primary error logging
     logger.error(f"   ❌ {message}")
 
 
 def log_warning(message: str) -> None:
-    """Log a warning message."""
+    """DEPRECATED: Use monitoring.Monitor.log_warning() instead."""
+    _warn_deprecated("log_warning")
     logger.warning(f"   ⚠️  {message}")
 
 
 def log_debug(message: str) -> None:
-    """Log debug information."""
+    """DEPRECATED: Use logger.debug() directly instead."""
+    _warn_deprecated("log_debug")
     logger.debug(message)

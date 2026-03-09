@@ -58,16 +58,23 @@ def _check_autoshot_available() -> bool:
 
     try:
         import torch
+
         # AutoShot uses a custom model architecture
         # Check if the autoshot package or weights are available
         from autoshot import AutoShotModel
+
         _autoshot_available = True
-        logger.debug("AutoShot available (SOTA scene detection - +4.2% F1 over TransNetV2)")
+        logger.debug(
+            "AutoShot available (SOTA scene detection - +4.2% F1 over TransNetV2)"
+        )
     except ImportError:
         # Fallback: Check for manual weight loading
         try:
             import torch
-            weights_path = Path.home() / ".cache" / "montage_ai" / "models" / "autoshot.pt"
+
+            weights_path = (
+                Path.home() / ".cache" / "montage_ai" / "models" / "autoshot.pt"
+            )
             if weights_path.exists():
                 _autoshot_available = True
                 logger.debug("AutoShot weights found (SOTA scene detection enabled)")
@@ -89,6 +96,7 @@ def _check_transnetv2_available() -> bool:
     try:
         import torch
         from transnetv2 import TransNetV2
+
         _transnet_available = True
         logger.debug("TransNetV2 available (neural scene detection enabled)")
     except ImportError:
@@ -101,6 +109,7 @@ def _check_transnetv2_available() -> bool:
 def _get_pytorch_device() -> str:
     """Get the best available PyTorch device."""
     import torch
+
     if torch.cuda.is_available():
         return "cuda"
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -125,6 +134,7 @@ def _get_autoshot_model():
 
     try:
         from autoshot import AutoShotModel
+
         _autoshot_model = AutoShotModel()
         _autoshot_model.to(device)
         _autoshot_model.eval()
@@ -168,6 +178,7 @@ def _get_transnet_model():
 @dataclass
 class SceneBoundary:
     """A detected scene boundary with confidence."""
+
     frame_number: int
     timestamp: float
     confidence: float
@@ -209,7 +220,7 @@ def _load_from_cache(video_path: str, backend: str) -> Optional[List[SceneBounda
             SceneBoundary(
                 frame_number=s["frame_number"],
                 timestamp=s["timestamp"],
-                confidence=s["confidence"]
+                confidence=s["confidence"],
             )
             for s in data["scenes"]
         ]
@@ -237,10 +248,10 @@ def _save_to_cache(video_path: str, backend: str, scenes: List[SceneBoundary]) -
                 {
                     "frame_number": s.frame_number,
                     "timestamp": s.timestamp,
-                    "confidence": s.confidence
+                    "confidence": s.confidence,
                 }
                 for s in scenes
-            ]
+            ],
         }
 
         with open(cache_path, "wb") as f:
@@ -354,7 +365,9 @@ def _detect_transnetv2(
     elapsed = time.perf_counter() - start_time
     effective_fps = total_frames / elapsed if elapsed > 0 else 0
 
-    logger.info(f"TransNetV2: Processed {total_frames} frames in {elapsed:.1f}s ({effective_fps:.0f} fps)")
+    logger.info(
+        f"TransNetV2: Processed {total_frames} frames in {elapsed:.1f}s ({effective_fps:.0f} fps)"
+    )
 
     # Extract scene boundaries from predictions
     scenes = []
@@ -366,11 +379,13 @@ def _detect_transnetv2(
 
     for frame_num in transitions:
         if frame_num < len(predictions_array):
-            scenes.append(SceneBoundary(
-                frame_number=int(frame_num),
-                timestamp=frame_num / fps,
-                confidence=float(predictions_array[frame_num])
-            ))
+            scenes.append(
+                SceneBoundary(
+                    frame_number=int(frame_num),
+                    timestamp=frame_num / fps,
+                    confidence=float(predictions_array[frame_num]),
+                )
+            )
 
     return scenes
 
@@ -446,7 +461,9 @@ def _detect_autoshot(
                         if isinstance(output, tuple):
                             output = output[0]
                         pred = torch.sigmoid(output).cpu().numpy().flatten()
-                        predictions.extend(pred[:1].tolist())  # One prediction per window slide
+                        predictions.extend(
+                            pred[:1].tolist()
+                        )  # One prediction per window slide
                     except Exception as e:
                         logger.debug(f"AutoShot inference error: {e}")
                         predictions.append(0.0)
@@ -459,7 +476,9 @@ def _detect_autoshot(
     elapsed = time.perf_counter() - start_time
     effective_fps = total_frames / elapsed if elapsed > 0 else 0
 
-    logger.info(f"AutoShot: Processed {total_frames} frames in {elapsed:.1f}s ({effective_fps:.0f} fps)")
+    logger.info(
+        f"AutoShot: Processed {total_frames} frames in {elapsed:.1f}s ({effective_fps:.0f} fps)"
+    )
 
     # Extract scene boundaries from predictions
     scenes = []
@@ -472,11 +491,13 @@ def _detect_autoshot(
 
         for frame_num in transitions:
             if frame_num < len(predictions_array):
-                scenes.append(SceneBoundary(
-                    frame_number=int(frame_num),
-                    timestamp=frame_num / fps,
-                    confidence=float(predictions_array[frame_num])
-                ))
+                scenes.append(
+                    SceneBoundary(
+                        frame_number=int(frame_num),
+                        timestamp=frame_num / fps,
+                        confidence=float(predictions_array[frame_num]),
+                    )
+                )
 
     return scenes
 
@@ -506,7 +527,9 @@ def _detect_pyscenedetect(
 
     video = open_video(video_path)
     scene_manager = SceneManager()
-    scene_manager.add_detector(ContentDetector(threshold=threshold, min_scene_len=min_scene_len))
+    scene_manager.add_detector(
+        ContentDetector(threshold=threshold, min_scene_len=min_scene_len)
+    )
     scene_manager.detect_scenes(video, show_progress=False)
 
     scene_list = scene_manager.get_scene_list()
@@ -517,17 +540,21 @@ def _detect_pyscenedetect(
     scenes = []
     for i, (start, end) in enumerate(scene_list):
         if i > 0:  # First scene start is frame 0, not a cut
-            scenes.append(SceneBoundary(
-                frame_number=start.get_frames(),
-                timestamp=start.get_seconds(),
-                confidence=0.8  # PySceneDetect doesn't provide confidence
-            ))
+            scenes.append(
+                SceneBoundary(
+                    frame_number=start.get_frames(),
+                    timestamp=start.get_seconds(),
+                    confidence=0.8,  # PySceneDetect doesn't provide confidence
+                )
+            )
 
     fps = video.frame_rate
     total_frames = video.duration.get_frames()
     effective_fps = total_frames / elapsed if elapsed > 0 else 0
 
-    logger.info(f"PySceneDetect: {len(scenes)} cuts in {elapsed:.1f}s ({effective_fps:.0f} fps)")
+    logger.info(
+        f"PySceneDetect: {len(scenes)} cuts in {elapsed:.1f}s ({effective_fps:.0f} fps)"
+    )
 
     return scenes
 
@@ -579,13 +606,19 @@ def detect_scenes_sota(
             if _check_transnetv2_available():
                 boundaries = _detect_transnetv2(video_path, threshold=thresh)
             else:
-                thresh = threshold if threshold is not None else settings.thresholds.scene_threshold
+                thresh = (
+                    threshold
+                    if threshold is not None
+                    else settings.thresholds.scene_threshold
+                )
                 boundaries = _detect_pyscenedetect(video_path, threshold=thresh)
     elif backend == "transnetv2":
         thresh = threshold if threshold is not None else 0.5
         boundaries = _detect_transnetv2(video_path, threshold=thresh)
     else:
-        thresh = threshold if threshold is not None else settings.thresholds.scene_threshold
+        thresh = (
+            threshold if threshold is not None else settings.thresholds.scene_threshold
+        )
         boundaries = _detect_pyscenedetect(video_path, threshold=thresh)
 
     # Save to cache
@@ -596,8 +629,7 @@ def detect_scenes_sota(
 
 
 def _boundaries_to_scenes(
-    video_path: str,
-    boundaries: List[SceneBoundary]
+    video_path: str, boundaries: List[SceneBoundary]
 ) -> List[Tuple[float, float]]:
     """Convert scene boundaries to (start, end) tuples."""
     import cv2
@@ -641,32 +673,46 @@ def get_available_backend() -> str:
 
 def benchmark_backends(video_path: str) -> Dict[str, Any]:
     """
-    Benchmark scene detection backends on a video.
+    DEPRECATED: Benchmark scene detection backends on a video.
+
+    This function is for development/testing only and not used in production.
+    Will be removed in v2.0.
 
     Returns timing and accuracy comparison.
     """
+    import warnings
+
+    warnings.warn(
+        "benchmark_backends() is deprecated. Development utility only.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     results = {}
 
     # PySceneDetect (baseline)
     start = time.perf_counter()
-    psd_scenes = detect_scenes_sota(video_path, backend="pyscenedetect", use_cache=False)
+    psd_scenes = detect_scenes_sota(
+        video_path, backend="pyscenedetect", use_cache=False
+    )
     psd_time = time.perf_counter() - start
     results["pyscenedetect"] = {
         "scenes": len(psd_scenes),
         "time_seconds": psd_time,
-        "available": True
+        "available": True,
     }
 
     # TransNetV2 (if available)
     if _check_transnetv2_available():
         start = time.perf_counter()
-        tn_scenes = detect_scenes_sota(video_path, backend="transnetv2", use_cache=False)
+        tn_scenes = detect_scenes_sota(
+            video_path, backend="transnetv2", use_cache=False
+        )
         tn_time = time.perf_counter() - start
         results["transnetv2"] = {
             "scenes": len(tn_scenes),
             "time_seconds": tn_time,
             "speedup": psd_time / tn_time if tn_time > 0 else 0,
-            "available": True
+            "available": True,
         }
     else:
         results["transnetv2"] = {"available": False}
@@ -681,7 +727,7 @@ def benchmark_backends(video_path: str) -> Dict[str, Any]:
             "time_seconds": as_time,
             "speedup": psd_time / as_time if as_time > 0 else 0,
             "available": True,
-            "is_sota": True
+            "is_sota": True,
         }
     else:
         results["autoshot"] = {"available": False}

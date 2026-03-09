@@ -12,7 +12,7 @@ Usage:
         create_test_clip,
         assert_valid_clip_metadata,
     )
-    
+
     scene = create_test_scene(duration=5.0)
     clip = create_test_clip(scene_id="test_1")
 """
@@ -22,13 +22,15 @@ from pathlib import Path
 import tempfile
 from dataclasses import dataclass, field
 
-# Import real objects where available
-from montage_ai.audio_analysis_objects import (
-    BeatInfo, EnergyProfile, SceneDetectionResult, ColorAnalysisResult
-)
+# Import real objects from production modules
+from montage_ai.audio_analysis import BeatInfo, EnergyProfile
 from montage_ai.config import (
-    StyleConfig, EffectConfig, VideoConfigSpec, AudioConfigSpec, 
-    MontageSettingsSpec, QualityProfile
+    StyleConfig,
+    EffectConfig,
+    VideoConfigSpec,
+    AudioConfigSpec,
+    MontageSettingsSpec,
+    QualityProfile,
 )
 
 
@@ -36,12 +38,13 @@ from montage_ai.config import (
 # Assertion Helpers
 # ============================================================================
 
+
 def assert_valid_clip_metadata(clip: Dict[str, Any]) -> None:
     """Assert that clip dict has valid metadata structure.
-    
+
     Args:
         clip: Clip dict to validate
-        
+
     Raises:
         AssertionError: If clip is invalid
     """
@@ -55,10 +58,10 @@ def assert_valid_clip_metadata(clip: Dict[str, Any]) -> None:
 
 def assert_valid_scene(scene: Dict[str, Any]) -> None:
     """Assert that scene dict has valid structure.
-    
+
     Args:
         scene: Scene dict to validate
-        
+
     Raises:
         AssertionError: If scene is invalid
     """
@@ -69,10 +72,10 @@ def assert_valid_scene(scene: Dict[str, Any]) -> None:
 
 def assert_valid_ffmpeg_filters(filters: str) -> None:
     """Assert that FFmpeg filter string is syntactically valid.
-    
+
     Args:
         filters: FFmpeg filter string
-        
+
     Raises:
         AssertionError: If filter string is invalid
     """
@@ -85,12 +88,12 @@ def assert_valid_ffmpeg_filters(filters: str) -> None:
 
 def assert_time_range_valid(start: float, end: float, duration: float = None) -> None:
     """Assert that time range is valid.
-    
+
     Args:
         start: Start time in seconds
         end: End time in seconds
         duration: Optional total duration to check against
-        
+
     Raises:
         AssertionError: If range is invalid
     """
@@ -104,6 +107,7 @@ def assert_time_range_valid(start: float, end: float, duration: float = None) ->
 # Test Data Generators
 # ============================================================================
 
+
 def create_test_scene(
     scene_id: str = "test_scene",
     start_time: float = 0.0,
@@ -113,7 +117,7 @@ def create_test_scene(
     audio_features: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Create a test scene dict with sensible defaults.
-    
+
     Args:
         scene_id: Scene identifier
         start_time: Scene start in seconds
@@ -121,7 +125,7 @@ def create_test_scene(
         description: Optional scene description
         visual_features: Optional visual feature dict
         audio_features: Optional audio feature dict
-        
+
     Returns:
         Test scene dict
     """
@@ -132,14 +136,14 @@ def create_test_scene(
             "contrast": 0.5,
             "saturation": 0.5,
         }
-    
+
     if audio_features is None:
         audio_features = {
             "loudness_db": -20.0,
             "has_speech": False,
             "has_music": False,
         }
-    
+
     return {
         "id": scene_id,
         "start_time": start_time,
@@ -163,7 +167,7 @@ def create_test_clip(
     score: float = 0.8,
 ) -> Dict[str, Any]:
     """Create a test clip dict.
-    
+
     Args:
         clip_id: Clip identifier
         source_path: Path to source file
@@ -171,7 +175,7 @@ def create_test_clip(
         end_time: Clip end in seconds
         scene_id: Associated scene ID
         score: Quality score [0.0, 1.0]
-        
+
     Returns:
         Test clip dict
     """
@@ -197,12 +201,12 @@ def create_test_clips(
     scene_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Create multiple test clips.
-    
+
     Args:
         count: Number of clips to create
         duration: Duration of each clip
         scene_id: Optional scene ID for all clips
-        
+
     Returns:
         List of test clip dicts
     """
@@ -223,7 +227,7 @@ def create_test_clips(
 
 def create_test_montage_config() -> Dict[str, Any]:
     """Create a minimal test montage configuration.
-    
+
     Returns:
         Test config dict
     """
@@ -244,7 +248,7 @@ def create_test_montage_config() -> Dict[str, Any]:
 
 def create_test_ffmpeg_config() -> Dict[str, Any]:
     """Create a test FFmpeg configuration.
-    
+
     Returns:
         Test FFmpeg config dict
     """
@@ -265,13 +269,14 @@ def create_test_ffmpeg_config() -> Dict[str, Any]:
 # Fixture Classes
 # ============================================================================
 
+
 @dataclass
 class TempFileFixture:
     """Manages temporary files for testing."""
-    
+
     _temp_dir: Optional[Path] = field(default=None, init=False)
     _files: List[Path] = field(default_factory=list, init=False)
-    
+
     def create_temp_file(
         self,
         name: str = "test.txt",
@@ -279,55 +284,56 @@ class TempFileFixture:
         suffix: str = "",
     ) -> Path:
         """Create a temporary file.
-        
+
         Args:
             name: File name
             content: File content
             suffix: File suffix
-            
+
         Returns:
             Path to temp file
         """
         if self._temp_dir is None:
             self._temp_dir = Path(tempfile.mkdtemp(prefix="montage_test_"))
-        
+
         filepath = self._temp_dir / f"{name}{suffix}"
         filepath.write_text(content)
         self._files.append(filepath)
         return filepath
-    
+
     def create_temp_dir(self, name: str = "test_dir") -> Path:
         """Create a temporary directory.
-        
+
         Args:
             name: Directory name
-            
+
         Returns:
             Path to temp directory
         """
         if self._temp_dir is None:
             self._temp_dir = Path(tempfile.mkdtemp(prefix="montage_test_"))
-        
+
         dirpath = self._temp_dir / name
         dirpath.mkdir(parents=True, exist_ok=True)
         return dirpath
-    
+
     def cleanup(self) -> None:
         """Clean up all created files and directories."""
         import shutil
+
         for filepath in self._files:
             if filepath.exists():
                 if filepath.is_dir():
                     shutil.rmtree(filepath)
                 else:
                     filepath.unlink()
-        
+
         if self._temp_dir and self._temp_dir.exists():
             shutil.rmtree(self._temp_dir)
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, _exc_tb):
         self.cleanup()
 
@@ -335,23 +341,23 @@ class TempFileFixture:
 @dataclass
 class MockClip:
     """Simple test helper for clip objects - for tests only.
-    
+
     NOT a real production clip. Use create_test_clip() for most testing.
     This exists for minimal dataclass-based test scenarios where full
     fixture generation is overkill. Avoids unittest.mock dependency.
-    
+
     Example:
         mock = MockClip(id="c1", score=0.9)
         assert mock.to_dict()["score"] == 0.9
     """
-    
+
     id: str = "mock_clip"
     source_path: str = "/test/mock.mp4"
     start_time: float = 0.0
     end_time: float = 5.0
     duration: float = 5.0
     score: float = 0.8
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dict."""
         return {
@@ -367,21 +373,21 @@ class MockClip:
 @dataclass
 class MockScene:
     """Simple test helper for scene objects - for tests only.
-    
+
     NOT a real production scene. Use create_test_scene() for most testing.
     This exists for minimal dataclass-based test scenarios where full
     fixture generation is overkill. Avoids unittest.mock dependency.
-    
+
     Example:
         mock = MockScene(id="s1", start_time=0, end_time=10)
         assert mock.to_dict()["end_time"] == 10
     """
-    
+
     id: str = "mock_scene"
     start_time: float = 0.0
     end_time: float = 10.0
     description: str = "Mock scene"
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dict."""
         return {
@@ -396,38 +402,39 @@ class MockScene:
 # Comparison Helpers
 # ============================================================================
 
+
 def compare_clips(
     clip1: Dict[str, Any],
     clip2: Dict[str, Any],
     tolerance: float = 0.01,
 ) -> bool:
     """Compare two clips for equality within tolerance.
-    
+
     Args:
         clip1: First clip
         clip2: Second clip
         tolerance: Tolerance for float comparisons
-        
+
     Returns:
         True if clips are effectively equal
     """
     # Compare IDs
     if clip1.get("id") != clip2.get("id"):
         return False
-    
+
     # Compare time ranges with tolerance
     for time_key in ["start_time", "end_time"]:
         t1 = float(clip1.get(time_key, 0))
         t2 = float(clip2.get(time_key, 0))
         if abs(t1 - t2) > tolerance:
             return False
-    
+
     # Compare scores with tolerance
     s1 = float(clip1.get("score", 0.5))
     s2 = float(clip2.get("score", 0.5))
     if abs(s1 - s2) > tolerance:
         return False
-    
+
     return True
 
 
@@ -437,26 +444,26 @@ def compare_scenes(
     tolerance: float = 0.01,
 ) -> bool:
     """Compare two scenes for equality within tolerance.
-    
+
     Args:
         scene1: First scene
         scene2: Second scene
         tolerance: Tolerance for float comparisons
-        
+
     Returns:
         True if scenes are effectively equal
     """
     # Compare IDs
     if scene1.get("id") != scene2.get("id"):
         return False
-    
+
     # Compare time ranges with tolerance
     for time_key in ["start_time", "end_time"]:
         t1 = float(scene1.get(time_key, 0))
         t2 = float(scene2.get(time_key, 0))
         if abs(t1 - t2) > tolerance:
             return False
-    
+
     return True
 
 
@@ -486,9 +493,7 @@ __all__ = [
     "AudioConfigSpec",
     "MontageSettingsSpec",
     "QualityProfile",
-    # Real Audio Analysis Objects (re-exported from audio_analysis_objects.py)
+    # Real Audio Analysis Objects (re-exported from audio_analysis.py)
     "BeatInfo",
     "EnergyProfile",
-    "SceneDetectionResult",
-    "ColorAnalysisResult",
 ]

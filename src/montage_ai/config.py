@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional, Set, Tuple, List
 from dataclasses import dataclass, field
 
-from montage_ai.config_parser import ConfigParser
+from .config_parser import ConfigParser
 
 
 # =============================================================================
@@ -126,7 +126,7 @@ def _is_cluster_deployment() -> bool:
     """Check if running in cluster deployment mode (unified detection)."""
     # Import here to avoid circular dependency
     try:
-        from montage_ai.deployment_mode import is_cluster_mode
+        from .deployment_mode import is_cluster_mode
         return is_cluster_mode()
     except ImportError:
         # Fallback to legacy behavior if module not available
@@ -376,6 +376,11 @@ class FeatureConfig:
 
     # Film Grain Simulation: none, 35mm, 16mm, 8mm, digital
     film_grain: str = field(default_factory=ConfigParser.make_str_parser("FILM_GRAIN", "none"))
+
+    # Compatibility flags kept on features for legacy call sites/tests.
+    cluster_mode: bool = field(default_factory=_is_cluster_deployment)
+    colorlevels: bool = field(default_factory=ConfigParser.make_bool_parser("COLORLEVELS", True))
+    luma_normalize: bool = field(default_factory=ConfigParser.make_bool_parser("LUMA_NORMALIZE", True))
 
 
 @dataclass
@@ -1660,6 +1665,27 @@ class MontageSettingsSpec:
 
     features: FeatureConfig = field(default_factory=FeatureConfig)
     """Feature toggles and runtime flags."""
+
+    llm: LLMConfig = field(default_factory=LLMConfig)
+    """LLM backend and timeout settings."""
+
+    encoding: EncodingConfig = field(default_factory=EncodingConfig)
+    """Encoding profile and codec settings."""
+
+    processing: ProcessingConfig = field(default_factory=ProcessingConfig)
+    """Runtime processing settings."""
+
+    creative: CreativeConfig = field(default_factory=CreativeConfig)
+    """Creative-direction defaults and targets."""
+
+    stabilization: StabilizationConfig = field(default_factory=StabilizationConfig)
+    """Stabilization and cluster controls."""
+
+    file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
+    """Allowed input extension sets."""
+
+    proxy: ProxyConfig = field(default_factory=ProxyConfig)
+    """Proxy generation controls."""
 
     job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S")))
     """Optional job identifier for builder compatibility."""
