@@ -29,14 +29,22 @@ from .config_parser import ConfigParser
 # Cluster/Service Endpoint Helpers
 # =============================================================================
 def _cluster_namespace() -> str:
-    return os.environ.get("CLUSTER_NAMESPACE") or os.environ.get("MONTAGE_NAMESPACE") or ""
+    return (
+        os.environ.get("CLUSTER_NAMESPACE") or os.environ.get("MONTAGE_NAMESPACE") or ""
+    )
 
 
 def _cluster_domain() -> str:
-    return os.environ.get("CLUSTER_DOMAIN") or os.environ.get("K3S_CLUSTER_DOMAIN") or "cluster.local"
+    return (
+        os.environ.get("CLUSTER_DOMAIN")
+        or os.environ.get("K3S_CLUSTER_DOMAIN")
+        or "cluster.local"
+    )
 
 
-def _cluster_service_host(service: str, namespace: Optional[str] = None, domain: Optional[str] = None) -> str:
+def _cluster_service_host(
+    service: str, namespace: Optional[str] = None, domain: Optional[str] = None
+) -> str:
     if not service:
         return ""
     ns = namespace or _cluster_namespace()
@@ -127,6 +135,7 @@ def _is_cluster_deployment() -> bool:
     # Import here to avoid circular dependency
     try:
         from .deployment_mode import is_cluster_mode
+
         return is_cluster_mode()
     except ImportError:
         # Fallback to legacy behavior if module not available
@@ -172,24 +181,46 @@ def _default_scene_cache_dir() -> Path:
 class PathConfig:
     """All filesystem paths used by Montage AI."""
 
-    input_dir: Path = field(default_factory=lambda: Path(os.environ.get("INPUT_DIR", "/data/input")))
-    music_dir: Path = field(default_factory=lambda: Path(os.environ.get("MUSIC_DIR", "/data/music")))
-    output_dir: Path = field(default_factory=lambda: Path(os.environ.get("OUTPUT_DIR", "/data/output")))
-    assets_dir: Path = field(default_factory=lambda: Path(os.environ.get("ASSETS_DIR", "/data/assets")))
+    input_dir: Path = field(
+        default_factory=lambda: Path(os.environ.get("INPUT_DIR", "/data/input"))
+    )
+    music_dir: Path = field(
+        default_factory=lambda: Path(os.environ.get("MUSIC_DIR", "/data/music"))
+    )
+    output_dir: Path = field(
+        default_factory=lambda: Path(os.environ.get("OUTPUT_DIR", "/data/output"))
+    )
+    assets_dir: Path = field(
+        default_factory=lambda: Path(os.environ.get("ASSETS_DIR", "/data/assets"))
+    )
     # OPTIMIZATION: Use RAM disk on Linux for 30-40% faster temp file I/O
     # /dev/shm is tmpfs mounted in RAM; fallback to /tmp when low on space
     temp_dir: Path = field(default_factory=_select_temp_dir)
-    lut_dir: Path = field(default_factory=lambda: Path(os.environ.get("LUT_DIR", "/data/luts")))
-    session_dir: Path = field(default_factory=lambda: Path(os.environ.get("SESSION_DIR", "/tmp/montage_sessions")))
-    transcript_dir: Path = field(default_factory=lambda: Path(os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_transcript")))
-    shorts_dir: Path = field(default_factory=lambda: Path(os.environ.get("SHORTS_DIR", "/tmp/montage_shorts")))
+    lut_dir: Path = field(
+        default_factory=lambda: Path(os.environ.get("LUT_DIR", "/data/luts"))
+    )
+    session_dir: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("SESSION_DIR", "/tmp/montage_sessions")
+        )
+    )
+    transcript_dir: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("TRANSCRIPT_DIR", "/tmp/montage_transcript")
+        )
+    )
+    shorts_dir: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("SHORTS_DIR", "/tmp/montage_shorts")
+        )
+    )
     scene_cache_dir: Path = field(default_factory=_default_scene_cache_dir)
     metadata_cache_dir: Path = field(
         default_factory=lambda: (
             Path(os.environ.get("METADATA_CACHE_DIR"))
             if os.environ.get("METADATA_CACHE_DIR")
+            # Prefer XDG cache (user-writable); fallback to ~/.cache
             else (
-                # Prefer XDG cache (user-writable); fallback to ~/.cache
                 Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
                 / "montage_ai"
                 / "metadata"
@@ -201,20 +232,28 @@ class PathConfig:
             Path(os.environ.get("TENSION_METADATA_DIR"))
             if os.environ.get("TENSION_METADATA_DIR")
             else (
-                (
-                    Path(os.environ.get("METADATA_CACHE_DIR")) / "tension"
-                    if os.environ.get("METADATA_CACHE_DIR")
-                    else (
-                        Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
-                        / "montage_ai"
-                        / "tension"
-                    )
+                Path(os.environ.get("METADATA_CACHE_DIR")) / "tension"
+                if os.environ.get("METADATA_CACHE_DIR")
+                else (
+                    Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+                    / "montage_ai"
+                    / "tension"
                 )
             )
         )
     )
-    style_preset_path: Optional[Path] = field(default_factory=lambda: Path(os.environ.get("STYLE_PRESET_PATH")) if os.environ.get("STYLE_PRESET_PATH") else None)
-    style_preset_dir: Optional[Path] = field(default_factory=lambda: Path(os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")) if (os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")) else None)
+    style_preset_path: Optional[Path] = field(
+        default_factory=lambda: Path(os.environ.get("STYLE_PRESET_PATH"))
+        if os.environ.get("STYLE_PRESET_PATH")
+        else None
+    )
+    style_preset_dir: Optional[Path] = field(
+        default_factory=lambda: Path(
+            os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR")
+        )
+        if (os.environ.get("STYLE_PRESET_DIR") or os.environ.get("STYLE_TEMPLATES_DIR"))
+        else None
+    )
 
     def ensure_directories(self) -> None:
         """Create all directories if they don't exist."""
@@ -328,90 +367,185 @@ def get_effective_cpu_count() -> int:
 class FeatureConfig:
     """Feature toggles for enhancement pipeline."""
 
-    stabilize: bool = field(default_factory=ConfigParser.make_bool_parser("STABILIZE", False))
-    upscale: bool = field(default_factory=ConfigParser.make_bool_parser("UPSCALE", False))
-    enhance: bool = field(default_factory=ConfigParser.make_bool_parser("ENHANCE", True))
-    preserve_aspect: bool = field(default_factory=ConfigParser.make_bool_parser("PRESERVE_ASPECT", False))
-    export_timeline: bool = field(default_factory=ConfigParser.make_bool_parser("EXPORT_TIMELINE", False))
-    generate_proxies: bool = field(default_factory=ConfigParser.make_bool_parser("GENERATE_PROXIES", False))
-    llm_clip_selection: bool = field(default_factory=ConfigParser.make_bool_parser("LLM_CLIP_SELECTION", True))
-    deep_analysis: bool = field(default_factory=ConfigParser.make_bool_parser("DEEP_ANALYSIS", False))
-    verbose: bool = field(default_factory=ConfigParser.make_bool_parser("VERBOSE", True))
-    enable_ai_filter: bool = field(default_factory=ConfigParser.make_bool_parser("ENABLE_AI_FILTER", False))
+    stabilize: bool = field(
+        default_factory=ConfigParser.make_bool_parser("STABILIZE", False)
+    )
+    upscale: bool = field(
+        default_factory=ConfigParser.make_bool_parser("UPSCALE", False)
+    )
+    enhance: bool = field(
+        default_factory=ConfigParser.make_bool_parser("ENHANCE", True)
+    )
+    preserve_aspect: bool = field(
+        default_factory=ConfigParser.make_bool_parser("PRESERVE_ASPECT", False)
+    )
+    export_timeline: bool = field(
+        default_factory=ConfigParser.make_bool_parser("EXPORT_TIMELINE", False)
+    )
+    generate_proxies: bool = field(
+        default_factory=ConfigParser.make_bool_parser("GENERATE_PROXIES", False)
+    )
+    llm_clip_selection: bool = field(
+        default_factory=ConfigParser.make_bool_parser("LLM_CLIP_SELECTION", True)
+    )
+    deep_analysis: bool = field(
+        default_factory=ConfigParser.make_bool_parser("DEEP_ANALYSIS", False)
+    )
+    verbose: bool = field(
+        default_factory=ConfigParser.make_bool_parser("VERBOSE", True)
+    )
+    enable_ai_filter: bool = field(
+        default_factory=ConfigParser.make_bool_parser("ENABLE_AI_FILTER", False)
+    )
     # Phase 4: Agentic Creative Loop - LLM evaluates and refines cuts iteratively
-    creative_loop: bool = field(default_factory=ConfigParser.make_bool_parser("CREATIVE_LOOP", False))
-    creative_loop_max_iterations: int = field(default_factory=ConfigParser.make_int_parser("CREATIVE_LOOP_MAX_ITERATIONS", 3))
+    creative_loop: bool = field(
+        default_factory=ConfigParser.make_bool_parser("CREATIVE_LOOP", False)
+    )
+    creative_loop_max_iterations: int = field(
+        default_factory=ConfigParser.make_int_parser("CREATIVE_LOOP_MAX_ITERATIONS", 3)
+    )
 
     # Episodic memory for analysis caching (experimental)
-    episodic_memory: bool = field(default_factory=ConfigParser.make_bool_parser("EPISODIC_MEMORY", False))
+    episodic_memory: bool = field(
+        default_factory=ConfigParser.make_bool_parser("EPISODIC_MEMORY", False)
+    )
 
     # Storytelling Engine (Phase 1 scaffolding)
-    story_engine: bool = field(default_factory=ConfigParser.make_bool_parser("ENABLE_STORY_ENGINE", False))
-    strict_cloud_compute: bool = field(default_factory=ConfigParser.make_bool_parser("STRICT_CLOUD_COMPUTE", False))
+    story_engine: bool = field(
+        default_factory=ConfigParser.make_bool_parser("ENABLE_STORY_ENGINE", False)
+    )
+    strict_cloud_compute: bool = field(
+        default_factory=ConfigParser.make_bool_parser("STRICT_CLOUD_COMPUTE", False)
+    )
 
     # Shorts Workflow (Vertical Video + Smart Reframing)
-    shorts_mode: bool = field(default_factory=ConfigParser.make_bool_parser("SHORTS_MODE", False))
-    reframe_mode: str = field(default_factory=ConfigParser.make_str_parser("REFRAME_MODE", "auto"))  # auto, speaker, center, custom
+    shorts_mode: bool = field(
+        default_factory=ConfigParser.make_bool_parser("SHORTS_MODE", False)
+    )
+    reframe_mode: str = field(
+        default_factory=ConfigParser.make_str_parser("REFRAME_MODE", "auto")
+    )  # auto, speaker, center, custom
 
     # 2025 P0/P1: Burn-in captions and voice isolation
-    captions: bool = field(default_factory=ConfigParser.make_bool_parser("CAPTIONS", False))
-    captions_style: str = field(default_factory=ConfigParser.make_str_parser("CAPTIONS_STYLE", "tiktok"))  # tiktok, minimal, bold, karaoke
-    transcription_model: str = field(default_factory=ConfigParser.make_str_parser("TRANSCRIPTION_MODEL", "medium"))
-    
+    captions: bool = field(
+        default_factory=ConfigParser.make_bool_parser("CAPTIONS", False)
+    )
+    captions_style: str = field(
+        default_factory=ConfigParser.make_str_parser("CAPTIONS_STYLE", "tiktok")
+    )  # tiktok, minimal, bold, karaoke
+    transcription_model: str = field(
+        default_factory=ConfigParser.make_str_parser("TRANSCRIPTION_MODEL", "medium")
+    )
+
     # Audio Polish: Clean Audio = Voice Isolation + Denoise (single toggle)
     # CLEAN_AUDIO is the new consolidated toggle, VOICE_ISOLATION is legacy
-    voice_isolation: bool = field(default_factory=lambda: (
-        ConfigParser.parse_bool("CLEAN_AUDIO", False) or ConfigParser.parse_bool("VOICE_ISOLATION", False)
-    ))
-    voice_isolation_model: str = field(default_factory=ConfigParser.make_str_parser("VOICE_ISOLATION_MODEL", "htdemucs"))
+    voice_isolation: bool = field(
+        default_factory=lambda: (
+            ConfigParser.parse_bool("CLEAN_AUDIO", False)
+            or ConfigParser.parse_bool("VOICE_ISOLATION", False)
+        )
+    )
+    voice_isolation_model: str = field(
+        default_factory=ConfigParser.make_str_parser(
+            "VOICE_ISOLATION_MODEL", "htdemucs"
+        )
+    )
 
     # Noise Reduction: DeepFilterNet for lightweight noise removal (faster than voice_isolation)
     # Use for podcasts, interviews, vlogs with background noise
-    noise_reduction: bool = field(default_factory=ConfigParser.make_bool_parser("NOISE_REDUCTION", False))
-    noise_reduction_strength: int = field(default_factory=ConfigParser.make_int_parser("NOISE_REDUCTION_STRENGTH", 100))
+    noise_reduction: bool = field(
+        default_factory=ConfigParser.make_bool_parser("NOISE_REDUCTION", False)
+    )
+    noise_reduction_strength: int = field(
+        default_factory=ConfigParser.make_int_parser("NOISE_REDUCTION_STRENGTH", 100)
+    )
 
     # Video Enhancement (per-clip)
-    denoise: bool = field(default_factory=ConfigParser.make_bool_parser("DENOISE", False))
-    sharpen: bool = field(default_factory=ConfigParser.make_bool_parser("SHARPEN", False))
+    denoise: bool = field(
+        default_factory=ConfigParser.make_bool_parser("DENOISE", False)
+    )
+    sharpen: bool = field(
+        default_factory=ConfigParser.make_bool_parser("SHARPEN", False)
+    )
 
     # Film Grain Simulation: none, 35mm, 16mm, 8mm, digital
-    film_grain: str = field(default_factory=ConfigParser.make_str_parser("FILM_GRAIN", "none"))
+    film_grain: str = field(
+        default_factory=ConfigParser.make_str_parser("FILM_GRAIN", "none")
+    )
 
     # Compatibility flags kept on features for legacy call sites/tests.
     cluster_mode: bool = field(default_factory=_is_cluster_deployment)
-    colorlevels: bool = field(default_factory=ConfigParser.make_bool_parser("COLORLEVELS", True))
-    luma_normalize: bool = field(default_factory=ConfigParser.make_bool_parser("LUMA_NORMALIZE", True))
+    colorlevels: bool = field(
+        default_factory=ConfigParser.make_bool_parser("COLORLEVELS", True)
+    )
+    luma_normalize: bool = field(
+        default_factory=ConfigParser.make_bool_parser("LUMA_NORMALIZE", True)
+    )
 
 
 @dataclass
 class StabilizationConfig:
     """Stabilization tuning and AI preferences."""
 
-    ai_enabled: bool = field(default_factory=ConfigParser.make_bool_parser("STABILIZE_AI", False))
-    force_cgpu: bool = field(default_factory=ConfigParser.make_bool_parser("STABILIZE_FORCE_CGPU", False))
-    mode: str = field(default_factory=ConfigParser.make_str_parser("STABILIZE_MODE", "professional"))
-    aggressive_smoothing: bool = field(default_factory=ConfigParser.make_bool_parser("AGGRESSIVE_SMOOTHING", False))
-    fast_stabilization: bool = field(default_factory=ConfigParser.make_bool_parser("FAST_STABILIZATION", False))
-    skip_color_correction: bool = field(default_factory=ConfigParser.make_bool_parser("SKIP_COLOR_CORRECTION", False))
-    shake_threshold: float = field(default_factory=ConfigParser.make_float_parser("STABILIZE_SHAKE_THRESHOLD", 0.25))
-    fast_mode_max_duration: float = field(default_factory=ConfigParser.make_float_parser("STABILIZE_FAST_MAX_DURATION", 1.2))
+    ai_enabled: bool = field(
+        default_factory=ConfigParser.make_bool_parser("STABILIZE_AI", False)
+    )
+    force_cgpu: bool = field(
+        default_factory=ConfigParser.make_bool_parser("STABILIZE_FORCE_CGPU", False)
+    )
+    mode: str = field(
+        default_factory=ConfigParser.make_str_parser("STABILIZE_MODE", "professional")
+    )
+    aggressive_smoothing: bool = field(
+        default_factory=ConfigParser.make_bool_parser("AGGRESSIVE_SMOOTHING", False)
+    )
+    fast_stabilization: bool = field(
+        default_factory=ConfigParser.make_bool_parser("FAST_STABILIZATION", False)
+    )
+    skip_color_correction: bool = field(
+        default_factory=ConfigParser.make_bool_parser("SKIP_COLOR_CORRECTION", False)
+    )
+    shake_threshold: float = field(
+        default_factory=ConfigParser.make_float_parser(
+            "STABILIZE_SHAKE_THRESHOLD", 0.25
+        )
+    )
+    fast_mode_max_duration: float = field(
+        default_factory=ConfigParser.make_float_parser(
+            "STABILIZE_FAST_MAX_DURATION", 1.2
+        )
+    )
 
     # Dialogue Ducking: Auto-duck music during speech
-    dialogue_duck: bool = field(default_factory=ConfigParser.make_bool_parser("DIALOGUE_DUCK", False))
-    dialogue_duck_level: float = field(default_factory=ConfigParser.make_float_parser("DIALOGUE_DUCK_LEVEL", -12.0))
+    dialogue_duck: bool = field(
+        default_factory=ConfigParser.make_bool_parser("DIALOGUE_DUCK", False)
+    )
+    dialogue_duck_level: float = field(
+        default_factory=ConfigParser.make_float_parser("DIALOGUE_DUCK_LEVEL", -12.0)
+    )
 
     # Performance: Low-resource hardware mode (longer timeouts, smaller batches, sequential processing)
-    low_memory_mode: bool = field(default_factory=ConfigParser.make_bool_parser("LOW_MEMORY_MODE", False))
+    low_memory_mode: bool = field(
+        default_factory=ConfigParser.make_bool_parser("LOW_MEMORY_MODE", False)
+    )
 
     # Cluster Mode: Distribute heavy processing across multiple Kubernetes nodes
     # Uses unified deployment mode detection for consistency
     cluster_mode: bool = field(default_factory=_is_cluster_deployment)
-    cluster_parallelism: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_PARALLELISM", 4))
-    cluster_render_tier: str = field(default_factory=ConfigParser.make_str_parser("CLUSTER_RENDER_TIER", "large"))
+    cluster_parallelism: int = field(
+        default_factory=ConfigParser.make_int_parser("CLUSTER_PARALLELISM", 4)
+    )
+    cluster_render_tier: str = field(
+        default_factory=ConfigParser.make_str_parser("CLUSTER_RENDER_TIER", "large")
+    )
 
     # Color/levels normalization controls (can be disabled for clean footage)
-    colorlevels: bool = field(default_factory=ConfigParser.make_bool_parser("COLORLEVELS", True))
-    luma_normalize: bool = field(default_factory=ConfigParser.make_bool_parser("LUMA_NORMALIZE", True))
+    colorlevels: bool = field(
+        default_factory=ConfigParser.make_bool_parser("COLORLEVELS", True)
+    )
+    luma_normalize: bool = field(
+        default_factory=ConfigParser.make_bool_parser("LUMA_NORMALIZE", True)
+    )
 
 
 # =============================================================================
@@ -420,22 +554,38 @@ class StabilizationConfig:
 @dataclass
 class ProcessingSettings:
     """Processing settings with adaptive batch sizing for high-resolution media."""
-    
-    batch_size: int = field(default_factory=lambda: int(os.environ.get("BATCH_SIZE", "5")))
-    max_input_resolution: int = field(default_factory=lambda: int(os.environ.get("MAX_INPUT_RESOLUTION", "8294400")))  # 4K default
+
+    batch_size: int = field(
+        default_factory=lambda: int(os.environ.get("BATCH_SIZE", "5"))
+    )
+    max_input_resolution: int = field(
+        default_factory=lambda: int(os.environ.get("MAX_INPUT_RESOLUTION", "8294400"))
+    )  # 4K default
     warn_threshold_resolution: int = 33177600  # 6K (6144x3160)
 
     # Job timeouts (seconds) — configurable via env to avoid hardcoded values in code
-    preview_job_timeout: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300")))
-    default_job_timeout: int = field(default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800")))
+    preview_job_timeout: int = field(
+        default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300"))
+    )
+    default_job_timeout: int = field(
+        default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800"))
+    )
 
     # Per-file timeout for scene detection tasks (seconds). Bounded in preview mode to
     # avoid a single bad input blocking the entire job. Configurable via env var
     # SCENE_DETECTION_PER_FILE_TIMEOUT (default: 120s).
-    scene_detection_per_file_timeout_seconds: int = field(default_factory=lambda: int(os.environ.get("SCENE_DETECTION_PER_FILE_TIMEOUT", "120")))
+    scene_detection_per_file_timeout_seconds: int = field(
+        default_factory=lambda: int(
+            os.environ.get("SCENE_DETECTION_PER_FILE_TIMEOUT", "120")
+        )
+    )
 
     def get_adaptive_batch_size_for_resolution(
-        self, width: int, height: int, low_memory: bool = False, memory_gb: Optional[float] = None
+        self,
+        width: int,
+        height: int,
+        low_memory: bool = False,
+        memory_gb: Optional[float] = None,
     ) -> int:
         """Adaptive batch sizing based on input resolution and available memory.
 
@@ -466,15 +616,17 @@ class ProcessingSettings:
         # - else: use configured base (default BATCH_SIZE env, typically 5)
         if pixels > 33_177_600:  # 8K+ (33MP+)
             from .logger import logger
+
             logger.warning(
-                f"⚠️ Very high resolution: {width}x{height} ({pixels/1e6:.1f}MP). "
+                f"⚠️ Very high resolution: {width}x{height} ({pixels / 1e6:.1f}MP). "
                 "Using batch_size=1. Consider proxy workflow for better performance."
             )
             base = 1
         elif pixels >= 15_000_000:  # 6K (15-33MP)
             from .logger import logger
+
             logger.warning(
-                f"⚠️ High resolution detected: {width}x{height} ({pixels/1e6:.1f}MP). "
+                f"⚠️ High resolution detected: {width}x{height} ({pixels / 1e6:.1f}MP). "
                 "Using reduced batch size. Consider proxy workflow for better performance."
             )
             base = 1
@@ -499,25 +651,26 @@ class ProcessingSettings:
             return max(1, base // 4)
 
         return base
-    
+
     def validate_resolution(self, width: int, height: int) -> bool:
         """Validate resolution is within safe limits."""
         from .logger import logger
+
         pixels = width * height
-        
+
         if pixels > self.warn_threshold_resolution:
             logger.warning(
-                f"⚠️ High resolution detected: {width}x{height} ({pixels/1e6:.1f}MP). "
+                f"⚠️ High resolution detected: {width}x{height} ({pixels / 1e6:.1f}MP). "
                 "Consider using proxy workflow for better performance."
             )
-        
+
         if pixels > self.max_input_resolution * 4:  # 8K
             logger.error(
                 f"❌ Resolution {width}x{height} exceeds safe limits. "
                 "Use proxy workflow or reduce resolution."
             )
             return False
-        
+
         return True
 
 
@@ -528,13 +681,25 @@ class ProcessingSettings:
 class GPUConfig:
     """GPU and hardware acceleration settings."""
 
-    use_gpu: str = field(default_factory=lambda: os.environ.get("USE_GPU", "auto").lower())
-    output_codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_CODEC", "h264"))
-    ffmpeg_hwaccel: str = field(default_factory=lambda: os.environ.get("FFMPEG_HWACCEL", "auto"))
-    use_ffmpeg_mcp: bool = field(default_factory=lambda: os.environ.get("USE_FFMPEG_MCP", "false").lower() == "true")
+    use_gpu: str = field(
+        default_factory=lambda: os.environ.get("USE_GPU", "auto").lower()
+    )
+    output_codec: str = field(
+        default_factory=lambda: os.environ.get("OUTPUT_CODEC", "h264")
+    )
+    ffmpeg_hwaccel: str = field(
+        default_factory=lambda: os.environ.get("FFMPEG_HWACCEL", "auto")
+    )
+    use_ffmpeg_mcp: bool = field(
+        default_factory=lambda: os.environ.get("USE_FFMPEG_MCP", "false").lower()
+        == "true"
+    )
     ffmpeg_mcp_endpoint: str = field(default_factory=_default_ffmpeg_mcp_endpoint)
     # Force routing encoding to CGPU service when beneficial or explicitly requested
-    force_cgpu_encoding: bool = field(default_factory=lambda: os.environ.get("FORCE_CGPU_ENCODING", "false").lower() == "true")
+    force_cgpu_encoding: bool = field(
+        default_factory=lambda: os.environ.get("FORCE_CGPU_ENCODING", "false").lower()
+        == "true"
+    )
 
 
 # =============================================================================
@@ -546,39 +711,84 @@ class LLMConfig:
 
     # OpenAI-compatible API (LiteLLM/llama-box, vLLM, LocalAI)
     # Priority: LITELLM_API_KEY (fluxibri_core convention) > OPENAI_API_KEY
-    openai_api_base: str = field(default_factory=lambda: os.environ.get("OPENAI_API_BASE", ""))
-    openai_api_key: str = field(default_factory=lambda: (
-        os.environ.get("LITELLM_API_KEY") or  # fluxibri_core/llama-box convention
-        os.environ.get("OPENAI_API_KEY") or
-        "not-needed"
-    ))
-    openai_model: str = field(default_factory=lambda: os.environ.get("OPENAI_MODEL", ""))
-    openai_vision_model: str = field(default_factory=lambda: os.environ.get("OPENAI_VISION_MODEL", ""))
+    openai_api_base: str = field(
+        default_factory=lambda: os.environ.get("OPENAI_API_BASE", "")
+    )
+    openai_api_key: str = field(
+        default_factory=lambda: (
+            os.environ.get("LITELLM_API_KEY")  # fluxibri_core/llama-box convention
+            or os.environ.get("OPENAI_API_KEY")
+            or "not-needed"
+        )
+    )
+    openai_model: str = field(
+        default_factory=lambda: os.environ.get("OPENAI_MODEL", "")
+    )
+    openai_vision_model: str = field(
+        default_factory=lambda: os.environ.get("OPENAI_VISION_MODEL", "")
+    )
 
     # Ollama (local fallback)
     ollama_host: str = field(default_factory=_default_ollama_host)
-    ollama_model: str = field(default_factory=lambda: os.environ.get("OLLAMA_MODEL", "llava"))
-    director_model: str = field(default_factory=lambda: os.environ.get("DIRECTOR_MODEL", "llama3.1:70b"))
+    ollama_model: str = field(
+        default_factory=lambda: os.environ.get("OLLAMA_MODEL", "llava")
+    )
+    director_model: str = field(
+        default_factory=lambda: os.environ.get("DIRECTOR_MODEL", "llama3.1:70b")
+    )
 
     # Google AI
-    google_api_key: str = field(default_factory=lambda: os.environ.get("GOOGLE_API_KEY", ""))
-    google_ai_model: str = field(default_factory=lambda: os.environ.get("GOOGLE_AI_MODEL", "gemini-2.0-flash"))
-    google_ai_endpoint: str = field(default_factory=lambda: os.environ.get("GOOGLE_AI_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta/models"))
+    google_api_key: str = field(
+        default_factory=lambda: os.environ.get("GOOGLE_API_KEY", "")
+    )
+    google_ai_model: str = field(
+        default_factory=lambda: os.environ.get("GOOGLE_AI_MODEL", "gemini-2.0-flash")
+    )
+    google_ai_endpoint: str = field(
+        default_factory=lambda: os.environ.get(
+            "GOOGLE_AI_ENDPOINT",
+            "https://generativelanguage.googleapis.com/v1beta/models",
+        )
+    )
 
     # cgpu (Colab GPU)
-    cgpu_enabled: bool = field(default_factory=lambda: os.environ.get("CGPU_ENABLED", "false").lower() == "true")
-    cgpu_gpu_enabled: bool = field(default_factory=lambda: os.environ.get("CGPU_GPU_ENABLED", "false").lower() == "true")
-    cgpu_host: str = field(default_factory=lambda: os.environ.get("CGPU_HOST", "127.0.0.1"))
-    cgpu_port: int = field(default_factory=lambda: int(os.environ.get("CGPU_PORT", "8090")))
-    cgpu_model: str = field(default_factory=lambda: os.environ.get("CGPU_MODEL", "gemini-2.0-flash"))
-    cgpu_output_dir: str = field(default_factory=lambda: os.environ.get("CGPU_OUTPUT_DIR", ""))
-    cgpu_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_TIMEOUT", "1200")))
-    cgpu_max_concurrency: int = field(default_factory=lambda: int(os.environ.get("CGPU_MAX_CONCURRENCY", "1")))
-    cgpu_status_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_STATUS_TIMEOUT", "30")))
-    cgpu_gpu_check_timeout: int = field(default_factory=lambda: int(os.environ.get("CGPU_GPU_CHECK_TIMEOUT", "120")))
-    
+    cgpu_enabled: bool = field(
+        default_factory=lambda: os.environ.get("CGPU_ENABLED", "false").lower()
+        == "true"
+    )
+    cgpu_gpu_enabled: bool = field(
+        default_factory=lambda: os.environ.get("CGPU_GPU_ENABLED", "false").lower()
+        == "true"
+    )
+    cgpu_host: str = field(
+        default_factory=lambda: os.environ.get("CGPU_HOST", "127.0.0.1")
+    )
+    cgpu_port: int = field(
+        default_factory=lambda: int(os.environ.get("CGPU_PORT", "8090"))
+    )
+    cgpu_model: str = field(
+        default_factory=lambda: os.environ.get("CGPU_MODEL", "gemini-2.0-flash")
+    )
+    cgpu_output_dir: str = field(
+        default_factory=lambda: os.environ.get("CGPU_OUTPUT_DIR", "")
+    )
+    cgpu_timeout: int = field(
+        default_factory=lambda: int(os.environ.get("CGPU_TIMEOUT", "1200"))
+    )
+    cgpu_max_concurrency: int = field(
+        default_factory=lambda: int(os.environ.get("CGPU_MAX_CONCURRENCY", "1"))
+    )
+    cgpu_status_timeout: int = field(
+        default_factory=lambda: int(os.environ.get("CGPU_STATUS_TIMEOUT", "30"))
+    )
+    cgpu_gpu_check_timeout: int = field(
+        default_factory=lambda: int(os.environ.get("CGPU_GPU_CHECK_TIMEOUT", "120"))
+    )
+
     # General LLM settings
-    timeout: int = field(default_factory=lambda: int(os.environ.get("LLM_TIMEOUT", "60")))
+    timeout: int = field(
+        default_factory=lambda: int(os.environ.get("LLM_TIMEOUT", "60"))
+    )
 
     @staticmethod
     def _is_auto_model(model: str) -> bool:
@@ -587,7 +797,10 @@ class LLMConfig:
     @property
     def has_openai_backend(self) -> bool:
         """Check if OpenAI-compatible backend is configured."""
-        return bool(self.openai_api_base and (self.openai_model or self._is_auto_model(self.openai_model)))
+        return bool(
+            self.openai_api_base
+            and (self.openai_model or self._is_auto_model(self.openai_model))
+        )
 
     @property
     def has_google_backend(self) -> bool:
@@ -602,54 +815,127 @@ class LLMConfig:
 class CloudConfig:
     """
     Montage Cloud (Pro) configuration.
-    
+
     Handles authentication and endpoints for the paid 'Pro' tier services
     (Cloud GPU offloading, hosted Web UI, etc.).
     """
-    api_key: str = field(default_factory=lambda: os.environ.get("MONTAGE_CLOUD_API_KEY", ""))
-    endpoint: str = field(default_factory=lambda: os.environ.get("MONTAGE_CLOUD_ENDPOINT", "https://api.montage.ai/v1"))
-    enabled: bool = field(default_factory=lambda: os.environ.get("MONTAGE_CLOUD_ENABLED", "false").lower() == "true")
-    
+
+    api_key: str = field(
+        default_factory=lambda: os.environ.get("MONTAGE_CLOUD_API_KEY", "")
+    )
+    endpoint: str = field(
+        default_factory=lambda: os.environ.get(
+            "MONTAGE_CLOUD_ENDPOINT", "https://api.montage.ai/v1"
+        )
+    )
+    enabled: bool = field(
+        default_factory=lambda: os.environ.get("MONTAGE_CLOUD_ENABLED", "false").lower()
+        == "true"
+    )
+
     # Billing / Usage tracking
-    track_usage: bool = field(default_factory=lambda: os.environ.get("TRACK_USAGE", "true").lower() == "true")
+    track_usage: bool = field(
+        default_factory=lambda: os.environ.get("TRACK_USAGE", "true").lower() == "true"
+    )
 
 
 @dataclass
 class ClusterConfig:
     """
     Kubernetes cluster and registry configuration.
-    
+
     Syncs with deploy/k3s/config-global.yaml values for distributed processing.
     """
+
     registry_host: str = field(default_factory=_default_registry_host)
     registry_port: str = field(default_factory=_default_registry_port)
-    image_name: str = field(default_factory=lambda: os.environ.get("IMAGE_NAME", "montage-ai"))
-    image_tag: str = field(default_factory=lambda: os.environ.get("IMAGE_TAG", "latest"))
+    image_name: str = field(
+        default_factory=lambda: os.environ.get("IMAGE_NAME", "montage-ai")
+    )
+    image_tag: str = field(
+        default_factory=lambda: os.environ.get("IMAGE_TAG", "latest")
+    )
     namespace: str = field(default_factory=lambda: _cluster_namespace() or "montage-ai")
-    image_pull_secret: Optional[str] = field(default_factory=lambda: os.environ.get("IMAGE_PULL_SECRET"))
-    pvc_name: str = field(default_factory=lambda: os.environ.get("PVC_NAME") or f"{_app_name()}-data")
-    pvc_input: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_INPUT_NAME") or "")
-    pvc_output: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_OUTPUT_NAME") or "")
-    pvc_music: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_MUSIC_NAME") or "")
-    pvc_assets: Optional[str] = field(default_factory=lambda: os.environ.get("PVC_ASSETS_NAME") or "")
+    image_pull_secret: Optional[str] = field(
+        default_factory=lambda: os.environ.get("IMAGE_PULL_SECRET")
+    )
+    pvc_name: str = field(
+        default_factory=lambda: os.environ.get("PVC_NAME") or f"{_app_name()}-data"
+    )
+    pvc_input: Optional[str] = field(
+        default_factory=lambda: os.environ.get("PVC_INPUT_NAME") or ""
+    )
+    pvc_output: Optional[str] = field(
+        default_factory=lambda: os.environ.get("PVC_OUTPUT_NAME") or ""
+    )
+    pvc_music: Optional[str] = field(
+        default_factory=lambda: os.environ.get("PVC_MUSIC_NAME") or ""
+    )
+    pvc_assets: Optional[str] = field(
+        default_factory=lambda: os.environ.get("PVC_ASSETS_NAME") or ""
+    )
 
     # Resource Tiers (Canonical Fluxibri Tiers)
-    tiers: dict = field(default_factory=lambda: {
-        "minimal": {"requests": {"cpu": "10m", "memory": "32Mi"}, "limits": {"cpu": "100m", "memory": "128Mi"}},
-        "small": {"requests": {"cpu": "100m", "memory": "256Mi"}, "limits": {"cpu": "500m", "memory": "1Gi"}},
-        "medium": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2", "memory": "4Gi"}},
-        "large": {"requests": {"cpu": "2", "memory": "4Gi"}, "limits": {"cpu": "8", "memory": "16Gi"}},
-        "xlarge": {"requests": {"cpu": "4", "memory": "8Gi"}, "limits": {"cpu": "16", "memory": "32Gi"}},
-        "gpu": {"requests": {"cpu": "1", "memory": "4Gi"}, "limits": {"cpu": "16", "memory": "32Gi"}}
-    })
-    scene_detect_tier: str = field(default_factory=lambda: os.environ.get("SCENE_DETECT_TIER", "medium"))
-    node_selector: str = field(default_factory=lambda: os.environ.get("CLUSTER_NODE_SELECTOR", ""))
-    tolerate_gpu: bool = field(default_factory=lambda: os.environ.get("CLUSTER_TOLERATE_GPU", "false").lower() == "true")
-    allow_mixed_arch: bool = field(default_factory=lambda: os.environ.get("CLUSTER_ALLOW_MIXED_ARCH", "true").lower() == "true")
-    arch_selector_key: str = field(default_factory=lambda: os.environ.get("CLUSTER_ARCH_SELECTOR_KEY", "kubernetes.io/arch"))
-    status_request_timeout_seconds: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_STATUS_REQUEST_TIMEOUT", 30))
-    status_poll_interval_seconds: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_STATUS_POLL_INTERVAL", 5))
-    status_max_errors: int = field(default_factory=ConfigParser.make_int_parser("CLUSTER_STATUS_MAX_ERRORS", 6))
+    tiers: dict = field(
+        default_factory=lambda: {
+            "minimal": {
+                "requests": {"cpu": "10m", "memory": "32Mi"},
+                "limits": {"cpu": "100m", "memory": "128Mi"},
+            },
+            "small": {
+                "requests": {"cpu": "100m", "memory": "256Mi"},
+                "limits": {"cpu": "500m", "memory": "1Gi"},
+            },
+            "medium": {
+                "requests": {"cpu": "500m", "memory": "1Gi"},
+                "limits": {"cpu": "2", "memory": "4Gi"},
+            },
+            "large": {
+                "requests": {"cpu": "2", "memory": "4Gi"},
+                "limits": {"cpu": "8", "memory": "16Gi"},
+            },
+            "xlarge": {
+                "requests": {"cpu": "4", "memory": "8Gi"},
+                "limits": {"cpu": "16", "memory": "32Gi"},
+            },
+            "gpu": {
+                "requests": {"cpu": "1", "memory": "4Gi"},
+                "limits": {"cpu": "16", "memory": "32Gi"},
+            },
+        }
+    )
+    scene_detect_tier: str = field(
+        default_factory=lambda: os.environ.get("SCENE_DETECT_TIER", "medium")
+    )
+    node_selector: str = field(
+        default_factory=lambda: os.environ.get("CLUSTER_NODE_SELECTOR", "")
+    )
+    tolerate_gpu: bool = field(
+        default_factory=lambda: os.environ.get("CLUSTER_TOLERATE_GPU", "false").lower()
+        == "true"
+    )
+    allow_mixed_arch: bool = field(
+        default_factory=lambda: os.environ.get(
+            "CLUSTER_ALLOW_MIXED_ARCH", "true"
+        ).lower()
+        == "true"
+    )
+    arch_selector_key: str = field(
+        default_factory=lambda: os.environ.get(
+            "CLUSTER_ARCH_SELECTOR_KEY", "kubernetes.io/arch"
+        )
+    )
+    status_request_timeout_seconds: int = field(
+        default_factory=ConfigParser.make_int_parser(
+            "CLUSTER_STATUS_REQUEST_TIMEOUT", 30
+        )
+    )
+    status_poll_interval_seconds: int = field(
+        default_factory=ConfigParser.make_int_parser("CLUSTER_STATUS_POLL_INTERVAL", 5)
+    )
+    status_max_errors: int = field(
+        default_factory=ConfigParser.make_int_parser("CLUSTER_STATUS_MAX_ERRORS", 6)
+    )
 
     @property
     def image_full(self) -> str:
@@ -663,7 +949,7 @@ class ClusterConfig:
         port = self.registry_port
         name = self.image_name
         tag = self.image_tag
-        
+
         # Build image path
         if not host:
             return f"{name}:{tag}" if name else ""
@@ -672,7 +958,10 @@ class ClusterConfig:
         return f"{host}/{name}:{tag}"
 
     # Opt-in JobSet usage (if CRD installed and desired)
-    use_jobset: bool = field(default_factory=lambda: os.environ.get("CLUSTER_USE_JOBSET", "false").lower() == "true")
+    use_jobset: bool = field(
+        default_factory=lambda: os.environ.get("CLUSTER_USE_JOBSET", "false").lower()
+        == "true"
+    )
 
 
 # =============================================================================
@@ -681,30 +970,56 @@ class ClusterConfig:
 @dataclass
 class MotionAnalysisConfig:
     """Optical flow and motion detection parameters for performance tuning."""
-    
+
     # Optical flow (Farneback algorithm) parameters
-    optical_flow_pyr_scale: float = field(default_factory=lambda: float(os.environ.get("OPTICAL_FLOW_PYR_SCALE", "0.5")))
-    optical_flow_levels: int = field(default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_LEVELS", "3")))
-    optical_flow_winsize: int = field(default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_WINSIZE", "15")))
-    optical_flow_iterations: int = field(default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_ITERATIONS", "3")))
-    optical_flow_poly_n: int = field(default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_POLY_N", "5")))
-    optical_flow_poly_sigma: float = field(default_factory=lambda: float(os.environ.get("OPTICAL_FLOW_POLY_SIGMA", "1.2")))
-    
+    optical_flow_pyr_scale: float = field(
+        default_factory=lambda: float(os.environ.get("OPTICAL_FLOW_PYR_SCALE", "0.5"))
+    )
+    optical_flow_levels: int = field(
+        default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_LEVELS", "3"))
+    )
+    optical_flow_winsize: int = field(
+        default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_WINSIZE", "15"))
+    )
+    optical_flow_iterations: int = field(
+        default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_ITERATIONS", "3"))
+    )
+    optical_flow_poly_n: int = field(
+        default_factory=lambda: int(os.environ.get("OPTICAL_FLOW_POLY_N", "5"))
+    )
+    optical_flow_poly_sigma: float = field(
+        default_factory=lambda: float(os.environ.get("OPTICAL_FLOW_POLY_SIGMA", "1.2"))
+    )
+
     # Motion magnitude normalization (typical range 0-10)
-    motion_magnitude_scale: float = field(default_factory=lambda: float(os.environ.get("MOTION_MAGNITUDE_SCALE", "10.0")))
-    
+    motion_magnitude_scale: float = field(
+        default_factory=lambda: float(os.environ.get("MOTION_MAGNITUDE_SCALE", "10.0"))
+    )
+
     # Optical flow direction threshold (determines if motion is static/left/right)
-    motion_direction_threshold: float = field(default_factory=lambda: float(os.environ.get("MOTION_DIRECTION_THRESHOLD", "0.5")))
-    
+    motion_direction_threshold: float = field(
+        default_factory=lambda: float(
+            os.environ.get("MOTION_DIRECTION_THRESHOLD", "0.5")
+        )
+    )
+
     # Blur/focus detection: Laplacian variance threshold
     # Higher = stricter quality threshold; typical range sharp ~1000, blurry ~100
-    blur_detection_variance_threshold: float = field(default_factory=lambda: float(os.environ.get("BLUR_DETECTION_VARIANCE_THRESHOLD", "1000.0")))
-    
+    blur_detection_variance_threshold: float = field(
+        default_factory=lambda: float(
+            os.environ.get("BLUR_DETECTION_VARIANCE_THRESHOLD", "1000.0")
+        )
+    )
+
     # Histogram bins for color matching (higher = more precise but slower)
-    histogram_bins: int = field(default_factory=lambda: int(os.environ.get("HISTOGRAM_BINS", "64")))
-    
+    histogram_bins: int = field(
+        default_factory=lambda: int(os.environ.get("HISTOGRAM_BINS", "64"))
+    )
+
     # Motion sampling strategy: "full" (all frames) or "adaptive" (skip low-motion scenes)
-    motion_sampling_mode: str = field(default_factory=lambda: os.environ.get("MOTION_SAMPLING_MODE", "adaptive"))
+    motion_sampling_mode: str = field(
+        default_factory=lambda: os.environ.get("MOTION_SAMPLING_MODE", "adaptive")
+    )
 
 
 # =============================================================================
@@ -713,24 +1028,40 @@ class MotionAnalysisConfig:
 @dataclass
 class AnalysisConstants:
     """Centralized constants for scene analysis and feature extraction."""
-    
+
     # Scene Detection (PySceneDetect)
-    scene_min_length_frames: int = field(default_factory=ConfigParser.make_int_parser("SCENE_MIN_LENGTH_FRAMES", 15))  # ~0.5s @ 30fps
+    scene_min_length_frames: int = field(
+        default_factory=ConfigParser.make_int_parser("SCENE_MIN_LENGTH_FRAMES", 15)
+    )  # ~0.5s @ 30fps
     scene_merge_overlap_tolerance_seconds: float = field(
-        default_factory=ConfigParser.make_float_parser("SCENE_MERGE_OVERLAP_TOLERANCE", 0.05)
+        default_factory=ConfigParser.make_float_parser(
+            "SCENE_MERGE_OVERLAP_TOLERANCE", 0.05
+        )
     )
-    
+
     # Optical Flow (Farneback algorithm)
-    optical_flow_pyr_scale: float = field(default_factory=ConfigParser.make_float_parser("OF_PYR_SCALE", 0.5))
-    optical_flow_levels: int = field(default_factory=ConfigParser.make_int_parser("OF_LEVELS", 3))
-    optical_flow_winsize: int = field(default_factory=ConfigParser.make_int_parser("OF_WINSIZE", 15))
-    
+    optical_flow_pyr_scale: float = field(
+        default_factory=ConfigParser.make_float_parser("OF_PYR_SCALE", 0.5)
+    )
+    optical_flow_levels: int = field(
+        default_factory=ConfigParser.make_int_parser("OF_LEVELS", 3)
+    )
+    optical_flow_winsize: int = field(
+        default_factory=ConfigParser.make_int_parser("OF_WINSIZE", 15)
+    )
+
     # Downsampling & Proxy
-    default_downsampling_height: int = field(default_factory=ConfigParser.make_int_parser("DEFAULT_DOWNSAMPLE_HEIGHT", 1080))
-    proxy_generation_timeout_seconds: int = field(default_factory=ConfigParser.make_int_parser("PROXY_GEN_TIMEOUT", 3600))  # 1 hour
-    
+    default_downsampling_height: int = field(
+        default_factory=ConfigParser.make_int_parser("DEFAULT_DOWNSAMPLE_HEIGHT", 1080)
+    )
+    proxy_generation_timeout_seconds: int = field(
+        default_factory=ConfigParser.make_int_parser("PROXY_GEN_TIMEOUT", 3600)
+    )  # 1 hour
+
     # Preview Resolution (for web UI thumbnails)
-    preview_height: int = field(default_factory=ConfigParser.make_int_parser("PREVIEW_HEIGHT", 360))
+    preview_height: int = field(
+        default_factory=ConfigParser.make_int_parser("PREVIEW_HEIGHT", 360)
+    )
 
 
 # =============================================================================
@@ -739,56 +1070,115 @@ class AnalysisConstants:
 @dataclass
 class ProxyConfig:
     """Proxy video generation for analysis acceleration.
-    
+
     For large/long videos, proxy mode generates a lightweight version
     for feature extraction and analysis, then applies results to full-res render.
     """
-    
+
     # Enable proxy mode for analysis (auto-enabled for large videos)
-    enable_proxy_analysis: bool = field(default_factory=lambda: os.environ.get("ENABLE_PROXY_ANALYSIS", "true").lower() == "true")
-    
+    enable_proxy_analysis: bool = field(
+        default_factory=lambda: os.environ.get("ENABLE_PROXY_ANALYSIS", "true").lower()
+        == "true"
+    )
+
     # Proxy resolution (height, maintains aspect ratio)
     # 720p = Good balance; maintains features while 2-3x speedup
     # Options: 360, 540, 720, 1080
-    proxy_height: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT", "720")))
+    proxy_height: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_HEIGHT", "720"))
+    )
 
     # Adaptive proxy height (dynamic per-file sizing)
-    adaptive_proxy_height: bool = field(default_factory=lambda: os.environ.get("ADAPTIVE_PROXY_HEIGHT", "true").lower() == "true")
-    proxy_height_small: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_SMALL", "360")))
-    proxy_height_medium: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_MEDIUM", "540")))
-    proxy_height_large: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_LARGE", "720")))
-    proxy_height_small_max_mb: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_SMALL_MAX_MB", "512")))
-    proxy_height_medium_max_mb: int = field(default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_MEDIUM_MAX_MB", "2048")))
-    
+    adaptive_proxy_height: bool = field(
+        default_factory=lambda: os.environ.get("ADAPTIVE_PROXY_HEIGHT", "true").lower()
+        == "true"
+    )
+    proxy_height_small: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_SMALL", "360"))
+    )
+    proxy_height_medium: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_MEDIUM", "540"))
+    )
+    proxy_height_large: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_LARGE", "720"))
+    )
+    proxy_height_small_max_mb: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_HEIGHT_SMALL_MAX_MB", "512"))
+    )
+    proxy_height_medium_max_mb: int = field(
+        default_factory=lambda: int(
+            os.environ.get("PROXY_HEIGHT_MEDIUM_MAX_MB", "2048")
+        )
+    )
+
     # Auto-enable threshold: if video is larger than this duration, use proxy
     # (in seconds: 600s = 10 minutes)
-    auto_proxy_duration_threshold: float = field(default_factory=lambda: float(os.environ.get("AUTO_PROXY_DURATION_THRESHOLD", "600.0")))
-    
+    auto_proxy_duration_threshold: float = field(
+        default_factory=lambda: float(
+            os.environ.get("AUTO_PROXY_DURATION_THRESHOLD", "600.0")
+        )
+    )
+
     # Auto-enable threshold: if video is larger than this pixel count, use proxy
     # (pixels: 1920*1080 = 2.07M; YouTube raw ~1920*1440 = 2.76M)
-    auto_proxy_resolution_threshold: int = field(default_factory=lambda: int(os.environ.get("AUTO_PROXY_RESOLUTION_THRESHOLD", "2000000")))
-    
+    auto_proxy_resolution_threshold: int = field(
+        default_factory=lambda: int(
+            os.environ.get("AUTO_PROXY_RESOLUTION_THRESHOLD", "2000000")
+        )
+    )
+
     # Reuse proxy for multiple analysis passes (e.g. scene detection + metadata)
-    cache_proxies: bool = field(default_factory=lambda: os.environ.get("CACHE_PROXIES", "true").lower() == "true")
+    cache_proxies: bool = field(
+        default_factory=lambda: os.environ.get("CACHE_PROXIES", "true").lower()
+        == "true"
+    )
 
     # Proxy cache policy (TTL and size-based eviction)
-    proxy_cache_ttl_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_CACHE_TTL_SECONDS", "86400")))
-    proxy_cache_max_bytes: int = field(default_factory=lambda: int(os.environ.get("PROXY_CACHE_MAX_BYTES", str(1 * 1024 * 1024 * 1024))))  # 1 GiB
-    proxy_cache_min_age_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_CACHE_MIN_AGE_SECONDS", "60")))
+    proxy_cache_ttl_seconds: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_CACHE_TTL_SECONDS", "86400"))
+    )
+    proxy_cache_max_bytes: int = field(
+        default_factory=lambda: int(
+            os.environ.get("PROXY_CACHE_MAX_BYTES", str(1 * 1024 * 1024 * 1024))
+        )
+    )  # 1 GiB
+    proxy_cache_min_age_seconds: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_CACHE_MIN_AGE_SECONDS", "60"))
+    )
 
     # Optional shared proxy cache directory (prefer a shared volume in cluster)
-    proxy_cache_dir: str = field(default_factory=lambda: os.environ.get("PROXY_CACHE_DIR", ""))
+    proxy_cache_dir: str = field(
+        default_factory=lambda: os.environ.get("PROXY_CACHE_DIR", "")
+    )
 
     # File-lock timeout to avoid proxy generation races
-    proxy_lock_timeout_seconds: int = field(default_factory=lambda: int(os.environ.get("PROXY_LOCK_TIMEOUT_SECONDS", "900")))
+    proxy_lock_timeout_seconds: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_LOCK_TIMEOUT_SECONDS", "900"))
+    )
 
     # When true, prefer the lightweight analysis proxy for preview/analysis passes
-    prefer_analysis_proxy_for_preview: bool = field(default_factory=lambda: os.environ.get("PREFER_ANALYSIS_PROXY_FOR_PREVIEW", "true").lower() == "true")
+    prefer_analysis_proxy_for_preview: bool = field(
+        default_factory=lambda: os.environ.get(
+            "PREFER_ANALYSIS_PROXY_FOR_PREVIEW", "true"
+        ).lower()
+        == "true"
+    )
 
     # Distributed proxy generation (cluster sharding)
-    distributed_proxy_generation: bool = field(default_factory=lambda: os.environ.get("PROXY_DISTRIBUTED_ENABLED", "false").lower() == "true")
-    distributed_proxy_min_files: int = field(default_factory=lambda: int(os.environ.get("PROXY_DISTRIBUTED_MIN_FILES", "8")))
-    distributed_proxy_min_total_mb: int = field(default_factory=lambda: int(os.environ.get("PROXY_DISTRIBUTED_MIN_TOTAL_MB", "2048")))
+    distributed_proxy_generation: bool = field(
+        default_factory=lambda: os.environ.get(
+            "PROXY_DISTRIBUTED_ENABLED", "false"
+        ).lower()
+        == "true"
+    )
+    distributed_proxy_min_files: int = field(
+        default_factory=lambda: int(os.environ.get("PROXY_DISTRIBUTED_MIN_FILES", "8"))
+    )
+    distributed_proxy_min_total_mb: int = field(
+        default_factory=lambda: int(
+            os.environ.get("PROXY_DISTRIBUTED_MIN_TOTAL_MB", "2048")
+        )
+    )
 
     def select_proxy_height(self, size_mb: Optional[float] = None) -> int:
         """Select proxy height based on file size and adaptive settings."""
@@ -801,20 +1191,22 @@ class ProxyConfig:
             return self.proxy_height_medium
         return self.proxy_height_large
 
-    def should_use_proxy(self, duration_seconds: float, width: int, height: int) -> bool:
+    def should_use_proxy(
+        self, duration_seconds: float, width: int, height: int
+    ) -> bool:
         """Determine if proxy should be used based on input characteristics."""
         if not self.enable_proxy_analysis:
             return False
-        
+
         # Check duration threshold
         if duration_seconds > self.auto_proxy_duration_threshold:
             return True
-        
+
         # Check resolution threshold
         pixel_count = width * height
         if pixel_count > self.auto_proxy_resolution_threshold:
             return True
-        
+
         return False
 
 
@@ -825,20 +1217,46 @@ class ProxyConfig:
 class EncodingConfig:
     """FFmpeg and video encoding settings."""
 
-    quality_profile: str = field(default_factory=lambda: os.environ.get("QUALITY_PROFILE", "standard").lower())
-    codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_CODEC", "libx264"))
+    quality_profile: str = field(
+        default_factory=lambda: os.environ.get("QUALITY_PROFILE", "standard").lower()
+    )
+    codec: str = field(
+        default_factory=lambda: os.environ.get("OUTPUT_CODEC", "libx264")
+    )
     crf: int = field(default_factory=lambda: int(os.environ.get("FINAL_CRF", "18")))
-    preset: str = field(default_factory=lambda: os.environ.get("FFMPEG_PRESET", "medium"))
-    hwaccel: str = field(default_factory=lambda: os.environ.get("FFMPEG_HWACCEL", "auto"))
-    pix_fmt: str = field(default_factory=lambda: os.environ.get("OUTPUT_PIX_FMT", "yuv420p"))
-    profile: str = field(default_factory=lambda: os.environ.get("OUTPUT_PROFILE", "high"))
+    preset: str = field(
+        default_factory=lambda: os.environ.get("FFMPEG_PRESET", "medium")
+    )
+    hwaccel: str = field(
+        default_factory=lambda: os.environ.get("FFMPEG_HWACCEL", "auto")
+    )
+    pix_fmt: str = field(
+        default_factory=lambda: os.environ.get("OUTPUT_PIX_FMT", "yuv420p")
+    )
+    profile: str = field(
+        default_factory=lambda: os.environ.get("OUTPUT_PROFILE", "high")
+    )
     level: str = field(default_factory=lambda: os.environ.get("OUTPUT_LEVEL", "4.1"))
-    threads: int = field(default_factory=lambda: int(os.environ.get("FFMPEG_THREADS", "0")))
-    audio_codec: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_CODEC", "aac"))
-    audio_bitrate: str = field(default_factory=lambda: os.environ.get("OUTPUT_AUDIO_BITRATE", "192k"))
-    normalize_clips: bool = field(default_factory=lambda: os.environ.get("NORMALIZE_CLIPS", "true").lower() == "true")
-    extract_reencode: bool = field(default_factory=lambda: os.environ.get("EXTRACT_REENCODE", "false").lower() == "true")
-    final_encode_backend: str = field(default_factory=lambda: os.environ.get("FINAL_ENCODE_BACKEND", "ffmpeg").lower())
+    threads: int = field(
+        default_factory=lambda: int(os.environ.get("FFMPEG_THREADS", "0"))
+    )
+    audio_codec: str = field(
+        default_factory=lambda: os.environ.get("OUTPUT_AUDIO_CODEC", "aac")
+    )
+    audio_bitrate: str = field(
+        default_factory=lambda: os.environ.get("OUTPUT_AUDIO_BITRATE", "192k")
+    )
+    normalize_clips: bool = field(
+        default_factory=lambda: os.environ.get("NORMALIZE_CLIPS", "true").lower()
+        == "true"
+    )
+    extract_reencode: bool = field(
+        default_factory=lambda: os.environ.get("EXTRACT_REENCODE", "false").lower()
+        == "true"
+    )
+    final_encode_backend: str = field(
+        default_factory=lambda: os.environ.get("FINAL_ENCODE_BACKEND", "ffmpeg").lower()
+    )
 
     def __post_init__(self) -> None:
         """Apply quality profile defaults when explicit env overrides are absent."""
@@ -876,11 +1294,21 @@ class EncodingConfig:
 @dataclass
 class ExportConfig:
     """Timeline export and NLE integration settings."""
-    
-    resolution_width: int = field(default_factory=lambda: int(os.environ.get("EXPORT_WIDTH", "1080")))
-    resolution_height: int = field(default_factory=lambda: int(os.environ.get("EXPORT_HEIGHT", "1920")))
-    fps: float = field(default_factory=lambda: float(os.environ.get("EXPORT_FPS", "30.0")))
-    project_name_template: str = field(default_factory=lambda: os.environ.get("EXPORT_PROJECT_NAME", "fluxibri_montage"))
+
+    resolution_width: int = field(
+        default_factory=lambda: int(os.environ.get("EXPORT_WIDTH", "1080"))
+    )
+    resolution_height: int = field(
+        default_factory=lambda: int(os.environ.get("EXPORT_HEIGHT", "1920"))
+    )
+    fps: float = field(
+        default_factory=lambda: float(os.environ.get("EXPORT_FPS", "30.0"))
+    )
+    project_name_template: str = field(
+        default_factory=lambda: os.environ.get(
+            "EXPORT_PROJECT_NAME", "fluxibri_montage"
+        )
+    )
     explicit_resolution_override: bool = field(init=False)
 
     def __post_init__(self) -> None:
@@ -896,11 +1324,23 @@ class ExportConfig:
 class UpscaleConfig:
     """Upscaling configuration for local and cloud pipelines."""
 
-    model: str = field(default_factory=lambda: os.environ.get("UPSCALE_MODEL", "realesrgan-x4plus"))
-    scale: int = field(default_factory=lambda: int(os.environ.get("UPSCALE_SCALE", "2")))
-    frame_format: str = field(default_factory=lambda: os.environ.get("UPSCALE_FRAME_FORMAT", "jpg"))
-    tile_size: int = field(default_factory=lambda: int(os.environ.get("UPSCALE_TILE_SIZE", "512")))
-    crf: int = field(default_factory=lambda: int(os.environ.get("UPSCALE_CRF", os.environ.get("FINAL_CRF", "18"))))
+    model: str = field(
+        default_factory=lambda: os.environ.get("UPSCALE_MODEL", "realesrgan-x4plus")
+    )
+    scale: int = field(
+        default_factory=lambda: int(os.environ.get("UPSCALE_SCALE", "2"))
+    )
+    frame_format: str = field(
+        default_factory=lambda: os.environ.get("UPSCALE_FRAME_FORMAT", "jpg")
+    )
+    tile_size: int = field(
+        default_factory=lambda: int(os.environ.get("UPSCALE_TILE_SIZE", "512"))
+    )
+    crf: int = field(
+        default_factory=lambda: int(
+            os.environ.get("UPSCALE_CRF", os.environ.get("FINAL_CRF", "18"))
+        )
+    )
 
 
 # =============================================================================
@@ -910,42 +1350,99 @@ class UpscaleConfig:
 class ProcessingConfig:
     """Batch processing and performance settings."""
 
-    batch_size: int = field(default_factory=ConfigParser.make_int_parser("BATCH_SIZE", 25))
-    max_scene_workers: int = field(default_factory=lambda: ConfigParser.parse_int("MAX_SCENE_WORKERS", get_effective_cpu_count()))
-    force_gc: bool = field(default_factory=ConfigParser.make_bool_parser("FORCE_GC", True))
-    parallel_enhance: bool = field(default_factory=ConfigParser.make_bool_parser("PARALLEL_ENHANCE", True))
-    skip_existing_outputs: bool = field(default_factory=ConfigParser.make_bool_parser("SKIP_EXISTING_OUTPUTS", True))
-    force_reprocess: bool = field(default_factory=ConfigParser.make_bool_parser("FORCE_REPROCESS", False))
-    min_output_bytes: int = field(default_factory=ConfigParser.make_int_parser("MIN_OUTPUT_BYTES", 1024))
-    job_id_strategy: str = field(default_factory=lambda: ConfigParser.parse_str("JOB_ID_STRATEGY", "timestamp").lower())
-    max_parallel_jobs: int = field(default_factory=lambda: ConfigParser.parse_int("MAX_PARALLEL_JOBS", max(get_effective_cpu_count() - 1, get_effective_cpu_count())))
-    max_concurrent_jobs: int = field(default_factory=ConfigParser.make_int_parser("MAX_CONCURRENT_JOBS", max(4, get_effective_cpu_count() - 1)))
-    max_scene_reuse: int = field(default_factory=ConfigParser.make_int_parser("MAX_SCENE_REUSE", 3))
+    batch_size: int = field(
+        default_factory=ConfigParser.make_int_parser("BATCH_SIZE", 25)
+    )
+    max_scene_workers: int = field(
+        default_factory=lambda: ConfigParser.parse_int(
+            "MAX_SCENE_WORKERS", get_effective_cpu_count()
+        )
+    )
+    force_gc: bool = field(
+        default_factory=ConfigParser.make_bool_parser("FORCE_GC", True)
+    )
+    parallel_enhance: bool = field(
+        default_factory=ConfigParser.make_bool_parser("PARALLEL_ENHANCE", True)
+    )
+    skip_existing_outputs: bool = field(
+        default_factory=ConfigParser.make_bool_parser("SKIP_EXISTING_OUTPUTS", True)
+    )
+    force_reprocess: bool = field(
+        default_factory=ConfigParser.make_bool_parser("FORCE_REPROCESS", False)
+    )
+    min_output_bytes: int = field(
+        default_factory=ConfigParser.make_int_parser("MIN_OUTPUT_BYTES", 1024)
+    )
+    job_id_strategy: str = field(
+        default_factory=lambda: ConfigParser.parse_str(
+            "JOB_ID_STRATEGY", "timestamp"
+        ).lower()
+    )
+    max_parallel_jobs: int = field(
+        default_factory=lambda: ConfigParser.parse_int(
+            "MAX_PARALLEL_JOBS",
+            max(get_effective_cpu_count() - 1, get_effective_cpu_count()),
+        )
+    )
+    max_concurrent_jobs: int = field(
+        default_factory=ConfigParser.make_int_parser(
+            "MAX_CONCURRENT_JOBS", max(4, get_effective_cpu_count() - 1)
+        )
+    )
+    max_scene_reuse: int = field(
+        default_factory=ConfigParser.make_int_parser("MAX_SCENE_REUSE", 3)
+    )
     cluster_shard_index: int = field(default_factory=get_cluster_shard_index)
     cluster_shard_count: int = field(default_factory=get_cluster_shard_count)
 
     # OPTIMIZATION: Configurable AI scene analysis limit (0 = unlimited)
     # Was hardcoded to 20 scenes - now can be scaled up for better quality
-    max_ai_analyze_scenes: int = field(default_factory=ConfigParser.make_int_parser("MAX_AI_ANALYZE_SCENES", 50))
+    max_ai_analyze_scenes: int = field(
+        default_factory=ConfigParser.make_int_parser("MAX_AI_ANALYZE_SCENES", 50)
+    )
 
     # Adaptive settings for low-resource hardware
-    clip_prefetch_count: int = field(default_factory=ConfigParser.make_int_parser("CLIP_PREFETCH_COUNT", 3))
-    analysis_timeout: int = field(default_factory=ConfigParser.make_int_parser("ANALYSIS_TIMEOUT", 120))  # seconds
-    ffprobe_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFPROBE_TIMEOUT", 10))
-    ffmpeg_short_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_SHORT_TIMEOUT", 30))
-    ffmpeg_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_TIMEOUT", 120))
-    ffmpeg_long_timeout: int = field(default_factory=ConfigParser.make_int_parser("FFMPEG_LONG_TIMEOUT", 600))
-    render_timeout: int = field(default_factory=ConfigParser.make_int_parser("RENDER_TIMEOUT", 3600))  # 1 hour default
+    clip_prefetch_count: int = field(
+        default_factory=ConfigParser.make_int_parser("CLIP_PREFETCH_COUNT", 3)
+    )
+    analysis_timeout: int = field(
+        default_factory=ConfigParser.make_int_parser("ANALYSIS_TIMEOUT", 120)
+    )  # seconds
+    ffprobe_timeout: int = field(
+        default_factory=ConfigParser.make_int_parser("FFPROBE_TIMEOUT", 10)
+    )
+    ffmpeg_short_timeout: int = field(
+        default_factory=ConfigParser.make_int_parser("FFMPEG_SHORT_TIMEOUT", 30)
+    )
+    ffmpeg_timeout: int = field(
+        default_factory=ConfigParser.make_int_parser("FFMPEG_TIMEOUT", 120)
+    )
+    ffmpeg_long_timeout: int = field(
+        default_factory=ConfigParser.make_int_parser("FFMPEG_LONG_TIMEOUT", 600)
+    )
+    render_timeout: int = field(
+        default_factory=ConfigParser.make_int_parser("RENDER_TIMEOUT", 3600)
+    )  # 1 hour default
 
     # Job timeout (seconds) — configurable via env to avoid hardcoded values in code
-    preview_job_timeout: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300")))
-    default_job_timeout: int = field(default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800")))
+    preview_job_timeout: int = field(
+        default_factory=lambda: int(os.environ.get("PREVIEW_JOB_TIMEOUT", "300"))
+    )
+    default_job_timeout: int = field(
+        default_factory=lambda: int(os.environ.get("JOB_TIMEOUT", "1800"))
+    )
 
     # Preview fast-path knobs (make configurable via Settings instead of in-code env reads)
-    preview_max_input_size_mb: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200")))
-    preview_max_files: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_MAX_FILES", "3")))
+    preview_max_input_size_mb: int = field(
+        default_factory=lambda: int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200"))
+    )
+    preview_max_files: int = field(
+        default_factory=lambda: int(os.environ.get("PREVIEW_MAX_FILES", "3"))
+    )
 
-    def get_adaptive_batch_size(self, low_memory: bool = False, memory_gb: Optional[float] = None) -> int:
+    def get_adaptive_batch_size(
+        self, low_memory: bool = False, memory_gb: Optional[float] = None
+    ) -> int:
         """Get batch size adjusted for memory constraints.
 
         Args:
@@ -963,7 +1460,8 @@ class ProcessingConfig:
         if memory_gb is None:
             try:
                 import psutil
-                memory_gb = psutil.virtual_memory().available / (1024 ** 3)
+
+                memory_gb = psutil.virtual_memory().available / (1024**3)
             except ImportError:
                 return self.batch_size  # Can't detect, use default
 
@@ -1034,14 +1532,30 @@ class ProcessingConfig:
 class CreativeConfig:
     """Creative and editing parameters."""
 
-    cut_style: str = field(default_factory=lambda: os.environ.get("CUT_STYLE", "dynamic").lower())
-    creative_prompt: str = field(default_factory=lambda: os.environ.get("CREATIVE_PROMPT", "").strip())
-    target_duration: float = field(default_factory=lambda: float(os.environ.get("TARGET_DURATION", "0") or "0"))
-    music_start: float = field(default_factory=lambda: float(os.environ.get("MUSIC_START", "0") or "0"))
-    music_end: Optional[float] = field(default_factory=lambda: float(os.environ.get("MUSIC_END", "0") or "0") or None)
-    num_variants: int = field(default_factory=lambda: int(os.environ.get("NUM_VARIANTS", "1")))
-    enable_xfade: str = field(default_factory=lambda: os.environ.get("ENABLE_XFADE", ""))  # "", "true", "false"
-    xfade_duration: float = field(default_factory=lambda: float(os.environ.get("XFADE_DURATION", "0.3")))
+    cut_style: str = field(
+        default_factory=lambda: os.environ.get("CUT_STYLE", "dynamic").lower()
+    )
+    creative_prompt: str = field(
+        default_factory=lambda: os.environ.get("CREATIVE_PROMPT", "").strip()
+    )
+    target_duration: float = field(
+        default_factory=lambda: float(os.environ.get("TARGET_DURATION", "0") or "0")
+    )
+    music_start: float = field(
+        default_factory=lambda: float(os.environ.get("MUSIC_START", "0") or "0")
+    )
+    music_end: Optional[float] = field(
+        default_factory=lambda: float(os.environ.get("MUSIC_END", "0") or "0") or None
+    )
+    num_variants: int = field(
+        default_factory=lambda: int(os.environ.get("NUM_VARIANTS", "1"))
+    )
+    enable_xfade: str = field(
+        default_factory=lambda: os.environ.get("ENABLE_XFADE", "")
+    )  # "", "true", "false"
+    xfade_duration: float = field(
+        default_factory=lambda: float(os.environ.get("XFADE_DURATION", "0.3"))
+    )
 
 
 # Audio Configuration
@@ -1049,11 +1563,19 @@ class CreativeConfig:
 @dataclass
 class AudioConfig:
     """Audio analysis and processing settings."""
-    
-    silence_threshold: str = field(default_factory=lambda: os.environ.get("SILENCE_THRESHOLD", "-35dB"))
-    min_silence_duration: float = field(default_factory=lambda: float(os.environ.get("MIN_SILENCE_DURATION", "0.05")))
-    energy_high_threshold: float = field(default_factory=lambda: float(os.environ.get("ENERGY_HIGH_THRESHOLD", "0.6")))
-    energy_low_threshold: float = field(default_factory=lambda: float(os.environ.get("ENERGY_LOW_THRESHOLD", "0.4")))
+
+    silence_threshold: str = field(
+        default_factory=lambda: os.environ.get("SILENCE_THRESHOLD", "-35dB")
+    )
+    min_silence_duration: float = field(
+        default_factory=lambda: float(os.environ.get("MIN_SILENCE_DURATION", "0.05"))
+    )
+    energy_high_threshold: float = field(
+        default_factory=lambda: float(os.environ.get("ENERGY_HIGH_THRESHOLD", "0.6"))
+    )
+    energy_low_threshold: float = field(
+        default_factory=lambda: float(os.environ.get("ENERGY_LOW_THRESHOLD", "0.4"))
+    )
 
 
 # =============================================================================
@@ -1067,27 +1589,47 @@ class ThresholdsConfig:
     """
 
     # Scene detection (PySceneDetect ContentDetector)
-    scene_threshold: float = field(default_factory=ConfigParser.make_float_parser("SCENE_THRESHOLD", 30.0))
+    scene_threshold: float = field(
+        default_factory=ConfigParser.make_float_parser("SCENE_THRESHOLD", 30.0)
+    )
 
     # Speech/VAD (silero/pyannote style)
-    speech_threshold: float = field(default_factory=ConfigParser.make_float_parser("SPEECH_THRESHOLD", 0.5))
-    speech_min_duration_ms: int = field(default_factory=ConfigParser.make_int_parser("SPEECH_MIN_DURATION", 250))
-    speech_min_silence_ms: int = field(default_factory=ConfigParser.make_int_parser("SPEECH_MIN_SILENCE", 100))
+    speech_threshold: float = field(
+        default_factory=ConfigParser.make_float_parser("SPEECH_THRESHOLD", 0.5)
+    )
+    speech_min_duration_ms: int = field(
+        default_factory=ConfigParser.make_int_parser("SPEECH_MIN_DURATION", 250)
+    )
+    speech_min_silence_ms: int = field(
+        default_factory=ConfigParser.make_int_parser("SPEECH_MIN_SILENCE", 100)
+    )
 
     # Silence detection for FFmpeg silencedetect
     # Stored without unit; append 'dB' at call sites when needed
-    silence_level_db: str = field(default_factory=ConfigParser.make_str_parser("SILENCE_THRESHOLD", "-35"))
-    silence_duration_s: float = field(default_factory=ConfigParser.make_float_parser("SILENCE_DURATION", 0.5))
+    silence_level_db: str = field(
+        default_factory=ConfigParser.make_str_parser("SILENCE_THRESHOLD", "-35")
+    )
+    silence_duration_s: float = field(
+        default_factory=ConfigParser.make_float_parser("SILENCE_DURATION", 0.5)
+    )
 
     # Face detection (MediaPipe)
-    face_confidence: float = field(default_factory=ConfigParser.make_float_parser("FACE_CONFIDENCE", 0.6))
+    face_confidence: float = field(
+        default_factory=ConfigParser.make_float_parser("FACE_CONFIDENCE", 0.6)
+    )
 
     # Audio ducking thresholds (sidechaincompress)
-    ducking_core_threshold: float = field(default_factory=ConfigParser.make_float_parser("DUCKING_CORE_THRESHOLD", 0.1))
-    ducking_soft_threshold: float = field(default_factory=ConfigParser.make_float_parser("DUCKING_SOFT_THRESHOLD", 0.03))
+    ducking_core_threshold: float = field(
+        default_factory=ConfigParser.make_float_parser("DUCKING_CORE_THRESHOLD", 0.1)
+    )
+    ducking_soft_threshold: float = field(
+        default_factory=ConfigParser.make_float_parser("DUCKING_SOFT_THRESHOLD", 0.03)
+    )
 
     # Music analysis
-    music_min_duration_s: float = field(default_factory=ConfigParser.make_float_parser("MUSIC_MIN_DURATION", 5.0))
+    music_min_duration_s: float = field(
+        default_factory=ConfigParser.make_float_parser("MUSIC_MIN_DURATION", 5.0)
+    )
 
 
 # =============================================================================
@@ -1097,12 +1639,22 @@ class ThresholdsConfig:
 class SessionConfig:
     """Session/backing store configuration (Redis optional)."""
 
-    redis_host: Optional[str] = field(default_factory=ConfigParser.make_str_parser("REDIS_HOST", ""))
+    redis_host: Optional[str] = field(
+        default_factory=ConfigParser.make_str_parser("REDIS_HOST", "")
+    )
     # Prefer REDIS_SERVICE_PORT when provided by Kubernetes service env
-    _redis_port_raw: str = field(default_factory=lambda: ConfigParser.parse_str("REDIS_SERVICE_PORT", ConfigParser.parse_str("REDIS_PORT", "6379")))
-    queue_fast_name: str = field(default_factory=ConfigParser.make_str_parser("QUEUE_FAST_NAME", "default"))
-    queue_heavy_name: str = field(default_factory=ConfigParser.make_str_parser("QUEUE_HEAVY_NAME", "default"))
-    
+    _redis_port_raw: str = field(
+        default_factory=lambda: ConfigParser.parse_str(
+            "REDIS_SERVICE_PORT", ConfigParser.parse_str("REDIS_PORT", "6379")
+        )
+    )
+    queue_fast_name: str = field(
+        default_factory=ConfigParser.make_str_parser("QUEUE_FAST_NAME", "default")
+    )
+    queue_heavy_name: str = field(
+        default_factory=ConfigParser.make_str_parser("QUEUE_HEAVY_NAME", "default")
+    )
+
     @property
     def redis_port(self) -> int:
         raw = self._redis_port_raw
@@ -1123,14 +1675,24 @@ class CacheConfig:
     """
 
     # Unify default TTL via legacy env var; allow independent overrides later if needed
-    analysis_ttl_hours: int = field(default_factory=ConfigParser.make_int_parser("CACHE_INVALIDATION_HOURS", 24))
-    metadata_ttl_hours: int = field(default_factory=ConfigParser.make_int_parser("CACHE_INVALIDATION_HOURS", 24))
+    analysis_ttl_hours: int = field(
+        default_factory=ConfigParser.make_int_parser("CACHE_INVALIDATION_HOURS", 24)
+    )
+    metadata_ttl_hours: int = field(
+        default_factory=ConfigParser.make_int_parser("CACHE_INVALIDATION_HOURS", 24)
+    )
 
     # Legacy toggle only existed for analysis cache; keep semantics
-    analysis_enabled: bool = field(default_factory=lambda: not ConfigParser.parse_bool("DISABLE_ANALYSIS_CACHE", False))
+    analysis_enabled: bool = field(
+        default_factory=lambda: not ConfigParser.parse_bool(
+            "DISABLE_ANALYSIS_CACHE", False
+        )
+    )
 
     # Unified cache version across subsystems
-    version: str = field(default_factory=ConfigParser.make_str_parser("CACHE_VERSION", "1.0"))
+    version: str = field(
+        default_factory=ConfigParser.make_str_parser("CACHE_VERSION", "1.0")
+    )
 
 
 # =============================================================================
@@ -1140,11 +1702,23 @@ class CacheConfig:
 class ResourceThresholdsConfig:
     """Resource limits and memory pressure thresholds."""
 
-    memory_limit_gb: float = field(default_factory=lambda: float(os.environ.get("MEMORY_LIMIT_GB", "8")))
-    memory_warning_threshold: float = field(default_factory=lambda: float(os.environ.get("MEMORY_WARNING_THRESHOLD", "0.75")))
-    memory_critical_threshold: float = field(default_factory=lambda: float(os.environ.get("MEMORY_CRITICAL_THRESHOLD", "0.90")))
+    memory_limit_gb: float = field(
+        default_factory=lambda: float(os.environ.get("MEMORY_LIMIT_GB", "8"))
+    )
+    memory_warning_threshold: float = field(
+        default_factory=lambda: float(
+            os.environ.get("MEMORY_WARNING_THRESHOLD", "0.75")
+        )
+    )
+    memory_critical_threshold: float = field(
+        default_factory=lambda: float(
+            os.environ.get("MEMORY_CRITICAL_THRESHOLD", "0.90")
+        )
+    )
     # Optional safety margin applied when estimating safe batch sizes
-    memory_safety_margin_mb: int = field(default_factory=lambda: int(os.environ.get("MEMORY_SAFETY_MARGIN_MB", "500")))
+    memory_safety_margin_mb: int = field(
+        default_factory=lambda: int(os.environ.get("MEMORY_SAFETY_MARGIN_MB", "500"))
+    )
 
 
 # =============================================================================
@@ -1154,10 +1728,16 @@ class ResourceThresholdsConfig:
 class MonitoringConfig:
     """Monitoring settings for live telemetry and tee logging."""
 
-    mem_interval_sec: float = field(default_factory=lambda: float(os.environ.get("MONITOR_MEM_INTERVAL", "30.0")))
-    log_file: Optional[str] = field(default_factory=lambda: os.environ.get("LOG_FILE") or None)
+    mem_interval_sec: float = field(
+        default_factory=lambda: float(os.environ.get("MONITOR_MEM_INTERVAL", "30.0"))
+    )
+    log_file: Optional[str] = field(
+        default_factory=lambda: os.environ.get("LOG_FILE") or None
+    )
     # KPI target for Time-to-First-Preview in seconds (default: 180s)
-    preview_target_seconds: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_TIME_TARGET", "180")))
+    preview_target_seconds: int = field(
+        default_factory=lambda: int(os.environ.get("PREVIEW_TIME_TARGET", "180"))
+    )
 
 
 # =============================================================================
@@ -1172,12 +1752,20 @@ class PreviewConfig:
     a fast, low-latency profile to optimize iteration speed.
     """
 
-    width: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_WIDTH", "640")))
-    height: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_HEIGHT", "360")))
+    width: int = field(
+        default_factory=lambda: int(os.environ.get("PREVIEW_WIDTH", "640"))
+    )
+    height: int = field(
+        default_factory=lambda: int(os.environ.get("PREVIEW_HEIGHT", "360"))
+    )
     crf: int = field(default_factory=lambda: int(os.environ.get("PREVIEW_CRF", "28")))
-    preset: str = field(default_factory=lambda: os.environ.get("PREVIEW_PRESET", "ultrafast"))
+    preset: str = field(
+        default_factory=lambda: os.environ.get("PREVIEW_PRESET", "ultrafast")
+    )
     # Max duration for generated previews (seconds)
-    max_duration: float = field(default_factory=lambda: float(os.environ.get("PREVIEW_MAX_DURATION", "30.0")))
+    max_duration: float = field(
+        default_factory=lambda: float(os.environ.get("PREVIEW_MAX_DURATION", "30.0"))
+    )
 
 
 # =============================================================================
@@ -1188,36 +1776,53 @@ class PreviewConfig:
 class FileTypeConfig:
     """Allowed file extensions for uploads and processing."""
 
-    video_extensions: Set[str] = field(default_factory=lambda: {'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'mxf', 'mts', 'm2ts', 'ts'})
-    audio_extensions: Set[str] = field(default_factory=lambda: {'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg'})
-    image_extensions: Set[str] = field(default_factory=lambda: {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'})
+    video_extensions: Set[str] = field(
+        default_factory=lambda: {
+            "mp4",
+            "mov",
+            "avi",
+            "mkv",
+            "webm",
+            "m4v",
+            "mxf",
+            "mts",
+            "m2ts",
+            "ts",
+        }
+    )
+    audio_extensions: Set[str] = field(
+        default_factory=lambda: {"mp3", "wav", "flac", "aac", "m4a", "ogg"}
+    )
+    image_extensions: Set[str] = field(
+        default_factory=lambda: {"png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"}
+    )
 
     def is_video(self, filename: str) -> bool:
         """Check if filename has a video extension."""
-        if '.' not in filename:
+        if "." not in filename:
             return False
-        ext = filename.rsplit('.', 1)[1].lower()
+        ext = filename.rsplit(".", 1)[1].lower()
         return ext in self.video_extensions
 
     def is_audio(self, filename: str) -> bool:
         """Check if filename has an audio extension."""
-        if '.' not in filename:
+        if "." not in filename:
             return False
-        ext = filename.rsplit('.', 1)[1].lower()
+        ext = filename.rsplit(".", 1)[1].lower()
         return ext in self.audio_extensions
 
     def is_image(self, filename: str) -> bool:
         """Check if filename has an image extension."""
-        if '.' not in filename:
+        if "." not in filename:
             return False
-        ext = filename.rsplit('.', 1)[1].lower()
+        ext = filename.rsplit(".", 1)[1].lower()
         return ext in self.image_extensions
 
     def allowed_file(self, filename: str, allowed_extensions: Set[str]) -> bool:
         """Check if file extension is in allowed set."""
-        if '.' not in filename:
+        if "." not in filename:
             return False
-        ext = filename.rsplit('.', 1)[1].lower()
+        ext = filename.rsplit(".", 1)[1].lower()
         return ext in allowed_extensions
 
 
@@ -1254,14 +1859,18 @@ class Settings:
     export: ExportConfig = field(default_factory=ExportConfig)
     upscale: UpscaleConfig = field(default_factory=UpscaleConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
-    high_res: ProcessingSettings = field(default_factory=ProcessingSettings)  # Phase 4: High-res support
+    high_res: ProcessingSettings = field(
+        default_factory=ProcessingSettings
+    )  # Phase 4: High-res support
     creative: CreativeConfig = field(default_factory=CreativeConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
     stabilization: StabilizationConfig = field(default_factory=StabilizationConfig)
     thresholds: ThresholdsConfig = field(default_factory=ThresholdsConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
     cache: CacheConfig = field(default_factory=CacheConfig)
-    resources: ResourceThresholdsConfig = field(default_factory=ResourceThresholdsConfig)
+    resources: ResourceThresholdsConfig = field(
+        default_factory=ResourceThresholdsConfig
+    )
     monitoring: MonitoringConfig = field(default_factory=MonitoringConfig)
     file_types: FileTypeConfig = field(default_factory=FileTypeConfig)
     preview: PreviewConfig = field(default_factory=PreviewConfig)
@@ -1504,8 +2113,10 @@ def reload_settings() -> Settings:
 # Style and Effect Configurations
 # =============================================================================
 
+
 class QualityProfile:
     """Video quality profile enumeration."""
+
     PREVIEW = "preview"  # 360p, fast
     STANDARD = "standard"  # 1080p
     HIGH = "high"  # 4K
@@ -1515,36 +2126,36 @@ class QualityProfile:
 @dataclass
 class StyleConfig:
     """Configuration for a specific montage style."""
-    
+
     name: str
     """Style name (e.g., 'dynamic', 'hitchcock')."""
-    
+
     weights: dict = field(default_factory=dict)
     """Scoring weights for selection."""
-    
+
     preferred_shots: List[str] = field(default_factory=list)
     """Preferred shot types (e.g., 'close', 'wide')."""
-    
+
     transition_style: str = "cut"
     """Transition type: 'cut', 'fade', 'dissolve'."""
-    
+
     cut_frequency: float = 1.0
     """Relative cut frequency (1.0 = normal, 2.0 = fast)."""
-    
+
     color_grading: Optional[str] = None
     """Color grading preset name."""
-    
+
     description: str = ""
     """Style description."""
-    
+
     def get_weight(self, key: str, default: float = 1.0) -> float:
         """Get weight for scoring factor with fallback."""
         return self.weights.get(key, default)
-    
+
     def has_shot_preference(self) -> bool:
         """Check if style has shot type preferences."""
         return len(self.preferred_shots) > 0
-    
+
     def is_high_energy(self) -> bool:
         """Check if style favors high-energy content."""
         return self.cut_frequency > 1.0
@@ -1553,74 +2164,76 @@ class StyleConfig:
 @dataclass
 class EffectConfig:
     """Video effects configuration."""
-    
+
     stabilize: bool = False
     """Enable video stabilization."""
-    
+
     upscale: bool = False
     """Enable AI upscaling."""
-    
+
     denoise: bool = True
     """Enable denoising."""
-    
+
     color_grade: bool = True
     """Enable color grading."""
-    
+
     audio_enhancement: bool = True
     """Enable audio enhancement."""
-    
+
     motion_blur: float = 0.0
     """Motion blur amount [0.0, 1.0]."""
-    
+
     sharpen: float = 0.0
     """Sharpening amount [0.0, 1.0]."""
-    
+
     def count_enabled_effects(self) -> int:
         """Count enabled boolean effects."""
-        return sum([
-            self.stabilize,
-            self.upscale,
-            self.denoise,
-            self.color_grade,
-            self.audio_enhancement,
-        ])
+        return sum(
+            [
+                self.stabilize,
+                self.upscale,
+                self.denoise,
+                self.color_grade,
+                self.audio_enhancement,
+            ]
+        )
 
 
 @dataclass
 class VideoConfigSpec:
     """Video format specification (distinct from processing settings)."""
-    
+
     width: int = 1920
     """Output video width in pixels."""
-    
+
     height: int = 1080
     """Output video height in pixels."""
-    
+
     fps: float = 24.0
     """Frames per second."""
-    
+
     duration: float = 60.0
     """Target duration in seconds."""
-    
+
     bitrate: str = "5000k"
     """Output bitrate."""
-    
+
     codec: str = "libx264"
     """Video codec."""
-    
+
     preset: str = "medium"
     """Encoding preset (ultrafast, fast, medium, slow, etc)."""
-    
+
     @property
     def aspect_ratio(self) -> float:
         """Get aspect ratio (width/height)."""
-        return self.width / self.height if self.height > 0 else 16/9
-    
+        return self.width / self.height if self.height > 0 else 16 / 9
+
     @property
     def is_portrait(self) -> bool:
         """Check if output is portrait orientation."""
         return self.height > self.width
-    
+
     @property
     def is_landscape(self) -> bool:
         """Check if output is landscape orientation."""
@@ -1630,33 +2243,88 @@ class VideoConfigSpec:
 @dataclass
 class AudioConfigSpec:
     """Audio format specification."""
-    
+
     codec: str = "aac"
     """Audio codec."""
-    
+
     bitrate: str = "128k"
     """Audio bitrate."""
-    
+
     sample_rate: int = 48000
     """Sample rate in Hz."""
-    
+
     channels: int = 2
     """Number of channels (1 = mono, 2 = stereo)."""
-    
+
     normalize: bool = True
     """Normalize loudness."""
-    
+
     target_loudness: float = -20.0
     """Target loudness in dB (LUFS)."""
-    
+
     ducking_strength: float = 0.5
     """Music ducking when speech present [0.0, 1.0]."""
 
 
 @dataclass
+class MoEConfigSpec:
+    """Mixture of Experts (MoE) configuration.
+
+    Controls the behavior of the MoE editing system, including
+    conflict resolution, human-in-the-loop settings, and timeouts.
+    """
+
+    enabled: bool = field(
+        default_factory=lambda: os.environ.get("MOE_ENABLED", "true").lower() == "true"
+    )
+    """Enable MoE editing system (default: true)."""
+
+    enable_human_review: bool = field(
+        default_factory=lambda: os.environ.get("MOE_HUMAN_REVIEW", "true").lower()
+        == "true"
+    )
+    """Require human approval for conflicting deltas (default: true)."""
+
+    auto_apply_low_impact: bool = field(
+        default_factory=lambda: os.environ.get("MOE_AUTO_APPLY", "true").lower()
+        == "true"
+    )
+    """Auto-apply deltas with LOW impact and high confidence (default: true)."""
+
+    auto_apply_threshold: float = field(
+        default_factory=lambda: float(os.environ.get("MOE_AUTO_THRESHOLD", "0.8"))
+    )
+    """Minimum confidence for auto-apply (default: 0.8)."""
+
+    max_conflicts_before_human: int = field(
+        default_factory=lambda: int(os.environ.get("MOE_MAX_CONFLICTS", "3"))
+    )
+    """Max conflicts before requiring human intervention (default: 3)."""
+
+    execution_timeout: float = field(
+        default_factory=lambda: float(os.environ.get("MOE_TIMEOUT", "30.0"))
+    )
+    """Expert execution timeout in seconds (default: 30)."""
+
+    fallback_enabled: bool = field(
+        default_factory=lambda: os.environ.get("MOE_FALLBACK", "true").lower() == "true"
+    )
+    """Fallback to classic pipeline on MoE errors (default: true)."""
+
+    expert_weights: dict = field(
+        default_factory=lambda: {
+            "rhythm": float(os.environ.get("MOE_WEIGHT_RHYTHM", "1.2")),
+            "narrative": float(os.environ.get("MOE_WEIGHT_NARRATIVE", "1.0")),
+            "audio": float(os.environ.get("MOE_WEIGHT_AUDIO", "1.1")),
+        }
+    )
+    """Expert influence weights (default: rhythm=1.2, narrative=1.0, audio=1.1)."""
+
+
+@dataclass
 class MontageSettingsSpec:
     """Complete montage settings - integrates style, effects, video, audio."""
-    
+
     style: StyleConfig
     """Selected montage style."""
 
@@ -1687,65 +2355,78 @@ class MontageSettingsSpec:
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
     """Proxy generation controls."""
 
-    job_id: str = field(default_factory=lambda: os.environ.get("JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S")))
+    moe: MoEConfigSpec = field(default_factory=MoEConfigSpec)
+    """MoE (Mixture of Experts) editing configuration."""
+
+    job_id: str = field(
+        default_factory=lambda: os.environ.get(
+            "JOB_ID", datetime.now().strftime("%Y%m%d_%H%M%S")
+        )
+    )
     """Optional job identifier for builder compatibility."""
-    
+
     quality: str = QualityProfile.STANDARD
     """Output quality profile."""
-    
+
     video: VideoConfigSpec = field(default_factory=VideoConfigSpec)
     """Video format settings."""
-    
+
     audio: AudioConfigSpec = field(default_factory=AudioConfigSpec)
     """Audio settings."""
-    
+
     effects: EffectConfig = field(default_factory=EffectConfig)
     """Effects configuration."""
-    
+
     max_transitions: int = 20
     """Maximum number of transitions."""
-    
+
     cache_enabled: bool = True
     """Enable analysis caching."""
-    
+
     @staticmethod
     def create_default(style_name: str = "dynamic") -> "MontageSettingsSpec":
         """Create settings with defaults."""
         style = StyleConfig(name=style_name, weights={"energy": 1.0})
         return MontageSettingsSpec(style=style)
-    
+
     @staticmethod
     def create_preview() -> "MontageSettingsSpec":
         """Create fast preview settings (360p, ultrafast)."""
         style = StyleConfig(name="dynamic", weights={"energy": 1.0})
         video = VideoConfigSpec(width=640, height=360, fps=24.0, preset="ultrafast")
-        return MontageSettingsSpec(style=style, quality=QualityProfile.PREVIEW, video=video)
-    
+        return MontageSettingsSpec(
+            style=style, quality=QualityProfile.PREVIEW, video=video
+        )
+
     @staticmethod
     def create_hires() -> "MontageSettingsSpec":
         """Create high-resolution 4K settings."""
         style = StyleConfig(name="dynamic", weights={"energy": 1.0})
-        video = VideoConfigSpec(width=3840, height=2160, bitrate="15000k", preset="slow")
-        return MontageSettingsSpec(style=style, quality=QualityProfile.HIGH, video=video)
-    
+        video = VideoConfigSpec(
+            width=3840, height=2160, bitrate="15000k", preset="slow"
+        )
+        return MontageSettingsSpec(
+            style=style, quality=QualityProfile.HIGH, video=video
+        )
+
     def validate(self) -> List[str]:
         """Validate settings, return list of errors."""
         errors = []
-        
+
         if self.video.width <= 0 or self.video.height <= 0:
             errors.append("Invalid video dimensions")
-        
+
         if self.video.fps <= 0:
             errors.append("Invalid FPS")
-        
+
         if self.audio.channels not in [1, 2]:
             errors.append("Invalid audio channels")
-        
+
         if self.max_transitions < 0:
             errors.append("Invalid max transitions")
-        
+
         return errors
-    
+
     def is_valid(self) -> bool:
         """Check if settings are valid."""
         return len(self.validate()) == 0
