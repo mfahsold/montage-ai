@@ -34,10 +34,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .core.hardware import get_best_hwaccel, HWConfig
 from .logger import logger
+from .ffmpeg_config import STANDARD_CRF, STANDARD_PRESET
 
 # Optional cgpu import
 try:
     from .cgpu_utils import is_cgpu_available
+
     CGPU_AVAILABLE = True
 except ImportError:
     CGPU_AVAILABLE = False
@@ -48,6 +50,7 @@ except ImportError:
 
 class TaskType(Enum):
     """Types of encoding tasks."""
+
     ENCODE = "encode"
     UPSCALE = "upscale"
     STABILIZE = "stabilize"
@@ -58,6 +61,7 @@ class TaskType(Enum):
 @dataclass
 class EncoderNode:
     """Configuration for a single encoding node."""
+
     name: str
     hostname: str
     encoder_type: str  # vaapi, nvmpi, nvenc, rocm, adreno, qsv, cpu
@@ -83,6 +87,7 @@ class EncoderNode:
 @dataclass
 class EncodeResult:
     """Result of an encoding operation."""
+
     success: bool
     output_path: str
     node_name: str
@@ -138,7 +143,9 @@ class EncoderRouter:
         """Add an encoding node to the router."""
         self.nodes.append(node)
         self._load[node.name] = 0
-        logger.info(f"Added encoder node: {node.name} ({node.encoder_type}) @ {node.hostname}")
+        logger.info(
+            f"Added encoder node: {node.name} ({node.encoder_type}) @ {node.hostname}"
+        )
 
     def remove_node(self, name: str) -> bool:
         """Remove a node by name."""
@@ -225,6 +232,7 @@ ClusterEncoderRouter = EncoderRouter
 # Task Routing
 # =============================================================================
 
+
 def route_task(
     router: EncoderRouter,
     task_type: str,
@@ -246,7 +254,9 @@ def route_task(
         is_upscale_task = task_type == "upscale"
 
         if is_upscale_task and (is_4k_upscale or is_long_duration):
-            logger.info(f"Routing {task_type} to CGPU (4K: {is_4k_upscale}, long: {is_long_duration})")
+            logger.info(
+                f"Routing {task_type} to CGPU (4K: {is_4k_upscale}, long: {is_long_duration})"
+            )
             return "cgpu"
 
     # Check for local GPU
@@ -265,6 +275,7 @@ def route_task(
 # =============================================================================
 # FFmpeg Execution
 # =============================================================================
+
 
 async def _run_ffmpeg_local(
     input_path: str,
@@ -300,7 +311,7 @@ async def _run_ffmpeg_local(
     elif hw_config.type == "qsv":
         cmd.extend(["-global_quality", "23"])
     elif hw_config.type == "cpu":
-        cmd.extend(["-crf", "23", "-preset", "medium"])
+        cmd.extend(["-crf", str(STANDARD_CRF), "-preset", STANDARD_PRESET])
 
     # Audio
     cmd.extend(["-c:a", "aac", "-b:a", "192k"])
@@ -350,8 +361,13 @@ async def _run_ffmpeg_ssh(
 
     # Build FFmpeg command for remote execution
     ffmpeg_cmd = [
-        "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",
-        "-i", input_path,
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "warning",
+        "-i",
+        input_path,
     ]
 
     if extra_args:
@@ -361,19 +377,35 @@ async def _run_ffmpeg_ssh(
     if node.encoder_type == "nvmpi":
         ffmpeg_cmd.extend(["-c:v", "h264_nvmpi", "-qp", "23"])
     elif node.encoder_type == "vaapi":
-        ffmpeg_cmd.extend([
-            "-vaapi_device", "/dev/dri/renderD128",
-            "-vf", "format=nv12,hwupload",
-            "-c:v", "h264_vaapi", "-qp", "23",
-        ])
+        ffmpeg_cmd.extend(
+            [
+                "-vaapi_device",
+                "/dev/dri/renderD128",
+                "-vf",
+                "format=nv12,hwupload",
+                "-c:v",
+                "h264_vaapi",
+                "-qp",
+                "23",
+            ]
+        )
     elif node.encoder_type == "rocm":
-        ffmpeg_cmd.extend([
-            "-vaapi_device", "/dev/dri/renderD128",
-            "-vf", "format=nv12,hwupload",
-            "-c:v", "h264_vaapi", "-qp", "23",
-        ])
+        ffmpeg_cmd.extend(
+            [
+                "-vaapi_device",
+                "/dev/dri/renderD128",
+                "-vf",
+                "format=nv12,hwupload",
+                "-c:v",
+                "h264_vaapi",
+                "-qp",
+                "23",
+            ]
+        )
     else:
-        ffmpeg_cmd.extend(["-c:v", "libx264", "-crf", "23", "-preset", "medium"])
+        ffmpeg_cmd.extend(
+            ["-c:v", "libx264", "-crf", str(STANDARD_CRF), "-preset", STANDARD_PRESET]
+        )
 
     ffmpeg_cmd.extend(["-c:a", "aac", "-b:a", "192k", output_path])
 
@@ -407,6 +439,7 @@ async def _run_ffmpeg_ssh(
 # High-Level API
 # =============================================================================
 
+
 async def encode_segment(
     router: EncoderRouter,
     input_path: str,
@@ -428,6 +461,7 @@ async def encode_segment(
         EncodeResult with success status and details.
     """
     import time
+
     start_time = time.monotonic()
 
     # Select best node
@@ -503,6 +537,7 @@ async def encode_segments_parallel(
 # =============================================================================
 # Cluster Discovery
 # =============================================================================
+
 
 def discover_cluster_nodes() -> List[EncoderNode]:
     """
@@ -583,9 +618,13 @@ async def probe_node_capabilities(hostname: str, ssh_user: str) -> Dict[str, Any
     }
 
     ssh_cmd = [
-        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "BatchMode=yes",
         f"{ssh_user}@{hostname}",
-        "ffmpeg -encoders 2>/dev/null | grep -E 'nvenc|nvmpi|vaapi|qsv|amf|v4l2'"
+        "ffmpeg -encoders 2>/dev/null | grep -E 'nvenc|nvmpi|vaapi|qsv|amf|v4l2'",
     ]
 
     try:

@@ -27,17 +27,20 @@ from types import SimpleNamespace
 # Mathematical optimization for smooth camera paths
 # Moved to local imports to reduce package startup time by ~700ms
 import importlib.util
+
 SCIPY_AVAILABLE = importlib.util.find_spec("scipy") is not None
 
 from .logger import logger
 from .config import get_settings
 from .core.cmd_runner import run_command
 from .ffmpeg_utils import build_ffmpeg_cmd
+from .ffmpeg_config import STANDARD_CODEC, STANDARD_PRESET, STANDARD_CRF
 
 
 # =============================================================================
 # Kalman Filter for Subject Tracking Smoothing
 # =============================================================================
+
 
 class SubjectKalmanFilter:
     """
@@ -54,7 +57,7 @@ class SubjectKalmanFilter:
         self,
         process_noise: float = 1.0,
         measurement_noise: float = 10.0,
-        initial_position: float = 0.0
+        initial_position: float = 0.0,
     ):
         # State: [position, velocity]
         self.x = np.array([initial_position, 0.0])
@@ -69,10 +72,12 @@ class SubjectKalmanFilter:
         self.H = np.array([[1, 0]])
 
         # Process noise covariance (how much we expect state to change)
-        self.Q = np.array([
-            [process_noise, 0],
-            [0, process_noise * 0.1]  # velocity noise is smaller
-        ])
+        self.Q = np.array(
+            [
+                [process_noise, 0],
+                [0, process_noise * 0.1],  # velocity noise is smaller
+            ]
+        )
 
         # Measurement noise covariance
         self.R = np.array([[measurement_noise]])
@@ -103,7 +108,7 @@ class SubjectKalmanFilter:
     def smooth_sequence(
         raw_centers: List[int],
         process_noise: float = 1.0,
-        measurement_noise: float = 10.0
+        measurement_noise: float = 10.0,
     ) -> List[int]:
         """
         Smooth a sequence of positions using forward-backward Kalman filtering.
@@ -117,7 +122,7 @@ class SubjectKalmanFilter:
         forward_kf = SubjectKalmanFilter(
             process_noise=process_noise,
             measurement_noise=measurement_noise,
-            initial_position=raw_centers[0]
+            initial_position=raw_centers[0],
         )
         forward_estimates = []
         forward_covariances = []
@@ -134,30 +139,42 @@ class SubjectKalmanFilter:
         smoothed[-1] = forward_estimates[-1]
 
         for i in range(n - 2, -1, -1):
-            P_pred = forward_kf.F @ forward_covariances[i] @ forward_kf.F.T + forward_kf.Q
+            P_pred = (
+                forward_kf.F @ forward_covariances[i] @ forward_kf.F.T + forward_kf.Q
+            )
             C = forward_covariances[i] @ forward_kf.F.T @ np.linalg.inv(P_pred)
-            smoothed[i] = forward_estimates[i] + C @ (smoothed[i + 1] - forward_kf.F @ forward_estimates[i])
+            smoothed[i] = forward_estimates[i] + C @ (
+                smoothed[i + 1] - forward_kf.F @ forward_estimates[i]
+            )
 
         return [int(s[0]) for s in smoothed]
+
 
 # Try importing MediaPipe, but don't crash if missing (optional dependency)
 try:
     import mediapipe as mp
+
     MP_AVAILABLE = True
 except ImportError:
     mp = None  # Allows tests to patch `mp` even when mediapipe is unavailable
     MP_AVAILABLE = False
-    logger.warning("MediaPipe not installed. Auto Reframe will fallback to center crop.")
+    logger.warning(
+        "MediaPipe not installed. Auto Reframe will fallback to center crop."
+    )
+
 
 @dataclass
 class Keyframe:
     """A manual override point for the camera path."""
+
     time: float
-    center_x_norm: float # Normalized 0.0-1.0 relative to video width
+    center_x_norm: float  # Normalized 0.0-1.0 relative to video width
+
 
 @dataclass
 class CropWindow:
     """A crop window at a specific timestamp."""
+
     time: float
     x: int
     y: int
@@ -165,32 +182,39 @@ class CropWindow:
     height: int
     score: float  # Confidence score of the subject
 
+
 class CameraMotionOptimizer:
     """
     Solves for an optimal camera path using convex optimization (L2 regularization).
     Minimizes: Distance to Subject + Velocity (Shake) + Acceleration (Jerk).
-    
+
     Cost Function:
     J(x) = Σ(x_t - c_t)² + λ1 * Σ(x_t - x_{t-1})² + λ2 * Σ(x_t - 2x_{t-1} + x_{t-2})²
     """
-    
-    def __init__(self, lambda_smooth: float = 500.0, lambda_trend: float = 50.0):
-        self.lambda_smooth = lambda_smooth # Penalizes velocity (keeps camera still)
-        self.lambda_trend = lambda_trend   # Penalizes acceleration (smooths starts/stops)
 
-    def solve(self, raw_centers: List[int], constraints: Dict[int, int] = None) -> List[int]:
+    def __init__(self, lambda_smooth: float = 500.0, lambda_trend: float = 50.0):
+        self.lambda_smooth = lambda_smooth  # Penalizes velocity (keeps camera still)
+        self.lambda_trend = (
+            lambda_trend  # Penalizes acceleration (smooths starts/stops)
+        )
+
+    def solve(
+        self, raw_centers: List[int], constraints: Dict[int, int] = None
+    ) -> List[int]:
         """
         Solve the linear system to find the optimal path.
-        
+
         Args:
             raw_centers: List of detected subject centers per frame.
             constraints: Optional dict mapping frame_index -> target_center_x (pixels).
                          Used for manual keyframes.
         """
         if not SCIPY_AVAILABLE:
-            logger.warning("Scipy not available. Falling back to simple moving average.")
+            logger.warning(
+                "Scipy not available. Falling back to simple moving average."
+            )
             return self._fallback_smooth(raw_centers, constraints)
-            
+
         n = len(raw_centers)
         if n < 3:
             return raw_centers
@@ -201,42 +225,42 @@ class CameraMotionOptimizer:
         # Construct sparse matrices
         # Identity matrix (Data term)
         I = sparse.eye(n)
-        
+
         # First difference matrix (Velocity term)
         # [ -1  1  0 ... ]
         # [  0 -1  1 ... ]
-        D1 = sparse.diags([-1, 1], [0, 1], shape=(n-1, n))
-        
+        D1 = sparse.diags([-1, 1], [0, 1], shape=(n - 1, n))
+
         # Second difference matrix (Acceleration term)
         # [  1 -2  1  0 ... ]
         # [  0  1 -2  1 ... ]
-        D2 = sparse.diags([1, -2, 1], [0, 1, 2], shape=(n-2, n))
-        
+        D2 = sparse.diags([1, -2, 1], [0, 1, 2], shape=(n - 2, n))
+
         # Construct the linear system (A * x = b)
         # Derivative of Cost Function set to 0:
         # (I + λ1*D1.T*D1 + λ2*D2.T*D2) * x = raw_centers
-        
+
         A = I + self.lambda_smooth * (D1.T @ D1) + self.lambda_trend * (D2.T @ D2)
         b = np.array(raw_centers)
-        
+
         # Apply constraints (Keyframes)
         if constraints:
             # Add penalty term: λ_constraint * Σ (x_i - target_i)^2
             # This modifies the diagonal of A and the vector b.
-            lambda_constraint = 10000.0 # Strong pull towards keyframe
-            
+            lambda_constraint = 10000.0  # Strong pull towards keyframe
+
             constraint_weights = np.zeros(n)
             constraint_targets = np.zeros(n)
-            
+
             for idx, target in constraints.items():
                 if 0 <= idx < n:
                     constraint_weights[idx] = lambda_constraint
                     constraint_targets[idx] = target
-            
+
             # Add diagonal matrix to A
             C = sparse.diags(constraint_weights, 0, shape=(n, n))
             A = A + C
-            
+
             # Add to b
             b = b + constraint_weights * constraint_targets
 
@@ -249,7 +273,9 @@ class CameraMotionOptimizer:
             logger.error(f"Optimization failed: {e}. Using fallback.")
             return self._fallback_smooth(raw_centers, constraints)
 
-    def _fallback_smooth(self, data: List[int], constraints: Dict[int, int] = None, window: int = 15) -> List[int]:
+    def _fallback_smooth(
+        self, data: List[int], constraints: Dict[int, int] = None, window: int = 15
+    ) -> List[int]:
         """Kalman filter fallback for smooth camera paths (when scipy unavailable)."""
         if not data:
             return []
@@ -264,8 +290,8 @@ class CameraMotionOptimizer:
         logger.info("Using Kalman Filter fallback for camera smoothing.")
         return SubjectKalmanFilter.smooth_sequence(
             working_data,
-            process_noise=1.0, 
-            measurement_noise=20.0  # Higher noise -> Smoother output
+            process_noise=1.0,
+            measurement_noise=20.0,  # Higher noise -> Smoother output
         )
 
 
@@ -274,16 +300,18 @@ class AutoReframeEngine:
     Intelligent video reframing engine.
     """
 
-    def __init__(self, target_aspect: float = 9/16, smoothing_window: int = 15):
+    def __init__(self, target_aspect: float = 9 / 16, smoothing_window: int = 15):
         self.target_aspect = target_aspect
         self.smoothing_window = smoothing_window
-        self.path_planner = CameraMotionOptimizer(lambda_smooth=100.0, lambda_trend=10.0)
-        
+        self.path_planner = CameraMotionOptimizer(
+            lambda_smooth=100.0, lambda_trend=10.0
+        )
+
         if MP_AVAILABLE and getattr(mp, "solutions", None):
             self.mp_face_detection = mp.solutions.face_detection
             self.face_detector = self.mp_face_detection.FaceDetection(
-                model_selection=1, # 1 = full range (better for video)
-                min_detection_confidence=get_settings().thresholds.face_confidence
+                model_selection=1,  # 1 = full range (better for video)
+                min_detection_confidence=get_settings().thresholds.face_confidence,
             )
         else:
             # Provide a lightweight stub so tests can patch or set side effects even when MediaPipe is absent.
@@ -295,7 +323,9 @@ class AutoReframeEngine:
                 self.face_detector.process.return_value = SimpleNamespace(detections=[])
             except Exception:
                 # Fallback stub without mock dependency
-                self.face_detector = SimpleNamespace(process=lambda _: SimpleNamespace(detections=[]))
+                self.face_detector = SimpleNamespace(
+                    process=lambda _: SimpleNamespace(detections=[])
+                )
 
     # Deprecated: Use AutoReframeEngine directly instead of SmartReframer.
 
@@ -304,28 +334,30 @@ class AutoReframeEngine:
         # box: [xmin, ymin, width, height]
         x1_min, y1_min, w1, h1 = box1.xmin, box1.ymin, box1.width, box1.height
         x1_max, y1_max = x1_min + w1, y1_min + h1
-        
+
         x2_min, y2_min, w2, h2 = box2.xmin, box2.ymin, box2.width, box2.height
         x2_max, y2_max = x2_min + w2, y2_min + h2
-        
+
         # Intersection
         xi_min = max(x1_min, x2_min)
         yi_min = max(y1_min, y2_min)
         xi_max = min(x1_max, x2_max)
         yi_max = min(y1_max, y2_max)
-        
+
         inter_w = max(0, xi_max - xi_min)
         inter_h = max(0, yi_max - yi_min)
         intersection = inter_w * inter_h
-        
+
         # Union
         area1 = w1 * h1
         area2 = w2 * h2
         union = area1 + area2 - intersection
-        
+
         return intersection / union if union > 0 else 0.0
 
-    def analyze(self, video_path: str, keyframes: List[Keyframe] = None) -> List[CropWindow]:
+    def analyze(
+        self, video_path: str, keyframes: List[Keyframe] = None
+    ) -> List[CropWindow]:
         """
         Analyze video and calculate optimal crop windows per frame.
         Returns list of CropWindow objects.
@@ -334,7 +366,7 @@ class AutoReframeEngine:
             return self._fallback_center_crop(video_path)
 
         logger.info(f"Analyzing {Path(video_path).name} for smart reframing...")
-        
+
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise RuntimeError(f"Could not open video: {video_path}")
@@ -346,45 +378,55 @@ class AutoReframeEngine:
 
         # Calculate target crop size
         target_width, target_height = self._calculate_crop_dims(width, height)
-        
+
         crops = []
         raw_centers = []
         frame_idx = 0
-        
+
         # Tracking state
         last_center_x = width // 2
         active_subject_bbox = None
         frames_since_detection = 0
-        MAX_LOST_FRAMES = int(fps * 1.0) # Reset tracking after 1 second of loss
-        
+        MAX_LOST_FRAMES = int(fps * 1.0)  # Reset tracking after 1 second of loss
+
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
-                
+
             # Detect face
             # Convert BGR to RGB
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = self.face_detector.process(rgb_frame)
-            
-            center_x = last_center_x # Default to last known
+
+            center_x = last_center_x  # Default to last known
             score = 0.0
             current_best_face = None
-            
+
             if results.detections:
-                if active_subject_bbox is None or frames_since_detection > MAX_LOST_FRAMES:
+                if (
+                    active_subject_bbox is None
+                    or frames_since_detection > MAX_LOST_FRAMES
+                ):
                     # No active subject or lost track -> Find largest face
-                    current_best_face = max(results.detections, key=lambda d: d.location_data.relative_bounding_box.width * d.location_data.relative_bounding_box.height)
-                    frames_since_detection = 0 # Reset counter
+                    current_best_face = max(
+                        results.detections,
+                        key=lambda d: d.location_data.relative_bounding_box.width
+                        * d.location_data.relative_bounding_box.height,
+                    )
+                    frames_since_detection = 0  # Reset counter
                 else:
                     # We have an active subject -> Find best match (IoU)
                     best_iou = -1.0
                     for detection in results.detections:
-                        iou = self._calculate_iou(active_subject_bbox, detection.location_data.relative_bounding_box)
+                        iou = self._calculate_iou(
+                            active_subject_bbox,
+                            detection.location_data.relative_bounding_box,
+                        )
                         if iou > best_iou:
                             best_iou = iou
                             current_best_face = detection
-                    
+
                     # If match is too poor, consider face tracking lost (scene cut or exit)
                     if best_iou < 0.1:
                         # Hold last position for stability instead of jumping
@@ -394,38 +436,40 @@ class AutoReframeEngine:
 
                 if current_best_face:
                     bbox = current_best_face.location_data.relative_bounding_box
-                    
+
                     # Update active subject
                     active_subject_bbox = bbox
-                    
+
                     # Calculate face center
                     face_center_x = int((bbox.xmin + bbox.width / 2) * width)
                     center_x = face_center_x
                     score = current_best_face.score[0]
-                    last_center_x = center_x # Update last known
+                    last_center_x = center_x  # Update last known
                 else:
                     frames_since_detection += 1
             else:
                 frames_since_detection += 1
-            
+
             raw_centers.append(center_x)
-            
+
             # Placeholder crop (will be updated after smoothing)
-            crops.append(CropWindow(
-                time=frame_idx / fps,
-                x=0, # To be filled
-                y=int((height - target_height) // 2),
-                width=target_width,
-                height=target_height,
-                score=score
-            ))
-            
+            crops.append(
+                CropWindow(
+                    time=frame_idx / fps,
+                    x=0,  # To be filled
+                    y=int((height - target_height) // 2),
+                    width=target_width,
+                    height=target_height,
+                    score=score,
+                )
+            )
+
             frame_idx += 1
             if frame_idx % 100 == 0:
                 logger.debug(f"Analyzed frame {frame_idx}/{total_frames}")
 
         cap.release()
-        
+
         # Convert keyframes to constraints
         constraints = {}
         if keyframes:
@@ -438,26 +482,28 @@ class AutoReframeEngine:
         # Apply Cinematic Path Planning (Global Optimization)
         logger.info("Optimizing camera path...")
         smoothed_centers = self.path_planner.solve(raw_centers, constraints)
-        
+
         # Update crops with smoothed centers
         for i, crop in enumerate(crops):
             # Clamp to frame boundaries
             center = smoothed_centers[i]
             x = max(0, min(width - target_width, center - target_width // 2))
             crop.x = int(x)
-            
+
         return crops
 
     def _fallback_smooth(self, data: List[int], window: int = 15) -> List[int]:
         """Simple moving average fallback."""
-        return [int(x) for x in np.convolve(data, np.ones(window)/window, mode='same')]
+        return [
+            int(x) for x in np.convolve(data, np.ones(window) / window, mode="same")
+        ]
 
     def _calculate_crop_dims(self, src_w: int, src_h: int) -> Tuple[int, int]:
         """Calculate crop dimensions maintaining target aspect ratio."""
         # If source is already narrower than target, fit width
         if src_w / src_h < self.target_aspect:
             return src_w, int(src_w / self.target_aspect)
-        
+
         # Otherwise fit height (standard for 16:9 -> 9:16)
         return int(src_h * self.target_aspect), src_h
 
@@ -474,13 +520,17 @@ class AutoReframeEngine:
         target_w, target_h = self._calculate_crop_dims(width, height)
         x = (width - target_w) // 2
         y = (height - target_h) // 2
-        
+
         return [
-            CropWindow(time=i/fps, x=x, y=y, width=target_w, height=target_h, score=0.0)
+            CropWindow(
+                time=i / fps, x=x, y=y, width=target_w, height=target_h, score=0.0
+            )
             for i in range(total_frames)
         ]
 
-    def _segment_crops(self, crops: List[CropWindow], min_segment_duration: float = 2.0) -> List[Dict]:
+    def _segment_crops(
+        self, crops: List[CropWindow], min_segment_duration: float = 2.0
+    ) -> List[Dict]:
         """
         Group frame-level crops into stable segments.
         Returns list of dicts: {'start': float, 'end': float, 'x': int, 'y': int, 'w': int, 'h': int}
@@ -492,18 +542,18 @@ class AutoReframeEngine:
         current_start_idx = 0
         current_x_sum = 0
         current_count = 0
-        
+
         width = crops[0].width
         height = crops[0].height
-        
+
         # Threshold for creating a new cut (in pixels)
         # If the subject moves significantly (> 25% of width), we cut to a new angle
         threshold = width * 0.25
-        
+
         for i, crop in enumerate(crops):
             # Check if we should cut
             duration = crop.time - crops[current_start_idx].time
-            
+
             if duration >= min_segment_duration:
                 # Calculate average of frames SO FAR (excluding current if it's the outlier)
                 if current_count > 0:
@@ -514,17 +564,19 @@ class AutoReframeEngine:
                 # If current frame deviates too much from segment average, start new segment
                 if abs(crop.x - avg_x) > threshold:
                     # Finalize current segment (excluding current frame)
-                    segments.append({
-                        'start': crops[current_start_idx].time,
-                        'end': crop.time,
-                        'x': int(avg_x),
-                        'y': crop.y,
-                        'w': width,
-                        'h': height
-                    })
+                    segments.append(
+                        {
+                            "start": crops[current_start_idx].time,
+                            "end": crop.time,
+                            "x": int(avg_x),
+                            "y": crop.y,
+                            "w": width,
+                            "h": height,
+                        }
+                    )
                     # Start new segment with current frame
                     current_start_idx = i
-                    current_x_sum = crop.x 
+                    current_x_sum = crop.x
                     current_count = 1
                     continue
 
@@ -534,18 +586,26 @@ class AutoReframeEngine:
         # Add final segment
         if current_count > 0:
             avg_x = current_x_sum / current_count
-            segments.append({
-                'start': crops[current_start_idx].time,
-                'end': crops[-1].time, # Use last frame time
-                'x': int(avg_x),
-                'y': crops[-1].y,
-                'w': width,
-                'h': height
-            })
-            
+            segments.append(
+                {
+                    "start": crops[current_start_idx].time,
+                    "end": crops[-1].time,  # Use last frame time
+                    "x": int(avg_x),
+                    "y": crops[-1].y,
+                    "w": width,
+                    "h": height,
+                }
+            )
+
         return segments
 
-    def apply(self, crops: Optional[List[CropWindow]], input_path: str, output_path: str, **kwargs) -> None:
+    def apply(
+        self,
+        crops: Optional[List[CropWindow]],
+        input_path: str,
+        output_path: str,
+        **kwargs,
+    ) -> None:
         """
         Apply the calculated crops using FFmpeg.
         Uses segmented cropping to simulate camera cuts/pans.
@@ -561,29 +621,37 @@ class AutoReframeEngine:
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             cap.release()
-            
+
             target_w, target_h = self._calculate_crop_dims(width, height)
             x = (width - target_w) // 2
             y = (height - target_h) // 2
-            
+
             # Use provided preset/crf or defaults
-            preset = kwargs.get('preset', 'medium')
-            crf = kwargs.get('crf', '18')
-            
-            cmd = build_ffmpeg_cmd([
-                "-i", input_path,
-                "-vf", f"crop={target_w}:{target_h}:{x}:{y}",
-                "-c:v", "libx264",
-                "-preset", preset,
-                "-crf", str(crf),
-                "-c:a", "copy",
-                output_path
-            ])
+            preset = kwargs.get("preset", STANDARD_PRESET)
+            crf = kwargs.get("crf", STANDARD_CRF)
+
+            cmd = build_ffmpeg_cmd(
+                [
+                    "-i",
+                    input_path,
+                    "-vf",
+                    f"crop={target_w}:{target_h}:{x}:{y}",
+                    "-c:v",
+                    STANDARD_CODEC,
+                    "-preset",
+                    preset,
+                    "-crf",
+                    str(crf),
+                    "-c:a",
+                    "copy",
+                    output_path,
+                ]
+            )
             run_command(cmd)
             return
 
         segments = self._segment_crops(crops)
-        
+
         if not segments:
             logger.warning("No crop segments found.")
             return
@@ -593,47 +661,62 @@ class AutoReframeEngine:
         # If only one segment, simple crop
         if len(segments) == 1:
             seg = segments[0]
-            preset = kwargs.get('preset', 'medium')
-            crf = kwargs.get('crf', '18')
-            
-            cmd = build_ffmpeg_cmd([
-                "-i", input_path,
-                "-vf", f"crop={seg['w']}:{seg['h']}:{seg['x']}:{seg['y']}",
-                "-c:v", "libx264", 
-                "-preset", preset,
-                "-crf", str(crf),
-                "-c:a", "copy",
-                output_path
-            ])
+            preset = kwargs.get("preset", STANDARD_PRESET)
+            crf = kwargs.get("crf", STANDARD_CRF)
+
+            cmd = build_ffmpeg_cmd(
+                [
+                    "-i",
+                    input_path,
+                    "-vf",
+                    f"crop={seg['w']}:{seg['h']}:{seg['x']}:{seg['y']}",
+                    "-c:v",
+                    STANDARD_CODEC,
+                    "-preset",
+                    preset,
+                    "-crf",
+                    str(crf),
+                    "-c:a",
+                    "copy",
+                    output_path,
+                ]
+            )
             run_command(cmd)
             return
-            
+
         # Multiple segments: complex filter with trim and crop
         # This implements smooth dynamic cropping across time segments
         # [0:v]trim=start=0:end=2,setpts=PTS-STARTPTS,crop=...[v0];
         # [0:v]trim=start=2:end=5,setpts=PTS-STARTPTS,crop=...[v1];
         # [v0][v1]concat=n=2:v=1:a=0[outv]
-        
+
         filter_complex = ""
         inputs = ""
-        
+
         for i, seg in enumerate(segments):
             # Ensure we don't exceed video duration (handled by trim usually)
             # trim expects seconds
             filter_complex += f"[0:v]trim=start={seg['start']}:end={seg['end']},setpts=PTS-STARTPTS,crop={seg['w']}:{seg['h']}:{seg['x']}:{seg['y']}[v{i}];"
             inputs += f"[v{i}]"
-            
+
         filter_complex += f"{inputs}concat=n={len(segments)}:v=1:a=0[outv]"
-        
-        cmd = build_ffmpeg_cmd([
-            "-i", input_path,
-            "-filter_complex", filter_complex,
-            "-map", "[outv]",
-            "-map", "0:a?",  # Map audio if exists
-            "-c:a", "copy",
-            output_path
-        ])
-        
+
+        cmd = build_ffmpeg_cmd(
+            [
+                "-i",
+                input_path,
+                "-filter_complex",
+                filter_complex,
+                "-map",
+                "[outv]",
+                "-map",
+                "0:a?",  # Map audio if exists
+                "-c:a",
+                "copy",
+                output_path,
+            ]
+        )
+
         run_command(cmd)
 
 

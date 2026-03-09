@@ -61,6 +61,7 @@ from .clip_processor import process_clip_task
 # MontageBuilder Class
 # =============================================================================
 
+
 class MontageBuilder:
     """
     Object-oriented pipeline for creating video montages.
@@ -82,7 +83,7 @@ class MontageBuilder:
         settings: Optional[Settings] = None,
         editing_instructions: Optional[Dict[str, Any]] = None,
         job_id: Optional[str] = None,
-        progress_callback: Optional[Any] = None
+        progress_callback: Optional[Any] = None,
     ):
         """
         Initialize the MontageBuilder.
@@ -97,13 +98,13 @@ class MontageBuilder:
         self.settings = settings or get_settings()
         self.variant_id = variant_id
         self.rng = random.Random(42 + variant_id)  # Seeded RNG for determinism
-        
+
         # Convert dict to strongly-typed model if necessary
         if isinstance(editing_instructions, dict):
             self.editing_instructions = EditingInstructions(**editing_instructions)
         else:
             self.editing_instructions = editing_instructions
-            
+
         self.progress_callback = progress_callback
 
         # Initialize context
@@ -122,21 +123,24 @@ class MontageBuilder:
         self._intelligent_selector = None
         self._resource_manager: Optional[ResourceManager] = None
         self._scene_provider = None  # Unified scene analysis provider
-        self._enhancement_tracker: Optional[EnhancementTracker] = None  # NLE export tracking
+        self._enhancement_tracker: Optional[EnhancementTracker] = (
+            None  # NLE export tracking
+        )
 
         # Parallel processing
         self._executor: Optional[ThreadPoolExecutor] = None
         self._pending_futures: List[Future] = []
-        
+
         # Progress tracking
         self.progress = JobProgress(job_id or self.settings.job_id, total_scenes=0)
-        
+
         # New Engines
         from .analysis_engine import AssetAnalyzer
         from .render_engine import RenderEngine
         from .pacing_engine import PacingEngine
         from .selection_engine import SelectionEngine
         from .story_engine import StoryEngine
+
         self._analyzer = AssetAnalyzer(self.ctx)
         self._render_engine = RenderEngine(self.ctx)
         self._render_engine.set_progress_callback(self.progress_callback)
@@ -180,6 +184,7 @@ class MontageBuilder:
         """Get the unified scene provider (lazy initialized)."""
         if self._scene_provider is None:
             from .scene_provider import get_scene_provider
+
             self._scene_provider = get_scene_provider()
         return self._scene_provider
 
@@ -213,13 +218,17 @@ class MontageBuilder:
 
             # Phase 3: Plan (Agentic Creative Loop)
             iteration = 0
-            max_iters = self.settings.features.creative_loop_max_iterations if self.settings.features.creative_loop else 1
+            max_iters = (
+                self.settings.features.creative_loop_max_iterations
+                if self.settings.features.creative_loop
+                else 1
+            )
             approved = False
 
             while iteration < max_iters and not approved:
                 logger.info(f"\n   🔄 Planning Iteration {iteration + 1}/{max_iters}")
                 self.plan_montage()
-                
+
                 if max_iters > 1:
                     # SOTA 2026: Agentic Review Pass (Plan-and-ReAct)
                     evaluation = self._evaluate_current_plan(iteration)
@@ -236,7 +245,11 @@ class MontageBuilder:
                     approved = True
 
             # Phase 4: Enhance (if enabled)
-            if self.ctx.features.stabilize or self.ctx.features.upscale or self.ctx.features.enhance:
+            if (
+                self.ctx.features.stabilize
+                or self.ctx.features.upscale
+                or self.ctx.features.enhance
+            ):
                 self.enhance_assets()
 
             # Phase 5: Render
@@ -255,7 +268,7 @@ class MontageBuilder:
             output_path = self.ctx.render.output_filename
             self.progress.finalization_complete(output_path)
             logger.info(self.progress.summary())
-            
+
             return MontageResult(
                 success=True,
                 output_path=output_path,
@@ -264,7 +277,9 @@ class MontageBuilder:
                 render_time=self.ctx.render.render_duration,
                 file_size_mb=self._get_output_file_size(),
                 stats=self._collect_stats(),
-                project_package_path=self.ctx.render.exported_files.get('package') if self.ctx.render.exported_files else None,
+                project_package_path=self.ctx.render.exported_files.get("package")
+                if self.ctx.render.exported_files
+                else None,
             )
 
         except Exception as e:
@@ -314,7 +329,9 @@ class MontageBuilder:
         self._init_intelligent_selector()
 
         # Initialize thread pool for parallel clip processing
-        adaptive_workers = self.settings.processing.get_adaptive_parallel_jobs(self.settings.stabilization.low_memory_mode)
+        adaptive_workers = self.settings.processing.get_adaptive_parallel_jobs(
+            self.settings.stabilization.low_memory_mode
+        )
         optimal_workers = self._resource_manager.get_optimal_threads()
         max_workers = max(1, min(adaptive_workers, optimal_workers))
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -322,15 +339,24 @@ class MontageBuilder:
 
         # Log enabled effects
         effects_list = []
-        if self.ctx.features.stabilize: effects_list.append("STAB")
-        if self.ctx.features.upscale: effects_list.append("UPSCALE")
-        if self.ctx.features.enhance: effects_list.append("ENHANCE")
-        if self.ctx.features.denoise: effects_list.append("DENOISE")
-        if self.ctx.features.sharpen: effects_list.append("SHARPEN")
-        if self.ctx.features.film_grain and self.ctx.features.film_grain != "none": effects_list.append(f"GRAIN:{self.ctx.features.film_grain}")
-        if self.ctx.features.dialogue_duck: effects_list.append("DUCK")
+        if self.ctx.features.stabilize:
+            effects_list.append("STAB")
+        if self.ctx.features.upscale:
+            effects_list.append("UPSCALE")
+        if self.ctx.features.enhance:
+            effects_list.append("ENHANCE")
+        if self.ctx.features.denoise:
+            effects_list.append("DENOISE")
+        if self.ctx.features.sharpen:
+            effects_list.append("SHARPEN")
+        if self.ctx.features.film_grain and self.ctx.features.film_grain != "none":
+            effects_list.append(f"GRAIN:{self.ctx.features.film_grain}")
+        if self.ctx.features.dialogue_duck:
+            effects_list.append("DUCK")
         effects_str = ", ".join(effects_list) if effects_list else "none"
-        logger.info(f"   🎨 Effects: [{effects_str}] COLOR_GRADE={self.ctx.features.color_grade}")
+        logger.info(
+            f"   🎨 Effects: [{effects_str}] COLOR_GRADE={self.ctx.features.color_grade}"
+        )
 
     def analyze_assets(self):
         """
@@ -355,17 +381,21 @@ class MontageBuilder:
             # If running in preview mode, apply conservative limits to speed up time-to-preview
             try:
                 quality = (self.settings.encoding.quality_profile or "").lower()
-            except Exception:
+            except (AttributeError, TypeError):
                 quality = ""
 
             if quality == "preview":
                 # Prefer configured settings (tests and deploys should set these via config.Settings).
                 try:
-                    max_size_mb = int(self.settings.processing.preview_max_input_size_mb)
+                    max_size_mb = int(
+                        self.settings.processing.preview_max_input_size_mb
+                    )
                     max_files = int(self.settings.processing.preview_max_files)
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     # Backwards-compatible fallback to legacy env vars
-                    max_size_mb = int(os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200"))
+                    max_size_mb = int(
+                        os.environ.get("PREVIEW_MAX_INPUT_SIZE_MB", "200")
+                    )
                     max_files = int(os.environ.get("PREVIEW_MAX_FILES", "3"))
 
                 logger.info(
@@ -379,7 +409,7 @@ class MontageBuilder:
                 for p in self.ctx.media.video_files:
                     try:
                         size_mb = os.path.getsize(p) / (1024 * 1024)
-                    except Exception:
+                    except (OSError, FileNotFoundError):
                         size_mb = 0
                     if size_mb > max_size_mb:
                         skipped.append((p, int(size_mb)))
@@ -390,9 +420,17 @@ class MontageBuilder:
 
                 if skipped:
                     for sfile, sz in skipped:
-                        logger.info("   ⚠️ Skipping large file for preview: %s (%dMB)", os.path.basename(sfile), sz)
+                        logger.info(
+                            "   ⚠️ Skipping large file for preview: %s (%dMB)",
+                            os.path.basename(sfile),
+                            sz,
+                        )
                 if len(filtered) < len(self.ctx.media.video_files):
-                    logger.info("   ℹ️ Preview-fast-path will analyze %d/%d files", len(filtered), len(self.ctx.media.video_files))
+                    logger.info(
+                        "   ℹ️ Preview-fast-path will analyze %d/%d files",
+                        len(filtered),
+                        len(self.ctx.media.video_files),
+                    )
 
                 # Mutate the context for the duration of analysis (restore later)
                 original_video_files = list(self.ctx.media.video_files)
@@ -404,9 +442,12 @@ class MontageBuilder:
                         # best-effort: shrink pool by creating a new executor for analysis
                         self._executor._shutdown(wait=False)
                         from concurrent.futures import ThreadPoolExecutor
+
                         self._executor = ThreadPoolExecutor(max_workers=1)
-                        logger.info("   ⚙️ Preview-mode: reduced worker pool to 1 for analysis")
-                except Exception:
+                        logger.info(
+                            "   ⚙️ Preview-mode: reduced worker pool to 1 for analysis"
+                        )
+                except (RuntimeError, ValueError):
                     # non-fatal — proceed with existing executor
                     pass
             else:
@@ -424,32 +465,44 @@ class MontageBuilder:
             # lazily create a minimal executor to keep analyze_assets robust.
             if self._executor is None:
                 from concurrent.futures import ThreadPoolExecutor
+
                 self._executor = ThreadPoolExecutor(max_workers=1)
-                logger.info("   ⚙️ Lazily initialized executor for analysis (tests/preview)")
+                logger.info(
+                    "   ⚙️ Lazily initialized executor for analysis (tests/preview)"
+                )
 
             generator = ProxyGenerator(proxy_dir)
 
             proxy_video_files = list(self.ctx.media.video_files)
             try:
-                if self.settings.stabilization.cluster_mode and self.settings.proxy.distributed_proxy_generation:
+                if (
+                    self.settings.stabilization.cluster_mode
+                    and self.settings.proxy.distributed_proxy_generation
+                ):
                     total_mb = 0.0
                     for p in proxy_video_files:
                         try:
                             total_mb += os.path.getsize(p) / (1024 * 1024)
-                        except Exception:
+                        except (OSError, FileNotFoundError):
                             pass
 
                     min_files = int(self.settings.proxy.distributed_proxy_min_files)
-                    min_total_mb = int(self.settings.proxy.distributed_proxy_min_total_mb)
+                    min_total_mb = int(
+                        self.settings.proxy.distributed_proxy_min_total_mb
+                    )
 
                     if len(proxy_video_files) >= min_files or total_mb >= min_total_mb:
-                        from montage_ai.config import get_cluster_shard_index, get_cluster_shard_count
+                        from montage_ai.config import (
+                            get_cluster_shard_index,
+                            get_cluster_shard_count,
+                        )
 
                         shard_index = get_cluster_shard_index()
                         shard_count = get_cluster_shard_count()
                         if shard_count > 1:
                             proxy_video_files = [
-                                p for i, p in enumerate(proxy_video_files)
+                                p
+                                for i, p in enumerate(proxy_video_files)
                                 if (i % shard_count) == shard_index
                             ]
                             logger.info(
@@ -463,7 +516,9 @@ class MontageBuilder:
                         else:
                             logger.info("   🧩 Proxy sharding skipped (single shard)")
             except Exception:
-                logger.debug("Proxy sharding unavailable; continuing with local proxy generation")
+                logger.debug(
+                    "Proxy sharding unavailable; continuing with local proxy generation"
+                )
 
             # Submit proxies and track per-file start times so we can emit telemetry later
             proxy_submissions = []  # list of (future, video_path, start_time)
@@ -473,13 +528,22 @@ class MontageBuilder:
 
                 # When in preview fast-path prefer a small analysis proxy (faster to produce and cache)
                 try:
-                    prefer_analysis = bool(self.settings.proxy.prefer_analysis_proxy_for_preview) and quality == "preview"
+                    prefer_analysis = (
+                        bool(self.settings.proxy.prefer_analysis_proxy_for_preview)
+                        and quality == "preview"
+                    )
                 except Exception:
                     prefer_analysis = True if quality == "preview" else False
 
                 if prefer_analysis:
-                    proxy_height = self._select_proxy_height(video_path, self.settings.proxy.proxy_height)
-                    fut = self._executor.submit(getattr(generator, "ensure_analysis_proxy"), video_path, proxy_height)
+                    proxy_height = self._select_proxy_height(
+                        video_path, self.settings.proxy.proxy_height
+                    )
+                    fut = self._executor.submit(
+                        getattr(generator, "ensure_analysis_proxy"),
+                        video_path,
+                        proxy_height,
+                    )
                 else:
                     fut = self._executor.submit(generator.ensure_proxy, video_path)
 
@@ -491,16 +555,24 @@ class MontageBuilder:
 
         if self.settings.features.voice_isolation:
             # Replicate music selection logic to start async job
-            music_files = self._get_files(self.ctx.paths.music_dir, self.settings.file_types.audio_extensions)
+            music_files = self._get_files(
+                self.ctx.paths.music_dir, self.settings.file_types.audio_extensions
+            )
             if music_files:
                 music_index = (self.variant_id - 1) % len(music_files)
                 music_path = music_files[music_index]
-                
+
                 # Check for override
-                if self.ctx.creative.editing_instructions and self.ctx.creative.editing_instructions.music_track:
+                if (
+                    self.ctx.creative.editing_instructions
+                    and self.ctx.creative.editing_instructions.music_track
+                ):
                     requested_track = self.ctx.creative.editing_instructions.music_track
                     for mf in music_files:
-                        if mf == requested_track or os.path.basename(mf) == requested_track:
+                        if (
+                            mf == requested_track
+                            or os.path.basename(mf) == requested_track
+                        ):
                             music_path = mf
                             break
 
@@ -518,19 +590,37 @@ class MontageBuilder:
         # Emit scene-detection telemetry (best-effort)
         try:
             from montage_ai import telemetry
-            telemetry.record_event("scene_detection", {"duration_s": round(t_scene_dur, 3), "scene_count": len(self.ctx.features.detected_scenes) if self.ctx.features.detected_scenes else 0})
+
+            telemetry.record_event(
+                "scene_detection",
+                {
+                    "duration_s": round(t_scene_dur, 3),
+                    "scene_count": len(self.ctx.features.detected_scenes)
+                    if self.ctx.features.detected_scenes
+                    else 0,
+                },
+            )
         except Exception:
             pass
 
         # Persist phase timestamp to job store (best-effort)
         try:
             from montage_ai.core.job_store import JobStore
+
             js = JobStore()
-            js.update_job_with_retry(self.ctx.job_id, {"phase_timestamps": {"scene_detection": datetime.now().isoformat()}}, retries=3)
+            js.update_job_with_retry(
+                self.ctx.job_id,
+                {"phase_timestamps": {"scene_detection": datetime.now().isoformat()}},
+                retries=3,
+            )
         except Exception:
             pass
         # Log scene detection completion
-        scene_count = len(self.ctx.features.detected_scenes) if self.ctx.features.detected_scenes else 0
+        scene_count = (
+            len(self.ctx.features.detected_scenes)
+            if self.ctx.features.detected_scenes
+            else 0
+        )
         self.progress.scene_detection_complete(scenes=scene_count)
         self.progress.metadata_extraction_start(total_scenes=scene_count)
 
@@ -542,7 +632,9 @@ class MontageBuilder:
                 logger.info(f"   ✅ Voice isolation completed")
             except Exception as e:
                 if self.settings.features.strict_cloud_compute:
-                    raise RuntimeError(f"Strict cloud compute enabled: Voice isolation async failed: {e}") from e
+                    raise RuntimeError(
+                        f"Strict cloud compute enabled: Voice isolation async failed: {e}"
+                    ) from e
                 logger.warning(f"   ⚠️ Voice isolation async failed: {e}")
                 isolated_audio_path = None
 
@@ -560,14 +652,17 @@ class MontageBuilder:
         logger.info("   🌳 Building scene similarity index (K-D tree)...")
         try:
             from ..scene_analysis import SceneSimilarityIndex
+
             similarity_index = SceneSimilarityIndex()
             similarity_index.build(self.ctx.media.all_scenes)
-            
+
             # Store in context for clip selection engine to use
             self.ctx.media.similarity_index = similarity_index
-            
+
             if similarity_index.enabled:
-                logger.info(f"   ✅ K-D tree index built (O(log n) similarity queries enabled)")
+                logger.info(
+                    f"   ✅ K-D tree index built (O(log n) similarity queries enabled)"
+                )
             else:
                 logger.info(f"   ⚠️ K-D tree unavailable, using O(n) linear search")
         except Exception as e:
@@ -575,7 +670,7 @@ class MontageBuilder:
             self.ctx.media.similarity_index = None
 
         # Wait for proxies (capture per-file durations and emit telemetry)
-        if 'proxy_submissions' in locals() and proxy_submissions:
+        if "proxy_submissions" in locals() and proxy_submissions:
             logger.info("   ⏳ Waiting for proxy generation to complete...")
             completed = 0
             durations = []
@@ -588,7 +683,12 @@ class MontageBuilder:
                     # Emit telemetry per-file (best-effort)
                     try:
                         from montage_ai import telemetry
-                        evt = {"file": os.path.basename(video_path), "duration_s": round(dur, 3), "proxy_created": bool(result)}
+
+                        evt = {
+                            "file": os.path.basename(video_path),
+                            "duration_s": round(dur, 3),
+                            "proxy_created": bool(result),
+                        }
                         telemetry.record_event("proxy_generation", evt)
                     except Exception:
                         pass
@@ -596,8 +696,17 @@ class MontageBuilder:
                     # Persist phase timestamp to job store (best-effort)
                     try:
                         from montage_ai.core.job_store import JobStore
+
                         js = JobStore()
-                        js.update_job_with_retry(self.ctx.job_id, {"phase_timestamps": {"proxy_ready": (datetime.now().isoformat())}}, retries=3)
+                        js.update_job_with_retry(
+                            self.ctx.job_id,
+                            {
+                                "phase_timestamps": {
+                                    "proxy_ready": (datetime.now().isoformat())
+                                }
+                            },
+                            retries=3,
+                        )
                     except Exception:
                         pass
 
@@ -613,28 +722,36 @@ class MontageBuilder:
 
         # Restore any context mutated by preview fast-path
         try:
-            if 'original_video_files' in locals() and original_video_files is not None:
+            if "original_video_files" in locals() and original_video_files is not None:
                 self.ctx.media.video_files = original_video_files
-                logger.info("   🔁 Restored original media file list after preview fast-path")
+                logger.info(
+                    "   🔁 Restored original media file list after preview fast-path"
+                )
         except Exception:
-            logger.warning("   ⚠️ Failed to restore original media file list (non-fatal)")
+            logger.warning(
+                "   ⚠️ Failed to restore original media file list (non-fatal)"
+            )
 
         self.progress.metadata_extraction_complete()
 
     def _setup_output_paths(self, style_name: str):
         """Determine output filename and logo path."""
         # Sanitize style name
-        style_label = "".join(c for c in style_name if c.isalnum() or c in ('-', '_')).strip()
+        style_label = "".join(
+            c for c in style_name if c.isalnum() or c in ("-", "_")
+        ).strip()
         if not style_label:
             style_label = "dynamic"
 
         self.ctx.render.output_filename = os.path.join(
             str(self.ctx.paths.output_dir),
-            f"gallery_montage_{self.ctx.job_id}_v{self.variant_id}_{style_label}.mp4"
+            f"gallery_montage_{self.ctx.job_id}_v{self.variant_id}_{style_label}.mp4",
         )
 
         # Check for logo
-        logo_files = self._get_files(self.ctx.paths.assets_dir, self.settings.file_types.image_extensions)
+        logo_files = self._get_files(
+            self.ctx.paths.assets_dir, self.settings.file_types.image_extensions
+        )
         self.ctx.render.logo_path = self._select_logo_file(logo_files)
 
     def plan_montage(self):
@@ -654,8 +771,11 @@ class MontageBuilder:
             return
 
         # Generate B-Roll plan if script is available
-        if self.ctx.creative.editing_instructions and self.ctx.creative.editing_instructions.script:
-             self._plan_broll_sequence()
+        if (
+            self.ctx.creative.editing_instructions
+            and self.ctx.creative.editing_instructions.script
+        ):
+            self._plan_broll_sequence()
 
         # Initialize audio and pacing
         self._pacing_engine.init_audio_duration()
@@ -674,8 +794,12 @@ class MontageBuilder:
         # Determine output filename
         style_name = "dynamic"
         if self.ctx.creative.editing_instructions is not None:
-             style_name = self.ctx.creative.editing_instructions.style.name if self.ctx.creative.editing_instructions.style else "dynamic"
-        
+            style_name = (
+                self.ctx.creative.editing_instructions.style.name
+                if self.ctx.creative.editing_instructions.style
+                else "dynamic"
+            )
+
         # Load style params
         try:
             template = get_style_template(style_name)
@@ -704,6 +828,7 @@ class MontageBuilder:
         # Initialize ClipEnhancer if needed
         if self._clip_enhancer is None:
             from ..clip_enhancement import ClipEnhancer
+
             self._clip_enhancer = ClipEnhancer(self.settings)
 
         # Enhancement happens during timeline assembly
@@ -741,13 +866,17 @@ class MontageBuilder:
                 max_size_mb = 0
 
             # Threshold: 4x the preview fast-path limit (configurable via env)
-            preview_limit = int(getattr(self.settings.processing, "preview_max_input_size_mb", 200))
+            preview_limit = int(
+                getattr(self.settings.processing, "preview_max_input_size_mb", 200)
+            )
             threshold_mb = max(1024, preview_limit * 4)
 
-            if (not self.settings.stabilization.cluster_mode) and max_size_mb > threshold_mb:
+            if (
+                not self.settings.stabilization.cluster_mode
+            ) and max_size_mb > threshold_mb:
                 raise RuntimeError(
                     f"Refusing to run local encode for large input ({int(max_size_mb)} MB) "
-                    f"with cluster-mode disabled.\n" 
+                    f"with cluster-mode disabled.\n"
                     f"Immediate options: 1) Enable cluster offload (export CLUSTER_MODE=true) 2) Reduce input size or generate a proxy 3) Lower PREVIEW_MAX_INPUT_SIZE_MB to a temporary value.\n"
                     f"See docs/CLI_REFERENCE.md and deploy/config.env for developer-safe defaults."
                 )
@@ -787,14 +916,16 @@ class MontageBuilder:
         # Cleanup via engine
         self._render_engine.cleanup()
         if self._progressive_renderer:
-             # Just in case engine didn't catch it
-             pass
+            # Just in case engine didn't catch it
+            pass
 
         # Cleanup temp directory
         temp_dir = str(self.ctx.paths.temp_dir)
         if os.path.isdir(temp_dir):
             for f in os.listdir(temp_dir):
-                if f.startswith(f"clip_{self.ctx.job_id}") or f.startswith("temp_clip_"):
+                if f.startswith(f"clip_{self.ctx.job_id}") or f.startswith(
+                    "temp_clip_"
+                ):
                     try:
                         fpath = os.path.join(temp_dir, f)
                         size = os.path.getsize(fpath) / (1024 * 1024)
@@ -804,7 +935,9 @@ class MontageBuilder:
                     except Exception:
                         pass
 
-        logger.info(f"   ✅ Deleted {cleanup_count} temp files ({cleanup_size_mb:.1f} MB freed)")
+        logger.info(
+            f"   ✅ Deleted {cleanup_count} temp files ({cleanup_size_mb:.1f} MB freed)"
+        )
 
         if self.settings.processing.force_gc:
             gc.collect()
@@ -818,7 +951,7 @@ class MontageBuilder:
         if self.ctx.creative.editing_instructions is None:
             return
 
-        effects = getattr(self.ctx.creative.editing_instructions, 'effects', {})
+        effects = getattr(self.ctx.creative.editing_instructions, "effects", {})
 
         # ENV takes precedence over style template
         env_stabilize = self.settings.features.stabilize
@@ -827,38 +960,40 @@ class MontageBuilder:
 
         # Force disable heavy features in Preview Mode
         if self.settings.encoding.quality_profile == "preview":
-            logger.info("   ⚡ Preview Mode: Disabling stabilization, upscale, and enhancement")
+            logger.info(
+                "   ⚡ Preview Mode: Disabling stabilization, upscale, and enhancement"
+            )
             self.ctx.features.stabilize = False
             self.ctx.features.upscale = False
             self.ctx.features.enhance = False
         else:
-            if not env_stabilize and 'stabilization' in effects:
-                self.ctx.features.stabilize = effects['stabilization']
+            if not env_stabilize and "stabilization" in effects:
+                self.ctx.features.stabilize = effects["stabilization"]
             else:
                 self.ctx.features.stabilize = env_stabilize
 
-            if not env_upscale and 'upscale' in effects:
-                self.ctx.features.upscale = effects['upscale']
+            if not env_upscale and "upscale" in effects:
+                self.ctx.features.upscale = effects["upscale"]
             else:
                 self.ctx.features.upscale = env_upscale
 
-            if not env_enhance and 'sharpness_boost' in effects:
-                self.ctx.features.enhance = effects['sharpness_boost']
+            if not env_enhance and "sharpness_boost" in effects:
+                self.ctx.features.enhance = effects["sharpness_boost"]
             else:
                 self.ctx.features.enhance = env_enhance
 
         # Parse color_grading from style template (NEW: replaces hardcoded Teal & Orange)
         # ENV takes priority, then style template effects, then default
-        env_color_grade = os.environ.get('COLOR_GRADING', '')
+        env_color_grade = os.environ.get("COLOR_GRADING", "")
         if env_color_grade:
             self.ctx.features.color_grade = env_color_grade
-        elif 'color_grading' in effects:
-            self.ctx.features.color_grade = effects['color_grading']
+        elif "color_grading" in effects:
+            self.ctx.features.color_grade = effects["color_grading"]
         else:
             self.ctx.features.color_grade = "teal_orange"  # Legacy default
 
         # Parse color_intensity (0.0-1.0, defaults to 1.0)
-        env_color_intensity = os.environ.get('COLOR_INTENSITY', '')
+        env_color_intensity = os.environ.get("COLOR_INTENSITY", "")
         if env_color_intensity:
             try:
                 self.ctx.features.color_intensity = float(env_color_intensity)
@@ -868,43 +1003,47 @@ class MontageBuilder:
             self.ctx.features.color_intensity = 1.0
 
         # Parse audio_normalize (loudness normalization to -14 LUFS)
-        env_audio_normalize = os.environ.get('AUDIO_NORMALIZE', 'false').lower() == 'true'
+        env_audio_normalize = (
+            os.environ.get("AUDIO_NORMALIZE", "false").lower() == "true"
+        )
         if env_audio_normalize:
             self.ctx.features.audio_normalize = True
             logger.info("Audio normalization enabled (-14 LUFS target)")
 
         # Parse number of variants to generate
-        env_variants = os.environ.get('NUM_VARIANTS', '1')
+        env_variants = os.environ.get("NUM_VARIANTS", "1")
         try:
             self.ctx.settings.num_variants = int(env_variants)
             if self.ctx.settings.num_variants > 1:
-                logger.info(f"Will generate {self.ctx.settings.num_variants} montage variants")
+                logger.info(
+                    f"Will generate {self.ctx.settings.num_variants} montage variants"
+                )
         except ValueError:
             self.ctx.settings.num_variants = 1
 
         # Extract semantic query for Phase 2: Semantic Storytelling
         # Priority: explicit semantic_query > content_focus > ENV
-        env_semantic = os.environ.get('SEMANTIC_QUERY', '')
-        
+        env_semantic = os.environ.get("SEMANTIC_QUERY", "")
+
         inst = self.ctx.creative.editing_instructions
-        
-        if getattr(inst, 'semantic_query', None):
+
+        if getattr(inst, "semantic_query", None):
             self.ctx.creative.semantic_query = inst.semantic_query
-        elif getattr(inst, 'content_focus', None):
+        elif getattr(inst, "content_focus", None):
             self.ctx.creative.semantic_query = inst.content_focus
         elif inst.style:
             # Combine mood, theme, or content hints
             style_params = inst.style.params
             semantic_parts = []
-            if style_params.get('mood'):
-                semantic_parts.append(style_params['mood'])
-            if style_params.get('theme'):
-                semantic_parts.append(style_params['theme'])
-            if style_params.get('content'):
-                semantic_parts.append(style_params['content'])
+            if style_params.get("mood"):
+                semantic_parts.append(style_params["mood"])
+            if style_params.get("theme"):
+                semantic_parts.append(style_params["theme"])
+            if style_params.get("content"):
+                semantic_parts.append(style_params["content"])
             if semantic_parts:
-                self.ctx.creative.semantic_query = ' '.join(semantic_parts)
-                
+                self.ctx.creative.semantic_query = " ".join(semantic_parts)
+
         if env_semantic and not self.ctx.creative.semantic_query:
             self.ctx.creative.semantic_query = env_semantic
 
@@ -919,9 +1058,12 @@ class MontageBuilder:
         """Initialize monitoring system."""
         try:
             from ..monitoring import get_monitor, init_monitor
+
             self._monitor = get_monitor()
             if self._monitor is None:
-                self._monitor = init_monitor(self.ctx.job_id, self.settings.features.verbose)
+                self._monitor = init_monitor(
+                    self.ctx.job_id, self.settings.features.verbose
+                )
         except ImportError:
             self._monitor = None
 
@@ -929,8 +1071,12 @@ class MontageBuilder:
         """Initialize intelligent clip selector."""
         try:
             from ..clip_selector import IntelligentClipSelector
+
             style = "dynamic"
-            if self.ctx.creative.editing_instructions is not None and self.ctx.creative.editing_instructions.style:
+            if (
+                self.ctx.creative.editing_instructions is not None
+                and self.ctx.creative.editing_instructions.style
+            ):
                 style = self.ctx.creative.editing_instructions.style.name
             self._intelligent_selector = IntelligentClipSelector(style=style)
             logger.info(f"   🧠 Intelligent Clip Selector initialized (style={style})")
@@ -944,21 +1090,19 @@ class MontageBuilder:
         """Load and analyze music file with caching support."""
         # Delegate to new Analyzer engine
         self._analyzer.analyze_music(isolated_audio_path)
-        
+
         # Monitor logging (kept here for now, could move to engine later)
         if self._monitor and self.ctx.media.audio_result:
             self._monitor.log_beat_analysis(
                 self.ctx.media.audio_result.music_path,
                 self.ctx.media.audio_result.tempo,
                 len(self.ctx.media.audio_result.beat_times),
-                self.ctx.media.audio_result.energy_profile
+                self.ctx.media.audio_result.energy_profile,
             )
-
 
     def _apply_noise_reduction(self, audio_path: str) -> str:
         """Deprecated: Use AssetAnalyzer._apply_noise_reduction"""
         return self._analyzer._apply_noise_reduction(audio_path)
-
 
     def _init_footage_pool(self):
         """Initialize footage pool manager."""
@@ -970,7 +1114,6 @@ class MontageBuilder:
             self.ctx.media.all_scenes_dicts,
             strict_once=False,
         )
-
 
     def _get_files(self, directory: Path, extensions: Iterable[str]) -> List[str]:
         """Get files with given extensions from directory."""
@@ -1007,7 +1150,9 @@ class MontageBuilder:
 
     def _get_output_file_size(self) -> float:
         """Get output file size in MB."""
-        if self.ctx.render.output_filename and os.path.exists(self.ctx.render.output_filename):
+        if self.ctx.render.output_filename and os.path.exists(
+            self.ctx.render.output_filename
+        ):
             return os.path.getsize(self.ctx.render.output_filename) / (1024 * 1024)
         return 0.0
 
@@ -1018,7 +1163,9 @@ class MontageBuilder:
             "variant_id": self.variant_id,
             "cut_count": self.ctx.timeline.cut_number,
             "duration": self.ctx.timeline.current_time,
-            "tempo": self.ctx.media.audio_result.tempo if self.ctx.media.audio_result else 0,
+            "tempo": self.ctx.media.audio_result.tempo
+            if self.ctx.media.audio_result
+            else 0,
             "scene_count": len(self.ctx.media.all_scenes),
             "elapsed_time": self.ctx.elapsed_time(),
             "story_engine": self.settings.features.story_engine,
@@ -1028,24 +1175,27 @@ class MontageBuilder:
     # Assembly Loop Helpers
     # =========================================================================
 
-
     def _init_progressive_renderer(self):
         """Initialize progressive renderer if available."""
         self._progressive_renderer = self._render_engine.init_progressive_renderer()
         # memory manager is handled inside engine now, though we expose it if needed
         # self._memory_manager is used in cleanup, let's keep it sync if possible or rely on engine cleanup
         if self._progressive_renderer:
-             self._memory_manager = self._progressive_renderer.memory_manager
+            self._memory_manager = self._progressive_renderer.memory_manager
 
     def _flush_pending_futures(self):
         """Wait for all pending clip processing futures to complete."""
         if not self._pending_futures:
             return
 
-        logger.info(f"   ⏳ Waiting for {len(self._pending_futures)} pending clips to finish processing...")
+        logger.info(
+            f"   ⏳ Waiting for {len(self._pending_futures)} pending clips to finish processing..."
+        )
         while self._pending_futures:
             fut, meta = self._pending_futures.pop(0)
-            self._render_engine.process_completed_task(fut, meta, self.enhancement_tracker)
+            self._render_engine.process_completed_task(
+                fut, meta, self.enhancement_tracker
+            )
 
     def _run_assembly_loop(self):
         """
@@ -1058,18 +1208,23 @@ class MontageBuilder:
 
         # Cut patterns for dynamic pacing
         default_patterns = [
-            [4, 4, 4, 4],       # Steady pace
-            [2, 2, 4, 8],       # Accelerate then hold
-            [8, 4, 2, 2],       # Long shot into fast cuts
-            [1, 1, 2, 3, 5],    # Fibonacci
-            [1.5, 1.5, 5],      # Syncopated
+            [4, 4, 4, 4],  # Steady pace
+            [2, 2, 4, 8],  # Accelerate then hold
+            [8, 4, 2, 2],  # Long shot into fast cuts
+            [1, 1, 2, 3, 5],  # Fibonacci
+            [1.5, 1.5, 5],  # Syncopated
         ]
-        
+
         # Load patterns from style if available
         cut_patterns = default_patterns
-        if self.ctx.creative.style_params and "cut_patterns" in self.ctx.creative.style_params:
+        if (
+            self.ctx.creative.style_params
+            and "cut_patterns" in self.ctx.creative.style_params
+        ):
             cut_patterns = self.ctx.creative.style_params["cut_patterns"]
-            logger.info(f"   🎨 Using {len(cut_patterns)} custom cut patterns from style")
+            logger.info(
+                f"   🎨 Using {len(cut_patterns)} custom cut patterns from style"
+            )
 
         # Get audio data
         beat_times = self.ctx.media.audio_result.beat_times
@@ -1081,21 +1236,30 @@ class MontageBuilder:
         unique_videos = len(set(s.path for s in self.ctx.media.all_scenes))
 
         # Main loop
-        while self.ctx.timeline.current_time < self.ctx.timeline.target_duration and self.ctx.media.all_scenes:
+        while (
+            self.ctx.timeline.current_time < self.ctx.timeline.target_duration
+            and self.ctx.media.all_scenes
+        ):
             # Get current energy
-            current_energy = self._pacing_engine.get_energy_at_time(self.ctx.timeline.current_time)
+            current_energy = self._pacing_engine.get_energy_at_time(
+                self.ctx.timeline.current_time
+            )
 
             # Calculate cut duration
             cut_duration = self._pacing_engine.get_next_cut_duration(current_energy)
-            
+
             # Calculate beats per cut (approx) for beat indexing
             beats_per_cut = cut_duration / (60.0 / tempo) if tempo > 0 else 4.0
 
             # Early exit: prevent overrun beyond target
-            remaining_time = self.ctx.timeline.target_duration - self.ctx.timeline.current_time
+            remaining_time = (
+                self.ctx.timeline.target_duration - self.ctx.timeline.current_time
+            )
             if remaining_time < cut_duration * 0.3:
                 # Less than 30% of a cut remaining - stop here
-                logger.info(f"   🛑 Target reached ({self.ctx.timeline.current_time:.1f}s / {self.ctx.timeline.target_duration:.1f}s)")
+                logger.info(
+                    f"   🛑 Target reached ({self.ctx.timeline.current_time:.1f}s / {self.ctx.timeline.target_duration:.1f}s)"
+                )
                 break
 
             # Trim last cut if it would significantly overshoot
@@ -1104,34 +1268,48 @@ class MontageBuilder:
 
             # Get available footage
             min_dur = cut_duration * 0.5
-            available_footage = self._footage_pool.get_available_clips(min_duration=min_dur)
+            available_footage = self._footage_pool.get_available_clips(
+                min_duration=min_dur
+            )
 
             # SOTA: Robust Edge Case Handler - "Empty Pool Recovery"
             if not available_footage:
                 logger.info("   🔄 Footage pool depleted. Relaxing constraints...")
                 # Try again without duration constraint or by enabling reuse if not already
-                available_footage = self._footage_pool.get_available_clips(min_duration=0.5)
-                if not available_footage and hasattr(self._footage_pool, 'reset_usage'):
+                available_footage = self._footage_pool.get_available_clips(
+                    min_duration=0.5
+                )
+                if not available_footage and hasattr(self._footage_pool, "reset_usage"):
                     logger.info("   🔄 Enabling footage reuse as final fallback.")
-                    self._footage_pool.reset_usage() # Custom method to allow all clips again
-                    available_footage = self._footage_pool.get_available_clips(min_duration=0.5)
+                    self._footage_pool.reset_usage()  # Custom method to allow all clips again
+                    available_footage = self._footage_pool.get_available_clips(
+                        min_duration=0.5
+                    )
 
             if not available_footage:
-                logger.warning("   ⚠️ No more footage available even after relaxation. Stopping.")
+                logger.warning(
+                    "   ⚠️ No more footage available even after relaxation. Stopping."
+                )
                 break
 
             # Score and select clip
             # OPTIMIZATION: Use K-D Tree similarity index if available (O(log n) lookup)
             similarity_fn = None
-            if hasattr(self.ctx.media, 'similarity_index') and self.ctx.media.similarity_index:
+            if (
+                hasattr(self.ctx.media, "similarity_index")
+                and self.ctx.media.similarity_index
+            ):
                 # K-D tree wrapper: find similar scenes in O(log n) time
                 similarity_fn = lambda scene: self._find_similar_scenes_kdtree(scene)
             elif self._scene_provider:
                 # Fallback to provider's method if K-D tree unavailable
                 similarity_fn = self._scene_provider.calculate_similarity
-            
+
             selected_scene, best_score = self._selection_engine.select_clip(
-                available_footage, current_energy, unique_videos, similarity_fn=similarity_fn
+                available_footage,
+                current_energy,
+                unique_videos,
+                similarity_fn=similarity_fn,
             )
 
             if selected_scene is None:
@@ -1142,26 +1320,28 @@ class MontageBuilder:
             # If this scene has been used before, use random selection to ensure variety
             # Otherwise use optical flow to find the "best" moment
             usage_count = 0
-            if hasattr(self, '_footage_pool') and hasattr(self._footage_pool, 'clips'):
+            if hasattr(self, "_footage_pool") and hasattr(self._footage_pool, "clips"):
                 clip_obj = self._footage_pool.clips.get(id(selected_scene))
                 if clip_obj:
                     usage_count = clip_obj.usage_count
 
             if usage_count > 0:
                 # Random selection for variety on reuse
-                max_start = selected_scene['end'] - cut_duration
-                if max_start > selected_scene['start']:
-                    clip_start = random.uniform(selected_scene['start'], max_start)
-                    logger.info(f"   🎲 Reusing scene (count={usage_count}): Random start {clip_start:.1f}s")
+                max_start = selected_scene["end"] - cut_duration
+                if max_start > selected_scene["start"]:
+                    clip_start = random.uniform(selected_scene["start"], max_start)
+                    logger.info(
+                        f"   🎲 Reusing scene (count={usage_count}): Random start {clip_start:.1f}s"
+                    )
                 else:
-                    clip_start = selected_scene['start']
+                    clip_start = selected_scene["start"]
             else:
                 # First use: Find peak action via optical flow
                 clip_start = find_best_start_point(
-                    selected_scene['path'],
-                    selected_scene['start'],
-                    selected_scene['end'],
-                    cut_duration
+                    selected_scene["path"],
+                    selected_scene["start"],
+                    selected_scene["end"],
+                    cut_duration,
                 )
 
             clip_end = clip_start + cut_duration
@@ -1171,7 +1351,7 @@ class MontageBuilder:
                 clip_id=id(selected_scene),
                 timeline_position=self.ctx.timeline.current_time,
                 used_in_point=clip_start,
-                used_out_point=clip_end
+                used_out_point=clip_end,
             )
 
             # Process and add clip to timeline
@@ -1180,9 +1360,11 @@ class MontageBuilder:
             )
 
             # Update state
-            self.ctx.timeline.last_used_path = selected_scene['path']
-            self.ctx.timeline.last_shot_type = selected_scene.get('meta', {}).get('shot', 'medium')
-            self.ctx.timeline.last_tags = selected_scene.get('meta', {}).get('tags', [])
+            self.ctx.timeline.last_used_path = selected_scene["path"]
+            self.ctx.timeline.last_shot_type = selected_scene.get("meta", {}).get(
+                "shot", "medium"
+            )
+            self.ctx.timeline.last_tags = selected_scene.get("meta", {}).get("tags", [])
             self.ctx.timeline.last_clip_end_time = clip_end
 
             self.ctx.timeline.current_time += cut_duration
@@ -1194,14 +1376,16 @@ class MontageBuilder:
                 self._monitor.log_progress(
                     self.ctx.timeline.cut_number,
                     self.ctx.timeline.estimated_total_cuts,
-                    "cuts placed"
+                    "cuts placed",
                 )
 
         # Flush remaining futures
         self._flush_pending_futures()
 
         self.progress.assembly_complete()
-        logger.info(f"   ✅ Assembly complete: {self.ctx.timeline.cut_number} cuts, {self.ctx.timeline.current_time:.1f}s")
+        logger.info(
+            f"   ✅ Assembly complete: {self.ctx.timeline.cut_number} cuts, {self.ctx.timeline.current_time:.1f}s"
+        )
 
     def _process_and_add_clip(
         self,
@@ -1209,29 +1393,31 @@ class MontageBuilder:
         clip_start: float,
         cut_duration: float,
         current_energy: float,
-        selection_score: float
+        selection_score: float,
     ):
         """Submit clip processing task and track metadata."""
-        
+
         # Calculate pattern beat for metadata
         pattern_beat = 4
         if self.ctx.timeline.current_pattern:
-             # pattern_idx was incremented in loop? No, beat_idx was. 
-             # Actually timeline.current_pattern logic is slightly opaque here.
-             # Assuming standard 4 if not available.
-             # The original code accessed pattern_idx - 1, implying it was updated.
-             # But pattern updating logic isn't visible in the snippet.
-             # Let's trust the context or just pass 4 if unsure.
-             # Actually, let's look at how beats_per_cut was calculated in loop.
-             pass
+            # pattern_idx was incremented in loop? No, beat_idx was.
+            # Actually timeline.current_pattern logic is slightly opaque here.
+            # Assuming standard 4 if not available.
+            # The original code accessed pattern_idx - 1, implying it was updated.
+            # But pattern updating logic isn't visible in the snippet.
+            # Let's trust the context or just pass 4 if unsure.
+            # Actually, let's look at how beats_per_cut was calculated in loop.
+            pass
 
         # We need to pass the current pattern beat if we want to match original behavior exactly for metadata.
         # Original: self.ctx.timeline.current_pattern[self.ctx.timeline.pattern_idx - 1] if ...
-        
+
         current_pattern_val = 4
         if self.ctx.timeline.current_pattern and self.ctx.timeline.pattern_idx > 0:
-             idx = (self.ctx.timeline.pattern_idx - 1) % len(self.ctx.timeline.current_pattern)
-             current_pattern_val = self.ctx.timeline.current_pattern[idx]
+            idx = (self.ctx.timeline.pattern_idx - 1) % len(
+                self.ctx.timeline.current_pattern
+            )
+            current_pattern_val = self.ctx.timeline.current_pattern[idx]
 
         # Submit via Render Engine
         future, clip_meta = self._render_engine.submit_clip_task(
@@ -1241,29 +1427,29 @@ class MontageBuilder:
             current_energy=current_energy,
             selection_score=selection_score,
             beat_idx=self.ctx.timeline.beat_idx,
-            beats_per_cut=0, # Let engine decide or reuse pattern val? 
-                             # The engine uses "beats_per_cut if beats_per_cut else current_pattern_beat".
-                             # So I pass 0 here and let it use current_pattern_val
+            beats_per_cut=0,  # Let engine decide or reuse pattern val?
+            # The engine uses "beats_per_cut if beats_per_cut else current_pattern_beat".
+            # So I pass 0 here and let it use current_pattern_val
             current_pattern_beat=current_pattern_val,
             executor=self._executor,
             enhancer=self._clip_enhancer,
-            resource_manager=self._resource_manager
+            resource_manager=self._resource_manager,
         )
-        
+
         self.ctx.timeline.clips_metadata.append(clip_meta)
         self._pending_futures.append((future, clip_meta))
-        
+
         # Process completed futures in order to keep memory usage in check
         while self._pending_futures and self._pending_futures[0][0].done():
             fut, meta = self._pending_futures.pop(0)
-            self._render_engine.process_completed_task(fut, meta, self.enhancement_tracker)
-
-
+            self._render_engine.process_completed_task(
+                fut, meta, self.enhancement_tracker
+            )
 
     def export_timeline(self):
         """
         Phase 6: Export timeline to NLE formats (EDL, XML, OTIO, AAF).
-        
+
         Exports to:
         - OTIO (canonical format with full metadata)
         - EDL (CMX 3600 for compatibility)
@@ -1275,27 +1461,33 @@ class MontageBuilder:
             return
 
         logger.info("\n   📝 Exporting timeline to NLE formats...")
-        
+
         # Convert ClipMetadata to format expected by exporter
         clips_data = []
         for clip in self.ctx.timeline.clips_metadata:
-            clips_data.append({
-                'source_path': clip.source_path,
-                'start_time': clip.start_time,
-                'duration': clip.duration,
-                'timeline_start': clip.timeline_start,
-                'metadata': {
-                    'energy': clip.energy,
-                    'action': clip.action,
-                    'shot': clip.shot,
-                    'selection_score': clip.selection_score,
-                    'enhancements': clip.enhancements
-                },
-                'enhancement_decision': clip.enhancement_decision,  # NLE export tracking
-            })
+            clips_data.append(
+                {
+                    "source_path": clip.source_path,
+                    "start_time": clip.start_time,
+                    "duration": clip.duration,
+                    "timeline_start": clip.timeline_start,
+                    "metadata": {
+                        "energy": clip.energy,
+                        "action": clip.action,
+                        "shot": clip.shot,
+                        "selection_score": clip.selection_score,
+                        "enhancements": clip.enhancements,
+                    },
+                    "enhancement_decision": clip.enhancement_decision,  # NLE export tracking
+                }
+            )
 
         # Get audio path safely
-        audio_path = self.ctx.media.audio_result.music_path if self.ctx.media.audio_result else ""
+        audio_path = (
+            self.ctx.media.audio_result.music_path
+            if self.ctx.media.audio_result
+            else ""
+        )
         if not audio_path:
             logger.warning("   ⚠️ No audio path found for export, using placeholder")
             audio_path = "audio_track_missing.mp3"
@@ -1308,8 +1500,11 @@ class MontageBuilder:
                 output_dir=str(self.ctx.paths.output_dir),
                 project_name=f"{self.ctx.job_id}_v{self.variant_id}",
                 generate_proxies=self.settings.features.generate_proxies,
-                resolution=(self.ctx.media.output_profile.width, self.ctx.media.output_profile.height),
-                fps=self.ctx.media.output_profile.fps
+                resolution=(
+                    self.ctx.media.output_profile.width,
+                    self.ctx.media.output_profile.height,
+                ),
+                fps=self.ctx.media.output_profile.fps,
             )
         except Exception as e:
             logger.error(f"   ❌ Timeline export failed: {e}")
@@ -1324,54 +1519,58 @@ class MontageBuilder:
         Invokes the CreativeEvaluator to analyze the proposed timeline.
         """
         from ..creative_evaluator import CreativeEvaluator
+
         evaluator = CreativeEvaluator(
             max_iterations=self.settings.features.creative_loop_max_iterations,
-            timeout=self.settings.llm.timeout
+            timeout=self.settings.llm.timeout,
         )
-        
+
         # Build evaluation context from context
         from .context import MontageResult
+
         temp_result = MontageResult(
             success=True,
             output_path="",
             duration=self.ctx.timeline.current_time,
             cut_count=self.ctx.timeline.cut_number,
-            render_time=0.0
+            render_time=0.0,
         )
-        
+
         # Pull clips from timeline (actual selected scenes)
         return evaluator.evaluate(
             result=temp_result,
-            original_instructions=self.ctx.creative.editing_instructions.model_dump() if self.ctx.creative.editing_instructions else {},
+            original_instructions=self.ctx.creative.editing_instructions.model_dump()
+            if self.ctx.creative.editing_instructions
+            else {},
             clips_metadata=self.ctx.timeline.clips,
             audio_profile=None,
-            iteration=iteration
+            iteration=iteration,
         )
 
     def _apply_evaluator_refinements(self, evaluation: "MontageEvaluation"):
         """Apply adjustments suggested by the evaluator."""
         if not evaluation.adjustments:
             return
-            
-        logger.info(f"   🛠️ Applying {len(evaluation.adjustments)} adjustments back to AI Director...")
+
+        logger.info(
+            f"   🛠️ Applying {len(evaluation.adjustments)} adjustments back to AI Director..."
+        )
         from ..creative_evaluator import CreativeEvaluator
+
         evaluator = CreativeEvaluator()
-        
+
         # Refine current instructions
         if self.ctx.creative.editing_instructions:
             refined_dict = evaluator.refine_instructions(
-                self.ctx.creative.editing_instructions.model_dump(),
-                evaluation
+                self.ctx.creative.editing_instructions.model_dump(), evaluation
             )
             # Re-instantiate model
             from .models import EditingInstructions
+
             self.ctx.creative.editing_instructions = EditingInstructions(**refined_dict)
-            
+
             # Re-apply affects (toggles/params)
             self._apply_creative_director_effects()
-
-
-
 
     # =========================================================================
     # Story Engine Methods (Phase 1)
@@ -1382,9 +1581,9 @@ class MontageBuilder:
         Executes the montage assembly using the Story Engine.
         """
         logger.info("   📖 Story Engine: Assembling narrative...")
-        
+
         # Ensure audio analysis is done
-        if not hasattr(self.ctx, 'audio_result') or self.ctx.media.audio_result is None:
+        if not hasattr(self.ctx, "audio_result") or self.ctx.media.audio_result is None:
             self._analyze_music()
 
         # Initialize duration, transitions, and renderer
@@ -1401,52 +1600,71 @@ class MontageBuilder:
 
         # Determine output filename and logo
         style_name = "dynamic"
-        if self.ctx.creative.editing_instructions and self.ctx.creative.editing_instructions.style:
+        if (
+            self.ctx.creative.editing_instructions
+            and self.ctx.creative.editing_instructions.style
+        ):
             style_name = self.ctx.creative.editing_instructions.style.name
         self._setup_output_paths(style_name)
-        
+
         logger.info(f"   ✅ Generated {len(timeline_events)} cuts based on story arc.")
 
         self._realize_story_plan(timeline_events)
 
     def _realize_story_plan(self, timeline_events: List[Dict[str, Any]]):
         """Converts abstract timeline events into concrete clips."""
-        
-        duration = self.ctx.timeline.target_duration or self.ctx.media.audio_result.duration
-        
+
+        duration = (
+            self.ctx.timeline.target_duration or self.ctx.media.audio_result.duration
+        )
+
         # Determine constraints
         min_clip_duration = None
         max_clip_duration = None
         if self.ctx.creative.editing_instructions:
-            constraints = getattr(self.ctx.creative.editing_instructions, 'constraints', {})
+            constraints = getattr(
+                self.ctx.creative.editing_instructions, "constraints", {}
+            )
             min_clip_duration = coerce_float(constraints.get("min_clip_duration_sec"))
             max_clip_duration = coerce_float(constraints.get("max_clip_duration_sec"))
-            if min_clip_duration is not None and max_clip_duration is not None and min_clip_duration > max_clip_duration:
-                min_clip_duration, max_clip_duration = max_clip_duration, min_clip_duration
+            if (
+                min_clip_duration is not None
+                and max_clip_duration is not None
+                and min_clip_duration > max_clip_duration
+            ):
+                min_clip_duration, max_clip_duration = (
+                    max_clip_duration,
+                    min_clip_duration,
+                )
 
         # Map scenes by source path (fallback to full clip duration if scenes missing)
         scenes_by_path: Dict[str, List[Dict[str, Any]]] = {}
         for scene in self.ctx.media.all_scenes_dicts:
-            scenes_by_path.setdefault(scene['path'], []).append(scene)
-            scene.setdefault('usage_count', 0)
+            scenes_by_path.setdefault(scene["path"], []).append(scene)
+            scene.setdefault("usage_count", 0)
 
         # Ensure we have scenes for all input clips even if detection failed
-        input_clips = self.ctx.media.video_files or self._get_files(self.ctx.paths.input_dir, self.settings.file_types.video_extensions)
+        input_clips = self.ctx.media.video_files or self._get_files(
+            self.ctx.paths.input_dir, self.settings.file_types.video_extensions
+        )
         if input_clips:
             from ..video_metadata import probe_duration
+
             for clip_path in input_clips:
                 if clip_path not in scenes_by_path:
                     clip_duration = probe_duration(clip_path)
                     if clip_duration > 0:
-                        scenes_by_path[clip_path] = [{
-                            "path": clip_path,
-                            "start": 0.0,
-                            "end": clip_duration,
-                            "duration": clip_duration,
-                            "meta": {},
-                            "usage_count": 0,
-                        }]
-                        
+                        scenes_by_path[clip_path] = [
+                            {
+                                "path": clip_path,
+                                "start": 0.0,
+                                "end": clip_duration,
+                                "duration": clip_duration,
+                                "meta": {},
+                                "usage_count": 0,
+                            }
+                        ]
+
         for scenes in scenes_by_path.values():
             self.rng.shuffle(scenes)
 
@@ -1455,12 +1673,12 @@ class MontageBuilder:
 
         # Assemble timeline
         for idx, event in enumerate(timeline_events):
-            start_time = float(event.get('time', 0.0))
+            start_time = float(event.get("time", 0.0))
             if start_time >= duration:
                 break
 
             if idx < len(timeline_events) - 1:
-                end_time = float(timeline_events[idx + 1].get('time', duration))
+                end_time = float(timeline_events[idx + 1].get("time", duration))
             else:
                 end_time = duration
 
@@ -1472,24 +1690,36 @@ class MontageBuilder:
             if cut_duration <= 0:
                 continue
 
-            clip_path = event.get('clip')
+            clip_path = event.get("clip")
             if not clip_path:
                 continue
 
-            candidates = [s for s in scenes_by_path.get(clip_path, []) if s.get('duration', 0.0) >= cut_duration]
+            candidates = [
+                s
+                for s in scenes_by_path.get(clip_path, [])
+                if s.get("duration", 0.0) >= cut_duration
+            ]
             if not candidates:
                 candidates = scenes_by_path.get(clip_path, [])
             if not candidates:
-                logger.warning(f"   ⚠️ Story Engine: No scenes available for {os.path.basename(clip_path)}")
+                logger.warning(
+                    f"   ⚠️ Story Engine: No scenes available for {os.path.basename(clip_path)}"
+                )
                 continue
 
-            min_usage = min(s.get('usage_count', 0) for s in candidates)
-            least_used = [s for s in candidates if s.get('usage_count', 0) == min_usage]
-            scene = self.rng.choice(least_used) if least_used else self.rng.choice(candidates)
+            min_usage = min(s.get("usage_count", 0) for s in candidates)
+            least_used = [s for s in candidates if s.get("usage_count", 0) == min_usage]
+            scene = (
+                self.rng.choice(least_used)
+                if least_used
+                else self.rng.choice(candidates)
+            )
 
-            scene_start = float(scene.get('start', 0.0))
-            scene_end = float(scene.get('end', scene_start + cut_duration))
-            scene_duration = float(scene.get('duration', max(scene_end - scene_start, cut_duration)))
+            scene_start = float(scene.get("start", 0.0))
+            scene_end = float(scene.get("end", scene_start + cut_duration))
+            scene_duration = float(
+                scene.get("duration", max(scene_end - scene_start, cut_duration))
+            )
             if cut_duration > scene_duration:
                 cut_duration = max(0.5, scene_duration)
 
@@ -1501,8 +1731,10 @@ class MontageBuilder:
 
             self.ctx.timeline.current_time = start_time
             self.ctx.timeline.beat_idx = idx
-            current_energy = float(event.get('clip_tension') or event.get('target_tension') or 0.5)
-            selection_score = float(event.get('score', 0.0))
+            current_energy = float(
+                event.get("clip_tension") or event.get("target_tension") or 0.5
+            )
+            selection_score = float(event.get("score", 0.0))
 
             self._process_and_add_clip(
                 scene,
@@ -1512,7 +1744,7 @@ class MontageBuilder:
                 selection_score,
             )
 
-            scene['usage_count'] = scene.get('usage_count', 0) + 1
+            scene["usage_count"] = scene.get("usage_count", 0) + 1
             self.ctx.timeline.cut_number += 1
             self.ctx.timeline.current_time = start_time + cut_duration
 
@@ -1522,25 +1754,30 @@ class MontageBuilder:
     def _find_similar_scenes_kdtree(self, target_scene: Dict[str, Any]) -> float:
         """
         Find similar scenes using K-D Tree index (O(log n) lookup).
-        
+
         Returns a similarity score (0-1) for use in clip selection scoring.
         """
-        if not hasattr(self.ctx.media, 'similarity_index') or not self.ctx.media.similarity_index:
+        if (
+            not hasattr(self.ctx.media, "similarity_index")
+            or not self.ctx.media.similarity_index
+        ):
             return 0.0
-        
+
         try:
             similarity_index = self.ctx.media.similarity_index
-            target_path = target_scene.get('path', '')
-            target_time = target_scene.get('start', 0.0) + (target_scene.get('duration', 1.0) / 2)
-            
+            target_path = target_scene.get("path", "")
+            target_time = target_scene.get("start", 0.0) + (
+                target_scene.get("duration", 1.0) / 2
+            )
+
             # Query K-D tree for similar scenes (O(log n) complexity)
             similar_scenes = similarity_index.find_similar(
-                target_path, 
-                target_time, 
+                target_path,
+                target_time,
                 k=3,  # Get top 3 similar scenes
-                threshold=0.7
+                threshold=0.7,
             )
-            
+
             # Return highest similarity score (clamped to match cutting preferences)
             if similar_scenes:
                 best_similarity, _ = similar_scenes[0]

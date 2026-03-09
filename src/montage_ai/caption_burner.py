@@ -23,10 +23,13 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from .ffmpeg_utils import build_ffmpeg_cmd
+from .ffmpeg_config import STANDARD_CRF
+from .logger import logger
 
 
 class CaptionStyle(Enum):
     """Predefined caption styles for different platforms."""
+
     TIKTOK = "tiktok"
     YOUTUBE = "youtube"
     MINIMAL = "minimal"
@@ -38,8 +41,9 @@ class CaptionStyle(Enum):
 @dataclass
 class CaptionSegment:
     """A single caption segment with timing."""
+
     start: float  # seconds
-    end: float    # seconds
+    end: float  # seconds
     text: str
     words: Optional[List[Dict[str, Any]]] = None  # word-level timing
 
@@ -47,6 +51,7 @@ class CaptionSegment:
 @dataclass
 class StyleConfig:
     """Configuration for caption rendering."""
+
     fontsize: int = 48
     fontcolor: str = "white"
     fontfile: Optional[str] = None  # Use default if None
@@ -59,7 +64,7 @@ class StyleConfig:
     boxcolor: str = "black@0.6"
     boxborderw: int = 10
     x_expr: str = "(w-text_w)/2"  # centered
-    y_expr: str = "h-100"         # near bottom
+    y_expr: str = "h-100"  # near bottom
     line_spacing: int = 10
 
 
@@ -148,21 +153,21 @@ def parse_srt(srt_path: Path) -> List[CaptionSegment]:
         r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*"
         r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*\n"
         r"(.*?)(?=\n\n|\n*$)",
-        re.DOTALL
+        re.DOTALL,
     )
 
     for match in pattern.finditer(content):
         start = (
-            int(match.group(2)) * 3600 +
-            int(match.group(3)) * 60 +
-            int(match.group(4)) +
-            int(match.group(5)) / 1000
+            int(match.group(2)) * 3600
+            + int(match.group(3)) * 60
+            + int(match.group(4))
+            + int(match.group(5)) / 1000
         )
         end = (
-            int(match.group(6)) * 3600 +
-            int(match.group(7)) * 60 +
-            int(match.group(8)) +
-            int(match.group(9)) / 1000
+            int(match.group(6)) * 3600
+            + int(match.group(7)) * 60
+            + int(match.group(8))
+            + int(match.group(9)) / 1000
         )
         text = match.group(10).strip().replace("\n", " ")
 
@@ -193,16 +198,16 @@ def parse_vtt(vtt_path: Path) -> List[CaptionSegment]:
         match = pattern.match(line)
         if match:
             start = (
-                int(match.group(1)) * 3600 +
-                int(match.group(2)) * 60 +
-                int(match.group(3)) +
-                int(match.group(4)) / 1000
+                int(match.group(1)) * 3600
+                + int(match.group(2)) * 60
+                + int(match.group(3))
+                + int(match.group(4)) / 1000
             )
             end = (
-                int(match.group(5)) * 3600 +
-                int(match.group(6)) * 60 +
-                int(match.group(7)) +
-                int(match.group(8)) / 1000
+                int(match.group(5)) * 3600
+                + int(match.group(6)) * 60
+                + int(match.group(7))
+                + int(match.group(8)) / 1000
             )
 
             # Collect text lines until blank line
@@ -246,7 +251,7 @@ def parse_whisper_json(json_path: Path) -> List[CaptionSegment]:
             start=seg["start"],
             end=seg["end"],
             text=seg["text"].strip(),
-            words=seg.get("words")
+            words=seg.get("words"),
         )
         segments.append(segment)
 
@@ -288,7 +293,7 @@ class CaptionBurner:
     def __init__(
         self,
         style: CaptionStyle = CaptionStyle.YOUTUBE,
-        custom_config: Optional[StyleConfig] = None
+        custom_config: Optional[StyleConfig] = None,
     ):
         """
         Initialize caption burner.
@@ -301,9 +306,7 @@ class CaptionBurner:
         self.config = custom_config or STYLE_CONFIGS[style]
 
     def _build_drawtext_filter(
-        self,
-        segment: CaptionSegment,
-        config: StyleConfig
+        self, segment: CaptionSegment, config: StyleConfig
     ) -> str:
         """Build FFmpeg drawtext filter string for a segment."""
         text = escape_ffmpeg_text(segment.text)
@@ -316,7 +319,7 @@ class CaptionBurner:
             f"bordercolor={config.bordercolor}",
             f"x={config.x_expr}",
             f"y={config.y_expr}",
-            f"enable='between(t,{segment.start:.3f},{segment.end:.3f})'"
+            f"enable='between(t,{segment.start:.3f},{segment.end:.3f})'",
         ]
 
         if config.fontfile:
@@ -335,21 +338,19 @@ class CaptionBurner:
         return ":".join(parts)
 
     def _build_karaoke_filters(
-        self,
-        segment: CaptionSegment,
-        config: StyleConfig
+        self, segment: CaptionSegment, config: StyleConfig
     ) -> List[str]:
         """
         Build Karaoke-style word-by-word highlighting filters.
-        
+
         Returns list of drawtext filters - one base layer + one highlight layer per word.
         """
         if not segment.words or len(segment.words) == 0:
             # Fallback to regular caption if no word timing
             return [self._build_drawtext_filter(segment, config)]
-        
+
         filters = []
-        
+
         # Base layer: Full sentence in default color (gray)
         base_text = escape_ffmpeg_text(segment.text)
         base_parts = [
@@ -360,23 +361,23 @@ class CaptionBurner:
             f"bordercolor={config.bordercolor}",
             f"x={config.x_expr}",
             f"y={config.y_expr}",
-            f"enable='between(t,{segment.start:.3f},{segment.end:.3f})'"
+            f"enable='between(t,{segment.start:.3f},{segment.end:.3f})'",
         ]
         filters.append(":".join(base_parts))
-        
+
         # Highlight layer: Each word in highlight color during its timing
         for i, word_data in enumerate(segment.words):
-            word_text = escape_ffmpeg_text(word_data.get('word', '').strip())
+            word_text = escape_ffmpeg_text(word_data.get("word", "").strip())
             if not word_text:
                 continue
-                
-            word_start = word_data.get('start', segment.start)
-            word_end = word_data.get('end', segment.end)
-            
+
+            word_start = word_data.get("start", segment.start)
+            word_end = word_data.get("end", segment.end)
+
             # Calculate word position offset (approximate)
             # This is a simple approach - word appears at same X as full text
             # For perfect positioning, would need to measure text width per word
-            
+
             word_parts = [
                 f"drawtext=text='{word_text}'",
                 f"fontsize={config.fontsize}",
@@ -385,17 +386,17 @@ class CaptionBurner:
                 f"bordercolor={config.bordercolor}",
                 f"x={config.x_expr}",
                 f"y={config.y_expr}",
-                f"enable='between(t,{word_start:.3f},{word_end:.3f})'"
+                f"enable='between(t,{word_start:.3f},{word_end:.3f})'",
             ]
-            
+
             filters.append(":".join(word_parts))
-        
+
         return filters
 
     def _build_filter_chain(self, segments: List[CaptionSegment]) -> str:
         """Build complete FFmpeg filter chain for all segments."""
         filters = []
-        
+
         # Check if Karaoke style (word-by-word)
         if self.style == CaptionStyle.KARAOKE:
             for segment in segments:
@@ -416,7 +417,7 @@ class CaptionBurner:
         output_path: Optional[str] = None,
         codec: str = "libx264",
         crf: int = 23,
-        preset: str = "medium"
+        preset: str = "medium",
     ) -> str:
         """
         Burn captions into video.
@@ -456,14 +457,22 @@ class CaptionBurner:
         # Run FFmpeg
         cmd = build_ffmpeg_cmd(
             [
-                "-hide_banner", "-loglevel", "error",
-                "-i", str(video),
-                "-vf", filter_chain,
-                "-c:v", codec,
-                "-crf", str(crf),
-                "-preset", preset,
-                "-c:a", "copy",
-                output_path
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(video),
+                "-vf",
+                filter_chain,
+                "-c:v",
+                codec,
+                "-crf",
+                str(crf),
+                "-preset",
+                preset,
+                "-c:a",
+                "copy",
+                output_path,
             ]
         )
 
@@ -481,7 +490,7 @@ class CaptionBurner:
         video_path: str,
         srt_path: str,
         output_path: Optional[str] = None,
-        force_style: Optional[str] = None
+        force_style: Optional[str] = None,
     ) -> str:
         """
         Alternative method using FFmpeg's subtitles filter.
@@ -508,17 +517,24 @@ class CaptionBurner:
 
         cmd = build_ffmpeg_cmd(
             [
-                "-hide_banner", "-loglevel", "error",
-                "-i", str(video),
-                "-vf", subtitle_filter,
-                "-c:v", "libx264",
-                "-crf", "23",
-                "-c:a", "copy",
-                output_path
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(video),
+                "-vf",
+                subtitle_filter,
+                "-c:v",
+                "libx264",
+                "-crf",
+                str(STANDARD_CRF),
+                "-c:a",
+                "copy",
+                output_path,
             ]
         )
 
-        print(f"   Burning captions (subtitles filter)...")
+        logger.info("Burning captions (subtitles filter)...")
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode != 0:
@@ -550,11 +566,12 @@ class CaptionBurner:
 # Convenience Functions
 # =============================================================================
 
+
 def burn_captions(
     video_path: str,
     caption_path: str,
     style: str = "youtube",
-    output_path: Optional[str] = None
+    output_path: Optional[str] = None,
 ) -> str:
     """
     Quick caption burning helper.
@@ -581,7 +598,10 @@ def burn_captions(
 def list_caption_styles() -> List[Dict[str, str]]:
     """List available caption styles with descriptions."""
     return [
-        {"name": "tiktok", "description": "Large centered text, social media optimized"},
+        {
+            "name": "tiktok",
+            "description": "Large centered text, social media optimized",
+        },
         {"name": "youtube", "description": "Classic bottom subtitles with background"},
         {"name": "minimal", "description": "Clean, small, unobtrusive text"},
         {"name": "karaoke", "description": "Yellow centered text for karaoke style"},
@@ -601,7 +621,9 @@ if __name__ == "__main__":
         print("Caption Burner - Burn subtitles into video")
         print()
         print("Usage:")
-        print("  python -m montage_ai.caption_burner <video> <captions> [style] [output]")
+        print(
+            "  python -m montage_ai.caption_burner <video> <captions> [style] [output]"
+        )
         print()
         print("Styles:")
         for s in list_caption_styles():
@@ -610,7 +632,9 @@ if __name__ == "__main__":
         print("Examples:")
         print("  python -m montage_ai.caption_burner video.mp4 subs.srt")
         print("  python -m montage_ai.caption_burner video.mp4 subs.srt tiktok")
-        print("  python -m montage_ai.caption_burner video.mp4 whisper.json bold output.mp4")
+        print(
+            "  python -m montage_ai.caption_burner video.mp4 whisper.json bold output.mp4"
+        )
 
     if len(sys.argv) < 3 or sys.argv[1] in ["-h", "--help"]:
         print_usage()

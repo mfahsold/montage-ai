@@ -52,6 +52,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import yaml
+
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
@@ -60,6 +61,7 @@ try:
     from kubernetes import client as k8s_client
     from kubernetes import config as k8s_config
     from kubernetes.client.rest import ApiException as K8sApiException
+
     K8S_CLIENT_AVAILABLE = True
 except ImportError:
     K8S_CLIENT_AVAILABLE = False
@@ -67,7 +69,10 @@ except ImportError:
 try:
     from ..cgpu_utils import is_cgpu_available
 except ImportError:
-    def is_cgpu_available(*args, **kwargs): return False
+
+    def is_cgpu_available(*args, **kwargs):
+        return False
+
 
 from ..logger import logger
 
@@ -76,22 +81,25 @@ from ..logger import logger
 # Enums
 # =============================================================================
 
+
 class TaskType(Enum):
     """Task types that can be distributed across the cluster."""
-    GPU_ENCODING = auto()         # Video encoding with GPU acceleration
+
+    GPU_ENCODING = auto()  # Video encoding with GPU acceleration
     CPU_SCENE_DETECTION = auto()  # CPU-intensive scene analysis
-    MEMORY_INTENSIVE = auto()     # 4K/8K processing, large batches
-    PROXY_GENERATION = auto()     # Lightweight proxy creation
-    AUDIO_ANALYSIS = auto()       # Beat detection, audio processing
-    THUMBNAIL_EXTRACTION = auto() # Quick thumbnail generation
-    FINAL_RENDER = auto()         # Final concatenation with effects
-    ML_INFERENCE = auto()         # LLM/VLM-based clip selection
-    CLOUD_UPSCALE = auto()        # Upscaling via cgpu/cloud
+    MEMORY_INTENSIVE = auto()  # 4K/8K processing, large batches
+    PROXY_GENERATION = auto()  # Lightweight proxy creation
+    AUDIO_ANALYSIS = auto()  # Beat detection, audio processing
+    THUMBNAIL_EXTRACTION = auto()  # Quick thumbnail generation
+    FINAL_RENDER = auto()  # Final concatenation with effects
+    ML_INFERENCE = auto()  # LLM/VLM-based clip selection
+    CLOUD_UPSCALE = auto()  # Upscaling via cgpu/cloud
     CLOUD_TRANSCRIPTION = auto()  # Transcription via cgpu/cloud
 
 
 class GPUType(Enum):
     """GPU types with associated encoder info."""
+
     NONE = ("none", None, None)
     AMD_ROCM = ("amd-rocm", "h264_amf", "amf")
     AMD_VAAPI = ("amd-vaapi", "h264_vaapi", "vaapi")
@@ -115,19 +123,22 @@ class GPUType(Enum):
 
 class ClusterMode(Enum):
     """Cluster discovery modes."""
-    LOCAL = "local"       # Single machine, auto-detect hardware
-    K8S = "k8s"          # Kubernetes cluster discovery
-    CONFIG = "config"     # Load from YAML config file
-    AUTO = "auto"        # Auto-detect best mode
+
+    LOCAL = "local"  # Single machine, auto-detect hardware
+    K8S = "k8s"  # Kubernetes cluster discovery
+    CONFIG = "config"  # Load from YAML config file
+    AUTO = "auto"  # Auto-detect best mode
 
 
 # =============================================================================
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class NodeCapability:
     """Hardware capabilities of a single node (local machine or cluster node)."""
+
     name: str
     cpu_cores: int
     memory_gb: float
@@ -189,7 +200,9 @@ class NodeCapability:
         ).lower()
         return "bare" in instance_type or "metal" in instance_type
 
-    def can_handle_task(self, task: TaskType, resolution: Tuple[int, int] = (1920, 1080)) -> bool:
+    def can_handle_task(
+        self, task: TaskType, resolution: Tuple[int, int] = (1920, 1080)
+    ) -> bool:
         """Check if this node can handle a specific task type."""
         pixels = resolution[0] * resolution[1]
         is_4k_plus = pixels >= 8_294_400  # 4K = 3840x2160
@@ -232,7 +245,9 @@ class NodeCapability:
 
         return True
 
-    def get_priority_for_task(self, task: TaskType, resolution: Tuple[int, int] = (1920, 1080)) -> int:
+    def get_priority_for_task(
+        self, task: TaskType, resolution: Tuple[int, int] = (1920, 1080)
+    ) -> int:
         """Get priority score for this task (higher = better)."""
         score = 0
 
@@ -243,7 +258,11 @@ class NodeCapability:
                 score = 80 + int(self.gpu_vram_gb * 4)
             elif self.gpu_type == GPUType.APPLE_VIDEOTOOLBOX:
                 score = 90  # Apple Silicon is very efficient
-            elif self.gpu_type in (GPUType.INTEL_QSV, GPUType.INTEL_VAAPI, GPUType.AMD_VAAPI):
+            elif self.gpu_type in (
+                GPUType.INTEL_QSV,
+                GPUType.INTEL_VAAPI,
+                GPUType.AMD_VAAPI,
+            ):
                 score = 50 + int(self.gpu_vram_gb * 2)
             elif self.gpu_type == GPUType.CGPU:
                 score = 120  # Cloud GPUs are powerful but have latency
@@ -291,7 +310,10 @@ class NodeCapability:
             score += 5
 
         # Prefer bare-metal resources for consistent throughput
-        if task not in (TaskType.CLOUD_UPSCALE, TaskType.CLOUD_TRANSCRIPTION) and self.is_bare_metal:
+        if (
+            task not in (TaskType.CLOUD_UPSCALE, TaskType.CLOUD_TRANSCRIPTION)
+            and self.is_bare_metal
+        ):
             score += 8
 
         # Apply benchmark multiplier (higher = faster)
@@ -349,11 +371,13 @@ class NodeCapability:
 # Hardware Detection (Local Machine)
 # =============================================================================
 
+
 def _get_cpu_count() -> int:
     """Get number of CPU cores."""
     try:
         # Prefer physical cores over logical
         import multiprocessing
+
         return multiprocessing.cpu_count()
     except Exception:
         return os.cpu_count() or 1
@@ -374,13 +398,16 @@ def _get_memory_gb() -> float:
         if platform.system() == "Darwin":
             result = subprocess.run(
                 ["sysctl", "-n", "hw.memsize"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 return int(result.stdout.strip()) / 1024 / 1024 / 1024
 
         # Fallback
         import psutil
+
         return psutil.virtual_memory().total / 1024 / 1024 / 1024
     except Exception:
         return 8.0  # Conservative default
@@ -406,8 +433,14 @@ def _detect_nvidia_gpu() -> Optional[Tuple[GPUType, float, str]]:
 
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5
+            [
+                "nvidia-smi",
+                "--query-gpu=name,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
             line = result.stdout.strip().split("\n")[0]
@@ -434,7 +467,9 @@ def _detect_amd_gpu() -> Optional[Tuple[GPUType, float, str]]:
     try:
         result = subprocess.run(
             ["rocm-smi", "--showmeminfo", "vram", "--json"],
-            capture_output=True, text=True, timeout=5
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             data = json.loads(result.stdout)
@@ -445,7 +480,9 @@ def _detect_amd_gpu() -> Optional[Tuple[GPUType, float, str]]:
                 # Get GPU name
                 name_result = subprocess.run(
                     ["rocm-smi", "--showproductname", "--json"],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 name = "AMD GPU"
                 if name_result.returncode == 0:
@@ -458,10 +495,7 @@ def _detect_amd_gpu() -> Optional[Tuple[GPUType, float, str]]:
 
     # Fallback to VAAPI detection for AMD
     try:
-        result = subprocess.run(
-            ["vainfo"],
-            capture_output=True, text=True, timeout=5
-        )
+        result = subprocess.run(["vainfo"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0 and "AMD" in result.stdout.upper():
             return (GPUType.AMD_VAAPI, 0.0, "AMD GPU (VAAPI)")
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -477,17 +511,16 @@ def _detect_intel_gpu() -> Optional[Tuple[GPUType, float, str]]:
 
     # Check for Intel QSV
     try:
-        result = subprocess.run(
-            ["vainfo"],
-            capture_output=True, text=True, timeout=5
-        )
+        result = subprocess.run(["vainfo"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             output = result.stdout.upper()
             if "INTEL" in output or "I965" in output or "IRIX" in output:
                 # Try to detect QSV support
                 ffmpeg_result = subprocess.run(
                     ["ffmpeg", "-hide_banner", "-encoders"],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 if ffmpeg_result.returncode == 0 and "h264_qsv" in ffmpeg_result.stdout:
                     return (GPUType.INTEL_QSV, 0.0, "Intel QSV")
@@ -510,15 +543,23 @@ def _detect_apple_gpu() -> Optional[Tuple[GPUType, float, str]]:
         # Check for VideoToolbox encoder support
         result = subprocess.run(
             ["ffmpeg", "-hide_banner", "-encoders"],
-            capture_output=True, text=True, timeout=5
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and "h264_videotoolbox" in result.stdout:
             # Get chip name
             chip_result = subprocess.run(
                 ["sysctl", "-n", "machdep.cpu.brand_string"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
-            chip_name = chip_result.stdout.strip() if chip_result.returncode == 0 else "Apple Silicon"
+            chip_name = (
+                chip_result.stdout.strip()
+                if chip_result.returncode == 0
+                else "Apple Silicon"
+            )
             return (GPUType.APPLE_VIDEOTOOLBOX, 0.0, chip_name)
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
@@ -544,7 +585,13 @@ def _detect_cgpu() -> Optional[Tuple[GPUType, float, str]]:
 def _detect_gpu() -> Tuple[GPUType, float, str]:
     """Detect best available GPU."""
     # Try each GPU type in priority order
-    for detector in [_detect_nvidia_gpu, _detect_amd_gpu, _detect_intel_gpu, _detect_apple_gpu, _detect_cgpu]:
+    for detector in [
+        _detect_nvidia_gpu,
+        _detect_amd_gpu,
+        _detect_intel_gpu,
+        _detect_apple_gpu,
+        _detect_cgpu,
+    ]:
         result = detector()
         if result:
             return result
@@ -585,6 +632,7 @@ def detect_local_hardware() -> NodeCapability:
 # Kubernetes Discovery
 # =============================================================================
 
+
 def _is_k8s_available() -> bool:
     """Check if Kubernetes is available via in-cluster config or kubectl."""
     if K8S_CLIENT_AVAILABLE and os.environ.get("KUBERNETES_SERVICE_HOST"):
@@ -600,7 +648,8 @@ def _is_k8s_available() -> bool:
     try:
         result = subprocess.run(
             ["kubectl", "cluster-info", "--request-timeout=3s"],
-            capture_output=True, timeout=5
+            capture_output=True,
+            timeout=5,
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -630,7 +679,9 @@ def _discover_k8s_nodes() -> List[NodeCapability]:
     try:
         result = subprocess.run(
             ["kubectl", "get", "nodes", "-o", "json"],
-            capture_output=True, text=True, timeout=30
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode != 0:
             logger.warning("Failed to get K8s nodes")
@@ -681,9 +732,10 @@ def _parse_k8s_node(item: Dict[str, Any]) -> Optional[NodeCapability]:
 
         # Check if control plane
         is_control_plane = any(
-            key in labels for key in [
+            key in labels
+            for key in [
                 "node-role.kubernetes.io/control-plane",
-                "node-role.kubernetes.io/master"
+                "node-role.kubernetes.io/master",
             ]
         )
 
@@ -730,9 +782,9 @@ def _parse_k8s_memory(mem_str: str) -> float:
     unit = (match.group(2) or "").upper()
 
     multipliers = {
-        "": 1 / (1024 ** 3),  # bytes to GB
-        "K": 1 / (1024 ** 2),
-        "KI": 1 / (1024 ** 2),
+        "": 1 / (1024**3),  # bytes to GB
+        "K": 1 / (1024**2),
+        "KI": 1 / (1024**2),
         "M": 1 / 1024,
         "MI": 1 / 1024,
         "G": 1,
@@ -741,7 +793,7 @@ def _parse_k8s_memory(mem_str: str) -> float:
         "TI": 1024,
     }
 
-    return value * multipliers.get(unit, 1 / (1024 ** 3))
+    return value * multipliers.get(unit, 1 / (1024**3))
 
 
 def _parse_k8s_benchmark_score(labels: Dict[str, str]) -> float:
@@ -762,13 +814,18 @@ def _parse_k8s_benchmark_score(labels: Dict[str, str]) -> float:
     return 1.0
 
 
-def _detect_k8s_gpu(labels: Dict[str, str], capacity: Dict[str, str]) -> Tuple[GPUType, float]:
+def _detect_k8s_gpu(
+    labels: Dict[str, str], capacity: Dict[str, str]
+) -> Tuple[GPUType, float]:
     """Detect GPU type from K8s node labels and capacity."""
     # Check for NVIDIA GPU
     nvidia_gpu = capacity.get("nvidia.com/gpu", "0")
     if nvidia_gpu != "0":
         # Check for Tegra/Jetson
-        if labels.get("accelerator") == "nvidia-tegra" or "jetson" in labels.get("node.kubernetes.io/instance-type", "").lower():
+        if (
+            labels.get("accelerator") == "nvidia-tegra"
+            or "jetson" in labels.get("node.kubernetes.io/instance-type", "").lower()
+        ):
             return (GPUType.NVIDIA_TEGRA, 8.0)  # Assume 8GB shared
         return (GPUType.NVIDIA_NVENC, 0.0)
 
@@ -793,6 +850,7 @@ def _detect_k8s_gpu(labels: Dict[str, str], capacity: Dict[str, str]) -> Tuple[G
 # =============================================================================
 # Configuration File Loading
 # =============================================================================
+
 
 def _load_config_file(config_path: str) -> List[NodeCapability]:
     """Load cluster configuration from YAML file."""
@@ -826,6 +884,7 @@ def _load_config_file(config_path: str) -> List[NodeCapability]:
 # Cluster Manager
 # =============================================================================
 
+
 class ClusterManager:
     """
     Manages cluster node capabilities and task routing.
@@ -853,7 +912,11 @@ class ClusterManager:
         # Read from environment if not specified
         if mode is None:
             mode_str = os.environ.get("MONTAGE_CLUSTER_MODE", "auto").lower()
-            mode = ClusterMode(mode_str) if mode_str in [m.value for m in ClusterMode] else ClusterMode.AUTO
+            mode = (
+                ClusterMode(mode_str)
+                if mode_str in [m.value for m in ClusterMode]
+                else ClusterMode.AUTO
+            )
 
         if config_path is None:
             config_path = os.environ.get("MONTAGE_CLUSTER_CONFIG")
@@ -926,7 +989,7 @@ class ClusterManager:
                     gpu_vram_gb=16.0,
                     gpu_name="Google Colab T4/A100",
                     labels={"tier": "cloud", "purpose": "acceleration"},
-                    address="colab.google.com"
+                    address="colab.google.com",
                 )
                 self._nodes[node.name] = node
                 logger.info("Added virtual cloud-cgpu node to cluster")
@@ -976,7 +1039,7 @@ class ClusterManager:
         self,
         task: TaskType,
         resolution: Tuple[int, int] = (1920, 1080),
-        max_nodes: Optional[int] = None
+        max_nodes: Optional[int] = None,
     ) -> List[NodeCapability]:
         """
         Get nodes capable of handling a task, sorted by priority.
@@ -989,10 +1052,7 @@ class ClusterManager:
         Returns:
             List of capable nodes, highest priority first
         """
-        capable = [
-            n for n in self.nodes
-            if n.can_handle_task(task, resolution)
-        ]
+        capable = [n for n in self.nodes if n.can_handle_task(task, resolution)]
 
         if self._is_bare_metal_only_mode(task):
             bare_nodes = [n for n in capable if n.is_bare_metal]
@@ -1006,8 +1066,7 @@ class ClusterManager:
 
         # Sort by priority (descending)
         capable.sort(
-            key=lambda n: n.get_priority_for_task(task, resolution),
-            reverse=True
+            key=lambda n: n.get_priority_for_task(task, resolution), reverse=True
         )
 
         if max_nodes:
@@ -1022,19 +1081,14 @@ class ClusterManager:
         return value in ("1", "true", "yes", "on")
 
     def get_best_node_for_task(
-        self,
-        task: TaskType,
-        resolution: Tuple[int, int] = (1920, 1080)
+        self, task: TaskType, resolution: Tuple[int, int] = (1920, 1080)
     ) -> Optional[NodeCapability]:
         """Get the single best node for a task."""
         nodes = self.get_nodes_for_task(task, resolution, max_nodes=1)
         return nodes[0] if nodes else None
 
     def get_parallel_distribution(
-        self,
-        task: TaskType,
-        num_items: int,
-        resolution: Tuple[int, int] = (1920, 1080)
+        self, task: TaskType, num_items: int, resolution: Tuple[int, int] = (1920, 1080)
     ) -> Dict[str, List[int]]:
         """
         Distribute items across capable nodes for parallel processing.
@@ -1085,38 +1139,44 @@ class ClusterManager:
         mode_name = self.mode.value.upper()
         title = f"CLUSTER SUMMARY ({mode_name} MODE)"
 
-        print("\n" + "=" * 70)
-        print(title)
-        print("=" * 70)
+        logger.info("=" * 70)
+        logger.info(title)
+        logger.info("=" * 70)
 
-        print(f"\nTotal Resources:")
-        print(f"  Worker Nodes: {len(self.nodes)}")
-        print(f"  Total CPU:    {self.total_cpu_cores} cores")
-        print(f"  Total RAM:    {self.total_memory_gb:.1f} GB")
-        print(f"  GPU Nodes:    {len(self.gpu_nodes)}")
+        logger.info(f"Total Resources:")
+        logger.info(f"  Worker Nodes: {len(self.nodes)}")
+        logger.info(f"  Total CPU:    {self.total_cpu_cores} cores")
+        logger.info(f"  Total RAM:    {self.total_memory_gb:.1f} GB")
+        logger.info(f"  GPU Nodes:    {len(self.gpu_nodes)}")
 
         if self.nodes:
-            print(f"\nNodes:")
+            logger.info(f"Nodes:")
             for node in sorted(self.nodes, key=lambda n: n.name):
                 gpu_info = f" | GPU: {node.gpu_type.value}" if node.is_gpu_node else ""
                 local_tag = " [LOCAL]" if node.is_local else ""
-                print(f"  {node.name}: {node.cpu_cores} CPU, {node.memory_gb:.1f}GB{gpu_info}{local_tag}")
+                logger.info(
+                    f"  {node.name}: {node.cpu_cores} CPU, {node.memory_gb:.1f}GB{gpu_info}{local_tag}"
+                )
 
-        print(f"\nTask Routing Preview:")
-        for task in [TaskType.GPU_ENCODING, TaskType.CPU_SCENE_DETECTION, TaskType.MEMORY_INTENSIVE]:
+        logger.info(f"Task Routing Preview:")
+        for task in [
+            TaskType.GPU_ENCODING,
+            TaskType.CPU_SCENE_DETECTION,
+            TaskType.MEMORY_INTENSIVE,
+        ]:
             best = self.get_best_node_for_task(task, resolution=(1920, 1080))
             if best:
-                print(f"  {task.name}: {best.name}")
+                logger.info(f"  {task.name}: {best.name}")
             else:
-                print(f"  {task.name}: No capable node")
+                logger.info(f"  {task.name}: No capable node")
 
-        print("=" * 70 + "\n")
+        logger.info("=" * 70)
 
     def to_dict(self) -> Dict[str, Any]:
         """Export cluster configuration as dictionary."""
         return {
             "mode": self.mode.value,
-            "nodes": [n.to_dict() for n in self._nodes.values()]
+            "nodes": [n.to_dict() for n in self._nodes.values()],
         }
 
     def save_config(self, path: str):
@@ -1141,7 +1201,7 @@ _cluster_manager: Optional[ClusterManager] = None
 def get_cluster_manager(
     mode: Optional[str] = None,
     config_path: Optional[str] = None,
-    force_refresh: bool = False
+    force_refresh: bool = False,
 ) -> ClusterManager:
     """
     Get or create the global ClusterManager instance.
@@ -1228,9 +1288,7 @@ if __name__ == "__main__":
     # Test task distribution
     print("Distribution for 10 videos (Scene Detection):")
     dist = cluster.get_parallel_distribution(
-        TaskType.CPU_SCENE_DETECTION,
-        num_items=10,
-        resolution=(1920, 1080)
+        TaskType.CPU_SCENE_DETECTION, num_items=10, resolution=(1920, 1080)
     )
     for node, items in dist.items():
         print(f"  {node}: {len(items)} items")

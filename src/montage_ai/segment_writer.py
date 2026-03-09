@@ -27,6 +27,7 @@ from .config import get_settings
 from .logger import logger
 from .core.cmd_runner import run_command, CommandError
 from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
+
 # Import centralized FFmpeg config (DRY)
 from .ffmpeg_config import (
     FFmpegConfig,
@@ -41,7 +42,7 @@ from .ffmpeg_config import (
 )
 
 # Default to horizontal (will be overridden by output profile sync)
-STANDARD_WIDTH = STANDARD_WIDTH_HORIZONTAL   # 1920
+STANDARD_WIDTH = STANDARD_WIDTH_HORIZONTAL  # 1920
 STANDARD_HEIGHT = STANDARD_HEIGHT_HORIZONTAL  # 1080
 
 _settings = get_settings()
@@ -65,6 +66,7 @@ def _get_cpu_config() -> FFmpegConfig:
         _ffmpeg_cpu_config = FFmpegConfig(hwaccel="none")
     return _ffmpeg_cpu_config
 
+
 def _moviepy_params(
     config: Optional[FFmpegConfig] = None,
     crf: Optional[int] = None,
@@ -86,6 +88,7 @@ def _moviepy_params(
         pix_fmt_override=target_pix_fmt,
     )
 
+
 def _video_params_for_target(
     config: FFmpegConfig,
     crf: int,
@@ -105,11 +108,13 @@ def _video_params_for_target(
         pix_fmt_override=target_pix_fmt,
     )
 
+
 def _append_hwupload_vf(vf_chain: str, config: FFmpegConfig) -> str:
     """Append hwupload filter if required by the active encoder."""
     if config.hwupload_filter:
         return f"{vf_chain},{config.hwupload_filter}"
     return vf_chain
+
 
 def _append_hwupload_filter_complex(
     filter_complex: str,
@@ -119,7 +124,10 @@ def _append_hwupload_filter_complex(
 ) -> Tuple[str, str]:
     """Append hwupload filter to a filter_complex graph when needed."""
     if config.hwupload_filter:
-        return f"{filter_complex};{input_label}{config.hwupload_filter}{output_label}", output_label
+        return (
+            f"{filter_complex};{input_label}{config.hwupload_filter}{output_label}",
+            output_label,
+        )
     return filter_complex, input_label
 
 
@@ -136,11 +144,15 @@ def _convert_svg_to_png(svg_path: str, temp_dir: Path) -> Optional[str]:
         converters.append(("convert", ["convert", svg_path]))
 
     if not converters:
-        logger.warning("No SVG converter found (rsvg-convert/inkscape/magick). Skipping SVG logo.")
+        logger.warning(
+            "No SVG converter found (rsvg-convert/inkscape/magick). Skipping SVG logo."
+        )
         return None
 
     try:
-        fd, output_path = tempfile.mkstemp(prefix="montage_logo_", suffix=".png", dir=str(temp_dir))
+        fd, output_path = tempfile.mkstemp(
+            prefix="montage_logo_", suffix=".png", dir=str(temp_dir)
+        )
         os.close(fd)
     except OSError as exc:
         logger.warning("Failed to create temp logo output: %s", exc)
@@ -179,6 +191,7 @@ def _convert_svg_to_png(svg_path: str, temp_dir: Path) -> Optional[str]:
 @dataclass
 class StreamParams:
     """Video stream parameters for validation."""
+
     fps: float
     pix_fmt: str
     width: int
@@ -186,15 +199,15 @@ class StreamParams:
     codec: str
     profile: Optional[str] = None
     duration: float = 0.0  # Added for xfade offset calculation
-    
-    def is_compatible_with(self, other: 'StreamParams') -> bool:
+
+    def is_compatible_with(self, other: "StreamParams") -> bool:
         """Check if streams are compatible for concat demuxer."""
         return (
-            abs(self.fps - other.fps) < 0.1 and
-            self.pix_fmt == other.pix_fmt and
-            self.width == other.width and
-            self.height == other.height and
-            self.codec == other.codec
+            abs(self.fps - other.fps) < 0.1
+            and self.pix_fmt == other.pix_fmt
+            and self.width == other.width
+            and self.height == other.height
+            and self.codec == other.codec
         )
 
 
@@ -202,7 +215,9 @@ class StreamParams:
 _stream_params_cache: Dict[str, Tuple[float, StreamParams]] = {}
 
 
-def ffprobe_stream_params(video_path: str, use_cache: bool = True) -> Optional[StreamParams]:
+def ffprobe_stream_params(
+    video_path: str, use_cache: bool = True
+) -> Optional[StreamParams]:
     """
     Get video stream parameters using ffprobe with caching.
 
@@ -229,20 +244,26 @@ def ffprobe_stream_params(video_path: str, use_cache: bool = True) -> Optional[S
             pass  # File may have been deleted, continue with fresh probe
 
     try:
-        cmd = build_ffprobe_cmd([
-            "-v", "quiet",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,r_frame_rate,pix_fmt,codec_name,profile:format=duration",
-            "-of", "json",
-            video_path
-        ])
+        cmd = build_ffprobe_cmd(
+            [
+                "-v",
+                "quiet",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height,r_frame_rate,pix_fmt,codec_name,profile:format=duration",
+                "-of",
+                "json",
+                video_path,
+            ]
+        )
         # Use run_command for consistent logging and error handling
         result = run_command(
             cmd,
             capture_output=True,
             timeout=_settings.processing.ffprobe_timeout,
             check=False,  # We handle returncode manually
-            log_output=False  # Keep logs clean
+            log_output=False,  # Keep logs clean
         )
 
         if result.returncode != 0:
@@ -275,7 +296,7 @@ def ffprobe_stream_params(video_path: str, use_cache: bool = True) -> Optional[S
             height=int(stream.get("height", 0)),
             codec=stream.get("codec_name", "unknown"),
             profile=stream.get("profile"),
-            duration=duration
+            duration=duration,
         )
 
         # Cache the result
@@ -298,16 +319,19 @@ def ffprobe_stream_params(video_path: str, use_cache: bool = True) -> Optional[S
         return None
 
 
-def normalize_clip_ffmpeg(input_path: str, output_path: str,
-                          target_width: int = STANDARD_WIDTH,
-                          target_height: int = STANDARD_HEIGHT,
-                          target_fps: float = STANDARD_FPS,
-                          target_pix_fmt: str = TARGET_PIX_FMT,
-                          target_codec: str = TARGET_CODEC,
-                          target_profile: Optional[str] = TARGET_PROFILE,
-                          target_level: Optional[str] = TARGET_LEVEL,
-                          crf: int = 18,
-                          preset: str = "fast") -> bool:
+def normalize_clip_ffmpeg(
+    input_path: str,
+    output_path: str,
+    target_width: int = STANDARD_WIDTH,
+    target_height: int = STANDARD_HEIGHT,
+    target_fps: float = STANDARD_FPS,
+    target_pix_fmt: str = TARGET_PIX_FMT,
+    target_codec: str = TARGET_CODEC,
+    target_profile: Optional[str] = TARGET_PROFILE,
+    target_level: Optional[str] = TARGET_LEVEL,
+    crf: int = 18,
+    preset: str = "fast",
+) -> bool:
     """
     Normalize a clip to standard parameters for concat compatibility.
 
@@ -352,10 +376,12 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
                 "colorlevels=rimin=0.063:gimin=0.063:bimin=0.063:"
                 "rimax=0.922:gimax=0.922:bimax=0.922"
             )
-        vf_filters.extend([
-            f"fps={target_fps}",
-            f"format={target_pix_fmt}",
-        ])
+        vf_filters.extend(
+            [
+                f"fps={target_fps}",
+                f"format={target_pix_fmt}",
+            ]
+        )
         vf_chain = ",".join(vf_filters)
 
         config = _ffmpeg_config
@@ -369,38 +395,49 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
         cmd = build_ffmpeg_cmd([])
         if config.is_gpu_accelerated:
             cmd.extend(config.hwaccel_input_params())
-        cmd.extend([
-            "-i", input_path,
-            "-vf", vf_chain,
-        ])
-        cmd.extend(_video_params_for_target(
-            config,
-            crf=crf,
-            preset=preset,
-            target_codec=target_codec,
-            target_profile=target_profile,
-            target_level=target_level,
-            target_pix_fmt=target_pix_fmt,
-        ))
-        cmd.extend([
-            "-an",  # No audio (added later)
-            "-movflags", "+faststart",
-            temp_output
-        ])
+        cmd.extend(
+            [
+                "-i",
+                input_path,
+                "-vf",
+                vf_chain,
+            ]
+        )
+        cmd.extend(
+            _video_params_for_target(
+                config,
+                crf=crf,
+                preset=preset,
+                target_codec=target_codec,
+                target_profile=target_profile,
+                target_level=target_level,
+                target_pix_fmt=target_pix_fmt,
+            )
+        )
+        cmd.extend(
+            [
+                "-an",  # No audio (added later)
+                "-movflags",
+                "+faststart",
+                temp_output,
+            ]
+        )
 
         result = run_command(
             cmd,
             capture_output=True,
             timeout=_settings.processing.ffmpeg_long_timeout,
             check=False,
-            log_output=False
+            log_output=False,
         )
-        
+
         if result.returncode == 0:
             os.rename(temp_output, output_path)
             return True
         else:
-            logger.error(f"   ❌ Normalization failed (code {result.returncode}): {result.stderr}")
+            logger.error(
+                f"   ❌ Normalization failed (code {result.returncode}): {result.stderr}"
+            )
             if os.path.exists(temp_output):
                 os.remove(temp_output)
             return False
@@ -408,7 +445,7 @@ def normalize_clip_ffmpeg(input_path: str, output_path: str,
     except Exception as e:
         logger.error(f"   ❌ Normalization failed: {e}")
         # Cleanup temp file if it exists
-        if 'temp_output' in locals() and os.path.exists(temp_output):
+        if "temp_output" in locals() and os.path.exists(temp_output):
             os.remove(temp_output)
         return False
 
@@ -423,7 +460,7 @@ def xfade_multiple_clips_single_pass(
     target_codec: str = TARGET_CODEC,
     target_profile: Optional[str] = TARGET_PROFILE,
     target_level: Optional[str] = TARGET_LEVEL,
-    target_pix_fmt: str = TARGET_PIX_FMT
+    target_pix_fmt: str = TARGET_PIX_FMT,
 ) -> bool:
     """
     PERFORMANCE OPTIMIZATION: Single-pass xfade for N clips.
@@ -450,9 +487,13 @@ def xfade_multiple_clips_single_pass(
     if len(clip_paths) == 2:
         # For 2 clips, use existing optimized function
         return xfade_two_clips(
-            clip_paths[0], clip_paths[1], output_path,
-            xfade_duration=xfade_duration, transition=transition,
-            crf=crf, preset=preset
+            clip_paths[0],
+            clip_paths[1],
+            output_path,
+            xfade_duration=xfade_duration,
+            transition=transition,
+            crf=crf,
+            preset=preset,
         )
 
     try:
@@ -472,13 +513,15 @@ def xfade_multiple_clips_single_pass(
         # [v2][3:v]xfade=transition=fade:duration=0.3:offset=7.4[v3]
 
         filter_parts = []
-        cumulative_duration = durations[0] - xfade_duration  # First clip duration minus xfade overlap
+        cumulative_duration = (
+            durations[0] - xfade_duration
+        )  # First clip duration minus xfade overlap
 
         for i in range(1, len(clip_paths)):
             if i == 1:
                 input_label = "[0:v]"
             else:
-                input_label = f"[v{i-1}]"
+                input_label = f"[v{i - 1}]"
 
             output_label = f"[v{i}]"
             offset = cumulative_duration
@@ -493,7 +536,7 @@ def xfade_multiple_clips_single_pass(
                 cumulative_duration += durations[i] - xfade_duration
 
         filter_complex = ";".join(filter_parts)
-        final_label = f"[v{len(clip_paths)-1}]"
+        final_label = f"[v{len(clip_paths) - 1}]"
 
         # Apply hardware upload if GPU accelerated
         config = _ffmpeg_config
@@ -513,11 +556,17 @@ def xfade_multiple_clips_single_pass(
             cmd.extend(["-i", path])
 
         cmd.extend(["-filter_complex", filter_complex, "-map", out_label])
-        cmd.extend(_video_params_for_target(
-            config, crf=crf, preset=preset,
-            target_codec=target_codec, target_profile=target_profile,
-            target_level=target_level, target_pix_fmt=target_pix_fmt
-        ))
+        cmd.extend(
+            _video_params_for_target(
+                config,
+                crf=crf,
+                preset=preset,
+                target_codec=target_codec,
+                target_profile=target_profile,
+                target_level=target_level,
+                target_pix_fmt=target_pix_fmt,
+            )
+        )
         cmd.extend(["-an", temp_output])
 
         logger.info(f"   🚀 Single-pass xfade for {len(clip_paths)} clips...")
@@ -527,7 +576,7 @@ def xfade_multiple_clips_single_pass(
             capture_output=True,
             timeout=_settings.processing.ffmpeg_long_timeout * len(clip_paths),
             check=False,
-            log_output=False
+            log_output=False,
         )
 
         if result.returncode != 0:
@@ -545,29 +594,33 @@ def xfade_multiple_clips_single_pass(
         return False
 
 
-def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
-                    xfade_duration: float = DEFAULT_XFADE_DURATION,
-                    transition: str = "fade",
-                    crf: int = 18,
-                    preset: str = "fast",
-                    target_codec: str = TARGET_CODEC,
-                    target_profile: Optional[str] = TARGET_PROFILE,
-                    target_level: Optional[str] = TARGET_LEVEL,
-                    target_pix_fmt: str = TARGET_PIX_FMT) -> bool:
+def xfade_two_clips(
+    clip1_path: str,
+    clip2_path: str,
+    output_path: str,
+    xfade_duration: float = DEFAULT_XFADE_DURATION,
+    transition: str = "fade",
+    crf: int = 18,
+    preset: str = "fast",
+    target_codec: str = TARGET_CODEC,
+    target_profile: Optional[str] = TARGET_PROFILE,
+    target_level: Optional[str] = TARGET_LEVEL,
+    target_pix_fmt: str = TARGET_PIX_FMT,
+) -> bool:
     """
     Create a real crossfade between two clips using FFmpeg xfade filter.
-    
+
     This creates an actual overlapping transition, not just fade-in/out.
-    
+
     Args:
         clip1_path: First clip path
-        clip2_path: Second clip path  
+        clip2_path: Second clip path
         output_path: Output path for merged clip
         xfade_duration: Crossfade duration in seconds (default 0.3s)
         transition: Transition type (fade, wipeleft, slideright, etc.)
         crf: Quality setting
         preset: Encoding preset
-        
+
     Returns:
         True if successful
     """
@@ -577,10 +630,10 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
         if not params1 or params1.duration <= 0:
             logger.warning(f"   ⚠️ Could not get duration for {clip1_path}")
             return False
-        
+
         # xfade offset = clip1_duration - xfade_duration
         offset = max(0, params1.duration - xfade_duration)
-        
+
         # Build xfade filter
         # Format: [0:v][1:v]xfade=transition=fade:duration=0.3:offset=2.7[v]
         config = _ffmpeg_config
@@ -589,12 +642,9 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
             f"duration={xfade_duration}:offset={offset}[v]"
         )
         filter_complex, out_label = _append_hwupload_filter_complex(
-            filter_complex,
-            config,
-            "[v]",
-            "[v_hw]"
+            filter_complex, config, "[v]", "[v_hw]"
         )
-        
+
         # Atomic write: write to .tmp first, then rename
         # Fix: preserve extension for ffmpeg format detection
         ext = os.path.splitext(output_path)[1]
@@ -603,48 +653,58 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
         cmd = build_ffmpeg_cmd([])
         if config.is_gpu_accelerated:
             cmd.extend(config.hwaccel_input_params())
-        cmd.extend([
-            "-i", clip1_path,
-            "-i", clip2_path,
-            "-filter_complex", filter_complex,
-            "-map", out_label,
-        ])
+        cmd.extend(
+            [
+                "-i",
+                clip1_path,
+                "-i",
+                clip2_path,
+                "-filter_complex",
+                filter_complex,
+                "-map",
+                out_label,
+            ]
+        )
 
-        cmd.extend(_video_params_for_target(
-            config,
-            crf=crf,
-            preset=preset,
-            target_codec=target_codec,
-            target_profile=target_profile,
-            target_level=target_level,
-            target_pix_fmt=target_pix_fmt,
-        ))
+        cmd.extend(
+            _video_params_for_target(
+                config,
+                crf=crf,
+                preset=preset,
+                target_codec=target_codec,
+                target_profile=target_profile,
+                target_level=target_level,
+                target_pix_fmt=target_pix_fmt,
+            )
+        )
 
-        cmd.extend([
-            "-an",  # No audio - handled separately
-            temp_output
-        ])
-        
+        cmd.extend(
+            [
+                "-an",  # No audio - handled separately
+                temp_output,
+            ]
+        )
+
         result = run_command(
             cmd,
             capture_output=True,
             timeout=_settings.processing.ffmpeg_long_timeout,
             check=False,
-            log_output=False
+            log_output=False,
         )
-        
+
         if result.returncode != 0:
             logger.warning(f"   ⚠️ xfade failed: {result.stderr[:200]}")
             if os.path.exists(temp_output):
                 os.remove(temp_output)
             return False
-            
+
         os.rename(temp_output, output_path)
         return True
-        
+
     except Exception as e:
         logger.error(f"   ❌ xfade error: {e}")
-        if 'temp_output' in locals() and os.path.exists(temp_output):
+        if "temp_output" in locals() and os.path.exists(temp_output):
             os.remove(temp_output)
         return False
 
@@ -652,12 +712,13 @@ def xfade_two_clips(clip1_path: str, clip2_path: str, output_path: str,
 @dataclass
 class SegmentInfo:
     """Information about a rendered segment."""
+
     path: str
     index: int
     clip_count: int
     duration: float
     size_bytes: int = 0
-    
+
     def __post_init__(self):
         if os.path.exists(self.path):
             self.size_bytes = os.path.getsize(self.path)
@@ -666,6 +727,7 @@ class SegmentInfo:
 @dataclass
 class SegmentWriterStats:
     """Statistics for segment writing operations."""
+
     total_segments: int = 0
     total_clips: int = 0
     total_duration: float = 0.0
@@ -677,31 +739,33 @@ class SegmentWriterStats:
 class SegmentWriter:
     """
     Manages progressive rendering of video segments to disk.
-    
-    Instead of keeping all clips in memory, renders batches to 
+
+    Instead of keeping all clips in memory, renders batches to
     intermediate segment files and concatenates at the end.
-    
+
     Features:
     - Configurable batch sizes
     - Automatic temp file management
     - FFmpeg-based concatenation with optional xfade transitions
     - Memory-efficient progressive rendering
     """
-    
-    def __init__(self, 
-                 output_dir: Optional[str] = None,
-                 segment_prefix: str = "segment",
-                 ffmpeg_preset: str = "fast",
-                 ffmpeg_crf: int = 18,
-                 cleanup_on_complete: bool = True,
-                 enable_xfade: bool = False,
-                 xfade_duration: float = DEFAULT_XFADE_DURATION,
-                 target_width: int = STANDARD_WIDTH,
-                 target_height: int = STANDARD_HEIGHT,
-                 target_fps: float = STANDARD_FPS):
+
+    def __init__(
+        self,
+        output_dir: Optional[str] = None,
+        segment_prefix: str = "segment",
+        ffmpeg_preset: str = "fast",
+        ffmpeg_crf: int = 18,
+        cleanup_on_complete: bool = True,
+        enable_xfade: bool = False,
+        xfade_duration: float = DEFAULT_XFADE_DURATION,
+        target_width: int = STANDARD_WIDTH,
+        target_height: int = STANDARD_HEIGHT,
+        target_fps: float = STANDARD_FPS,
+    ):
         """
         Initialize segment writer.
-        
+
         Args:
             output_dir: Directory for intermediate segment files
             segment_prefix: Prefix for segment filenames
@@ -726,28 +790,33 @@ class SegmentWriter:
         self.target_width = target_width
         self.target_height = target_height
         self.target_fps = target_fps
-        
+
         # State
         self.segments: List[SegmentInfo] = []
         self.stats = SegmentWriterStats()
-        
+
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def get_segment_path(self, index: int) -> str:
         """Get path for segment file at given index."""
         return str(self.output_dir / f"{self.segment_prefix}_{index:04d}.mp4")
+
     def _get_xfade_temp_path(self, segment_index: int, clip_index: int) -> str:
         """Generate a unique temp path for xfade intermediates."""
         pid = os.getpid()
-        return str(self.output_dir / f"xfade_temp_{segment_index}_{clip_index}_{pid}.mp4")
+        return str(
+            self.output_dir / f"xfade_temp_{segment_index}_{clip_index}_{pid}.mp4"
+        )
 
-    def _write_ffmpeg_log(self,
-                          step: str,
-                          segment_index: int,
-                          cmd: List[str],
-                          result: subprocess.CompletedProcess,
-                          concat_list_path: Optional[str] = None) -> str:
+    def _write_ffmpeg_log(
+        self,
+        step: str,
+        segment_index: int,
+        cmd: List[str],
+        result: subprocess.CompletedProcess,
+        concat_list_path: Optional[str] = None,
+    ) -> str:
         """Write full FFmpeg stdout/stderr to a log file for debugging."""
         log_path = self.output_dir / f"ffmpeg_{step}_{segment_index:04d}.log"
         try:
@@ -770,10 +839,9 @@ class SegmentWriter:
 
         return str(log_path)
 
-    def _build_reencode_cmd(self,
-                            concat_list_path: str,
-                            segment_path: str,
-                            config: FFmpegConfig) -> List[str]:
+    def _build_reencode_cmd(
+        self, concat_list_path: str, segment_path: str, config: FFmpegConfig
+    ) -> List[str]:
         """Build FFmpeg command for segment re-encode."""
         vf_chain = (
             f"scale={self.target_width}:{self.target_height}:force_original_aspect_ratio=decrease,"
@@ -785,64 +853,82 @@ class SegmentWriter:
         cmd = build_ffmpeg_cmd([])
         if config.is_gpu_accelerated:
             cmd.extend(config.hwaccel_input_params())
-        cmd.extend([
-            "-f", "concat",
-            "-safe", "0",
-            "-i", concat_list_path,
-            "-vf", vf_chain,
-        ])
+        cmd.extend(
+            [
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                concat_list_path,
+                "-vf",
+                vf_chain,
+            ]
+        )
 
-        cmd.extend(_video_params_for_target(
-            config,
-            crf=self.ffmpeg_crf,
-            preset=self.ffmpeg_preset,
-            target_codec=TARGET_CODEC,
-            target_profile=TARGET_PROFILE,
-            target_level=TARGET_LEVEL,
-            target_pix_fmt=TARGET_PIX_FMT,
-        ))
+        cmd.extend(
+            _video_params_for_target(
+                config,
+                crf=self.ffmpeg_crf,
+                preset=self.ffmpeg_preset,
+                target_codec=TARGET_CODEC,
+                target_profile=TARGET_PROFILE,
+                target_level=TARGET_LEVEL,
+                target_pix_fmt=TARGET_PIX_FMT,
+            )
+        )
 
-        cmd.extend([
-            "-an",  # No audio in segments
-            segment_path
-        ])
+        cmd.extend(
+            [
+                "-an",  # No audio in segments
+                segment_path,
+            ]
+        )
 
         return cmd
-    
-    def write_segment(self, 
-                      clips: List,  # MoviePy VideoFileClip objects
-                      segment_index: int,
-                      audio_clip = None) -> Optional[SegmentInfo]:
+
+    def write_segment(
+        self,
+        clips: List,  # MoviePy VideoFileClip objects
+        segment_index: int,
+        audio_clip=None,
+    ) -> Optional[SegmentInfo]:
         """
         Write a batch of clips as a single segment file.
-        
+
         Args:
             clips: List of MoviePy VideoFileClip objects
             segment_index: Index of this segment
             audio_clip: Optional audio to mix (usually None for segments)
-            
+
         Returns:
             SegmentInfo if successful, None if failed
         """
         if not clips:
             return None
-        
+
         from .moviepy_compat import concatenate_videoclips
-        
+
         segment_path = self.get_segment_path(segment_index)
-        
+
         try:
-            logger.info(f"   📼 Writing segment {segment_index} ({len(clips)} clips)...")
-            
+            logger.info(
+                f"   📼 Writing segment {segment_index} ({len(clips)} clips)..."
+            )
+
             # Concatenate clips in memory (minimal, just this batch)
             combined = concatenate_videoclips(clips, method="compose")
-            
+
             moviepy_config = _ffmpeg_config
             if moviepy_config.is_gpu_accelerated and moviepy_config.hwupload_filter:
                 moviepy_config = _get_cpu_config()
                 codec = TARGET_CODEC
             else:
-                codec = moviepy_config.effective_codec if moviepy_config.is_gpu_accelerated else TARGET_CODEC
+                codec = (
+                    moviepy_config.effective_codec
+                    if moviepy_config.is_gpu_accelerated
+                    else TARGET_CODEC
+                )
 
             # Write to disk
             combined.write_videofile(
@@ -860,59 +946,63 @@ class SegmentWriter:
                     target_profile=TARGET_PROFILE,
                     target_level=TARGET_LEVEL,
                     target_pix_fmt=TARGET_PIX_FMT,
-                )
+                ),
             )
-            
+
             # Get duration before closing
             duration = combined.duration
-            
+
             # Close to free memory immediately
             combined.close()
-            
+
             # Close individual clips
             for clip in clips:
                 try:
                     clip.close()
                 except Exception:
                     pass  # Ignore cleanup errors during memory release
-            
+
             # Create segment info
             segment_info = SegmentInfo(
                 path=segment_path,
                 index=segment_index,
                 clip_count=len(clips),
-                duration=duration
+                duration=duration,
             )
-            
+
             self.segments.append(segment_info)
             self.stats.total_segments += 1
             self.stats.total_clips += len(clips)
             self.stats.total_duration += duration
             self.stats.total_size_bytes += segment_info.size_bytes
-            
-            logger.info(f"   ✅ Segment {segment_index} written: {duration:.1f}s, "
-                  f"{segment_info.size_bytes / (1024*1024):.1f}MB")
-            
+
+            logger.info(
+                f"   ✅ Segment {segment_index} written: {duration:.1f}s, "
+                f"{segment_info.size_bytes / (1024 * 1024):.1f}MB"
+            )
+
             return segment_info
-            
+
         except Exception as e:
             logger.error(f"   ❌ Failed to write segment {segment_index}: {e}")
             return None
-    
-    def write_segment_ffmpeg(self,
-                              clip_paths: List[str],
-                              segment_index: int,
-                              durations: Optional[List[float]] = None,
-                              validate_streams: bool = True) -> Optional[SegmentInfo]:
+
+    def write_segment_ffmpeg(
+        self,
+        clip_paths: List[str],
+        segment_index: int,
+        durations: Optional[List[float]] = None,
+        validate_streams: bool = True,
+    ) -> Optional[SegmentInfo]:
         """
         Write segment using FFmpeg concat demuxer with -c copy (no re-encoding).
-        
+
         Args:
             clip_paths: List of video file paths (must have compatible streams)
             segment_index: Index of this segment
             durations: Optional list of durations for each clip
             validate_streams: Check stream compatibility before concat
-            
+
         Returns:
             SegmentInfo if successful, None if failed
         """
@@ -925,12 +1015,14 @@ class SegmentWriter:
             for path in missing_paths:
                 logger.error(f"      - {path}")
             return None
-        
+
         segment_path = self.get_segment_path(segment_index)
         concat_list_path = str(self.output_dir / f"concat_{segment_index}.txt")
 
         try:
-            logger.info(f"   📼 Writing segment {segment_index} ({len(clip_paths)} clips via FFmpeg -c copy)...")
+            logger.info(
+                f"   📼 Writing segment {segment_index} ({len(clip_paths)} clips via FFmpeg -c copy)..."
+            )
 
             # Validate stream parameters if requested
             if validate_streams and len(clip_paths) > 1:
@@ -939,34 +1031,48 @@ class SegmentWriter:
                     for path in clip_paths[1:]:
                         params = ffprobe_stream_params(path)
                         if params and not first_params.is_compatible_with(params):
-                            logger.warning(f"   ⚠️ Stream mismatch in {os.path.basename(path)}")
-                            logger.warning(f"      Expected: {first_params.fps:.2f}fps, {first_params.pix_fmt}")
-                            logger.warning(f"      Got: {params.fps:.2f}fps, {params.pix_fmt}")
+                            logger.warning(
+                                f"   ⚠️ Stream mismatch in {os.path.basename(path)}"
+                            )
+                            logger.warning(
+                                f"      Expected: {first_params.fps:.2f}fps, {first_params.pix_fmt}"
+                            )
+                            logger.warning(
+                                f"      Got: {params.fps:.2f}fps, {params.pix_fmt}"
+                            )
                             # Fall back to re-encoding for this segment
-                            return self._write_segment_ffmpeg_reencode(clip_paths, segment_index, concat_list_path)
+                            return self._write_segment_ffmpeg_reencode(
+                                clip_paths, segment_index, concat_list_path
+                            )
 
             # Create concat file list
-            with open(concat_list_path, 'w') as f:
+            with open(concat_list_path, "w") as f:
                 for path in clip_paths:
                     # Escape single quotes in path
                     escaped_path = path.replace("'", "'\\''")
                     f.write(f"file '{escaped_path}'\n")
 
             # FFmpeg concat demuxer with -c copy (no re-encoding, very fast)
-            cmd = build_ffmpeg_cmd([
-                "-f", "concat",
-                "-safe", "0",
-                "-i", concat_list_path,
-                "-c", "copy",  # Stream copy - no re-encoding!
-                segment_path
-            ])
+            cmd = build_ffmpeg_cmd(
+                [
+                    "-f",
+                    "concat",
+                    "-safe",
+                    "0",
+                    "-i",
+                    concat_list_path,
+                    "-c",
+                    "copy",  # Stream copy - no re-encoding!
+                    segment_path,
+                ]
+            )
 
             result = run_command(
                 cmd,
                 capture_output=True,
                 timeout=_settings.processing.ffmpeg_timeout,
                 check=False,
-                log_output=False
+                log_output=False,
             )
 
             if result.returncode != 0:
@@ -980,8 +1086,12 @@ class SegmentWriter:
                 log_hint = f" (log: {log_path})" if log_path else ""
                 stderr_preview = (result.stderr or "").strip().splitlines()
                 preview = stderr_preview[-1] if stderr_preview else "unknown error"
-                logger.warning(f"   ⚠️ Concat copy failed, trying re-encode: {preview}{log_hint}")
-                return self._write_segment_ffmpeg_reencode(clip_paths, segment_index, concat_list_path)
+                logger.warning(
+                    f"   ⚠️ Concat copy failed, trying re-encode: {preview}{log_hint}"
+                )
+                return self._write_segment_ffmpeg_reencode(
+                    clip_paths, segment_index, concat_list_path
+                )
 
             # Get duration from output file
             duration = self._get_video_duration(segment_path)
@@ -990,7 +1100,7 @@ class SegmentWriter:
                 path=segment_path,
                 index=segment_index,
                 clip_count=len(clip_paths),
-                duration=duration
+                duration=duration,
             )
 
             self.segments.append(segment_info)
@@ -999,8 +1109,10 @@ class SegmentWriter:
             self.stats.total_duration += duration
             self.stats.total_size_bytes += segment_info.size_bytes
 
-            logger.info(f"   ✅ Segment {segment_index} (copy): {duration:.1f}s, "
-                  f"{segment_info.size_bytes / (1024*1024):.1f}MB")
+            logger.info(
+                f"   ✅ Segment {segment_index} (copy): {duration:.1f}s, "
+                f"{segment_info.size_bytes / (1024 * 1024):.1f}MB"
+            )
 
             return segment_info
 
@@ -1017,35 +1129,32 @@ class SegmentWriter:
                     os.remove(concat_list_path)
                 except OSError:
                     logger.warning(f"   ⚠️ Failed to cleanup: {concat_list_path}")
-    
-    def _write_segment_ffmpeg_reencode(self,
-                                        clip_paths: List[str],
-                                        segment_index: int,
-                                        concat_list_path: str) -> Optional[SegmentInfo]:
+
+    def _write_segment_ffmpeg_reencode(
+        self, clip_paths: List[str], segment_index: int, concat_list_path: str
+    ) -> Optional[SegmentInfo]:
         """
         Fallback: Write segment with re-encoding when streams are incompatible.
-        
+
         Only used when -c copy fails due to stream parameter mismatches.
         """
         segment_path = self.get_segment_path(segment_index)
-        
+
         try:
-            logger.info(f"   🔄 Re-encoding segment {segment_index} (stream normalization)...")
-            
+            logger.info(
+                f"   🔄 Re-encoding segment {segment_index} (stream normalization)..."
+            )
+
             # Create concat file list if not exists
             if not os.path.exists(concat_list_path):
-                with open(concat_list_path, 'w') as f:
+                with open(concat_list_path, "w") as f:
                     for path in clip_paths:
                         escaped_path = path.replace("'", "'\\''")
                         f.write(f"file '{escaped_path}'\n")
 
             config = _ffmpeg_config
             cmd = self._build_reencode_cmd(concat_list_path, segment_path, config)
-            result = run_command(
-                cmd,
-                check=False,
-                log_output=False
-            )
+            result = run_command(cmd, check=False, log_output=False)
 
             if result.returncode != 0:
                 log_path = self._write_ffmpeg_log(
@@ -1059,14 +1168,16 @@ class SegmentWriter:
                 logger.error(f"   ❌ Re-encode failed{log_hint}")
                 if config.is_gpu_accelerated:
                     cpu_config = _get_cpu_config()
-                    cmd_cpu = self._build_reencode_cmd(concat_list_path, segment_path, cpu_config)
+                    cmd_cpu = self._build_reencode_cmd(
+                        concat_list_path, segment_path, cpu_config
+                    )
                     logger.info("   ↪️  Retrying re-encode on CPU...")
                     result_cpu = run_command(
                         cmd_cpu,
                         capture_output=True,
                         timeout=_settings.processing.ffmpeg_long_timeout,
                         check=False,
-                        log_output=False
+                        log_output=False,
                     )
                     if result_cpu.returncode != 0:
                         cpu_log_path = self._write_ffmpeg_log(
@@ -1083,60 +1194,65 @@ class SegmentWriter:
                     return None
 
             duration = self._get_video_duration(segment_path)
-            
+
             segment_info = SegmentInfo(
                 path=segment_path,
                 index=segment_index,
                 clip_count=len(clip_paths),
-                duration=duration
+                duration=duration,
             )
-            
+
             self.segments.append(segment_info)
             self.stats.total_segments += 1
             self.stats.total_clips += len(clip_paths)
             self.stats.total_duration += duration
             self.stats.total_size_bytes += segment_info.size_bytes
-            
+
             logger.info(f"   ✅ Segment {segment_index} (re-encoded): {duration:.1f}s")
             return segment_info
-            
+
         except Exception as e:
             logger.error(f"   ❌ Re-encode failed: {e}")
             return None
         finally:
             if os.path.exists(concat_list_path):
                 os.remove(concat_list_path)
-    
-    def write_segment_with_xfade(self,
-                                  clip_paths: List[str],
-                                  segment_index: int,
-                                  xfade_duration: float = None) -> Optional[SegmentInfo]:
+
+    def write_segment_with_xfade(
+        self, clip_paths: List[str], segment_index: int, xfade_duration: float = None
+    ) -> Optional[SegmentInfo]:
         """
         Write segment using FFmpeg xfade filter for real crossfade transitions.
-        
+
         Creates overlapping transitions between clips instead of fade-to-black.
         Requires re-encoding but produces professional-looking transitions.
-        
+
         Args:
             clip_paths: List of video file paths
             segment_index: Index of this segment
             xfade_duration: Crossfade duration (uses instance default if None)
-            
+
         Returns:
             SegmentInfo if successful, None if failed
         """
         if not clip_paths:
             return None
-            
+
         if len(clip_paths) == 1:
             # Single clip - no crossfade needed, just copy
-            return self.write_segment_ffmpeg(clip_paths, segment_index, validate_streams=False)
-        
-        xfade_dur = xfade_duration if xfade_duration is not None else self.xfade_duration
+            return self.write_segment_ffmpeg(
+                clip_paths, segment_index, validate_streams=False
+            )
+
+        xfade_dur = (
+            xfade_duration if xfade_duration is not None else self.xfade_duration
+        )
         segment_path = self.get_segment_path(segment_index)
 
         try:
-            logger.info(f"   📼 Writing segment {segment_index} ({len(clip_paths)} clips with xfade)...")
+            logger.info(
+                f"   📼 Writing segment {segment_index} ({len(clip_paths)} clips with xfade)..."
+            )
 
             # PERFORMANCE OPTIMIZATION: Try single-pass xfade first (25-50x faster)
             # This eliminates N-1 temp files and process spawns
@@ -1146,12 +1262,14 @@ class SegmentWriter:
                 xfade_duration=xfade_dur,
                 transition="fade",
                 crf=self.ffmpeg_crf,
-                preset=self.ffmpeg_preset
+                preset=self.ffmpeg_preset,
             )
 
             if not single_pass_success:
                 # Fallback to sequential xfade (original method)
-                logger.info(f"   ↩️ Falling back to sequential xfade for segment {segment_index}")
+                logger.info(
+                    f"   ↩️ Falling back to sequential xfade for segment {segment_index}"
+                )
 
                 # For xfade, we need to chain clips together progressively
                 # Start with first clip, then xfade each subsequent clip
@@ -1174,11 +1292,13 @@ class SegmentWriter:
                         xfade_duration=xfade_dur,
                         transition="fade",
                         crf=self.ffmpeg_crf,
-                        preset=self.ffmpeg_preset
+                        preset=self.ffmpeg_preset,
                     )
 
                     if not success:
-                        print(f"   ⚠️ xfade failed at clip {i}, falling back to concat")
+                        logger.warning(
+                            f"xfade failed at clip {i}, falling back to concat"
+                        )
                         # Cleanup temp files
                         for tf in temp_files:
                             if os.path.exists(tf):
@@ -1193,40 +1313,44 @@ class SegmentWriter:
                 for tf in temp_files:
                     if os.path.exists(tf):
                         os.remove(tf)
-            
+
             # Get duration and create segment info
             duration = self._get_video_duration(segment_path)
-            
+
             segment_info = SegmentInfo(
                 path=segment_path,
                 index=segment_index,
                 clip_count=len(clip_paths),
-                duration=duration
+                duration=duration,
             )
-            
+
             self.segments.append(segment_info)
             self.stats.total_segments += 1
             self.stats.total_clips += len(clip_paths)
             self.stats.total_duration += duration
             self.stats.total_size_bytes += segment_info.size_bytes
-            
-            print(f"   ✅ Segment {segment_index} (xfade): {duration:.1f}s, "
-                  f"{segment_info.size_bytes / (1024*1024):.1f}MB")
-            
+
+            logger.info(
+                f"Segment {segment_index} (xfade): {duration:.1f}s, "
+                f"{segment_info.size_bytes / (1024 * 1024):.1f}MB"
+            )
+
             return segment_info
-            
+
         except Exception as e:
-            print(f"   ❌ xfade segment failed: {e}")
+            logger.error(f"xfade segment failed: {e}")
             # Fall back to regular concat
             return self.write_segment_ffmpeg(clip_paths, segment_index)
-    
-    def concatenate_segments(self,
-                              output_path: str,
-                              audio_path: Optional[str] = None,
-                              audio_volume: float = 1.0,
-                              audio_duration: Optional[float] = None,
-                              logo_path: Optional[str] = None,
-                              logo_position: str = "top-right") -> bool:
+
+    def concatenate_segments(
+        self,
+        output_path: str,
+        audio_path: Optional[str] = None,
+        audio_volume: float = 1.0,
+        audio_duration: Optional[float] = None,
+        logo_path: Optional[str] = None,
+        logo_position: str = "top-right",
+    ) -> bool:
         """
         Concatenate all segments into final output file using -c copy.
 
@@ -1247,29 +1371,39 @@ class SegmentWriter:
         if not self.segments:
             logger.error("   ❌ No segments to concatenate")
             return False
-        
+
         import time
+
         start_time = time.time()
-        
+
         # Sort segments by index
         sorted_segments = sorted(self.segments, key=lambda s: s.index)
-        
-        logger.info(f"\n   🔗 Concatenating {len(sorted_segments)} segments with -c copy...")
-        
+
+        logger.info(
+            f"\n   🔗 Concatenating {len(sorted_segments)} segments with -c copy..."
+        )
+
         # Create concat file
         concat_list_path = str(self.output_dir / "final_concat.txt")
-        
-        with open(concat_list_path, 'w') as f:
+
+        with open(concat_list_path, "w") as f:
             for seg in sorted_segments:
                 escaped_path = seg.path.replace("'", "'\\''")
                 f.write(f"file '{escaped_path}'\n")
 
-        use_router = (_settings.encoding.final_encode_backend == "router" or _settings.gpu.force_cgpu_encoding)
+        use_router = (
+            _settings.encoding.final_encode_backend == "router"
+            or _settings.gpu.force_cgpu_encoding
+        )
         if use_router and logo_path:
-            logger.info("   ⚠️ Router final encode disabled when logo overlay is requested. Falling back to FFmpeg pipeline.")
+            logger.info(
+                "   ⚠️ Router final encode disabled when logo overlay is requested. Falling back to FFmpeg pipeline."
+            )
             use_router = False
         if use_router and not _settings.encoding.normalize_clips:
-            logger.info("   ⚠️ Router final encode requires NORMALIZE_CLIPS=true. Falling back to FFmpeg pipeline.")
+            logger.info(
+                "   ⚠️ Router final encode requires NORMALIZE_CLIPS=true. Falling back to FFmpeg pipeline."
+            )
             use_router = False
 
         if use_router:
@@ -1291,34 +1425,50 @@ class SegmentWriter:
                         af_filters.insert(0, f"atrim=0:{audio_duration}")
                     af_chain = ",".join(af_filters)
 
-                    cmd.extend([
-                        "-c:v", "copy",
-                        "-c:a", _settings.encoding.audio_codec,
-                        "-b:a", _settings.encoding.audio_bitrate,
-                        "-af", af_chain,
-                        "-shortest",
-                        "-movflags", "+faststart",
-                        muxed_output,
-                    ])
+                    cmd.extend(
+                        [
+                            "-c:v",
+                            "copy",
+                            "-c:a",
+                            _settings.encoding.audio_codec,
+                            "-b:a",
+                            _settings.encoding.audio_bitrate,
+                            "-af",
+                            af_chain,
+                            "-shortest",
+                            "-movflags",
+                            "+faststart",
+                            muxed_output,
+                        ]
+                    )
                 else:
-                    cmd.extend([
-                        "-c:v", "copy",
-                        "-movflags", "+faststart",
-                        muxed_output,
-                    ])
+                    cmd.extend(
+                        [
+                            "-c:v",
+                            "copy",
+                            "-movflags",
+                            "+faststart",
+                            muxed_output,
+                        ]
+                    )
 
                 result = run_command(
                     cmd,
                     capture_output=True,
                     timeout=_settings.processing.ffmpeg_long_timeout,
                     check=False,
-                    log_output=False
+                    log_output=False,
                 )
 
                 if result.returncode == 0 and os.path.exists(muxed_output):
                     from .core.encoder_router import smart_encode
 
-                    codec = "hevc" if "265" in _ffmpeg_config.codec or "hevc" in _ffmpeg_config.codec.lower() else "h264"
+                    codec = (
+                        "hevc"
+                        if "265" in _ffmpeg_config.codec
+                        or "hevc" in _ffmpeg_config.codec.lower()
+                        else "h264"
+                    )
                     fps_filter = f"fps={self.target_fps}" if self.target_fps else None
 
                     encoded_path = smart_encode(
@@ -1340,14 +1490,22 @@ class SegmentWriter:
                         self.stats.concatenation_time = time.time() - start_time
                         if self.cleanup_on_complete:
                             self.cleanup_segments()
-                        final_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+                        final_size = (
+                            os.path.getsize(output_path)
+                            if os.path.exists(output_path)
+                            else 0
+                        )
                         logger.info(f"   ✅ Final video: {output_path}")
                         logger.info(f"      Duration: {self.stats.total_duration:.1f}s")
-                        logger.info(f"      Size: {final_size / (1024*1024):.1f}MB")
-                        logger.info(f"      Concatenation time: {self.stats.concatenation_time:.1f}s")
+                        logger.info(f"      Size: {final_size / (1024 * 1024):.1f}MB")
+                        logger.info(
+                            f"      Concatenation time: {self.stats.concatenation_time:.1f}s"
+                        )
                         return True
 
-                logger.warning("   ⚠️ Router final encode failed; falling back to FFmpeg pipeline.")
+                logger.warning(
+                    "   ⚠️ Router final encode failed; falling back to FFmpeg pipeline."
+                )
             finally:
                 if os.path.exists(muxed_output):
                     try:
@@ -1361,7 +1519,7 @@ class SegmentWriter:
             actual_output = str(self.output_dir / "pre_logo.mp4")
         else:
             actual_output = f"{output_path}.tmp.mp4"
-        
+
         try:
             if audio_path and os.path.exists(audio_path):
                 # Concatenate video (copy) + encode audio only
@@ -1378,22 +1536,37 @@ class SegmentWriter:
                 base_args = []
 
                 # Add hardware init for GPU encoders (VAAPI needs init_hw_device)
-                if _settings.encoding.normalize_clips and _ffmpeg_config.is_gpu_accelerated:
+                if (
+                    _settings.encoding.normalize_clips
+                    and _ffmpeg_config.is_gpu_accelerated
+                ):
                     gpu_type = _ffmpeg_config.gpu_encoder_type
                     if gpu_type in ("vaapi", "rocm"):
-                        base_args.extend([
-                            "-init_hw_device", "vaapi=va:/dev/dri/renderD128",
-                            "-filter_hw_device", "va",
-                        ])
+                        base_args.extend(
+                            [
+                                "-init_hw_device",
+                                "vaapi=va:/dev/dri/renderD128",
+                                "-filter_hw_device",
+                                "va",
+                            ]
+                        )
 
-                base_args.extend([
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", concat_list_path,
-                    "-i", audio_path,
-                    "-map", "0:v",
-                    "-map", "1:a",
-                ])
+                base_args.extend(
+                    [
+                        "-f",
+                        "concat",
+                        "-safe",
+                        "0",
+                        "-i",
+                        concat_list_path,
+                        "-i",
+                        audio_path,
+                        "-map",
+                        "0:v",
+                        "-map",
+                        "1:a",
+                    ]
+                )
 
                 cmd = build_ffmpeg_cmd(base_args)
 
@@ -1404,47 +1577,69 @@ class SegmentWriter:
                     # Refresh target codec from config in case it changed or was init early
                     current_target_codec = _ffmpeg_config.codec
                     gpu_type = _ffmpeg_config.gpu_encoder_type
-                    logger.info(f"   🎥 Final Encode: codec={current_target_codec} profile={TARGET_PROFILE} pix_fmt={TARGET_PIX_FMT} gpu={gpu_type}")
+                    logger.info(
+                        f"   🎥 Final Encode: codec={current_target_codec} profile={TARGET_PROFILE} pix_fmt={TARGET_PIX_FMT} gpu={gpu_type}"
+                    )
 
                     # Add hwupload filter for GPU encoders (VAAPI, ROCm, etc.)
                     if _ffmpeg_config.hwupload_filter:
                         cmd.extend(["-vf", _ffmpeg_config.hwupload_filter])
 
-                    cmd.extend(_video_params_for_target(
-                        _ffmpeg_config,
-                        crf=self.ffmpeg_crf,
-                        preset=self.ffmpeg_preset,
-                        target_codec=current_target_codec,
-                        target_profile=TARGET_PROFILE,
-                        target_level=TARGET_LEVEL,
-                        target_pix_fmt=TARGET_PIX_FMT,
-                    ))
+                    cmd.extend(
+                        _video_params_for_target(
+                            _ffmpeg_config,
+                            crf=self.ffmpeg_crf,
+                            preset=self.ffmpeg_preset,
+                            target_codec=current_target_codec,
+                            target_profile=TARGET_PROFILE,
+                            target_level=TARGET_LEVEL,
+                            target_pix_fmt=TARGET_PIX_FMT,
+                        )
+                    )
                 else:
                     cmd.extend(["-c:v", "copy"])  # Stream copy - no re-encode!
 
-                cmd.extend([
-                    "-c:a", "aac",
-                    "-b:a", "192k",
-                    "-af", af_chain,
-                    "-shortest",
-                    "-movflags", "+faststart",
-                    actual_output
-                ])
+                cmd.extend(
+                    [
+                        "-c:a",
+                        "aac",
+                        "-b:a",
+                        "192k",
+                        "-af",
+                        af_chain,
+                        "-shortest",
+                        "-movflags",
+                        "+faststart",
+                        actual_output,
+                    ]
+                )
             else:
                 # Just concatenate video
                 base_args = []
-                if _settings.encoding.normalize_clips and _ffmpeg_config.is_gpu_accelerated:
+                if (
+                    _settings.encoding.normalize_clips
+                    and _ffmpeg_config.is_gpu_accelerated
+                ):
                     gpu_type = _ffmpeg_config.gpu_encoder_type
                     if gpu_type in ("vaapi", "rocm"):
-                        base_args.extend([
-                            "-init_hw_device", "vaapi=va:/dev/dri/renderD128",
-                            "-filter_hw_device", "va",
-                        ])
-                base_args.extend([
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", concat_list_path,
-                ])
+                        base_args.extend(
+                            [
+                                "-init_hw_device",
+                                "vaapi=va:/dev/dri/renderD128",
+                                "-filter_hw_device",
+                                "va",
+                            ]
+                        )
+                base_args.extend(
+                    [
+                        "-f",
+                        "concat",
+                        "-safe",
+                        "0",
+                        "-i",
+                        concat_list_path,
+                    ]
+                )
 
                 # Build cmd for non-audio path as well
                 cmd = build_ffmpeg_cmd(base_args)
@@ -1453,15 +1648,17 @@ class SegmentWriter:
                     current_target_codec = _ffmpeg_config.codec
                     if _ffmpeg_config.hwupload_filter:
                         cmd.extend(["-vf", _ffmpeg_config.hwupload_filter])
-                    cmd.extend(_video_params_for_target(
-                        _ffmpeg_config,
-                        crf=self.ffmpeg_crf,
-                        preset=self.ffmpeg_preset,
-                        target_codec=current_target_codec,
-                        target_profile=TARGET_PROFILE,
-                        target_level=TARGET_LEVEL,
-                        target_pix_fmt=TARGET_PIX_FMT,
-                    ))
+                    cmd.extend(
+                        _video_params_for_target(
+                            _ffmpeg_config,
+                            crf=self.ffmpeg_crf,
+                            preset=self.ffmpeg_preset,
+                            target_codec=current_target_codec,
+                            target_profile=TARGET_PROFILE,
+                            target_level=TARGET_LEVEL,
+                            target_pix_fmt=TARGET_PIX_FMT,
+                        )
+                    )
                 else:
                     cmd.extend(["-c:v", "copy"])
 
@@ -1472,7 +1669,7 @@ class SegmentWriter:
                 capture_output=True,
                 timeout=_settings.processing.ffmpeg_long_timeout,
                 check=False,
-                log_output=False
+                log_output=False,
             )
 
             # If we failed, inspect stderr for common GPU/hwupload errors and
@@ -1493,36 +1690,53 @@ class SegmentWriter:
                 if any(ind in stderr for ind in gpu_error_indicators):
                     logger.warning(
                         "GPU encoding detected failure: '%s'. Retrying with software encoder (libx264)...",
-                        first_line
+                        first_line,
                     )
 
                     # Build a minimal software-only fallback command (no hwinit, no hwupload)
-                    fallback_base = ["-f", "concat", "-safe", "0", "-i", concat_list_path]
+                    fallback_base = [
+                        "-f",
+                        "concat",
+                        "-safe",
+                        "0",
+                        "-i",
+                        concat_list_path,
+                    ]
                     if audio_path and os.path.exists(audio_path):
-                        fallback_base.extend(["-i", audio_path, "-map", "0:v", "-map", "1:a"])
+                        fallback_base.extend(
+                            ["-i", audio_path, "-map", "0:v", "-map", "1:a"]
+                        )
 
                     fallback_cmd = build_ffmpeg_cmd(fallback_base)
 
                     # Force software encoding parameters
-                    fallback_cmd.extend(_video_params_for_target(
-                        _ffmpeg_config,
-                        crf=self.ffmpeg_crf,
-                        preset=self.ffmpeg_preset,
-                        target_codec="libx264",
-                        target_profile="high",  # Scale back to High profile for wide compatibility
-                        target_level=TARGET_LEVEL,
-                        target_pix_fmt="yuv420p", # Scale back to 8-bit for libx264 compatibility
-                    ))
+                    fallback_cmd.extend(
+                        _video_params_for_target(
+                            _ffmpeg_config,
+                            crf=self.ffmpeg_crf,
+                            preset=self.ffmpeg_preset,
+                            target_codec="libx264",
+                            target_profile="high",  # Scale back to High profile for wide compatibility
+                            target_level=TARGET_LEVEL,
+                            target_pix_fmt="yuv420p",  # Scale back to 8-bit for libx264 compatibility
+                        )
+                    )
 
                     if audio_path and os.path.exists(audio_path):
-                        fallback_cmd.extend([
-                            "-c:a", "aac",
-                            "-b:a", "192k",
-                            "-af", af_chain,
-                            "-shortest",
-                            "-movflags", "+faststart",
-                            actual_output,
-                        ])
+                        fallback_cmd.extend(
+                            [
+                                "-c:a",
+                                "aac",
+                                "-b:a",
+                                "192k",
+                                "-af",
+                                af_chain,
+                                "-shortest",
+                                "-movflags",
+                                "+faststart",
+                                actual_output,
+                            ]
+                        )
                     else:
                         fallback_cmd.extend(["-movflags", "+faststart", actual_output])
 
@@ -1538,7 +1752,10 @@ class SegmentWriter:
                         logger.info("Software fallback succeeded (libx264)")
                         result = fallback_result
                     else:
-                        logger.error("Software fallback failed: %s", (fallback_result.stderr or "").strip().split("\n")[0])
+                        logger.error(
+                            "Software fallback failed: %s",
+                            (fallback_result.stderr or "").strip().split("\n")[0],
+                        )
                         if os.path.exists(actual_output):
                             os.remove(actual_output)
                         return False
@@ -1558,7 +1775,9 @@ class SegmentWriter:
 
             if logo_input and os.path.exists(actual_output):
                 logger.info("   🏷️ Adding logo overlay...")
-                logo_success = self._apply_logo_overlay(actual_output, output_path, logo_input, logo_position)
+                logo_success = self._apply_logo_overlay(
+                    actual_output, output_path, logo_input, logo_position
+                )
                 # Cleanup temp file
                 if os.path.exists(actual_output):
                     os.remove(actual_output)
@@ -1579,11 +1798,15 @@ class SegmentWriter:
             if self.cleanup_on_complete:
                 self.cleanup_segments()
 
-            final_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+            final_size = (
+                os.path.getsize(output_path) if os.path.exists(output_path) else 0
+            )
             logger.info(f"   ✅ Final video: {output_path}")
             logger.info(f"      Duration: {self.stats.total_duration:.1f}s")
-            logger.info(f"      Size: {final_size / (1024*1024):.1f}MB")
-            logger.info(f"      Concatenation time: {self.stats.concatenation_time:.1f}s")
+            logger.info(f"      Size: {final_size / (1024 * 1024):.1f}MB")
+            logger.info(
+                f"      Concatenation time: {self.stats.concatenation_time:.1f}s"
+            )
 
             return True
 
@@ -1600,18 +1823,23 @@ class SegmentWriter:
                     os.remove(concat_list_path)
                 except OSError:
                     logger.warning(f"   ⚠️ Failed to cleanup: {concat_list_path}")
-    
-    def _apply_logo_overlay(self, input_path: str, output_path: str, 
-                            logo_path: str, position: str = "top-right") -> bool:
+
+    def _apply_logo_overlay(
+        self,
+        input_path: str,
+        output_path: str,
+        logo_path: str,
+        position: str = "top-right",
+    ) -> bool:
         """
         Apply logo overlay to video (requires re-encoding).
-        
+
         Args:
             input_path: Source video
             output_path: Output with logo
             logo_path: Logo image path
             position: Position (top-right, top-left, bottom-right, bottom-left)
-            
+
         Returns:
             True if successful
         """
@@ -1621,17 +1849,16 @@ class SegmentWriter:
                 "top-right": "W-w-50:50",
                 "top-left": "50:50",
                 "bottom-right": "W-w-50:H-h-50",
-                "bottom-left": "50:H-h-50"
+                "bottom-left": "50:H-h-50",
             }
             overlay_pos = positions.get(position, positions["top-right"])
-            
+
             config = _ffmpeg_config
-            filter_complex = f"[1:v]scale=150:-1[logo];[0:v][logo]overlay={overlay_pos}[v]"
+            filter_complex = (
+                f"[1:v]scale=150:-1[logo];[0:v][logo]overlay={overlay_pos}[v]"
+            )
             filter_complex, out_label = _append_hwupload_filter_complex(
-                filter_complex,
-                config,
-                "[v]",
-                "[v_hw]"
+                filter_complex, config, "[v]", "[v_hw]"
             )
 
             # Atomic write: write to .tmp first, then rename
@@ -1642,39 +1869,51 @@ class SegmentWriter:
             cmd = build_ffmpeg_cmd([])
             if config.is_gpu_accelerated:
                 cmd.extend(config.hwaccel_input_params())
-            cmd.extend([
-                "-i", input_path,
-                "-i", logo_path,
-                "-filter_complex",
-                filter_complex,
-                "-map", out_label,
-                "-map", "0:a?",
-            ])
+            cmd.extend(
+                [
+                    "-i",
+                    input_path,
+                    "-i",
+                    logo_path,
+                    "-filter_complex",
+                    filter_complex,
+                    "-map",
+                    out_label,
+                    "-map",
+                    "0:a?",
+                ]
+            )
 
-            cmd.extend(_video_params_for_target(
-                config,
-                crf=self.ffmpeg_crf,
-                preset=self.ffmpeg_preset,
-                target_codec=TARGET_CODEC,
-                target_profile=TARGET_PROFILE,
-                target_level=TARGET_LEVEL,
-                target_pix_fmt=TARGET_PIX_FMT,
-            ))
+            cmd.extend(
+                _video_params_for_target(
+                    config,
+                    crf=self.ffmpeg_crf,
+                    preset=self.ffmpeg_preset,
+                    target_codec=TARGET_CODEC,
+                    target_profile=TARGET_PROFILE,
+                    target_level=TARGET_LEVEL,
+                    target_pix_fmt=TARGET_PIX_FMT,
+                )
+            )
 
-            cmd.extend([
-                "-c:a", "copy",  # Audio copy
-                "-movflags", "+faststart",
-                temp_output
-            ])
-            
+            cmd.extend(
+                [
+                    "-c:a",
+                    "copy",  # Audio copy
+                    "-movflags",
+                    "+faststart",
+                    temp_output,
+                ]
+            )
+
             result = run_command(
                 cmd,
                 capture_output=True,
                 timeout=_settings.processing.ffmpeg_long_timeout,
                 check=False,
-                log_output=False
+                log_output=False,
             )
-            
+
             if result.returncode == 0:
                 os.rename(temp_output, output_path)
                 return True
@@ -1682,10 +1921,10 @@ class SegmentWriter:
                 if os.path.exists(temp_output):
                     os.remove(temp_output)
                 return False
-            
+
         except Exception as e:
             logger.error(f"   ❌ Logo overlay error: {e}")
-            if 'temp_output' in locals() and os.path.exists(temp_output):
+            if "temp_output" in locals() and os.path.exists(temp_output):
                 os.remove(temp_output)
             return False
 
@@ -1702,11 +1941,11 @@ class SegmentWriter:
         if not converted:
             return None, None
         return converted, converted
-    
+
     def cleanup_segments(self) -> int:
         """
         Remove all segment files.
-        
+
         Returns:
             Number of files removed
         """
@@ -1718,10 +1957,10 @@ class SegmentWriter:
                     removed += 1
             except OSError:
                 pass
-        
+
         logger.info(f"   🧹 Cleaned up {removed} segment files")
         return removed
-    
+
     def cleanup_all(self) -> None:
         """Remove all temp files including output directory and temporary clip files."""
         self.cleanup_segments()
@@ -1738,86 +1977,94 @@ class SegmentWriter:
         # These are created in TEMP_DIR and can accumulate during long runs
         try:
             from pathlib import Path
+
             temp_dir = get_settings().paths.temp_dir
 
             # Find and remove clip files matching pattern clip_*_####.mp4
             for clip_file in temp_dir.glob("clip_*_*.mp4"):
                 try:
                     clip_file.unlink()
-                    print(f"   🧹 Cleaned up temp clip: {clip_file.name}")
-                except Exception:
+                    logger.debug(f"Cleaned up temp clip: {clip_file.name}")
+                except (OSError, FileNotFoundError):
                     pass
 
             # Find and remove normalized files (*_norm.mp4)
             for norm_file in temp_dir.glob("*_norm.mp4"):
                 try:
                     norm_file.unlink()
-                    print(f"   🧹 Cleaned up normalized clip: {norm_file.name}")
-                except Exception:
+                    logger.debug(f"Cleaned up normalized clip: {norm_file.name}")
+                except (OSError, FileNotFoundError):
                     pass
-        except Exception as e:
-            print(f"   ⚠️ Temp file cleanup warning: {e}")
-    
+        except (OSError, FileNotFoundError) as e:
+            logger.warning(f"Temp file cleanup warning: {e}")
+
     def _get_video_duration(self, video_path: str) -> float:
         """Get video duration using ffprobe."""
         try:
-            cmd = build_ffprobe_cmd([
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                video_path
-            ])
+            cmd = build_ffprobe_cmd(
+                [
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    video_path,
+                ]
+            )
             result = run_command(
                 cmd,
                 capture_output=True,
                 timeout=_settings.processing.ffprobe_timeout,
                 check=False,
-                log_output=False
+                log_output=False,
             )
             return float(result.stdout.strip()) if result.stdout.strip() else 0.0
         except Exception:
             return 0.0
-    
+
     def get_stats(self) -> Dict:
         """Get statistics as dictionary."""
         return {
-            'total_segments': self.stats.total_segments,
-            'total_clips': self.stats.total_clips,
-            'total_duration': self.stats.total_duration,
-            'total_size_mb': self.stats.total_size_bytes / (1024 * 1024),
-            'concatenation_time': self.stats.concatenation_time,
-            'segment_paths': [s.path for s in self.segments]
+            "total_segments": self.stats.total_segments,
+            "total_clips": self.stats.total_clips,
+            "total_duration": self.stats.total_duration,
+            "total_size_mb": self.stats.total_size_bytes / (1024 * 1024),
+            "concatenation_time": self.stats.concatenation_time,
+            "segment_paths": [s.path for s in self.segments],
         }
 
 
 class ProgressiveRenderer:
     """
     High-level interface for progressive video rendering.
-    
+
     Coordinates SegmentWriter with memory management for
     optimal memory usage during large montage creation.
-    
+
     Uses FFmpeg concat demuxer for memory-efficient segment writing
     instead of MoviePy in-memory concatenation.
-    
+
     Supports real crossfade transitions via xfade filter when enabled.
     """
-    
-    def __init__(self,
-                 batch_size: int = 25,
-                 output_dir: Optional[str] = None,
-                 memory_manager = None,
-                 job_id: str = "default",
-                 enable_xfade: bool = False,
-                 xfade_duration: float = DEFAULT_XFADE_DURATION,
-                 ffmpeg_crf: int = 18,
-                 normalize_clips: bool = False,
-                 target_width: int = STANDARD_WIDTH,
-                 target_height: int = STANDARD_HEIGHT,
-                 target_fps: float = STANDARD_FPS):
+
+    def __init__(
+        self,
+        batch_size: int = 25,
+        output_dir: Optional[str] = None,
+        memory_manager=None,
+        job_id: str = "default",
+        enable_xfade: bool = False,
+        xfade_duration: float = DEFAULT_XFADE_DURATION,
+        ffmpeg_crf: int = 18,
+        normalize_clips: bool = False,
+        target_width: int = STANDARD_WIDTH,
+        target_height: int = STANDARD_HEIGHT,
+        target_fps: float = STANDARD_FPS,
+    ):
         """
         Initialize progressive renderer.
-        
+
         Args:
             batch_size: Number of clips per segment
             output_dir: Directory for temp files
@@ -1843,7 +2090,7 @@ class ProgressiveRenderer:
         self.target_width = target_width
         self.target_height = target_height
         self.target_fps = target_fps
-        
+
         self.segment_writer = SegmentWriter(
             output_dir=output_dir,
             segment_prefix=f"segment_{job_id}",
@@ -1852,58 +2099,58 @@ class ProgressiveRenderer:
             ffmpeg_crf=ffmpeg_crf,
             target_width=target_width,
             target_height=target_height,
-            target_fps=target_fps
+            target_fps=target_fps,
         )
-        
+
         # Track clip file paths (not MoviePy objects - more memory efficient)
         self.current_batch_paths: List[str] = []
         self.current_batch_index = 0
-        
+
         # For clips that need MoviePy processing first
         self.pending_moviepy_clips: List = []
-    
+
     def add_clip_path(self, clip_path: str) -> Optional[SegmentInfo]:
         """
         Add a pre-rendered clip file to the current batch.
-        
+
         This is the memory-efficient path - clips are already on disk.
-        
+
         Args:
             clip_path: Path to video file
-            
+
         Returns:
             SegmentInfo if segment was written, None otherwise
         """
         self.current_batch_paths.append(clip_path)
-        
+
         # Calculate effective batch size based on memory
         effective_batch_size = self.batch_size
         if self.memory_manager:
             effective_batch_size = self.memory_manager.calculate_safe_batch_size(
                 self.batch_size, clip_size_mb=60.0
             )
-            
+
             # Force immediate flush on critical memory
             if self.memory_manager.is_critical():
                 logger.warning(f"   🚨 Critical memory - forcing segment flush")
                 effective_batch_size = 1
-        
+
         # Check if batch is full
         if len(self.current_batch_paths) >= effective_batch_size:
             return self.flush_batch()
-        
+
         return None
-    
+
     def add_moviepy_clip(self, clip, temp_path: str) -> Optional[SegmentInfo]:
         """
         Add a MoviePy clip by rendering it to a temp file first.
-        
+
         This converts MoviePy objects to files for FFmpeg processing.
-        
+
         Args:
             clip: MoviePy VideoFileClip object
             temp_path: Path to write the clip to
-            
+
         Returns:
             SegmentInfo if segment was written, None otherwise
         """
@@ -1914,85 +2161,93 @@ class ProgressiveRenderer:
                 moviepy_config = _get_cpu_config()
                 codec = TARGET_CODEC
             else:
-                codec = moviepy_config.effective_codec if moviepy_config.is_gpu_accelerated else TARGET_CODEC
+                codec = (
+                    moviepy_config.effective_codec
+                    if moviepy_config.is_gpu_accelerated
+                    else TARGET_CODEC
+                )
 
             clip.write_videofile(
                 temp_path,
                 codec=codec,
-                audio_codec='aac',
+                audio_codec="aac",
                 fps=STANDARD_FPS,
-                preset='fast',
+                preset="fast",
                 logger=None,
                 ffmpeg_params=_moviepy_params(
                     config=moviepy_config,
-                    preset='fast',
+                    preset="fast",
                     target_profile=TARGET_PROFILE,
                     target_level=TARGET_LEVEL,
                     target_pix_fmt=TARGET_PIX_FMT,
-                )
+                ),
             )
-            
+
             # Close MoviePy clip to free memory
             try:
                 clip.close()
             except Exception:
                 pass  # Ignore cleanup errors during memory release
-            
+
             # Add the file path
             return self.add_clip_path(temp_path)
-            
+
         except Exception as e:
             logger.error(f"   ❌ Failed to render clip: {e}")
             return None
-    
+
     def flush_batch(self) -> Optional[SegmentInfo]:
         """
         Write current batch as a segment using FFmpeg.
-        
+
         Uses xfade for real crossfades if enabled, otherwise concat demuxer.
-        
+
         Returns:
             SegmentInfo if successful
         """
         if not self.current_batch_paths:
             return None
-        
+
         if self.memory_manager:
-            self.memory_manager.print_memory_status(f"   [Segment {self.current_batch_index}] Before flush: ")
-        
+            self.memory_manager.print_memory_status(
+                f"   [Segment {self.current_batch_index}] Before flush: "
+            )
+
         # Normalize clips if enabled (ensures stream compatibility)
         if self.normalize_clips and len(self.current_batch_paths) > 1:
             self._normalize_batch_clips()
-        
+
         # Choose method based on xfade setting
         if self.enable_xfade:
             # Use xfade for real crossfade transitions (requires re-encoding)
             segment = self.segment_writer.write_segment_with_xfade(
                 self.current_batch_paths,
                 self.current_batch_index,
-                xfade_duration=self.xfade_duration
+                xfade_duration=self.xfade_duration,
             )
         else:
             # Use concat demuxer (no re-encoding, fast)
             segment = self.segment_writer.write_segment_ffmpeg(
-                self.current_batch_paths,
-                self.current_batch_index
+                self.current_batch_paths, self.current_batch_index
             )
-        
+
         # Clear batch paths
         self.current_batch_paths = []
         self.current_batch_index += 1
-        
+
         # Trigger garbage collection
         import gc
+
         gc.collect()
-        
+
         if self.memory_manager:
             self.memory_manager.trigger_cleanup(force=True)
-            self.memory_manager.print_memory_status(f"   [Segment {self.current_batch_index-1}] After flush:  ")
-        
+            self.memory_manager.print_memory_status(
+                f"   [Segment {self.current_batch_index - 1}] After flush:  "
+            )
+
         return segment
-    
+
     def _normalize_batch_clips(self) -> None:
         """
         Normalize all clips in current batch to ensure stream compatibility.
@@ -2000,7 +2255,9 @@ class ProgressiveRenderer:
         Only called when NORMALIZE_CLIPS is enabled. Converts clips to
         standard fps/pix_fmt/profile/dimensions for concat demuxer compatibility.
         """
-        logger.info(f"   🔄 Normalizing {len(self.current_batch_paths)} clips for compatibility...")
+        logger.info(
+            f"   🔄 Normalizing {len(self.current_batch_paths)} clips for compatibility..."
+        )
 
         normalized_paths = []
         for clip_path in self.current_batch_paths:
@@ -2008,23 +2265,23 @@ class ProgressiveRenderer:
             params = ffprobe_stream_params(clip_path)
 
             needs_normalize = (
-                params is None or
-                abs(params.fps - self.target_fps) >= 0.1 or
-                params.pix_fmt != STANDARD_PIX_FMT or
-                params.width != self.target_width or
-                params.height != self.target_height
+                params is None
+                or abs(params.fps - self.target_fps) >= 0.1
+                or params.pix_fmt != STANDARD_PIX_FMT
+                or params.width != self.target_width
+                or params.height != self.target_height
             )
 
             if needs_normalize:
                 # Create normalized version
-                normalized_path = clip_path.replace('.mp4', '_norm.mp4')
+                normalized_path = clip_path.replace(".mp4", "_norm.mp4")
                 success = normalize_clip_ffmpeg(
                     clip_path,
                     normalized_path,
                     target_width=self.target_width,
                     target_height=self.target_height,
                     target_fps=self.target_fps,
-                    crf=self.segment_writer.ffmpeg_crf
+                    crf=self.segment_writer.ffmpeg_crf,
                 )
 
                 if success:
@@ -2042,30 +2299,33 @@ class ProgressiveRenderer:
 
         self.current_batch_paths = normalized_paths
         logger.info(f"   ✅ Normalization complete")
-    
-    def finalize(self, 
-                 output_path: str,
-                 audio_path: Optional[str] = None,
-                 audio_duration: Optional[float] = None,
-                 logo_path: Optional[str] = None) -> bool:
+
+    def finalize(
+        self,
+        output_path: str,
+        audio_path: Optional[str] = None,
+        audio_duration: Optional[float] = None,
+        logo_path: Optional[str] = None,
+    ) -> bool:
         """
         Finalize rendering - write remaining batch and concatenate.
-        
+
         Uses FFmpeg for final concatenation with audio mixing.
         Optionally adds logo overlay as second pass.
-        
+
         Args:
             output_path: Final output video path
             audio_path: Optional audio track to mix
             audio_duration: Duration to trim audio to (if different from video)
             logo_path: Optional logo image for branding overlay
-            
+
         Returns:
             True if successful
         """
         import time
+
         self.finalize_start_time = time.time()
-        
+
         # Flush any remaining clips
         if self.current_batch_paths:
             self.flush_batch()
@@ -2075,32 +2335,32 @@ class ProgressiveRenderer:
             output_path,
             audio_path=audio_path,
             audio_duration=audio_duration,
-            logo_path=logo_path
+            logo_path=logo_path,
         )
-        
+
         self.finalize_duration = time.time() - self.finalize_start_time
         return success
-    
+
     def get_finalize_duration(self) -> float:
         """Get duration of finalize() call in seconds."""
-        return getattr(self, 'finalize_duration', 0.0)
-    
+        return getattr(self, "finalize_duration", 0.0)
+
     def get_segment_count(self) -> int:
         """Get number of segments written so far."""
         return len(self.segment_writer.segments)
-    
+
     def get_total_clips(self) -> int:
         """Get total number of clips processed."""
         return self.segment_writer.stats.total_clips + len(self.current_batch_paths)
-    
+
     def get_stats(self) -> Dict:
         """Get rendering statistics."""
         stats = self.segment_writer.get_stats()
-        stats['batch_size'] = self.batch_size
-        stats['pending_clips'] = len(self.current_batch_paths)
-        stats['job_id'] = self.job_id
+        stats["batch_size"] = self.batch_size
+        stats["pending_clips"] = len(self.current_batch_paths)
+        stats["job_id"] = self.job_id
         return stats
-    
+
     def cleanup(self) -> None:
         """Clean up all temporary files."""
         self.segment_writer.cleanup_all()

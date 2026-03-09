@@ -26,10 +26,14 @@ from typing import Optional, List, Tuple
 from pathlib import Path
 
 from .ffmpeg_utils import build_ffmpeg_cmd, build_ffprobe_cmd
+from .ffmpeg_config import STANDARD_CRF, STANDARD_PRESET
+from .logger import logger
+
 
 @dataclass
 class ColorProfile:
     """Color characteristics of a video clip."""
+
     avg_brightness: float = 0.5
     avg_saturation: float = 0.5
     contrast: float = 1.0
@@ -39,6 +43,7 @@ class ColorProfile:
 @dataclass
 class HarmonizerConfig:
     """Configuration for color harmonization."""
+
     # Histogram matching strength (0.0-1.0)
     match_strength: float = 0.7
 
@@ -103,32 +108,37 @@ class ColorHarmonizer:
         if not filters:
             # No processing needed, just copy
             import shutil
+
             shutil.copy(input_path, output_path)
             return True
 
         filter_chain = ",".join(filters)
 
-        cmd = build_ffmpeg_cmd([
-            "-i", input_path,
-            "-vf", filter_chain,
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "18",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "copy",
-            output_path
-        ])
+        cmd = build_ffmpeg_cmd(
+            [
+                "-i",
+                input_path,
+                "-vf",
+                filter_chain,
+                "-c:v",
+                "libx264",
+                "-preset",
+                STANDARD_PRESET,
+                "-crf",
+                str(STANDARD_CRF),
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "copy",
+                output_path,
+            ]
+        )
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             return result.returncode == 0
         except (subprocess.TimeoutExpired, Exception) as e:
-            print(f"   ⚠️ Color harmonization failed: {e}")
+            logger.warning(f"Color harmonization failed: {e}")
             return False
 
     def _build_filter_chain(self, reference_path: Optional[str] = None) -> List[str]:
@@ -152,8 +162,8 @@ class ColorHarmonizer:
         if cfg.broadcast_safe:
             # Scale from full range to broadcast range
             filters.append(
-                f"colorlevels=rimin={cfg.black_level/255}:gimin={cfg.black_level/255}:bimin={cfg.black_level/255}:"
-                f"rimax={cfg.white_level/255}:gimax={cfg.white_level/255}:bimax={cfg.white_level/255}"
+                f"colorlevels=rimin={cfg.black_level / 255}:gimin={cfg.black_level / 255}:bimin={cfg.black_level / 255}:"
+                f"rimax={cfg.white_level / 255}:gimax={cfg.white_level / 255}:bimax={cfg.white_level / 255}"
             )
 
         # 3. Contrast adjustment
@@ -197,20 +207,21 @@ class ColorHarmonizer:
         # Extract first frame and analyze
         try:
             # Use signalstats filter for video analysis
-            cmd = build_ffprobe_cmd([
-                "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=avg_frame_rate",
-                "-of", "csv=p=0",
-                video_path
-            ])
-
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
+            cmd = build_ffprobe_cmd(
+                [
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-show_entries",
+                    "stream=avg_frame_rate",
+                    "-of",
+                    "csv=p=0",
+                    video_path,
+                ]
             )
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
             # Basic profile (could be extended with histogram analysis)
             return ColorProfile()
@@ -223,7 +234,7 @@ class ColorHarmonizer:
         source_path: str,
         reference_path: str,
         output_path: str,
-        strength: float = 0.7
+        strength: float = 0.7,
     ) -> bool:
         """
         Create a color-matched version of source to match reference.
@@ -247,30 +258,34 @@ class ColorHarmonizer:
             # Normalize (auto-levels)
             "normalize=blackpt=black:whitept=white:smoothing=10",
             # Apply broadcast safe
-            f"colorlevels=rimin={16/255}:gimin={16/255}:bimin={16/255}:"
-            f"rimax={235/255}:gimax={235/255}:bimax={235/255}",
+            f"colorlevels=rimin={16 / 255}:gimin={16 / 255}:bimin={16 / 255}:"
+            f"rimax={235 / 255}:gimax={235 / 255}:bimax={235 / 255}",
         ]
 
         filter_chain = ",".join(filters)
 
-        cmd = build_ffmpeg_cmd([
-            "-i", source_path,
-            "-vf", filter_chain,
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "18",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "copy",
-            output_path
-        ])
+        cmd = build_ffmpeg_cmd(
+            [
+                "-i",
+                source_path,
+                "-vf",
+                filter_chain,
+                "-c:v",
+                "libx264",
+                "-preset",
+                STANDARD_PRESET,
+                "-crf",
+                str(STANDARD_CRF),
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "copy",
+                output_path,
+            ]
+        )
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             return result.returncode == 0
         except Exception:
             return False
@@ -280,7 +295,7 @@ def harmonize_clips_batch(
     clips: List[str],
     output_dir: str,
     config: Optional[HarmonizerConfig] = None,
-    reference_clip: Optional[str] = None
+    reference_clip: Optional[str] = None,
 ) -> List[str]:
     """
     Batch harmonize multiple clips for consistent look.
@@ -304,9 +319,7 @@ def harmonize_clips_batch(
         output_path = os.path.join(output_dir, output_name)
 
         success = harmonizer.harmonize_clip(
-            clip,
-            output_path,
-            reference_path=reference_clip
+            clip, output_path, reference_path=reference_clip
         )
 
         if success:

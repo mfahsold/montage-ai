@@ -20,10 +20,11 @@ from .utils import get_video_duration
 
 logger = logging.getLogger(__name__)
 
+
 class ProxyGenerator:
     """
     Manages generation of video proxies for performance optimization.
-    
+
     Strategy:
     1. Check if proxy exists.
     2. detailed probing of source (resolution, codec).
@@ -31,29 +32,34 @@ class ProxyGenerator:
     4. Generate using HW acceleration.
     """
 
-    def __init__(self, proxy_dir: Union[str, Path], config: Optional[FFmpegConfig] = None):
+    def __init__(
+        self, proxy_dir: Union[str, Path], config: Optional[FFmpegConfig] = None
+    ):
         self.proxy_dir = Path(proxy_dir)
         self.config = config or FFmpegConfig(hwaccel="auto")
         self.proxy_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_proxy_path(self, source_path: Union[str, Path], format: str = "h264") -> Path:
+    def get_proxy_path(
+        self, source_path: Union[str, Path], format: str = "h264"
+    ) -> Path:
         """Get the expected path for a proxy file."""
         source = Path(source_path)
-        ext_map = {
-            "h264": ".mp4",
-            "prores": ".mov",
-            "dnxhr": ".mov"
-        }
+        ext_map = {"h264": ".mp4", "prores": ".mov", "dnxhr": ".mov"}
         ext = ext_map.get(format, ".mp4")
         # Unique mapping: filename_projection.mp4
         # We use a simple strategy: proxy_{stem}.mp4
         return self.proxy_dir / f"proxy_{source.stem}{ext}"
 
-    def generate(self, source_path: Union[str, Path], output_path: Union[str, Path], format: str = "h264") -> bool:
+    def generate(
+        self,
+        source_path: Union[str, Path],
+        output_path: Union[str, Path],
+        format: str = "h264",
+    ) -> bool:
         """Generate a proxy file using ffmpeg."""
         from .ffmpeg_utils import build_ffmpeg_cmd
         from .core.cmd_runner import run_command
-        
+
         # Determine codec settings
         if format == "prores":
             v_codec = ["-c:v", "prores_ks", "-profile:v", "proxy"]
@@ -64,16 +70,22 @@ class ProxyGenerator:
         else:
             # H.264 (Default)
             # Use 720p or 540p for proxies
-            v_codec = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-vf", "scale=-2:720"]
+            v_codec = [
+                "-c:v",
+                "libx264",
+                "-preset",
+                PROXY_PRESET,
+                "-crf",
+                str(PROXY_CRF),
+                "-vf",
+                "scale=-2:720",
+            ]
             a_codec = ["-c:a", "aac", "-b:a", "128k"]
-            
-        cmd = build_ffmpeg_cmd([
-            "-i", str(source_path),
-            *v_codec,
-            *a_codec,
-            str(output_path)
-        ])
-        
+
+        cmd = build_ffmpeg_cmd(
+            ["-i", str(source_path), *v_codec, *a_codec, str(output_path)]
+        )
+
         try:
             run_command(cmd)
             return True
@@ -81,7 +93,9 @@ class ProxyGenerator:
             logger.error(f"Proxy generation failed: {e}")
             raise
 
-    def ensure_proxy(self, source_path: Union[str, Path], format: str = "h264", force: bool = False) -> Optional[Path]:
+    def ensure_proxy(
+        self, source_path: Union[str, Path], format: str = "h264", force: bool = False
+    ) -> Optional[Path]:
         """Ensure a proxy exists for the given source file (with TTL + cache checks).
 
         Behavior:
@@ -95,6 +109,7 @@ class ProxyGenerator:
         # Try to read cache policy from settings (fall back to safe defaults)
         try:
             from .config import get_settings
+
             settings = get_settings()
             ttl = int(settings.proxy.proxy_cache_ttl_seconds)
             max_bytes = int(settings.proxy.proxy_cache_max_bytes)
@@ -112,18 +127,33 @@ class ProxyGenerator:
                 proxy_size = proxy_path.stat().st_size
 
                 # TTL check
-                if (time.time() - proxy_mtime) <= ttl and proxy_mtime >= src_mtime and proxy_size > 0:
+                if (
+                    (time.time() - proxy_mtime) <= ttl
+                    and proxy_mtime >= src_mtime
+                    and proxy_size > 0
+                ):
                     logger.debug(f"Proxy cache hit: {proxy_path}")
                     try:
                         from montage_ai import telemetry
-                        telemetry.record_event("proxy_cache_hit", {"file": proxy_path.name, "size": proxy_size})
+
+                        telemetry.record_event(
+                            "proxy_cache_hit",
+                            {"file": proxy_path.name, "size": proxy_size},
+                        )
                     except Exception:
                         pass
                     return proxy_path
                 else:
                     try:
                         from montage_ai import telemetry
-                        telemetry.record_event("proxy_cache_miss", {"file": proxy_path.name, "age_s": int(time.time() - proxy_mtime)})
+
+                        telemetry.record_event(
+                            "proxy_cache_miss",
+                            {
+                                "file": proxy_path.name,
+                                "age_s": int(time.time() - proxy_mtime),
+                            },
+                        )
                     except Exception:
                         pass
         except OSError:
@@ -144,7 +174,11 @@ class ProxyGenerator:
             # Emit telemetry and enforce cache limits after successful creation
             try:
                 from montage_ai import telemetry
-                telemetry.record_event("proxy_generation", {"file": proxy_path.name, "size": proxy_path.stat().st_size})
+
+                telemetry.record_event(
+                    "proxy_generation",
+                    {"file": proxy_path.name, "size": proxy_path.stat().st_size},
+                )
             except Exception:
                 pass
 
@@ -161,10 +195,10 @@ class ProxyGenerator:
     def _generate(self, source: Path, output: Path, format: str) -> Path:
         """Internal generation logic with FFmpeg."""
         logger.info(f"Generating proxy [{format}]: {source.name} -> {output.name}")
-        
+
         # 1. Build Command
         cmd = ["ffmpeg", "-y"]
-        
+
         # Input options (HW decode if available)
         cmd.extend(self.config.hwaccel_input_params())
         cmd.extend(["-i", str(source)])
@@ -179,37 +213,49 @@ class ProxyGenerator:
             # ProRes Proxy (profile 0)
             # Scale to 960x540 (qscale -1 maintains aspect ratio)
             # ProRes needs pcm audio
-            cmd.extend([
-                "-c:v", "prores_ks",
-                "-profile:v", "0",
-                "-vf", "scale=-2:540",
-                "-c:a", "pcm_s16le"
-            ])
+            cmd.extend(
+                [
+                    "-c:v",
+                    "prores_ks",
+                    "-profile:v",
+                    "0",
+                    "-vf",
+                    "scale=-2:540",
+                    "-c:a",
+                    "pcm_s16le",
+                ]
+            )
             # ProRes doesn't use GOP settings like H.264
-            
+
         elif format == "dnxhr":
             # DNxHR LB (Low Bandwidth)
-            cmd.extend([
-                "-c:v", "dnxhd",
-                "-profile:v", "dnxhr_lb",
-                "-vf", "scale=-2:540,format=yuv422p",
-                "-c:a", "pcm_s16le"
-            ])
-            
+            cmd.extend(
+                [
+                    "-c:v",
+                    "dnxhd",
+                    "-profile:v",
+                    "dnxhr_lb",
+                    "-vf",
+                    "scale=-2:540,format=yuv422p",
+                    "-c:a",
+                    "pcm_s16le",
+                ]
+            )
+
         else:
             # SOTA: H.264 540p or 720p, Fixed GOP for scrubbing performance
             # Standard H.264 (Default)
-            
+
             # Audio: AAC for MP4
             cmd.extend(["-c:a", "aac", "-b:a", "128k"])
 
             # Resolution: Scale to 540p height, maintain aspect ratio
             vf_chain = ["scale=-2:540"]
-            
+
             # HW Upload if needed (for VAAPI/QSV pipeline)
             hw_filter = self.config.hwupload_filter
             # Simplified: relying on SW scaling if filters complex
-            
+
             cmd.extend(["-vf", ",".join(vf_chain)])
 
             # GOP size optimization for scrubbing (FRAME.IO Keyframe Interval)
@@ -220,29 +266,25 @@ class ProxyGenerator:
             # We request "fast" preset and higher CRF (lower quality) for proxies
             # Proxy Quality: CRF 28 (Visual OK, small size)
             base_video_params = self.config.video_params(
-                crf=26, 
-                preset="fast"
+                crf=26,
+                preset="fast",
                 # We don't override codec here, we let config choose best H.264 encoder
             )
             cmd.extend(base_video_params)
 
-        
         # Timecode Passthrough (CRITICAL for NLE Relinking)
         cmd.extend(["-map_metadata", "0", "-write_tmcd", "1"])
-        
+
         # Output
         cmd.append(str(output))
 
         # 2. Execute
         with subprocess.Popen(
-            cmd, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE,
-            universal_newlines=True
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
         ) as proc:
             # We can parse progress here if we want
             stdout, stderr = proc.communicate()
-            
+
             if proc.returncode != 0:
                 raise RuntimeError(f"FFmpeg exited with {proc.returncode}:\n{stderr}")
 
@@ -294,11 +336,17 @@ class ProxyGenerator:
         if removed:
             try:
                 from montage_ai import telemetry
-                telemetry.record_event("proxy_cache_evicted", {"files_removed": removed, "bytes_freed": freed})
+
+                telemetry.record_event(
+                    "proxy_cache_evicted",
+                    {"files_removed": removed, "bytes_freed": freed},
+                )
             except Exception:
                 pass
 
-    def ensure_analysis_proxy(self, source_path: Union[str, Path], height: int = 360, force: bool = False) -> Optional[Path]:
+    def ensure_analysis_proxy(
+        self, source_path: Union[str, Path], height: int = 360, force: bool = False
+    ) -> Optional[Path]:
         """Ensure a small analysis proxy exists (cached) and return its path.
 
         This is a convenience wrapper around `generate_analysis_proxy` that uses
@@ -309,6 +357,7 @@ class ProxyGenerator:
 
         try:
             from .config import get_settings
+
             cache_enabled = bool(get_settings().proxy.cache_proxies)
         except Exception:
             cache_enabled = True
@@ -324,13 +373,17 @@ class ProxyGenerator:
                     if out.stat().st_size > 0:
                         try:
                             from .config import get_settings
+
                             ttl = int(get_settings().proxy.proxy_cache_ttl_seconds)
                         except Exception:
                             ttl = 86400
                         if (time.time() - out.stat().st_mtime) <= ttl:
                             try:
                                 from montage_ai import telemetry
-                                telemetry.record_event("analysis_proxy_reuse", {"file": out.name})
+
+                                telemetry.record_event(
+                                    "analysis_proxy_reuse", {"file": out.name}
+                                )
                             except Exception:
                                 pass
                             return out
@@ -344,6 +397,7 @@ class ProxyGenerator:
             lock_timeout = None
             try:
                 from .config import get_settings
+
                 lock_timeout = int(get_settings().proxy.proxy_lock_timeout_seconds)
             except Exception:
                 lock_timeout = 900
@@ -362,7 +416,10 @@ class ProxyGenerator:
             self.generate_analysis_proxy(str(src), str(out), height=height)
             try:
                 from montage_ai import telemetry
-                telemetry.record_event("analysis_proxy_created", {"file": out.name, "height": height})
+
+                telemetry.record_event(
+                    "analysis_proxy_created", {"file": out.name, "height": height}
+                )
             except Exception:
                 pass
             return out
@@ -406,7 +463,9 @@ class ProxyGenerator:
             pass
 
     @staticmethod
-    def generate_analysis_proxy(source_path: str, output_path: str, height: int = 720) -> bool:
+    def generate_analysis_proxy(
+        source_path: str, output_path: str, height: int = 720
+    ) -> bool:
         """
         Generate a lightweight proxy for fast analysis (scene detection, feature extraction).
 
@@ -416,7 +475,7 @@ class ProxyGenerator:
         - Cap proxy-generation timeout for preview workloads to avoid long hangs.
         """
         import subprocess
-        from .ffmpeg_config import FFmpegConfig
+        from .ffmpeg_config import FFmpegConfig, PROXY_PRESET, PROXY_CRF
         from .config import get_settings
         from pathlib import Path
 
@@ -453,22 +512,37 @@ class ProxyGenerator:
         tmp_output = output.with_name(f"{output.stem}.tmp.{os.getpid()}{output.suffix}")
         cmd.append(str(tmp_output))
 
-        logger.info("Generating analysis proxy: %sp (%s -> %s) using %s", height, src.name, Path(output_path).name, config.effective_codec)
+        logger.info(
+            "Generating analysis proxy: %sp (%s -> %s) using %s",
+            height,
+            src.name,
+            Path(output_path).name,
+            config.effective_codec,
+        )
 
         # Respect configured timeout but bound it for preview so SLOs aren't blocked
         settings = get_settings()
         timeout = int(settings.analysis.proxy_generation_timeout_seconds)
         try:
             if getattr(settings.encoding, "quality_profile", "") == "preview":
-                timeout = min(timeout, int(getattr(settings.processing, "preview_job_timeout", 120)))
+                timeout = min(
+                    timeout,
+                    int(getattr(settings.processing, "preview_job_timeout", 120)),
+                )
         except Exception:
             # best-effort; keep configured timeout
             pass
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout
+            )
             if result.returncode != 0:
-                logger.error("Proxy generation failed (rc=%s): %s", result.returncode, (result.stderr or "").strip()[:512])
+                logger.error(
+                    "Proxy generation failed (rc=%s): %s",
+                    result.returncode,
+                    (result.stderr or "").strip()[:512],
+                )
                 raise RuntimeError(f"FFmpeg failed: rc={result.returncode}")
             try:
                 tmp_output.replace(output)
