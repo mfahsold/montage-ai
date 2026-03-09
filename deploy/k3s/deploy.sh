@@ -158,6 +158,39 @@ else
   echo "  See: docs/operations/rollback.md"
 fi
 
+wait_for_deployment_if_scaled() {
+  local deploy_name="$1"
+  local timeout_seconds="$2"
+
+  if ! kubectl get deployment "${deploy_name}" -n "${CLUSTER_NAMESPACE}" >/dev/null 2>&1; then
+    echo "ℹ️  Deployment ${deploy_name} not found; skipping wait"
+    return 0
+  fi
+
+  local desired
+  desired="$(kubectl get deployment "${deploy_name}" -n "${CLUSTER_NAMESPACE}" -o jsonpath='{.spec.replicas}')"
+  if [ -z "${desired}" ]; then
+    desired="1"
+  fi
+
+  if [ "${desired}" = "0" ]; then
+    echo "ℹ️  Deployment ${deploy_name} scaled to 0; skipping wait"
+    return 0
+  fi
+
+  echo "Waiting for deployment/${deploy_name} (${desired} replicas)..."
+  if kubectl wait --for=condition=available --timeout="${timeout_seconds}" deployment/"${deploy_name}" -n "${CLUSTER_NAMESPACE}" >/dev/null 2>&1; then
+    echo "✅ deployment/${deploy_name} available"
+  else
+    echo "⚠️  deployment/${deploy_name} not available within ${timeout_seconds}"
+    kubectl get deployment "${deploy_name}" -n "${CLUSTER_NAMESPACE}" || true
+  fi
+}
+
+wait_for_deployment_if_scaled "montage-ai-worker" "300s"
+wait_for_deployment_if_scaled "redis" "180s"
+wait_for_deployment_if_scaled "cgpu-server" "180s"
+
 echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "✅ Manifests Applied!"

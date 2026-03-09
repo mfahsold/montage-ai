@@ -1,0 +1,90 @@
+---
+# ServiceMonitor for Montage AI web metrics endpoint.
+# Requires Prometheus Operator CRDs in the cluster.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: montage-ai-web
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: montage-ai
+      app.kubernetes.io/component: web-ui
+  namespaceSelector:
+    matchNames:
+      - montage-ai
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+# Alerting rules for Montage AI operational SLOs and failure modes.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: montage-ai-alerts
+  namespace: montage-ai
+  labels:
+    app.kubernetes.io/name: montage-ai
+    app.kubernetes.io/component: observability
+spec:
+  groups:
+    - name: montage-ai-availability
+      interval: 30s
+      rules:
+        - alert: MontageAIWebUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="montage-ai",deployment="montage-ai-web"} < 1
+          for: 5m
+          labels:
+            severity: critical
+            component: montage-ai
+          annotations:
+            summary: "Montage AI web deployment unavailable"
+            description: "No available replicas for deployment montage-ai-web in namespace montage-ai for 5 minutes."
+
+        - alert: MontageAIWorkerCrashLoop
+          expr: sum(increase(kube_pod_container_status_restarts_total{namespace="montage-ai",container="worker",pod=~"montage-ai-worker-.*"}[10m])) > 3
+          for: 10m
+          labels:
+            severity: warning
+            component: montage-ai
+          annotations:
+            summary: "Montage AI worker restart storm"
+            description: "Worker containers restarted more than 3 times over the last 10 minutes."
+
+        - alert: MontageAIPVCUsageHigh
+          expr: kubelet_volume_stats_used_bytes{namespace="montage-ai",persistentvolumeclaim=~"montage-ai-.*|montage-(input|output|music|assets|cache).*"} / kubelet_volume_stats_capacity_bytes{namespace="montage-ai",persistentvolumeclaim=~"montage-ai-.*|montage-(input|output|music|assets|cache).*"} > 0.85
+          for: 15m
+          labels:
+            severity: warning
+            component: montage-ai
+          annotations:
+            summary: "Montage AI PVC usage above 85%"
+            description: "A Montage AI PVC is above 85% capacity for at least 15 minutes."
+
+        - alert: MontageAIPreviewP95SLOBreach
+          expr: histogram_quantile(0.95, sum(rate(montage_time_to_preview_seconds_bucket[10m])) by (le)) > 30
+          for: 10m
+          labels:
+            severity: warning
+            component: montage-ai
+            slo: preview
+          annotations:
+            summary: "Montage AI preview p95 SLO breach"
+            description: "Preview p95 is above 30 seconds for 10 minutes."
+
+        - alert: MontageAIProxyCacheHitRateLow
+          expr: montage_proxy_cache_hit_rate < 0.70
+          for: 15m
+          labels:
+            severity: warning
+            component: montage-ai
+            slo: preview
+          annotations:
+            summary: "Montage AI proxy cache hit rate below target"
+            description: "Proxy cache hit rate is below 70% for 15 minutes."

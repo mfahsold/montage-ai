@@ -369,6 +369,129 @@ See your cloud provider's documentation for RWX StorageClass configuration.
 
 ---
 
+## Infrastructure Requirements
+
+### Node Pool Architecture
+
+Montage AI requires a multi-pool cluster architecture to separate control plane, web/API, and compute workloads:
+
+| Node Pool | Purpose | Workload | Taints/Tolerations |
+|-----------|---------|----------|-------------------|
+| **control** | Control plane, system workloads | Kubernetes control plane, etcd | No user workloads |
+| **web** | Web UI, API Gateway | Flask web UI, Ingress controllers | None |
+| **cpu-worker** | CPU-intensive rendering | FFmpeg encoding, audio analysis | `workload=cpu:NoSchedule` |
+| **gpu-worker** | GPU-accelerated tasks | NVENC encoding, ML inference | `gpu=true:NoSchedule` |
+
+**Example node labels:**
+```bash
+# CPU workers
+kubectl label node <node-name> node-role.kubernetes.io/worker-cpu=""
+
+# GPU workers
+kubectl label node <node-name> node-role.kubernetes.io/worker-gpu=""
+kubectl taint node <node-name> gpu=true:NoSchedule
+```
+
+### GPU Support
+
+For GPU-accelerated encoding (NVENC, VAAPI, QSV):
+
+1. **NVIDIA GPUs:** Install NVIDIA Device Plugin
+   ```bash
+   helm repo add nvidia https://nvidia.github.io/k8s-device-plugin
+   helm install nvidia-device-plugin nvidia/k8s-device-plugin
+   ```
+
+2. **Intel GPUs:** Install Intel Device Plugin
+   ```bash
+   kubectl apply -k 'https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/gpu_plugin?ref=v0.29.0'
+   ```
+
+3. **Verify GPU availability:**
+   ```bash
+   kubectl get nodes -o yaml | grep nvidia.com/gpu
+   # or
+   kubectl get resource -n <namespace>
+   ```
+
+### Storage Architecture
+
+**Two-tier storage model:**
+
+| Tier | Type | Use Case | Lifecycle |
+|------|------|----------|-----------|
+| **Persistent** | RWX PVC (NFS/Longhorn/EFS) | Input footage, music, final output | Survives pod restarts |
+| **Ephemeral** | emptyDir | Temporary segments, cache, scratch | Pod-scoped, auto-cleanup |
+
+**PVC Requirements:**
+- `montage-ai-input`: Source footage (ReadWriteMany)
+- `montage-ai-output`: Rendered videos (ReadWriteMany)
+- `montage-ai-music`: Music library (ReadWriteMany)
+- `montage-ai-assets`: Style templates, logos (ReadWriteMany)
+
+**Storage Performance:**
+- Minimum IOPS: 3000 (input), 5000 (output)
+- Sequential write: >200 MB/s for output PVC
+- Latency: <10ms for metadata operations
+
+### Secret Management
+
+**Required Secrets:**
+```yaml
+# API keys for external services
+apiVersion: v1
+kind: Secret
+metadata:
+  name: montage-ai-secrets
+stringData:
+  LITELLM_API_KEY: "sk-..."
+  CGPU_CREDENTIALS: '{"refresh_token": "..."}'
+```
+
+**Never commit secrets to git.** Use:
+- External secret operators (Vault, AWS Secrets Manager)
+- Sealed Secrets
+- Manual secret creation pre-deployment
+
+### Observability Stack
+
+**Required monitoring:**
+- **Logs:** Centralized logging (ELK, Loki, or cloud provider)
+- **Metrics:** Prometheus + Grafana
+- **Alerts:** PodNotReady, CrashLoopBackOff, StorageFull, GPU unavailable
+
+**Key metrics to track:**
+```
+- Render job duration (histogram)
+- Queue depth (gauge)
+- GPU utilization (nvidia-smi metrics)
+- Storage capacity (% used)
+- Error rate (% failed jobs)
+```
+
+**Canonical manifests:**
+- `deploy/k3s/base/monitoring.yaml` (ServiceMonitor + PrometheusRule)
+- `deploy/grafana/dashboards/preview_slo.json` (preview SLO dashboard)
+
+### Network Security
+
+**NetworkPolicies required:**
+- Default deny all ingress/egress
+- Allow web → API (port 8080)
+- Allow workers → Redis (port 6379)
+- Allow workers → storage (NFS ports)
+- Allow egress to registry only
+
+**Canonical manifest:**
+- `deploy/k3s/base/network-policy.yaml`
+- Must not include permissive `allow-all` policy in production.
+
+**TLS:**
+- Ingress with TLS termination
+- Internal mTLS via service mesh (optional)
+
+---
+
 ## Advanced
 
 For advanced topics (multi-arch builds, custom overlays, KEDA autoscaling, distributed rendering), see [deploy/k3s/README.md](../deploy/k3s/README.md).

@@ -235,6 +235,8 @@ deploy/k3s/
 │   ├── deployment.yaml      # Web UI deployment
 │   ├── worker.yaml          # Queue workers (single adaptive tier)
 │   ├── pvc.yaml             # Storage claims (RWX-friendly)
+│   ├── network-policy.yaml  # Default-deny + explicit ingress/egress allows
+│   ├── monitoring.yaml      # ServiceMonitor + PrometheusRule
 │   └── kustomization.yaml   # Base kustomization
 └── overlays/
     ├── cluster/             # Canonical cluster overlay

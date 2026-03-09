@@ -13,6 +13,7 @@ resources:
   - pvc.yaml
   - resourcequota.yaml
   - network-policy.yaml
+  - monitoring.yaml
   - pdb.yaml
 
 # =============================================================================
@@ -279,3 +280,13 @@ replacements:
           name: montage-ai-worker
         fieldPaths:
           - spec.template.spec.containers.[name=worker].resources.limits.memory
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.CGPU_REPLICAS
+    targets:
+      - select:
+          kind: Deployment
+          name: cgpu-server
+        fieldPaths:
+          - spec.replicas

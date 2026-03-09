@@ -13,7 +13,96 @@ This backlog reflects current industry and research signals for professional vid
 - **Production-grade stabilization + motion smoothing**
 - **Shot-boundary detection improvements (transformer-based)**
 - **Workflow automation & QC: consistency, legal/music clearance, technical checks**
+ ALLE INFRASTRUKTUR-AUFGABEN ERLEDIGT & GEPUSHT
 
+📊 COMMIT: 200947a
+
+Message: docs: add MoE cluster rollout checklist and externalize MoE configuration
+
+🎯 WAS WURDE IMPLEMENTIERT
+
+1. MoE Konfiguration Externalisiert ⚙️
+
+Neue MoEConfigSpec in config.py:
+
+# Alle Parameter via Environment Variables konfigurierbar:
+MOE_ENABLED=true              # Master switch
+MOE_HUMAN_REVIEW=true         # Human-in-the-loop
+MOE_AUTO_APPLY=true           # Auto-apply low-impact
+MOE_AUTO_THRESHOLD=0.8        # Confidence threshold
+MOE_TIMEOUT=30.0              # Execution timeout
+MOE_FALLBACK=true             # Fallback to classic
+MOE_WEIGHT_RHYTHM=1.2         # Expert weights
+MOE_WEIGHT_NARRATIVE=1.0
+MOE_WEIGHT_AUDIO=1.1
+Integration in MontageSettingsSpec:
+
+settings.moe.enabled           # Zugriff auf MoE Config
+settings.moe.execution_timeout # Timeout Wert
+2. Cluster Rollout Checkliste 📋
+
+Neue Datei: docs/operations/MOE_CLUSTER_ROLLOUT_CHECKLIST.md
+
+Enthält:
+
+✅ Pre-Flight Gates (5 kritische Checks)
+✅ Storage Requirements (RWX, Bootstrap)
+✅ Configuration Management (Alle Env-Vars)
+✅ MoE-Specific Requirements (Timeouts, Fallback, Human Review)
+✅ Standard Rollout Sequence (7 Schritte)
+✅ Go-Live Verification (SLOs, Metriken)
+✅ Rollback Readiness (Trigger, Commands)
+✅ Go/No-Go Criteria (Klare Entscheidungsmatrix)
+3. MoE Metriken & Monitoring 📊
+
+In der Checkliste dokumentiert:
+
+Expert execution count
+Conflict detection rate
+Auto-apply rate (> 60% target)
+Pending human review queue
+Timeout rate (< 10% threshold)
+Prometheus-Integration:
+
+# Alertmanager rules
+- High MoE timeout rate (> 10%)
+- High conflict rate (> 80% indicates misconfiguration)
+- Expert error rate
+4. Fallback-Path Dokumentiert ↩️
+
+In Checkliste:
+
+MOE_FALLBACK=true - Aktiviert Fallback
+Trigger: MoE errors, timeouts, exceptions
+Verhalten: Automatisch auf klassische Pipeline
+Tested: Rollback auf bekannte funktionierende Version
+🚀 VERWENDUNG
+
+Environment Setup:
+
+# MoE aktivieren
+export MOE_ENABLED=true
+export MOE_HUMAN_REVIEW=true
+export MOE_TIMEOUT=30.0
+
+# Expert Gewichtung anpassen
+export MOE_WEIGHT_RHYTHM=1.5  # Mehr Einfluss für Rhythmus
+export MOE_WEIGHT_NARRATIVE=0.8  # Weniger für Narrative
+Rollout:
+
+# Checkliste vor Deploy abarbeiten
+cat docs/operations/MOE_CLUSTER_ROLLOUT_CHECKLIST.md
+
+# Dann standard Deploy
+cd deploy/k3s
+make config pre-flight validate deploy-cluster
+✅ TESTS
+
+31/31 Tests passing:
+
+13 MoE Tests (Delta, State, 3 Experts, Control Plane, Integration)
+18 Config Tests (Paths, Features, LLM, MoE Config)
+Alles erfolgreich auf origin main gepusht! 🎉
 ## SWOT Update (Q1 2026, Critical)
 
 ### Strengths

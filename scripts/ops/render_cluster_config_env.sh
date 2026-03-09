@@ -51,7 +51,7 @@ fi
 : "${OPENAI_MODEL:=auto}"
 : "${OPENAI_VISION_MODEL:=}"
 : "${OLLAMA_HOST:=}"
-: "${CGPU_ENABLED:=}"
+: "${CGPU_ENABLED:=false}"
 : "${CGPU_GPU_ENABLED:=}"
 : "${CGPU_HOST:=}"
 : "${CGPU_PORT:=8080}"
@@ -61,6 +61,7 @@ fi
 : "${CGPU_STATUS_TIMEOUT:=30}"
 : "${CGPU_GPU_CHECK_TIMEOUT:=120}"
 : "${CGPU_OUTPUT_DIR:=}"
+: "${CGPU_REPLICAS:=}"
 : "${FORCE_CGPU_ENCODING:=}"
 : "${FINAL_ENCODE_BACKEND:=}"
 : "${FFMPEG_MCP_ENDPOINT:=}"
@@ -110,6 +111,18 @@ fi
 if [ -z "${FFMPEG_MCP_ENDPOINT:-}" ] && [ -n "${CLUSTER_NAMESPACE:-}" ]; then
   cluster_domain="${K3S_CLUSTER_DOMAIN:-${CLUSTER_DOMAIN:-cluster.local}}"
   FFMPEG_MCP_ENDPOINT="http://ffmpeg-mcp.${CLUSTER_NAMESPACE}.svc.${cluster_domain}:${FFMPEG_MCP_PORT}"
+fi
+
+# Optional cgpu deployment scale: default to 0 unless explicitly enabled.
+if [ -z "${CGPU_REPLICAS:-}" ]; then
+  case "$(echo "${CGPU_ENABLED:-false}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on)
+      CGPU_REPLICAS="1"
+      ;;
+    *)
+      CGPU_REPLICAS="0"
+      ;;
+  esac
 fi
 
 if [ -z "${CLUSTER_ALLOW_MIXED_ARCH:-}" ]; then
@@ -179,6 +192,7 @@ CGPU_MAX_CONCURRENCY=${CGPU_MAX_CONCURRENCY}
 CGPU_STATUS_TIMEOUT=${CGPU_STATUS_TIMEOUT}
 CGPU_GPU_CHECK_TIMEOUT=${CGPU_GPU_CHECK_TIMEOUT}
 CGPU_OUTPUT_DIR=${CGPU_OUTPUT_DIR}
+CGPU_REPLICAS=${CGPU_REPLICAS}
 FORCE_CGPU_ENCODING=${FORCE_CGPU_ENCODING}
 FINAL_ENCODE_BACKEND=${FINAL_ENCODE_BACKEND}
 FFMPEG_MCP_ENDPOINT=${FFMPEG_MCP_ENDPOINT}

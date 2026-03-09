@@ -4,6 +4,8 @@
 **Date:** 2026-03-09  
 **Purpose:** Pre-deployment validation for Montage AI clusters with MoE support
 
+**Canonical sign-off artifact:** [MOE_GO_LIVE_SIGNOFF.md](MOE_GO_LIVE_SIGNOFF.md)
+
 ---
 
 ## **Pre-Flight Gates** ✅
@@ -16,11 +18,28 @@ Before any deployment, verify these hard gates:
 - [ ] Registry/image accessible from all nodes
 - [ ] Image tag explicitly versioned (not `latest`)
 - [ ] Architecture match: Nodes match config (amd64/arm64)
+- [ ] **Node pools separated:** control, web, cpu-worker, gpu-worker pools exist
+- [ ] **GPU device plugin installed** (NVIDIA/Intel) and GPUs schedulable
+- [ ] **RWX StorageClass** available with sufficient IOPS (>3000)
+- [ ] **Registry pull secrets** configured for private registries
+- [ ] **Secrets created** (not in git): litellm-auth, cgpu-credentials
+- [ ] **NetworkPolicies** applied (default deny + explicit allows)
+- [ ] **Observability stack** ready: Prometheus, Grafana, central logging
 
 **Quick Check:**
 ```bash
 cd deploy/k3s
 make pre-flight
+
+# Verify node pools
+kubectl get nodes --label-columns=node-role.kubernetes.io/worker-cpu,node-role.kubernetes.io/worker-gpu
+
+# Verify GPU support
+kubectl get nodes -o yaml | grep -A5 "nvidia.com/gpu"
+
+# Verify storage
+kubectl get storageclass
+kubectl get pvc -n <namespace>
 ```
 
 ---
@@ -31,6 +50,9 @@ make pre-flight
 - [ ] RWX-capable StorageClass available (NFS/Longhorn/Ceph/EFS)
 - [ ] PVC strategy defined and documented
 - [ ] Storage backend health verified: `kubectl get sc,pvc -A`
+
+If existing cluster PVCs are still `RWO`, execute:
+- [RWX_PVC_MIGRATION_RUNBOOK.md](RWX_PVC_MIGRATION_RUNBOOK.md)
 
 ### Bootstrap Verification
 - [ ] `.ready` marker file created after first deployment
@@ -238,12 +260,7 @@ Set up within 24h of deployment:
 
 ## **Sign-Off** ✍️
 
-| Role | Name | Date | Signature |
-|------|------|------|-----------|
-| Deploy Engineer | | | |
-| QA Lead | | | |
-| SRE/Ops | | | |
-| Product Owner | | | |
+Record dated approvals and evidence in [MOE_GO_LIVE_SIGNOFF.md](MOE_GO_LIVE_SIGNOFF.md).
 
 ---
 
@@ -267,6 +284,40 @@ kubectl scale deploy/montage-ai-worker -n <namespace> --replicas=5
 kubectl scale deploy/montage-ai-web deploy/montage-ai-worker \
   -n <namespace> --replicas=0
 ```
+
+---
+
+## **Go-Live Abnahmekriterien** ✅
+
+Before production activation, verify:
+
+### Load Testing
+- [ ] Parallel render jobs (10+) complete successfully
+- [ ] Preview generation p95 < 30s under load
+- [ ] No OOM kills during 1h stress test
+- [ ] Storage I/O not saturated (<80% bandwidth)
+
+### Resilience Testing
+- [ ] Pod restart: Jobs resume without data loss
+- [ ] Node failure: Workload rescheduled within 60s
+- [ ] GPU node failure: Fallback to CPU encoding works
+- [ ] Storage failover: PVCs remain accessible
+
+### Recovery Testing
+- [ ] Output data recovery time < 5 minutes
+- [ ] Queue state recovery (Redis persistence)
+- [ ] Rollback tested: `kubectl rollout undo`
+
+### Observability Verification
+- [ ] Dashboards accessible: Grafana, Kibana/Loki
+- [ ] Alerts configured and tested:
+  - "Job hängt" (>10 min no progress)
+  - "GPU unavailable" (nvidia.com/gpu = 0 allocatable)
+  - "Storage saturated" (>85% PVC usage)
+  - "Error rate spike" (>5% failed jobs)
+
+**Sign-Off Required:**
+Use [MOE_GO_LIVE_SIGNOFF.md](MOE_GO_LIVE_SIGNOFF.md) as the single approval table (owner, status, evidence, date).
 
 ---
 
